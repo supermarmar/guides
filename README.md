@@ -15,7 +15,7 @@
 │
 ├── docs               <- Version-controlled guides, including executable examples and a bibliography
 │   ├── azure          <- An Azure specific guide with team standards on managing the repo
-│   ├── modelling      <- Training and reference guides for all CRM topics (e.g. IFRS 9, Basel 3.1)
+│   ├── modelling      <- Training and reference guides for all topics (e.g. IFRS 9, Basel 3.1)
 │   └── regulation     <- Latest regulation material for IFRS9, Basel 3.1, PRA etc.
 │
 ├── pyproject.toml     <- Project configuration file with package metadata for 
@@ -86,6 +86,7 @@ spacy
 
 # model interpretability
 lime
+shap
 
 # utility
 tqdm # Progress bars for loops and iterables.
@@ -95,29 +96,3 @@ typer # Build command-line interfaces easily.
 ipykernel # IPython kernel for Jupyter notebooks and interactive computing.
 papermill # Tool for parameterizing and executing Jupyter Notebooks.
 ```
-
-## Benefits of contributing to the library
-
-- **Enhanced Skills**: Working on real-world projects exposes you to diverse coding styles, problem-solving approaches, and cutting-edge technologies, enhancing your technical expertise.
-- **Knowledge Sharing**: Contributing fosters a culture of collaboration and knowledge exchange, benefiting both individual contributors and the wider team.
-- **Giving Back**: The library thrives on contributions. By participating, you contribute to solutions used by many.
-
-## Risks and considerations for consultants
-
-- **Client Confidentiality**: Protecting client data and intellectual property is paramount. Never copy code from client projects into open source repositories, and exercise extreme caution when implementing solutions inspired by open source projects for clients.
-- **Time Management**: Contributing requires dedicated time and effort. Ensure you balance contributions with client commitments and internal responsibilities.
-- **Code Quality and Licensing**: Adhere to the project's coding standards and licensing agreements. Ensure your contributions meet the required quality and legal standards.
-
-## Best Practices for Responsible Contribution
-
-- **Start Small**: Begin with contributions like bug fixes, documentation improvements, or adding unit tests to familiarise yourself with the project's work flow.
-- **Choose Projects Wisely**: Focus on projects relevant to your expertise in Credit Risk.
-- **Understand Project Guidelines**: Thoroughly review the project's contributing guidelines, and coding style.
-- **Communication is Key**: Engage with the project maintainers and community. Ask questions, seek clarification, and participate in discussions.
-- **Respect Intellectual Property**: Never copy code from clients or other sources.
-- **Seek Internal Guidance**: Consult with Rohan or Will if you have any questions.
-
-## Protecting Client Confidentiality
-
-- **Clean Room Approach**: When drawing inspiration from open source for client solutions, implement a "clean room" approach. This involves re-implementing the concept from scratch based on your understanding, ensuring no direct code copying.
-- **Code Reviews**: Implement rigorous code reviews within your team to identify and mitigate any potential risks of inadvertently including client-specific code in open source contributions.
