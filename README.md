@@ -1,12 +1,4 @@
-# UK CRM Credit Risk Library
-
-Welcome to the UK CRM Credit Risk Library. The purpose of this library is to create, review and maintain valuable code related to credit modelling engagements, for the benefit and continued development of team members.
-
-Contributing to this Library should be a rewarding experience that can enhance your skills and benefit the community. By adhering to these guidelines, you can contribute responsibly while safeguarding client confidentiality and upholding professional ethics.
-
-Everyone in the team is welcome to contribute to this library!
-
-## Project Organization
+# Project Organization
 
 ```text
 ├── LICENSE            <- Open-source license if one is chosen
@@ -26,12 +18,6 @@ Everyone in the team is welcome to contribute to this library!
 │   ├── modelling      <- Training and reference guides for all CRM topics (e.g. IFRS 9, Basel 3.1)
 │   └── regulation     <- Latest regulation material for IFRS9, Basel 3.1, PRA etc.
 │
-├── pipelines          <- Automated pipelines run using papermill to execute notebooks.
-│
-├── playground         <- Playground where team members can code freely and contribute to the repo.
-│   ├── clients        <- Code written during projects.
-│   └── template       <- Folder structure template for all projects.
-│
 ├── pyproject.toml     <- Project configuration file with package metadata for 
 │                         src and configuration for tools like black
 │
@@ -46,7 +32,7 @@ Everyone in the team is welcome to contribute to this library!
     │
     ├── config.py               <- Store useful variables and configuration.
     │
-    └── functions               <- Store all functions that get imported into pipelines and originate from playground.
+    └── functions               <- Store all functions that get imported into pipelines.
 ```
 
 ## Documentation
