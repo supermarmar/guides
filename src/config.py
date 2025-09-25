@@ -19,12 +19,11 @@ KAGGLE_DATA_DIR = RAW_DATA_DIR / "kaggle"
 HOME_CREDIT_DATA_DIR = KAGGLE_DATA_DIR / "home_credit_group"
 AMEX_DATA_DIR = KAGGLE_DATA_DIR / "amex"
 CREDIT_RISK_DATA_DIR = KAGGLE_DATA_DIR / "credit_risk"
-
 INTERIM_DATA_DIR = DATA_DIR / "interim"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 EXTERNAL_DATA_DIR = DATA_DIR / "external"
-
 MODELS_DIR = PROJ_ROOT / "models"
-
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
+
+HOME_CREDIT_DB = "home_credit_mds.db"

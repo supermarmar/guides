@@ -1,255 +1,4 @@
-# **Basel**
-
-## **Bank for International Settlements**
-
-The BIS is owned by 63 central banks, representing countries from around the world that together account for about 95% of world GDP including the Bank of England, European Central Bank and South African Reserve Bank.
-
-Their mission is to support central banks' pursuit of monetary and financial stability through international cooperation, and to act as a bank for central banks.
-
-- The BIS provides central banks and financial supervisory authorities with a forum for dialogue and cooperation, where they can freely exchange information, forge a common understanding and decide on common actions.
-- It also supports central banks and other financial authorities in the implementation of global regulatory standards and sound supervisory practices.
-- As its name indicates, the BIS also acts as a bank. They offer ﬁnancial services exclusively to central banks, monetary authorities and international organisations, mainly to assist them in the management of their foreign exchange assets.
-
-The governance of the Bank is exercised at three levels
-
-1. Board of Directors
-2. General Meetings of member central banks
-3. BIS Management
-
-### **History**
-
-Established in 1930, the Bank for International Settlements is the oldest international financial institution. From its inception to the present day, the BIS has played a number of key roles in the global economy, from settling reparation payments imposed on Germany following the First World War, to serving central banks in their pursuit of monetary and financial stability.
-
-The BIS was set up to take over the functions previously performed by the Agent General for Reparations: managing the collection, administration and distribution of the annuities payable as reparations. The Bank's name is derived from this original role. Finally, the BIS was tasked to promote central bank cooperation more generally.
-
-With the reparations issue out of the way, the BIS focused its activities on the technical cooperation between central banks (including reserve management, foreign exchange transactions, international postal payments, gold deposit and swap facilities) and on providing a forum for regular meetings of central bank Governors and officials.
-
-In July 1944, a United Nations conference met at Bretton Woods in the United States to discuss the postwar international monetary system. The Bretton Woods Conference adopted a resolution calling for the abolition of the BIS "at the earliest possible moment", because it considered that the BIS would have no useful role to play once the newly created World Bank and International Monetary Fund were operational. European central bankers held a different opinion, and successfully lobbied for maintaining the BIS. By early 1948, the BIS liquidation resolution had been put aside. It was understood that henceforth the BIS would focus foremost on European monetary and financial matters.
-
-### **The Basel Process**
-
-The Basel Process refers to the way in which the BIS promotes international cooperation among monetary authorities and financial supervisory officials.
-
-Governors and other senior officials of BIS member central banks hold bimonthly meetings, usually in Basel, to discuss current developments and the outlook for the world economy and financial markets. They also exchange views and experiences on issues of interest to central banks.
-
-The outcomes of this process are visible to the public in the form of committee reports analysing specific topics and internationally agreed standards. International agreement is the precondition for globally consistent standards produced by the standard-setting committees. But it does not substitute for national legislation. In order to become binding, the agreements reached in Basel have to be approved and implemented at the national level, following due regulatory and legislative processes in each individual jurisdiction.
-
-The Financial Stability Institute assists central banks and financial regulatory and supervisory authorities worldwide in strengthening their financial systems by supporting the implementation of global regulatory standards and sound supervisory practices. It does so through policy work, knowledge-sharing activities and capacity-building.
-
-### **Committees**
-
-The BIS hosts six committees, which are overseen by three senior groupings in the context of the Basel Process.
-
-- The **Global Economy Meeting (GEM)** provides oversight to three committees: the Committee on the Global Financial System, the BIS Committee on Payments and Market Infrastructures and the Markets Committee
-- The **All Governors' Meeting**, which includes all 63 BIS member central banks, oversees the work of two committees: the Central Bank Governance Forum and the Irving Fisher Committee on Central Bank Statistics
-- The **Group of Governors and Heads of Supervision (GHOS)** provides oversight to the Basel Committee on Banking Supervision (BCBS). The GHOS comprises the central bank Governors and non-central bank heads of supervision from BCBS member jurisdictions.
-
-The committees have their own respective governance arrangements and reporting lines, and their agendas are guided by various groups of central banks and supervisory authorities.
-
-1. Basel Committee on Banking Supervision: develops global regulatory standards for banks and seeks to strengthen micro- and macroprudential supervision.
-2. Committee on the Global Financial System: monitors and analyses issues relating to financial markets and systems.
-3. Committee on Payments and Market Infrastructures: establishes and promotes global regulatory/oversight standards for payment, clearing, settlement and other market infrastructures, and monitors and analyses developments in these areas.
-4. Markets Committee: monitors developments in financial markets and their implications for central bank operations.
-5. Central Bank Governance Forum: examines issues related to the design and operation of central banks.
-6. Irving Fisher Committee on Central Bank Statistics: addresses statistical issues relating to economic, monetary and financial stability.
-
-### **Associations**
-
-The following associations involved in international cooperation in the area of financial stability also have their secretariats at the BIS, but have their own separate legal identity and governance structure and report to their members.
-
-1. Financial Stability Board: coordinates the work of national authorities and international standard setters  in developing and promoting the implementation of effective regulatory, supervisory and other financial sector policies in the interest of global financial stability.
-2. International Association of Deposit Insurers: sets global standards for deposit insurance systems and promotes cooperation on deposit insurance and bank resolution arrangements.
-3. International Association of Insurance Supervisors: sets global standards for the insurance sector to promote effective and globally consistent supervision for the benefit and protection of policyholders and to contribute to global financial stability.
-
-## **Basel Committee on Banking Supervision**
-
-The Basel Committee on Banking Supervision (BCBS) is the primary global standard setter for the prudential regulation of banks and provides a forum for regular cooperation on banking supervisory matters. Its 45 members comprise central banks and bank supervisors from 28 jurisdictions.
-
-In 1974, the collapse of Bankhaus Herstatt in Germany and of Franklin National Bank in the United States highlighted the lack of efficient banking supervision of banks' international activities, and prompted the G10 central bank Governors to create the Basel Committee on Banking Supervision. The Basel Committee was initially named the Committee on Banking Regulations and Supervisory Practices.
-
-The Committee's first meeting took place in February 1975, and meetings have been held regularly three or four times a year since. Since its inception, the Basel Committee has expanded its membership from the G10 to 45 institutions from 28 jurisdictions. Starting with the Basel Concordat, first issued in 1975 and revised several times since, the Committee has established a series of international standards for bank regulation, most notably its landmark publications of the accords on capital adequacy which are commonly known as Basel I, Basel II and, most recently, Basel III.
-
-![alt text](images/basel/bcbs_structure.png)
-
-### **Basel Committee Charter**
-
-#### **I. Purpose & Role**
-
-(1) Mandate
-Its mandate is to strengthen the regulation, supervision and practices of banks worldwide with the purpose of enhancing financial stability.
-
-(2) Activities
-The BCBS seeks to achieve its mandate through the following activities:
-
-- exchanging information on developments in the banking sector and financial markets, to help identify current or emerging risks for the global financial system;
-- sharing supervisory issues, approaches and techniques to promote common understanding and to improve cross-border cooperation;
-- establishing and promoting global standards for the regulation and supervision of banks as well as guidelines and sound practices;
-- addressing regulatory and supervisory gaps that pose risks to financial stability;
-- monitoring the implementation of BCBS standards in member countries and beyond with the purpose of ensuring their timely, consistent and effective implementation and contributing to a "level playing field" among internationally active banks;
-- consulting with central banks and bank supervisory authorities which are not members of the BCBS to benefit from their input into the BCBS policy formulation process and to promote the implementation of BCBS standards, guidelines and sound practices beyond BCBS member countries; and
-- coordinating and cooperating with other financial sector standard setters and international bodies, particularly those involved in promoting financial stability.
-
-The BCBS does not possess any formal supranational authority. Its decisions do not have legal force. Rather, the BCBS relies on its members' commitments, as described in Section 5, to achieve its mandate.
-
-(3) Legal status
-The BCBS does not possess any formal supranational authority. Its decisions do not have legal force. Rather, the BCBS relies on its members' commitments, as described in Section 5, to achieve its mandate.
-
-#### **II. Membership**
-
-(4) BCBS members
-BCBS members include organisations with direct banking supervisory authority and central banks. After consulting the Committee, the BCBS Chair may invite other organisations to become BCBS observers.
-
-#### **III. Oversight**
-
-(6) The Group of Governors and Heads of Supervision (GHOS)
-The GHOS is the oversight body of the BCBS. The BCBS reports to the GHOS and seeks its endorsement for major decisions.
-
-#### **IV. Organisation**
-
-(7) Structure
-The internal organisational structure of the BCBS comprises:
-
-- The Committee
-- Groups, working groups, virtual networks and task forces3
-- The Chair
-- The Secretariat
-
-(8) The Committee
-The Committee is the ultimate decision-making body of the BCBS with responsibility for ensuring that its mandate is achieved. The Committee is responsible for:
-
-- developing, guiding and monitoring the BCBS work programme within the general direction provided by GHOS;
-- establishing and promoting BCBS standards, guidelines and sound practices;
-- establishing and disbanding groups, working groups, virtual networks and task forces; approving and modifying their mandates; and monitoring their progress;
-- recommending to the GHOS amendments to the BCBS Charter; and
-- deciding on the organisational regulations governing its activities.
-
-The Committee generally meets three times every year. However, the Chair can decide to hold additional or fewer meetings4 as necessary. Committee decisions of public interest shall be communicated through the BCBS website. The Committee shall issue, when appropriate, press statements to communicate its decisions.
-
-(9) Groups, working groups, virtual networks and task forces
-The BCBS's work is largely organised around groups, working groups, virtual networks and task forces. The Secretariat will make publicly available the list of BCBS groups and working groups. BCBS groups report directly to the Committee.
-
-- BCBS groups form part of the permanent internal structure of the BCBS and thus operate without a specific deliverable or end date.
-- Working groups consist of experts from BCBS members that support the technical work of BCBS groups.
-- Virtual networks serve as an expert group that are called upon as needed by the parent group or the Committee. The primary function of virtual networks is to monitor existing policies.
-- Task forces are created to undertake specific tasks for a limited time. These are generally composed of technical experts from BCBS member institutions. However, when these groupings are created by the Committee, they consist of BCBS representatives and deal with specific issues that require prompt attention of the Committee. In such cases, they are called high-level task forces.
-
-(10) Chair
-The Chair directs the work of the Committee in accordance with the BCBS mandate.
-
-(11) The Secretariat
-The Secretariat is provided by the Bank for International Settlements (BIS) and supports the work of the Committee, the Chair and the groups around which the Committee organises its work. The Secretariat is staffed mainly by professional staff, mostly on temporary secondment from BCBS members.
-
-#### **V. BCBS standards, guidelines and sound practices**
-
-(12) Standards
-The BCBS sets standards for the prudential regulation and supervision of banks. The BCBS expects full implementation of its standards by BCBS members and their internationally active banks. However, BCBS standards constitute minimum requirements and BCBS members may decide to go beyond them.
-
-The Committee expects standards to be incorporated into local legal frameworks through each jurisdiction's rule-making process within the pre-defined timeframe established by the Committee. If deviation from literal transposition into local legal frameworks is unavoidable, members should seek the greatest possible equivalence of standards and their outcome.
-
-(13) Guidelines
-Guidelines elaborate the standards in areas where they are considered desirable for the prudential regulation and supervision of banks, in particular international active banks. They generally supplement BCBS standards by providing additional guidance for the purpose of their implementation.
-
-(14) Sound practices
-Sound practices generally describe actual observed practices, with the goal of promoting common understanding and improving supervisory or banking practices. BCBS members are encouraged to compare these practices with those applied by themselves and their supervised institutions to identify potential areas for improvement.
-
-### **Concordat**
-
-At the outset, one important aim of the Committee's work was to close gaps in international supervisory coverage so that
-
-- (i) no banking establishment would escape supervision; and
-- (ii) supervision would be adequate and consistent across member jurisdictions.
-
-A first step in this direction was the paper issued in 1975 that came to be known as the "Concordat". The Concordat set out principles for sharing supervisory responsibility for banks' foreign branches, subsidiaries and joint ventures between host and parent (or home) supervisory authorities.
-
-![alt text](images/basel/concordat.png)
-
-In May 1983, the Concordat was revised and re-issued as Principles for the supervision of banks' foreign establishments.
-
-![alt text](images/basel/may_1983.png)
-
-### **Basel Capital Accord** 🔴
-
-With the foundations for supervision of internationally active banks laid, capital adequacy soon became the main focus of the Committee's activities. In the early 1980s, the onset of the Latin American debt crisis heightened the Committee's concerns that the capital ratios of the main international banks were deteriorating at a time of growing international risks. Backed by the G10 Governors, Committee members resolved to halt the erosion of capital standards in their banking systems and to work towards greater convergence in the measurement of capital adequacy. This resulted in a broad consensus on a weighted approach to the measurement of risk, both on and off banks' balance sheets.
-
-There was strong recognition within the Committee of the overriding need for a multinational accord to strengthen the stability of the international banking system and to remove a source of competitive inequality arising from differences in national capital requirements. Following comments on a consultative paper published in December 1987, a capital measurement system commonly referred to as the Basel Capital Accord was approved by the G10 Governors and released to banks in July 1988. The 1988 Accord called for a minimum ratio of capital to risk-weighted assets of 8% to be implemented by the end of 1992. The standards were almost entirely addressed to credit risk, the main risk incurred by banks.
-
-The document consists of two main sections, which cover (a) the definition of capital and (b) the structure of risk weights. Two shorter sections define the target standard ratio and the transitional and implementing arrangements. There are four technical annexes covering the definition of capital, the counterparty risk weights, the credit conversion factors for off-balance-sheet items and the transitional arrangements.
-
-<https://www.bis.org/publ/bcbs04a.htm>
-
-### **Market Risk Amendment** 🔴
-
-The Committee also refined the framework to address risks other than credit risk, which was the focus of the 1988 Accord. In January 1996, following two consultative processes, the Committee issued the Amendment to the Capital Accord to incorporate market risks (or Market Risk Amendment), to take effect at the end of 1997. This was designed to incorporate within the Accord a capital requirement for the market risks arising from banks' exposures to foreign exchange, traded debt securities, equities, commodities and options. An important aspect of the Market Risk Amendment was that banks were, for the first time, allowed to use internal models (value-at-risk models) as a basis for measuring their market risk capital requirements, subject to strict quantitative and qualitative standards. Much of the preparatory work for the market risk package was undertaken jointly with securities regulators.
-
-<https://www.bis.org/publ/bcbs24a.htm>
-
-### **Basel II** 🔴
-
-In June 1999, the Committee issued a proposal for a new capital adequacy framework to replace the 1988 Accord. This led to the release of a revised capital framework in June 2004. Generally known as "Basel II", the revised framework comprised three pillars:
-
-1. minimum capital requirements, which sought to develop and expand the standardised rules set out in the 1988 Accord
-2. supervisory review of an institution's capital adequacy and internal assessment process
-3. effective use of disclosure as a lever to strengthen market discipline and encourage sound banking practices
-
-The new framework was designed to improve the way regulatory capital requirements reflect underlying risks and to better address the financial innovation that had occurred in recent years. The changes aimed at rewarding and encouraging continued improvements in risk measurement and control.  
-
-The framework's publication in June 2004 followed almost six years of intensive preparation. During this period, the Basel Committee consulted extensively with banking sector representatives, supervisory agencies, central banks and outside observers in order to develop significantly more risk-sensitive capital requirements.
-
-<https://www.bis.org/publ/bcbs107.htm>
-
-Following the June 2004 release, which focused primarily on the banking book, the Committee turned its attention to the trading book. In close cooperation with the International Organization of Securities Commissions (IOSCO), the international body of securities regulators, the Committee published in July 2005 a consensus document governing the treatment of banks' trading books under the new framework. For ease of reference, this new text was integrated with the June 2004 text in a comprehensive document released in June 2006: Basel II: International convergence of capital measurement and capital standards: A revised framework - Comprehensive version.
-
-<https://www.bis.org/publ/bcbs128.htm>
-
-### **Basel III** 🔴
-
-Even before Lehman Brothers collapsed in September 2008, the need for a fundamental strengthening of the Basel II framework had become apparent. The banking sector entered the financial crisis with too much leverage and inadequate liquidity buffers. These weaknesses were accompanied by poor governance and risk management, as well as inappropriate incentive structures. The dangerous combination of these factors was demonstrated by the mispricing of credit and liquidity risks, and excess credit growth.
-
-Responding to these risk factors, the Basel Committee issued Principles for sound liquidity risk management and supervision in the same month that Lehman Brothers failed.
-
-<https://www.bis.org/publ/bcbs144.htm>
-
-In July 2009, the Committee issued a further package of documents to strengthen the Basel II capital framework, notably with regard to the treatment of certain complex securitisation positions, off-balance sheet vehicles and trading book exposures. These enhancements were part of a broader effort to strengthen the regulation and supervision of internationally active banks, in the light of weaknesses revealed by the financial market crisis.
-
-In September 2010, the Group of Governors and Heads of Supervision (GHOS) announced higher global minimum capital standards for commercial banks. This followed an agreement reached in July regarding the overall design of the capital and liquidity reform package, now referred to as "Basel III". In November 2010, the new capital and liquidity standards were endorsed at the G20 Leaders' Summit in Seoul and subsequently agreed at the December 2010 Basel Committee meeting.
-
-The proposed standards were issued by the Committee in mid-December 2010 (and have been subsequently revised). The December 2010 versions were set out in Basel III: International framework for liquidity risk measurement, standards and monitoring and Basel III: A global regulatory framework for more resilient banks and banking systems.
-
-<https://www.bis.org/publ/bcbs188.htm>
-
-<https://www.bis.org/publ/bcbs189_dec2010.htm>
-
-The enhanced Basel framework revises and strengthens the three pillars established by Basel II, and extends it in several areas. Most of the reforms are being phased in between 2013 and 2019:
-
-- stricter requirements for the quality and quantity of regulatory capital, in particular reinforcing the central role of common equity
-- an additional layer of common equity - the capital conservation buffer - that, when breached, restricts payouts to help meet the minimum common equity requirement
-- a countercyclical capital buffer, which places restrictions on participation by banks in system-wide credit booms with the aim of reducing their losses in credit busts
-- a leverage ratio - a minimum amount of loss-absorbing capital relative to all of a bank's assets and off-balance sheet exposures regardless of risk weighting
-- liquidity requirements - a minimum liquidity ratio, the Liquidity Coverage Ratio (LCR), intended to provide enough cash to cover funding needs over a 30-day period of stress; and a longer-term ratio, the Net Stable Funding Ratio (NSFR), intended to address maturity mismatches over the entire balance sheet
-- additional requirements for systemically important banks, including additional loss absorbency and strengthened arrangements for cross-border supervision and resolution
-
-### **Basel III Reforms | 3.1 | Endgame**
-
-Basel 3.1 refers to the final set of banking reforms developed by the Basel Committee on Banking Supervision, aimed at strengthening the regulation, supervision, and risk management within the banking sector. These reforms are an extension of the original Basel III framework, often termed the "Basel III Endgame," and are known as Basel 3.1 in the UK.
-
-From 2011, the Committee turned its attention to improvements in the calculation of capital requirements. The risk-based capital requirements set out in the Basel II framework were expanded to cover:
-
-- in 2012, capital requirements for banks' exposures to central counterparties (initially an interim approach, subsequently revised in 2014)
-- in 2013, margin requirements for non-centrally cleared derivatives and capital requirements for banks' equity in funds
-- in 2014, a standardised approach for measuring counterparty credit risk exposures, improving the previous methodologies for assessing the counterparty credit risk associated with derivatives transactions
-- in 2014, a more robust framework for calculating capital requirements for securitisations, as well as the introduction of large exposure limits to constrain the maximum loss a bank could face in the event of a sudden failure of a counterparty
-- in 2016, a revised market risk framework that followed a fundamental review of trading book capital requirements
-- a consolidated and enhanced framework for disclosure requirements to reflect the development of the Basel standards
-
-The Committee completed its Basel III post-crisis reforms in 2017, with the publication of new standards for the calculation of capital requirements for credit risk, credit valuation adjustment risk and operational risk. The final reforms also include a revised leverage ratio, a leverage ratio buffer for global systemically important banks and an output floor, based on the revised standardised approaches, which limits the extent to which banks can use internal models to reduce risk-based capital requirements. These final reforms address shortcomings of the pre-crisis regulatory framework and provide a regulatory foundation for a resilient banking system that supports the real economy.
-
-<https://www.bis.org/bcbs/publ/d424.htm>
-
-<https://www.bis.org/bcbs/publ/d424_hlsummary.pdf>
-
-A key objective of the revisions was to reduce excessive variability of risk-weighted assets (RWA). At the peak of the global financial crisis, a wide range of stakeholders lost faith in banks' reported risk-weighted capital ratios. The Committee's own empirical analyses also highlighted a worrying degree of variability in banks' calculation of RWA. The revisions to the regulatory framework will help restore credibility in the calculation of RWA by enhancing the robustness and risk sensitivity of the standardised approaches for credit risk and operational risk, constraining internally modelled approaches and complementing the risk-based framework with a revised leverage ratio and output floor.
-
-## **Basel Framework**
+# **Basel Framework**
 
 <https://www.bis.org/basel_framework/>
 
@@ -276,15 +25,15 @@ The framework comprises the 14 standards listed below. Each standard is divided 
 | DIS | Disclosure requirements |
 | BCP | Core Principles for Effective Banking Supervision |
 
-### **CAP**
+## **CAP**
 
 This standard describes the criteria that bank capital instruments must meet to be eligible to satisfy the Basel capital requirements, as well as necessary regulatory adjustments and transitional arrangements.
 
-#### **CAP10: Eligible Capital**
+### **CAP10: Eligible Capital**
 
 This chapter sets out the eligibility criteria for regulatory capital. Three categories of instruments are permitted: Common Equity Tier 1, Additional Tier 1 and Tier 2.
 
-##### **Capital Components**
+#### **Capital Components**
 
 10.1 Regulatory capital consists of three categories, each governed by a single set of criteria that instruments are required to meet before inclusion in the relevant category.
 
@@ -298,7 +47,7 @@ This chapter sets out the eligibility criteria for regulatory capital. Three cat
 
 ![alt text](images/basel/cap_basel_2_vs_basel_3.png)
 
-##### **Common Equity Tier 1**
+#### **Common Equity Tier 1**
 
 10.6 Common Equity Tier 1 capital consists of the sum of the following elements:
 
@@ -310,7 +59,7 @@ This chapter sets out the eligibility criteria for regulatory capital. Three cat
 
 10.7  Dividends are removed from Common Equity Tier 1 in accordance with applicable accounting standards.
 
-##### **Additional Tier 1**
+#### **Additional Tier 1**
 
 10.9 Additional Tier 1 capital consists of the sum of the following elements:
 
@@ -323,7 +72,7 @@ This chapter sets out the eligibility criteria for regulatory capital. Three cat
 - Is neither secured nor covered by a guarantee of the issuer or related entity or other arrangement that legally or economically enhances the seniority of the claim vis-à-vis bank creditors
 - Is perpetual, ie there is no maturity date and there are no step-ups or other incentives to redeem
 
-##### **Tier 2**
+#### **Tier 2**
 
 10.14 Tier 2 capital consists of the sum of the following elements:
 
@@ -344,11 +93,11 @@ approach.
 
 10.19 Under the internal ratings based approach, where the total expected loss amount is less than total eligible provisions (measured gross of tax effects), as explained in CRE35, banks may recognise the difference in Tier 2 capital up to a maximum of 0.6% of credit risk-weighted assets calculated under the internal ratings-based approach. At national discretion, a limit lower than 0.6% may be applied.
 
-#### **CAP30: Adjustments**
+### **CAP30: Adjustments**
 
 This chapter describes adjustments that must be made to the components of regulatory capital in order to calculate the amount of a bank's capital resources that may be used to meet prudential requirements.
 
-##### **Minimum TLAC**
+#### **Minimum TLAC**
 
 30.2 Global systemically important banks (G-SIBs) are required to meet a minimum total loss-absorbing capacity (TLAC) requirement set in accordance with the Financial Stability Board’s (FSB) TLAC principles and term sheet. The criteria for an instrument to be recognised as TLAC by the issuing G-SIB are set out in the FSB’s TLAC Term Sheet. Bank that invest in TLAC or similar instruments may be required to deduct them in the calculation of their own regulatory capital.
 
@@ -358,41 +107,37 @@ This chapter describes adjustments that must be made to the components of regula
 
 *5. Minimum TLAC is an additional requirement to minimum regulatory capital requirements.*
 
-##### **Goodwill & Other Intangibles**
+#### **Goodwill & Other Intangibles**
 
 30.7 Goodwill and all other intangibles must be deducted in the calculation of Common Equity Tier 1, including any goodwill included in the valuation of significant investments in the capital of banking, financial and insurance entities that are outside the scope of regulatory consolidation.
 
-##### **Deferred Tax Assets**
+#### **Deferred Tax Assets**
 
 30.9 Deferred tax assets (DTAs) that rely on future profitability of the bank to be realised are to be deducted in the calculation of Common Equity Tier 1. DTAs may be netted with associated DTLs only if the DTAs and DTLs relate to taxes levied by the same taxation authority and offsetting is permitted by the relevant taxation authority
 
-#### **CAP50: Prudent Valuation Guidance**
+### **CAP50: Prudent Valuation Guidance**
 
 This chapter provides banks with guidance on prudent valuation for positions that are accounted for at fair value, whether they are in the trading book or in the banking book.
 
-##### **Marking-to-Market**
+#### **Marking-to-Market**
 
-50.4 Marking-to-market is at least the daily valuation of positions at readily available
-close out prices that are sourced independently. Examples of readily available
-close out prices include exchange prices, screen prices, or quotes from several
-independent reputable brokers.
+50.4 Marking-to-market is at least the daily valuation of positions at readily available close out prices that are sourced independently. Examples of readily available close out prices include exchange prices, screen prices, or quotes from several independent reputable brokers.
 
 50.5 Banks must mark-to-market as much as possible.
 
-##### **Marking-to-Model**
+#### **Marking-to-Model**
 
-50.6 Only where marking-to-market is not possible should banks mark-to-model, but this must be demonstrated to be prudent. Marking-to-model is defined as any valuation which has to be benchmarked, extrapolated or otherwise calculated from a market input. When marking to model, an extra degree of conservatism is appropriate. Valuation adjustments should be made as appropriate, for example, to cover
-the uncertainty of the model valuation.
+50.6 Only where marking-to-market is not possible should banks mark-to-model, but this must be demonstrated to be prudent. Marking-to-model is defined as any valuation which has to be benchmarked, extrapolated or otherwise calculated from a market input. When marking to model, an extra degree of conservatism is appropriate. Valuation adjustments should be made as appropriate, for example, to cover the uncertainty of the model valuation.
 
-### **RBC**
+## **RBC**
 
 This standard describes the framework for risk-based capital requirements.
 
-#### **RBC20: MCR**
+### **RBC20: MCR**
 
 This chapter sets out the minimum regulatory capital requirements under the risk-based framework and how banks must calculate risk-weighted assets.
 
-##### **MCR**
+#### **MCR**
 
 20.1 Banks must meet the following requirements at all times:
 
@@ -402,7 +147,7 @@ This chapter sets out the minimum regulatory capital requirements under the risk
 
 ![alt text](images/basel/capital_ratios.png)
 
-##### **RWA**
+#### **RWA**
 
 20.3 The Basel framework describes how to calculate RWA for credit risk, market risk and operational risk. The requirements for calculating RWA for credit risk and market risk allow banks to use different approaches, some of which banks may only use with supervisory approval.
 
@@ -416,7 +161,7 @@ This chapter sets out the minimum regulatory capital requirements under the risk
 
 ![alt text](images/basel/rwa.png)
 
-##### **Credit Risk RWA**
+#### **Credit Risk RWA**
 
 20.6 RWA for credit risk (including counterparty credit risk) is calculated as the sum of the following:
 
@@ -425,7 +170,7 @@ This chapter sets out the minimum regulatory capital requirements under the risk
    - The internal ratings-based (IRB) approach, set out in CRE30 to CRE36.
 2) RWA for counterparty credit risk arising from banking book exposures and from trading book instruments (as specified in CRE55), except the exposures listed in (3) to (6) below, using the methods outlined in CRE51.
 
-##### **Market Risk RWA**
+#### **Market Risk RWA**
 
 20.9 RWA for market risk is calculated as the sum of the following:
 
@@ -438,21 +183,21 @@ This chapter sets out the minimum regulatory capital requirements under the risk
    - The standardised approach to CVA risk (SA-CVA).
    - 100% of the bank’s RWA for counterparty credit risk, for banks that have exposures below a materiality threshold (see MAR50.9).
 
-##### **Operational Risk RWA**
+#### **Operational Risk RWA**
 
 20.10 RWA for operational risk is calculated using the standardised approach for operational risk, set out in OPE25.
 
-#### **RBC25: Banking vs Trading Book**
+### **RBC25: Banking vs Trading Book**
 
 This chapter sets out the instruments to be included in the trading book (which are subject to market risk capital requirements) and those to be included in the banking book (which are subject to credit risk capital requirements).
 
-##### **Banking Book**
+#### **Banking Book**
 
 25.8 The following instruments must be assigned to the banking book:
 
 - retail and small or medium-sized enterprise (SME) credit
 
-##### **Trading Book**
+#### **Trading Book**
 
 25.9 There is a general presumption that any of the following instruments are being held for at least one of the purposes listed in RBC25.5 and therefore are trading book instruments, unless specifically otherwise provided for in RBC25.3 or RBC25.
 
@@ -463,11 +208,11 @@ This chapter sets out the instruments to be included in the trading book (which 
 
 Under IFRS (IAS 39) and US GAAP, these instruments would be designated as held for trading. Under IFRS 9, these instruments would be held within a trading business model. These instruments would be fair valued through the P&L account
 
-#### **RBC30: Buffers**
+### **RBC30: Buffers**
 
 This chapter describes buffers that banks are expected to maintain above the minimum riskbased capital requirements, as well as the capital conservation requirements that apply to banks that do not maintain such buffers.
 
-##### **Capital Conservation Buffer (CCoB)**
+#### **Capital Conservation Buffer (CCoB)**
 
 30.1 This chapter outlines the operation of the capital conservation buffer, which is designed to ensure that banks build up capital buffers outside periods of stress which can be drawn down as losses are incurred. The requirement is based on simple capital conservation rules designed to avoid breaches of minimum capital requirements.
 
@@ -484,195 +229,114 @@ requirements, but would have a zero conservation buffer and therefore be subject
 
 ![alt text](images/basel/ccob.png)
 
-##### **Countercyclical Buffer (CCyB)**
+#### **Countercyclical Buffer (CCyB)**
 
-30.6 Losses incurred in the banking sector can be extremely large when a downturn is
-preceded by a period of excess credit growth. These losses can destabilise the
-banking sector and spark a vicious circle, whereby problems in the financial
-system can contribute to a downturn in the real economy that then feeds back on
-to the banking sector. These interactions highlight the particular importance of
-the banking sector building up additional capital defences in periods where the
-risks of system-wide stress are growing markedly.
+30.6 Losses incurred in the banking sector can be extremely large when a downturn is preceded by a period of excess credit growth. These losses can destabilise the banking sector and spark a vicious circle, whereby problems in the financial system can contribute to a downturn in the real economy that then feeds back on to the banking sector. These interactions highlight the particular importance of the banking sector building up additional capital defences in periods where the risks of system-wide stress are growing markedly.
 
-30.7 The countercyclical buffer aims to ensure that banking sector capital
-requirements take account of the macro-financial environment in which banks
-operate. It will be deployed by national jurisdictions when excess aggregate
-credit growth is judged to be associated with a build-up of system-wide risk to
-ensure the banking system has a buffer of capital to protect it against future
-potential losses. This focus on excess aggregate credit growth means that
-jurisdictions are likely to only need to deploy the buffer on an infrequent basis.
-The buffer for internationally-active banks will be a weighted average of the
-buffers deployed across all the jurisdictions to which it has credit exposures. This
-means that they will likely find themselves subject to a small buffer on a more
-frequent basis, since credit cycles are not always highly correlated across
-jurisdictions.
+30.7 The countercyclical buffer aims to ensure that banking sector capital requirements take account of the macro-financial environment in which banks
+operate. It will be deployed by national jurisdictions when excess aggregate credit growth is judged to be associated with a build-up of system-wide risk to
+ensure the banking system has a buffer of capital to protect it against future potential losses. This focus on excess aggregate credit growth means that
+jurisdictions are likely to only need to deploy the buffer on an infrequent basis. The buffer for internationally-active banks will be a weighted average of the buffers deployed across all the jurisdictions to which it has credit exposures. This means that they will likely find themselves subject to a small buffer on a more frequent basis, since credit cycles are not always highly correlated across jurisdictions.
 
-##### **National CCyB Requirements**
+#### **National CCyB Requirements**
 
-30.9 Each Basel Committee member jurisdiction will identify an authority with the
-responsibility to make decisions on the size of the countercyclical capital buffer. If
-the relevant national authority judges a period of excess credit growth to be
-leading to the build up of system-wide risk, they will consider, together with any
-other macroprudential tools at their disposal, putting in place a countercyclical
-buffer requirement. This will vary between 0% and 2.5% of risk weighted assets,
-depending on their judgement as to the extent of the build up of system-wide
-risk.
+30.9 Each Basel Committee member jurisdiction will identify an authority with the responsibility to make decisions on the size of the countercyclical capital buffer. If the relevant national authority judges a period of excess credit growth to be leading to the build up of system-wide risk, they will consider, together with any other macroprudential tools at their disposal, putting in place a countercyclical buffer requirement. This will vary between 0% and 2.5% of risk weighted assets, depending on their judgement as to the extent of the build up of system-wide risk.
 
-30.11 To give banks time to adjust to a buffer level, a jurisdiction will pre-announce its
-decision to raise the level of the countercyclical buffer by up to 12 months.
+30.11 To give banks time to adjust to a buffer level, a jurisdiction will pre-announce its decision to raise the level of the countercyclical buffer by up to 12 months.
 
-30.18 For illustrative purposes, the following table sets out the conservation ratios a
-bank must meet at various levels of CET1 capital if the bank is subject to a 2.5%
-countercyclical buffer requirement.
+30.18 For illustrative purposes, the following table sets out the conservation ratios a bank must meet at various levels of CET1 capital if the bank is subject to a 2.5% countercyclical buffer requirement.
 
 ![alt text](images/basel/buffers.png)
 
-##### **Capital Conservation Best Practice**
+#### **Capital Conservation Best Practice**
 
 30.20 Outside of periods of stress, banks should hold buffers of capital above the regulatory minimum.  Retaining a greater proportion of earnings during a downturn will help ensure that capital remains available to support the ongoing business operations of banks through the period of stress.
 
-30.21 When buffers have been drawn down, one way banks should look to rebuild
-them is through reducing discretionary distributions of earnings. This could
-include reducing dividend payments, share-backs and staff bonus payments.
-Banks may also choose to raise new capital from the private sector as an
-alternative to conserving internally generated capital.
+30.21 When buffers have been drawn down, one way banks should look to rebuild them is through reducing discretionary distributions of earnings. This could include reducing dividend payments, share-backs and staff bonus payments. Banks may also choose to raise new capital from the private sector as an alternative to conserving internally generated capital
 
-#### **RBC40: SIB Buffers**
+### **RBC40: SIB Buffers**
 
-This chapter describes the higher loss
-absorbency requirements applying to global and
-domestic systemically important banks.
+This chapter describes the higher loss absorbency requirements applying to global and domestic systemically important banks.
 
-##### **Higher Loss Absorbency: G-SIBs**
+#### **Higher Loss Absorbency: G-SIBs**
 
-40.1 Taking into account this going-concern
-objective, global systemically important banks (G-SIBs) must meet their higher
-loss absorbency requirement with Common Equity Tier 1 capital only.
+40.1 Taking into account this going-concern objective, global systemically important banks (G-SIBs) must meet their higher loss absorbency requirement with Common Equity Tier 1 capital only.
 
-40.4 Based on the bucketing approach set out in SCO40.19 to SCO40.22, the magnitude of the higher loss
-absorbency requirement for each bucket is as follows.
+40.4 Based on the bucketing approach set out in SCO40.19 to SCO40.22, the magnitude of the higher loss absorbency requirement for each bucket is as follows.
 
 ![alt text](images/basel/gsibs_loss.png)
 
-##### **Higher Loss Absorbency: D-SIBs**
+#### **Higher Loss Absorbency: D-SIBs**
 
-40.7 As described in SCO50, a domestic systemically important bank (D-SIB)
-framework is best understood as taking the complementary perspective to the GSIB regime by focusing on the impact that the distress or failure of banks (including by international banks) will have on the domestic economy.
+40.7 As described in SCO50, a domestic systemically important bank (D-SIB) framework is best understood as taking the complementary perspective to the GSIB regime by focusing on the impact that the distress or failure of banks (including by international banks) will have on the domestic economy.
 
-### **CRE**
+## **CRE**
 
 This standard describes how to calculate capital requirements for credit risk.
 
 ![alt text](images/basel/irb_vs_standard.png)
 
-#### **CRE20: Standardised Approach (Indiviudal Exposures)**
+### **CRE20: Standardised Approach (Indiviudal Exposures)**
 
-This chapter sets out the standardised approach
-for credit risk as it applies to individual claims.
+This chapter sets out the standardised approach for credit risk as it applies to individual claims.
 
-##### **Sovereigns**
+#### **Sovereigns**
 
 20.7 Exposures to sovereigns and their central banks will be risk-weighted as follows:
 
 ![alt text](images/basel/sovereign_rws.png)
 
-20.9 For the purpose of risk-weighting exposures to sovereigns, supervisors may
-recognise the country risk scores assigned by Export Credit Agencies (ECAs). These ECA risk scores will correspond to risk weight
-categories as detailed below.
+20.9 For the purpose of risk-weighting exposures to sovereigns, supervisors may recognise the country risk scores assigned by Export Credit Agencies (ECAs). These ECA risk scores will correspond to risk weight categories as detailed below.
 
 ![alt text](images/basel/eca_rws.png)
 
-20.10 Exposures to the Bank for International Settlements, the International Monetary
-Fund, the European Central Bank, the European Union, the European Stability
-Mechanism and the European Financial Stability Facility may receive a 0% risk
-weight.
+20.10 Exposures to the Bank for International Settlements, the International Monetary Fund, the European Central Bank, the European Union, the European Stability Mechanism and the European Financial Stability Facility may receive a 0% risk weight.
 
-##### **Public Sector Entities**
+#### **Public Sector Entities**
 
-20.11 Exposures to domestic PSEs will be risk-weighted at national discretion, according
-to either of the following two options.
+20.11 Exposures to domestic PSEs will be risk-weighted at national discretion, according to either of the following two options.
 
 ![alt text](images/basel/pse_rws.png)
 
-##### **Banks**
+#### **Banks**
 
-20.16 For the purposes of calculating capital requirements, a bank exposure is defined
-as a claim (including loans and senior debt instruments, unless considered as
-subordinated debt for the purposes of CRE20.60) on any financial institution that
-is licensed to take deposits from the public and is subject to appropriate
-prudential standards and level of supervision
+20.16 For the purposes of calculating capital requirements, a bank exposure is defined as a claim (including loans and senior debt instruments, unless considered as subordinated debt for the purposes of CRE20.60) on any financial institution that is licensed to take deposits from the public and is subject to appropriate prudential standards and level of supervision
 
 20.17 Bank exposures will be risk-weighted based on the following hierarchy:
 
-1. External Credit Risk Assessment Approach (ECRA): This approach is for banks
-incorporated in jurisdictions that allow the use of external ratings for
-regulatory purposes. It applies to all their rated exposures to banks. Banks
-will apply CRE21.1 to CRE21.21 to determine which rating can be used and
-for which exposures.
-2. Standardised Credit Risk Assessment Approach (SCRA): This approach is for
-all exposures of banks incorporated in jurisdictions that do not allow the use
-of external ratings for regulatory purposes. For exposures to banks that are
-unrated, this approach also applies to banks incorporated in jurisdictions
-that allow the use of external ratings for regulatory purposes.
+1. External Credit Risk Assessment Approach (ECRA): This approach is for banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes. It applies to all their rated exposures to banks. Banks will apply CRE21.1 to CRE21.21 to determine which rating can be used and for which exposures.
+2. Standardised Credit Risk Assessment Approach (SCRA): This approach is for all exposures of banks incorporated in jurisdictions that do not allow the use of external ratings for regulatory purposes. For exposures to banks that are unrated, this approach also applies to banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes.
 
-###### **ECRA**
+##### **ECRA**
 
-20.18 Banks incorporated in jurisdictions that allow the use of external ratings for
-regulatory purposes will assign to their rated bank exposures the corresponding
-“base” risk weights determined by the external ratings according to Table 6.
+20.18 Banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes will assign to their rated bank exposures the corresponding “base” risk weights determined by the external ratings according to Table 6.
 
 ![alt text](images/basel/ecra_rws.png)
 
-###### **SCRA**
+##### **SCRA**
 
-20.21 Banks incorporated in jurisdictions that do not allow the use of external ratings
-for regulatory purposes will apply the SCRA to all their bank exposures. The SCRA
-also applies to unrated bank exposures for banks incorporated in jurisdictions
-that allow the use of external ratings for regulatory purposes. The SCRA requires
-banks to classify bank exposures into one of three risk-weight buckets (ie Grades
-A, B and C) and assign the corresponding risk weights in Table 7.
+20.21 Banks incorporated in jurisdictions that do not allow the use of external ratings for regulatory purposes will apply the SCRA to all their bank exposures. The SCRA also applies to unrated bank exposures for banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes. The SCRA requires banks to classify bank exposures into one of three risk-weight buckets (ie Grades A, B and C) and assign the corresponding risk weights in Table 7.
 
 ![alt text](images/basel/scra_rws.png)
 
-20.22 Grade A refers to exposures to banks, where the counterparty bank has adequate
-capacity to meet their financial commitments (including repayments of principal
-and interest) in a timely manner, for the projected life of the assets or exposures
-and irrespective of the economic cycles and business conditions.
+20.22 Grade A refers to exposures to banks, where the counterparty bank has adequate capacity to meet their financial commitments (including repayments of principal and interest) in a timely manner, for the projected life of the assets or exposures and irrespective of the economic cycles and business conditions.
 
-20.25 Grade B refers to exposures to banks, where the counterparty bank is subject to
-substantial credit risk, such as repayment capacities that are dependent on stable
-or favourable economic or business conditions.
+20.25 Grade B refers to exposures to banks, where the counterparty bank is subject to substantial credit risk, such as repayment capacities that are dependent on stable or favourable economic or business conditions.
 
-20.28 Grade C refers to higher credit risk exposures to banks, where the counterparty
-bank has material default risks and limited margins of safety. For these
-counterparties, adverse business, financial, or economic conditions are very likely
-to lead, or have led, to an inability to meet their financial commitments.
+20.28 Grade C refers to higher credit risk exposures to banks, where the counterparty bank has material default risks and limited margins of safety. For these counterparties, adverse business, financial, or economic conditions are very likely to lead, or have led, to an inability to meet their financial commitments.
 
-##### **Securities Firms & Other Financial Institutions**
+#### **Securities Firms & Other Financial Institutions**
 
-20.40 Exposures to securities firms and other financial institutions will be treated as
-exposures to banks provided that these firms are subject to prudential standards
-and a level of supervision equivalent to those applied to banks (including capital
-and liquidity requirements)
+20.40 Exposures to securities firms and other financial institutions will be treated as exposures to banks provided that these firms are subject to prudential standards and a level of supervision equivalent to those applied to banks (including capital and liquidity requirements)
 
-##### **Corporates**
+#### **Corporates**
 
-20.41 For the purposes of calculating capital requirements, exposures to corporates
-include exposures (loans, bonds, receivables, etc) to incorporated entities,
-associations, partnerships, proprietorships, trusts, funds and other entities with
-similar characteristics, except those which qualify for one of the other exposure
-classes. The treatment associated with subordinated debt and equities of these
-counterparties is addressed in CRE20.53 to CRE20.62. The corporate exposure
-class includes exposures to insurance companies and other financial corporates
-that do not meet the definitions of exposures to banks, or securities firms and
-other financial institutions, as determined in CRE20.16 and CRE20.40 respectively.
-The corporate exposure class does not include exposures to individuals. The
-corporate exposure class differentiates between the following subcategories:
+20.41 For the purposes of calculating capital requirements, exposures to corporates include exposures (loans, bonds, receivables, etc) to incorporated entities, associations, partnerships, proprietorships, trusts, funds and other entities with similar characteristics, except those which qualify for one of the other exposure classes. The treatment associated with subordinated debt and equities of these counterparties is addressed in CRE20.53 to CRE20.62. The corporate exposure class includes exposures to insurance companies and other financial corporates that do not meet the definitions of exposures to banks, or securities firms and other financial institutions, as determined in CRE20.16 and CRE20.40 respectively. The corporate exposure class does not include exposures to individuals. The corporate exposure class differentiates between the following subcategories:
 
 1. General corporate exposures;
 2. Specialised lending exposures, as defined in CRE20.48.
 
-##### **General Corporate Exposures**
+#### **General Corporate Exposures**
 
 20.42 For corporate exposures of banks incorporated in jurisdictions that allow the use
 of external ratings for regulatory purposes, banks will assign "base" risk weights
@@ -699,7 +363,7 @@ adequate capacity to meet its financial commitments in a timely manner and its
 ability to do so is assessed to be robust against adverse changes in the economic
 cycle and business conditions.
 
-##### **SMEs**
+#### **SMEs**
 
 20.47 Corporate SMEs are defined as corporate exposures where the reported annual
 sales for the consolidated group of which the corporate counterparty is a part is
@@ -713,7 +377,7 @@ purposes, an 85% risk weight will be applied. Exposures to SMEs that meet the
 criteria in CRE20.65(1) to CRE20.65(3) will be treated as regulatory retail SME
 exposures and risk weighted at 75%.
 
-##### **Specialised Lending**
+#### **Specialised Lending**
 
 20.48 A corporate exposure will be treated as a specialised lending exposure if such
 lending possesses some or all of the following characteristics, either in legal form
@@ -768,7 +432,7 @@ entity that is able to meet its financial commitments in a timely manner and its
 ability to do so is assessed to be robust against adverse changes in the economic
 cycle and business conditions.
 
-##### **Equity, Subordinated Debt & Other Instruments**
+#### **Equity, Subordinated Debt & Other Instruments**
 
 20.53 The treatment described in CRE20.57 to CRE20.60 applies to subordinated debt,
 equity and other regulatory capital instruments issued by either corporates or
@@ -821,7 +485,7 @@ TLAC liabilities” in CAP30.3 to CAP30.5 and that are not deducted from regulat
 capital are considered to be subordinated debt for the purposes of this
 paragraph.
 
-##### **Retail Lending**
+#### **Retail Lending**
 
 20.63 The retail exposure class excludes exposures within the real estate exposure class.
 The retail exposure class includes the following types of exposures:
@@ -876,7 +540,7 @@ persons that do not meet all of the regulatory retail criteria in CRE20.65.
 defined in CRE20.66) will be risk weighted at 45%.
 3. Other retail exposures will be risk weighted at 100%
 
-##### **Real Estate**
+#### **Real Estate**
 
 20.69 Real estate is immovable property that is land, including agricultural land and
 forest, or anything treated as attached to land, in particular buildings, in contrast
@@ -919,7 +583,7 @@ set according to CRE20.73.
 - Prudent value of property: the property must be valued according to the
 criteria in CRE20.74 to CRE20.76 for determining the value in the loan-to-value ratio (LTV). Moreover, the value of the property must not depend materially on the performance of the borrower.
 
-###### **LTV**
+##### **LTV**
 
 20.74 The LTV is the amount of the loan divided by the value of the property. When
 calculating the LTV, the loan amount will be reduced as the loan amortises. The
@@ -943,7 +607,7 @@ committed amount of the mortgage loan.
 2. Value of the property: the valuation must be appraised independently
 using prudently conservative valuation criteria
 
-##### **Residential Real Estate**
+#### **Residential Real Estate**
 
 20.77 A “regulatory residential real estate” exposure is a regulatory real estate exposure
 that is secured by a property that has the nature of a dwelling and satisfies all
@@ -974,7 +638,7 @@ exposure amount will be determined based on the exposure’s LTV ratio in Table
 
 ![alt text](images/basel/table_12.png)
 
-##### **Commercial Real Estate**
+#### **Commercial Real Estate**
 
 20.78 A “regulatory commercial real estate” exposure is regulatory real estate exposure
 that is not a regulatory residential real estate exposure.
@@ -1003,7 +667,7 @@ total exposure amount will be determined based on the exposure’s LTV in Table
 
 ![alt text](images/basel/table_14.png)
 
-##### **Other Real Estate**
+#### **Other Real Estate**
 
 20.88 An “other real estate” exposure is an exposure within the real estate asset class
 that is not a regulatory real estate exposure (as defined in CRE20.71 above) and is
@@ -1020,7 +684,7 @@ assigned to an unsecured exposure to that counterparty.
 - The risk weight of 150% is used for other real estate exposures that are
 materially dependent on the cash flows generated by the property
 
-##### **Land ADC**
+#### **Land ADC**
 
 20.90 Land ADC exposures refers to loans to companies or SPVs financing any of the
 land acquisition for development and construction purposes, or development
@@ -1045,7 +709,7 @@ is terminated. Equity at risk should be determined as an appropriate amount
 of borrower-contributed equity to the real estate’s appraised as-completed
 value.
 
-##### **Derivatives**
+#### **Derivatives**
 
 20.102 For exposures that give rise to counterparty credit risk according to CRE51.4 (ie
 OTC derivatives, exchange-traded derivatives, long settlement transactions and
@@ -1053,14 +717,14 @@ securities financing transactions), the exposure amount to be used in the
 determination of RWA is to be calculated under the rules set out in CRE50 to
 CRE54.
 
-##### **Credit Derivatives**
+#### **Credit Derivatives**
 
 20.103 A bank providing credit protection through a first-to-default or second-to-default
 credit derivative is subject to capital requirements on such instruments. For first-to-default credit derivatives, the risk weights of the assets included in the basket
 must be aggregated up to a maximum of 1250% and multiplied by the nominal
 amount of the protection provided by the credit derivative to obtain the risk-weighted asset amount.
 
-##### **Defaulted Exposures (Stage 3)**
+#### **Defaulted Exposures (Stage 3)**
 
 20.104 For risk-weighting purposes under the standardised approach, a defaulted
 exposure is defined as one that is past due for more than 90 days, or is an
@@ -1085,7 +749,7 @@ financial collateral which are eligible according to the credit risk mitigation
 framework might be taken into account in the calculation of the exposure in
 accordance with CRE20.76.
 
-#### **CRE30: IRB Approach Overiview**
+### **CRE30: IRB Approach Overiview**
 
 This chapter sets out an overview of the internal
 ratings-based approach to credit risk, including
@@ -1117,7 +781,7 @@ a distinct treatment for purchased receivables may also apply provided certain
 conditions are met. For the equity asset class the IRB approach is not permitted,
 as outlined further below.
 
-##### **Corporate Class**
+#### **Corporate Class**
 
 30.6 In general, a corporate exposure is defined as a debt obligation of a corporation,
 partnership, or proprietorship. Banks are permitted to distinguish separately
@@ -1161,7 +825,7 @@ portfolio default rates;
 1. Loans financing any of the land acquisition, development and construction
 (ADC) phases for properties of those types in such jurisdictions; and
 
-##### **Sovereign Class**
+#### **Sovereign Class**
 
 30.17 This asset class covers all exposures to counterparties treated as sovereigns under
 the standardised approach. This includes sovereigns (and their central banks),
@@ -1170,7 +834,7 @@ approach, multilateral development banks (MDBs) that meet the criteria for a 0%
 risk weight and referred to in the first footnote of CRE20.14 of the standardised
 approach, and the entities referred to in CRE20.10 of the standardised approach.
 
-##### **Bank Class**
+#### **Bank Class**
 
 30.18 This asset class covers exposures to banks as defined in CRE20.16 of the
 standardised approach for credit risk and those securities firms and other
@@ -1183,7 +847,7 @@ equity exposures as defined in CRE30.26; (ii) are not deducted from regulatory
 capital or risk-weighted at 250% according to CAP30; and (iii) are not risk
 weighted at 1250% according to CRE20.62.
 
-##### **Retail Class**
+#### **Retail Class**
 
 30.19 An exposure is categorised as a retail exposure if it meets all of the criteria set out
 in CRE30.20 (which relate to the nature of the borrower and value of individual
@@ -1246,12 +910,12 @@ over the previous 12 months. All exposures that are not QRRE transactors are
 QRRE revolvers, including QRRE exposures with less than 12 months of
 repayment history.
 
-##### **Equity Class**
+#### **Equity Class**
 
 30.26 This asset class covers exposures to equities as defined in CRE20.54 to CRE20.56
 of the standardised approach for credit risk
 
-##### **F-IRB vs A-IRB**
+#### **F-IRB vs A-IRB**
 
 30.32 For each of the asset classes covered under the IRB framework, there are three
 key elements:
@@ -1295,7 +959,7 @@ ultimate parent of the consolidated group). The figures must be based on the
 average amounts calculated over the prior three years, or on the latest amounts
 updated every three years by the bank.
 
-###### **Corporate, Sovereign & Bank Exposures**
+##### **Corporate, Sovereign & Bank Exposures**
 
 30.36 Under the foundation approach, banks must provide their own estimates of PD
 associated with each of their borrower grades, but must use supervisory
@@ -1308,7 +972,7 @@ and provide their own estimates of PD, LGD and EAD.
 30.38 There is an exception to this general rule for the five sub-classes of assets
 identified as SL.
 
-###### **Speciliased Lending & Commercial Real Estate**
+##### **Speciliased Lending & Commercial Real Estate**
 
 30.39 Banks that do not meet the requirements for the estimation of PD under the
 corporate foundation approach for their SL exposures are required to map their
@@ -1330,12 +994,12 @@ these requirements for HVCRE exposure are able to use an advanced approach
 that is similar in all respects to the corporate approach, with the exception of a
 separate risk-weight function as described in CRE31.11.
 
-###### **Retail Exposure**
+##### **Retail Exposure**
 
 30.42 For retail exposures, banks must provide their own estimates of PD, LGD and
 EAD. There is no foundation approach for this asset class.
 
-##### **Roll-out Requirements**
+#### **Roll-out Requirements**
 
 30.45. Once a bank adopts an IRB approach for part of its holdings within an asset class,
 it is expected to extend it across all holdings within that asset class. In this
@@ -1405,13 +1069,13 @@ other sub-classes. However, a bank should not move to the advanced approach
 for the HVCRE sub-class without also doing so for material IPRE exposures at the
 same time
 
-###### **Equity**
+##### **Equity**
 
 30.43 All equity exposures are subject to the approach set out in CRE20.57 of the
 standardised approach for credit risk, with the exception of equity investments in
 funds that are subject to the requirements set out in CRE60.
 
-#### **CRE31: IRB Approach Risk-weight Functions**
+### **CRE31: IRB Approach Risk-weight Functions**
 
 31.1 This chapter presents the calculation of risk weighted assets under the internal
 ratings-based (IRB) approach for: (i) corporate, sovereign and bank exposures;
@@ -1451,7 +1115,7 @@ print(N_x)
 print(G_z)
 ```
 
-##### **Defaulted Exposures (ST3)**
+#### **Defaulted Exposures (ST3)**
 
 31.3 The capital requirement $K$ for a defaulted exposure is equal to the greater of
 zero and the difference between its LGD (described in CRE36.83) and the bank’s
@@ -1460,7 +1124,7 @@ amount for the defaulted exposure is the product of $K$, 12.5, and the EAD.
 
 $\text{RWA} = \max\{0, 12.5\times(\text{LGD}-\text{EL}_\text{BE})\times \text{EAD}\}$
 
-##### **Corporates, Sovereigns & Banks**
+#### **Corporates, Sovereigns & Banks**
 
 31.4 The derivation of risk-weighted assets is dependent on estimates of the PD, LGD,
 EAD and, in some cases, effective maturity (M), for a given exposure.
@@ -1495,7 +1159,7 @@ to USD100 billion.
 
 Correlation $= R_{FI} = 1.25 R$
 
-##### **SME**
+#### **SME**
 
 31.8 Under the IRB approach for corporate credits, banks will be permitted to
 separately distinguish exposures to SME borrowers (defined as corporate
@@ -1510,7 +1174,7 @@ adjustment for SME borrowers.
 Correlation $= R - 0.04(1-\Large\frac{S-5}{45}$
 $)$
 
-##### **Specialised  Lending**
+#### **Specialised  Lending**
 
 31.10 Regarding project finance, object finance, commodities finance and income producing real estate sub-asset classes of specialised lending (SL):
 
@@ -1531,15 +1195,13 @@ weights that is used for other SL exposures, except that they will apply the
 following asset correlation formula:
 
 Correlation
-$= R = 0.12\Large{(\frac{1-e^{-50PD}}{1-e^{-50}}})$
-$+0.30(1-\Large{(\frac{1-e^{-50PD}}{1-e^{-50}}})$
-$)$
+$= R = 0.12{(\frac{1-e^{-50PD}}{1-e^{-50}}})+0.30(1-{(\frac{1-e^{-50PD}}{1-e^{-50}}}))$
 
 31.12 Banks that do not meet the requirements for estimation of LGD or EAD for
 HVCRE exposures must use the supervisory parameters for LGD and EAD for
 corporate exposures, or use the supervisory slotting approach.
 
-##### **Retail  Lending**
+#### **Retail  Lending**
 
 31.13 There are three separate risk-weight functions for retail exposures, as defined in
 CRE31.14 to CRE31.16. Risk weights for retail exposures are based on separate
@@ -1548,7 +1210,7 @@ three retail risk-weight functions contain the full maturity adjustment componen
 that is present in the risk-weight function for exposures to banks, sovereigns and
 corporates. Illustrative risk weights are shown in CRE99.
 
-##### **Retail Residential Mortgage**
+#### **Retail Residential Mortgage**
 
 31.14 For exposures defined in CRE30.19 that are not in default and are secured or
 partly secured by residential mortgages, risk weights will be assigned based on
@@ -1556,12 +1218,11 @@ the following formula:
 
 Correlation $= R = 0.15$
 
-Capital Req $=K=\text{LGD}[N(\Large\frac{G(PD)+\sqrt{R}\times G(0.999)}{\sqrt{1-R}})$
-$-PD]$
+Capital Req $=K=\text{LGD}[N(\frac{G(PD)+\sqrt{R}\times G(0.999)}{\sqrt{1-R}})-PD]$
 
 RWA $=12.5\times K\times$ EAD
 
-##### **QRRE**
+#### **QRRE**
 
 31.15 For qualifying revolving retail exposures as defined in CRE30.23 and CRE30.24
 that are not in default, risk weights are defined based on the following formula:
@@ -1573,7 +1234,7 @@ $-PD]$
 
 RWA $=12.5\times K\times$ EAD
 
-##### **Other Retail Exposures**
+#### **Other Retail Exposures**
 
 31.16 For all other retail exposures that are not in default, risk weights are assigned
 based on the following function, which allows correlation to vary with PD:
@@ -1588,7 +1249,7 @@ $-PD]$
 
 RWA $=12.5\times K\times$ EAD
 
-#### **CRE32: IRB Approach Risk Components**
+### **CRE32: IRB Approach Risk Components**
 
 32.1 This chapter presents the calculation of the risk components (PD, LGD, EAD, M)
 that are used in the formulas set out in CRE31. In calculating these components,
@@ -1596,12 +1257,12 @@ the legal certainty standards for recognising credit risk mitigation under the
 standardised approach to credit risk (CRE22) apply for both the foundation and
 advanced internal ratings-based (IRB) approaches.
 
-##### **Corporate, Sovereign and Banks**
+#### **Corporate, Sovereign and Banks**
 
 32.2 This section, CRE32.2 to CRE32.56, sets out the calculation of the risk components
 for corporate, sovereign and bank exposures.
 
-###### **PDs**
+##### **PDs**
 
 32.3 For corporate, sovereign and bank exposures, the PD is the one-year PD
 associated with the internal borrower grade to which that exposure is assigned.
@@ -1614,7 +1275,7 @@ CRE36.77 to CRE36.79.
 exposure that is used as input into the risk weight formula and the calculation of
 expected loss must not be less than 0.05%.
 
-###### **LGD: F-IRB**
+##### **LGD: F-IRB**
 
 32.6 Under the foundation approach, senior claims on sovereigns, banks, securities
 firms and other financial institutions (including insurance companies and any
@@ -1632,7 +1293,7 @@ used to secure other exposures.
 
 32.8 to 32.14 give a in-depth description of how to deal with collateral
 
-###### **LGD: A-IRB**
+##### **LGD: A-IRB**
 
 32.15 Subject to certain additional minimum requirements specified below (and the
 conditions set out in CRE30.34), supervisors may permit banks to use their own
@@ -1653,7 +1314,7 @@ exposures in the sovereign asset class):
 32.19 The minimum requirements for the derivation of LGD estimates are outlined in
 CRE36.83 to CRE36.88.
 
-###### Exposure at default (EAD)
+##### Exposure at default (EAD)
 
 32.29 The following sections apply to both on and off-balance sheet positions. All
 exposures are measured gross of specific provisions or partial write-offs. The EAD
@@ -1685,7 +1346,7 @@ EAD. In both the foundation approach and advanced approaches, the definition
 of commitments is the same as in the standardised approach, as set out in CRE20.
 94.
 
-###### **EAD: F-IRB**
+##### **EAD: F-IRB**
 
 32.33 The types of instruments and the CCFs applied to them under the F-IRB approach
 are the same as those in the standardised approach, as set out in CRE20.94 to
@@ -1696,7 +1357,7 @@ committed credit line, and the value that reflects any possible constraining of 
 availability of the facility, such as the existence of a ceiling on the potential
 lending amount which is related to a borrower’s reported cash flow.
 
-###### **EAD: A-IBR**
+##### **EAD: A-IBR**
 
 32.36 Banks which meet the minimum requirements for use of their own estimates of
 EAD (see CRE36.89 to CRE36.98) will be allowed for exposures for which A-IRB is
@@ -1719,7 +1380,7 @@ borrower to drawdown, repay and re-draw loans advanced to it.
 Facilities that allow prepayments and subsequent redraws of those
 prepayments are considered as revolving.*
 
-###### **Effective Maturity (M)**
+##### **Effective Maturity (M)**
 
 32.44 Effective maturity (M) will be 2.5 years for exposures to which the bank applies
 the foundation approach, except for repo-style transactions where the effective
@@ -1750,24 +1411,19 @@ permitted to take to fully discharge its contractual obligation (principal, inte
 and fees) under the terms of loan agreement. Normally, this will correspond to
 the nominal maturity of the instrument
 
-##### **Retail**
+#### **Retail**
 
-32.57 This section, CRE32.57 to CRE32.67, sets out the calculation of the risk
-components for retail exposures.
+32.57 This section, CRE32.57 to CRE32.67, sets out the calculation of the risk components for retail exposures.
 
-###### **PDs & LGDs**
+##### **PDs & LGDs**
 
-32.58 For each identified pool of retail exposures, banks are expected to provide an
-estimate of the PD and LGD associated with the pool, subject to the minimum
-requirements as set out in CRE36. Additionally, the PD for retail exposures is the
-greater of: (i) the one-year PD associated with the internal borrower grade to
-which the pool of retail exposures is assigned; and (ii) 0.1% for qualifying
-revolving retail exposure (QRRE) revolvers (see CRE30.24 for the definition of
+32.58 For each identified pool of retail exposures, banks are expected to provide anestimate of the PD and LGD associated with the pool, subject to the minimum requirements as set out in CRE36. Additionally, the PD for retail exposures is the greater of:
+
+- (i) the one-year PD associated with the internal borrower grade to which the pool of retail exposures is assigned; and
+- (ii) 0.1% for qualifying revolving retail exposure (QRRE) revolvers (see CRE30.24 for the definition of
 QRRE revolvers) and 0.05% for all other exposures.
 
-The LGD for each exposure
-that is used as input into the risk weight formula and the calculation of expected
-loss must not be less than the parameter floors indicated in the table below:
+The LGD for each exposure that is used as input into the risk weight formula and the calculation of expected loss must not be less than the parameter floors indicated in the table below:
 
 ![alt text](images/basel/lgd_params_floors_2.png)
 
@@ -1777,7 +1433,7 @@ according to the formula set out in CRE32.17. The LGD floor for residential
 mortgages is fixed at 5%, irrespective of the level of collateral provided by the
 property.
 
-###### **EAD**
+##### **EAD**
 
 32.62 Both on- and off-balance sheet retail exposures are measured gross of specific
 provisions or partial write-offs. The EAD on drawn amounts should not be less
@@ -1808,7 +1464,7 @@ banks must ensure that they continue to hold required capital against the
 undrawn balances associated with the securitised exposures using the IRB
 approach to credit risk for commitments
 
-#### **CRE35: IRB Approach ELs and Provisions**
+### **CRE35: IRB Approach ELs and Provisions**
 
 35.1 This chapter discusses the calculation of expected losses (EL) under the internal
 ratings-based (IRB) approach, and the method by which the difference between
@@ -1818,7 +1474,7 @@ included in or must be deducted from regulatory capital, as outlined in the
 definition of capital standard (CAP10.19 and CAP30.13). The treatment of EL and
 provisions related to securitisation exposures is outlined in CRE40.36.
 
-##### **Expected Losses**
+#### **Expected Losses**
 
 35.2 A bank must sum the EL amount (defined as EL multiplied by exposure at default)
 associated with its exposures to which the IRB approach is applied (excluding the
@@ -1834,7 +1490,7 @@ slotting criteria EL is calculated as described in the chapter on the supervisor
 slotting approach (paragraphs CRE33.8 to CRE33.12). Securitisation exposures do
 not contribute to the EL amount, as set out in CRE40.36.
 
-##### **Provisions**
+#### **Provisions**
 
 35.4 Total eligible provisions are defined as the sum of all provisions (eg specific
 provisions, partial write-offs, portfolio-specific general provisions such as country
@@ -1857,7 +1513,7 @@ Tier 2 capital. If specific provisions exceed the EL amount on defaulted assets 
 assessment also needs to be made before using the difference to offset the EL
 amount on non-defaulted assets.
 
-#### **CRE36: IRB Approach Minimum Requirements**
+### **CRE36: IRB Approach Minimum Requirements**
 
 36.1 This chapter presents the minimum requirements for entry and on-going use of
 the internal ratings-based (IRB) approach. The minimum requirements are set out
@@ -1875,7 +1531,7 @@ in the following 11 sections:
 10) Requirements for recognition of leasing
 11) Disclosure requirements
 
-##### **Section 3: Rating System Design**
+#### **Section 3: Rating System Design**
 
 36.9 The term “rating system” comprises all of the methods, processes, controls, and
 data collection and IT systems that support the assessment of credit risk, the
@@ -1885,7 +1541,7 @@ estimates.
 36.10 Within each asset class, a bank may utilise multiple rating methodologies
 /systems.
 
-###### **Corporate, Sovereign and  Banks**
+##### **Corporate, Sovereign and  Banks**
 
 36.11 A qualifying IRB rating system must have two separate and distinct dimensions:
 
@@ -1899,7 +1555,7 @@ irrespective of any differences in the nature of each specific transaction.
 36.13 The second dimension must reflect transaction-specific factors, such as collateral,
 seniority, product type, etc.
 
-###### **Retail Exposures**
+##### **Retail Exposures**
 
 36.16 Rating systems for retail exposures must be oriented to both borrower and
 transaction risk, and must capture all relevant borrower and transaction
@@ -1923,9 +1579,9 @@ present.
 - Delinquency of exposure: Banks are expected to separately identify
 exposures that are delinquent and those that are not.
 
-##### **Section 7: Risk Quantification**
+#### **Section 7: Risk Quantification**
 
-###### **Overall Requirements**
+##### **Overall Requirements**
 
 36.62 This section addresses the broad standards for own-estimates of PD, LGD, and
 EAD. Generally, all banks using the IRB approaches must estimate a PD for each
@@ -1956,40 +1612,29 @@ data period used for quantification must be sufficient to provide the bank with
 confidence in the accuracy and robustness of its estimates. The estimation
 technique must perform well in out-of-sample tests.
 
-###### **Margin of Conservatism (MoC)**
+##### **Margin of Conservatism (MoC)**
 
 36.67 In general, estimates of PDs, LGDs, and EADs are likely to involve unpredictable
 errors. In order to avoid over-optimism, a bank must add to its estimates a margin of conservatism that is related to the likely range of errors. Where methods and data are less satisfactory and the likely range of errors is larger, the
 margin of conservatism must be larger.
 
-###### **Appropriate Adjustment (AA)**
+##### **Appropriate Adjustment (AA)**
 
 Supervisors may allow some flexibility in application of the required standards for data that are collected prior to the date of implementation of this Framework. However, in such cases banks must
 demonstrate to their supervisors that appropriate adjustments have been made to achieve broad equivalence to the data without such flexibility. Data collected beyond the date of implementation must conform to the minimum standards unless otherwise stated.
 
-###### **Default Definition**
+##### **Default Definition**
 
-36.68 A default is considered to have occurred with regard to a particular obligor when
-either or both of the two following events have taken place.
+36.68 A default is considered to have occurred with regard to a particular obligor when either or both of the two following events have taken place.
 
-1. The bank considers that the obligor is unlikely to pay its credit obligations to
-the banking group in full, without recourse by the bank to actions such as
-realising security (if held).
-2. The obligor is past due more than 90 days on any material credit obligation
-to the banking group. Overdrafts will be considered as being past due once
-the customer has breached an advised limit or been advised of a limit
-smaller than current outstandings.
+1. The bank considers that the obligor is unlikely to pay its credit obligations to the banking group in full, without recourse by the bank to actions such as realising security (if held).
+2. The obligor is past due more than 90 days on any material credit obligation to the banking group. Overdrafts will be considered as being past due once the customer has breached an advised limit or been advised of a limit smaller than current outstandings.
 
-36.71 For retail exposures, the definition of default can be applied at the level of a
-particular facility, rather than at the level of the obligor. As such, default by a
-borrower on one obligation does not require a bank to treat all other obligations
-to the banking group as defaulted.
+36.71 For retail exposures, the definition of default can be applied at the level of a particular facility, rather than at the level of the obligor. As such, default by a borrower on one obligation does not require a bank to treat all other obligations to the banking group as defaulted.
 
-36.72 A bank must record actual defaults on IRB exposure classes using this reference
-definition. A bank must also use the reference definition for its estimation of PDs,
-and (where relevant) LGDs and EADs.
+36.72 A bank must record actual defaults on IRB exposure classes using this reference definition. A bank must also use the reference definition for its estimation of PDs, and (where relevant) LGDs and EADs.
 
-###### **Loss Definition**
+##### **Loss Definition**
 
 36.76 The definition of loss used in estimating LGD is economic loss. When measuring
 economic loss, all relevant factors should be taken into account. This must
@@ -2002,7 +1647,7 @@ their LGD estimates, but adjustments to estimates for such expertise must be
 conservative until the bank has sufficient internal empirical evidence of the
 impact of its expertise.
 
-###### **PD Requirements: Corporates, Sovereigns and Banks**
+##### **PD Requirements: Corporates, Sovereigns and Banks**
 
 36.78 For all
 methods listed below, banks must estimate a PD for each rating grade based on
@@ -2044,23 +1689,12 @@ source. If the available observation period spans a longer period for any source
 and this data are relevant and material, this longer period must be used. The data
 should include a representative mix of good and bad years.
 
-###### **PD Requirements: Retail**
+##### **PD Requirements: Retail**
 
-36.80 Given the bank-specific basis of assigning exposures to pools, banks must regard
-internal data as the primary source of information for estimating loss
-characteristics. Banks are permitted to use external data or statistical models for
-quantification provided a strong link can be demonstrated between: (a) the bank’
-s process of assigning exposures to a pool and the process used by the external
-data source; and (b) between the bank’s internal risk profile and the composition
-of the external data. In all cases banks must use all relevant and material data
-sources as points of comparison.
+36.80 Given the bank-specific basis of assigning exposures to pools, banks must regard internal data as the primary source of information for estimating loss characteristics. Banks are permitted to use external data or statistical models for quantification provided a strong link can be demonstrated between:
 
-36.79 Irrespective of whether a bank is using external, internal, or pooled data sources,
-or a combination of the three, for its PD estimation, the length of the underlying
-historical observation period used must be at least five years for at least one
-source. If the available observation period spans a longer period for any source,
-and this data are relevant and material, this longer period must be used. The data
-should include a representative mix of good and bad years.
+- (a) the bank’s process of assigning exposures to a pool and the process used by the external data source; and
+- (b) between the bank’s internal risk profile and the composition of the external data. In all cases banks must use all relevant and material data sources as points of comparison.
 
 36.81 One method for deriving long-run average estimates of PD and default-weighted
 average loss rates given default (as defined in CRE36.83) for retail would be
@@ -2072,16 +1706,9 @@ the LGD used for the IRB capital calculation cannot be less than the long-run
 default-weighted average loss rate given default and must be consistent with the
 concepts defined in CRE36.83.
 
-36.82 Irrespective of whether banks are using external, internal, pooled data sources, or
-a combination of the three, for their estimation of loss characteristics, the length
-of the underlying historical observation period used must be at least five years. If
-the available observation spans a longer period for any source, and these data
-are relevant, this longer period must be used. The data should include a
-representative mix of good and bad years of the economic cycle relevant for the
-portfolio. The PD should be based on the observed historical average one-year
-default rate.
+36.82 Irrespective of whether banks are using external, internal, pooled data sources, or a combination of the three, for their estimation of loss characteristics, the length of the underlying historical observation period used must be at least five years. If the available observation spans a longer period for any source, and these data are relevant, this longer period must be used. The data should include a representative mix of good and bad years of the economic cycle relevant for the portfolio. The PD should be based on the observed historical average one-year default rate.
 
-###### **LGD Requirements**
+##### **LGD Requirements**
 
 36.83 A bank must estimate an LGD for each facility that aims to reflect economic
 downturn conditions where necessary to capture the relevant risks. This LGD
@@ -2132,7 +1759,7 @@ relevant, this longer period must be used.
 five years. The less data a bank has, the more conservative it must be in its
 estimation.
 
-###### **EAD Requirements**
+##### **EAD Requirements**
 
 36.89 EAD for an on-balance sheet or off-balance sheet item is defined as the expected
 gross exposure of the facility upon default of the obligor.
@@ -2157,10 +1784,7 @@ explicitly confirm that the basic downturn requirement of the framework is met, 
 the bank’s estimates do not fall below a (conservative) estimate of the long-run
 default-weighted average EAD for similar facilities.
 
-36.93 Banks’ EAD estimates must be developed using a 12-month fixed-horizon
-approach; ie for each observation in the reference data set, default outcomes
-must be linked to relevant obligor and facility characteristics twelve months prior
-to default.
+36.93 Banks’ EAD estimates must be developed using a 12-month fixed-horizon approach; ie for each observation in the reference data set, default outcomes must be linked to relevant obligor and facility characteristics twelve months prior to default.
 
 36.94 Consistent with this principle, EAD estimates applied to particular exposures should not be based on data that comingle the effects of disparate characteristics or data from exposures that
 exhibit different characteristics (eg same broad product grouping but different
@@ -2184,26 +1808,12 @@ other credit-related products over the observation period unless that data
 has been effectively mitigated for such changes, eg by adjusting the data to
 remove the effects of the changes in the product mix
 
-36.95 A well-known feature of the commonly used undrawn limit factor (ULF) approach
-to estimating CCFs is the region of instability associated with facilities close to
-being fully drawn at reference date. Banks should ensure that their EAD estimates
-are effectively quarantined from the potential effects of this region of instability.
+36.95 A well-known feature of the commonly used undrawn limit factor (ULF) approach to estimating CCFs is the region of instability associated with facilities close to being fully drawn at reference date. Banks should ensure that their EAD estimates are effectively quarantined from the potential effects of this region of instability.
 
-- (1) An acceptable approach could include using an estimation method other
-than the ULF approach that avoids the instability issue by not using
-potentially small undrawn limits that could approach zero in the
-denominator or, as appropriate, switching to a method other than the ULF as
-the region of instability is approached, eg a limit factor, balance factor or
-additional utilisation factor approach. Note that, consistent with CRE36.94,
-including limit utilisation as a driver in EAD models could quarantine much
-of the relevant portfolio from this issue but, in the absence of other actions,
-leaves open how to develop appropriate EAD estimates to be applied to
-exposures within the region of instability.
-- (2) Common but ineffective approaches to mitigating this issue include capping
-and flooring reference data (eg observed CCFs at 100 per cent and zero
-respectively) or omitting observations that are judged to be affected.
+- (1) An acceptable approach could include using an estimation method other than the ULF approach that avoids the instability issue by not using potentially small undrawn limits that could approach zero in the denominator or, as appropriate, switching to a method other than the ULF as the region of instability is approached, eg a limit factor, balance factor or additional utilisation factor approach. Note that, consistent with CRE36.94, including limit utilisation as a driver in EAD models could quarantine much of the relevant portfolio from this issue but, in the absence of other actions, leaves open how to develop appropriate EAD estimates to be applied to exposures within the region of instability.
+- (2) Common but ineffective approaches to mitigating this issue include capping and flooring reference data (eg observed CCFs at 100 per cent and zero respectively) or omitting observations that are judged to be affected.
 
-###### Undrawn Limit Factor Method
+##### Undrawn Limit Factor Method
 
 A specific type of CCF, where predicted additional drawings in the leadup to default are expressed as a percentage of the undrawn limit that remains available to the obligor under the terms and conditions of a facility
 
@@ -2213,20 +1823,20 @@ $\text {EAD} = B_0 = B_t + \text{ULF}(L_t – B_t)$ where
 - $B_t$ is the current balance (for predicted EAD) or balance at reference date (for observed EAD);
 - $L_t$ is the current limit (for predicted EAD) or limit at reference date (for realised/observed EAD).
 
-###### Limit Factor Method
+##### Limit Factor Method
 
 A limit factor (LF) is a specific type of CCF, where the predicted balance at default is expressed as a percentage of the total limit that is available to the obligor under the terms and conditions of a credit facility,
 
 $\text {EAD} = B_0 = LF\times L_t$ where
 
-###### Balance Factor Method
+##### Balance Factor Method
 
 A balance factor (BF) is a specific type of CCF, where the predicted balance at default is
 expressed as a percentage of the current balance that has been drawn down under a credit facility.
 
 $\text {EAD} = B_0 = BF\times B_t$ where
 
-###### Additional Utilisation Factor
+##### Additional Utilisation Factor
 
 An additional utilisation factor (AUF) is a specific type of CCF, where predicted
 additional drawings in the lead-up to default are expressed as a percentage of the total limit that is available to the obligor under the terms and conditions of a credit facility.
@@ -2237,13 +1847,6 @@ $\text {EAD} = B_0 = B_t + \text{AUF}(L_t)$ where
 facility limits. Accrued interest, other due payments and limit excesses should be
 included in EAD reference data.
 
-36.98 Estimates of EAD must be based on a time period that must ideally cover a
-complete economic cycle but must in any case be no shorter than a period of
-seven years. If the available observation period spans a longer period for any
-source, and the data are relevant, this longer period must be used. EAD estimates
-must be calculated using a default-weighted average and not a time-weighted
-average.
+36.98 Estimates of EAD must be based on a time period that must ideally cover a complete economic cycle but must in any case be no shorter than a period of seven years. If the available observation period spans a longer period for any source, and the data are relevant, this longer period must be used. EAD estimates must be calculated using a default-weighted average and not a time-weighted average.
 
-36.99 The minimum data observation period for EAD estimates for retail exposures is
-five years. The less data a bank has, the more conservative it must be in its
-estimation.
+36.99 The minimum data observation period for EAD estimates for retail exposures is five years. The less data a bank has, the more conservative it must be in its estimation.

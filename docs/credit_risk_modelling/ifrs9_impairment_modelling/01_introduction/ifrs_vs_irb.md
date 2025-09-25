@@ -1,0 +1,3 @@
+# **IFRS 9 vs IRB**
+
+Banks around the globe leverage their well-established IRB models as starting point to satisfy the IFRS 9 modelling needs. The IRB PD, LGD and EAD parameters are typically TTC. IFRS 9 requires the use of PIT parameters. The outcome of the IRB models is adjusted for IFRS 9 purposes to reflect forward looking and macro-economic information. The figure below provides an example of the steps taken to convert TTC parameters to PIT parameters and meet IFRS 9 compliance.
