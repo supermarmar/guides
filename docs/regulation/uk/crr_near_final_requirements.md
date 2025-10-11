@@ -1,6 +1,10 @@
-# Capital Requirements Regulation (CRR)
+# Capital Requirements Regulation (CRR) Near Final Requirements
 
 <https://www.bankofengland.co.uk/-/media/boe/files/prudential-regulation/policy-statement/2024/september/ps924app2.pdf>
+
+While SS4/24 is the most recent standalone issuance, it is part of a broader regime change the PRA is implementing — namely, the restatement and adaptation of CRR (Capital Requirements Regulation) into the PRA’s domestic rulebook, especially post-Brexit. This is sometimes informally referred to as the “CRR Near Final Requirements” exercise.
+
+The PRA is consulting and implementing restated CRR provisions (own funds, definition of capital, credit quality steps, large exposures, etc.) into its UK Rulebook. PS12/25 is a policy statement on the restatement of CRR and Solvency II requirements into the PRA Rulebook, effective 1 January 2026. The “near-final rules” include how CRR’s capital, liquidity, large exposure, and credit risk regimes will be embedded in the PRA’s own rulebook (with modifications to suit the UK context).
 
 ## Required Level of Own Funds (CRR) Part (Annex B)
 
@@ -26,6 +30,11 @@
 ## Credit Risk: Standardised Approach (CRR) Part (Annex D)
 
 ## Credit Risk: Internal Ratings Based Approach (CRR) Part (Annex E)
+
+### Article 144 HIGH-LEVEL REQUIREMENTS FOR USING THE IRB APPROACH
+
+1. An institution shall meet the following requirements when using the IRB Approach:
+    - (b) internal ratings and default and loss estimates used in the calculation of own funds requirements and associated systems and processes shall play an essential role in the risk management and decision-making process, and in the credit approval, internal capital allocation and corporate governance functions of the institution;
 
 ### Article 163 PROBABILITY OF DEFAULT (PD): RETAIL
 
@@ -63,8 +72,8 @@
 
     - (a) the institution shall estimate PDs by obligor grade, facility grade or pool from long run  averages of one-year default rates over a representative mix of good and bad economic  periods;
     - (c) the institution shall regard internal data for assigning exposures to grades or pools as the primary source of information for estimating loss characteristics. The institution may use external data (including pooled data) or statistical models for quantification provided that the following strong links both exist:
-        - (i) between the institution’s process of assigning exposures to grades or pools and the process used by the external data source; and 
-        - (ii) between the institution’s internal risk profile and the composition of the external data; 
+        - (i) between the institution’s process of assigning exposures to grades or pools and the process used by the external data source; and
+        - (ii) between the institution’s internal risk profile and the composition of the external data;
     - (e) irrespective of whether the institution is using external, internal or pooled data sources or a combination of the three, for its estimation of loss characteristics, the length of the underlying  historical observation period used shall be at least five years for at least one source. If the  available observations span a longer period for any source, and these data are relevant, this longer period shall be used. The data shall include a representative mix of good and bad years from the economic cycle relevant for the type of exposures;
 
 ### Article 182 REQUIREMENTS SPECIFIC TO OWN-CONVERSION FACTOR ESTIMATES AND EAD ESTIMATES

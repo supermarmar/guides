@@ -1,6 +1,4 @@
-# **European Banking Authority**
-
-## **Capital Requirements Regulation (CRR)**
+# **Capital Requirements Regulation (CRR)**
 
 In response to the global financial crisis of 2008-2009, the Union embarked on a wide-ranging reform of the prudential framework for institutions, as defined in Regulation (EU) No 575/2013 of the European Parliament and of the Council (4) with a view to increasing the resilience of the Union banking sector. One of the main elements of the reform consisted of the implementation of the international standards agreed in 2010 by the Basel Committee on Banking Supervision (BCBS), specifically the so-called ‘Basel III reform’ and the resulting Basel III standards. Thanks to that reform, the Union banking sector entered the COVID-19 crisis on a resilient footing. However, while the overall level of capital in institutions in the Union is now generally satisfactory, some of the problems that were identified in the wake of the global financial crisis have yet to be addressed.
 
@@ -8,7 +6,7 @@ In response to the global financial crisis of 2008-2009, the Union embarked on a
 
 <https://www.eba.europa.eu/regulation-and-policy/single-rulebook/interactive-single-rulebook/12674>
 
-### Article 179: Overall requirements for estimation
+## Article 179: Overall requirements for estimation
 
 1. In quantifying the risk parameters to be associated with rating grades or pools, institutions shall apply the following requirements:
 
@@ -16,7 +14,7 @@ In response to the global financial crisis of 2008-2009, the Union embarked on a
 - (b) an institution shall be able to provide a breakdown of its loss experience in terms of default frequency, LGD, conversion factor, or loss where EL estimates are used, by the factors it sees as the drivers of the respective risk parameters. The institution's estimates shall be representative of long run experience;
 - (f) an institution shall add to its estimates a margin of conservatism that is related to the expected range of estimation errors. Where methods and data are considered to be less satisfactory, the expected range of errors is larger, the margin of conservatism shall be larger.
 
-### Article 182: Requirements specific to own-conversion factor estimates
+## Article 182: Requirements specific to own-conversion factor estimates
 
 1. In quantifying the risk parameters to be associated with rating grades or pools, institutions shall apply the following requirements specific to own-conversion factor estimates:
 
@@ -61,11 +59,11 @@ Approach for certain types of exposures in accordance with the sequential implem
 applies for implementation of material changes to the IRB Approach or applies to return to the use
 of less sophisticated approaches.
 
-### Chapter 8: Assessment methodology for risk quantification
+## Chapter 8: Assessment methodology for risk quantification
 
-#### Section 2: Overall Risk Parameter Quantification
+### Section 2: Overall Risk Parameter Quantification
 
-##### Article 47: MoC
+#### Article 47: MoC
 
 1. Competent authorities shall assess whether an appropriate margin of conservatism is
 included in the values of risk parameters used in the calculation of capital requirements
@@ -83,9 +81,9 @@ in the institution’s risk appetite.
 requirements laid down in Article 146 of Regulation (EU) No 575/2013 and any related
 corrective actions by the institution, but shall apply in addition to them.
 
-#### Section 5: EAD
+### Section 5: EAD
 
-##### Article 56: Length of the historical observation period
+#### Article 56: Length of the historical observation period
 
 In assessing the length of the historical observation period used for conversion factors
 estimation, as referred to in Article 182(2), (3) and (4) of Regulation (EU) No 575/2013,
@@ -104,7 +102,7 @@ historical data used, that this is justified by better prediction of conversion
 factors and that specific weights applied to realised conversion factors are
 significantly higher than zero.
 
-##### Article 57: Method of conversion factors estimation
+#### Article 57: Method of conversion factors estimation
 
 In assessing the method of conversion factors estimation, as referred to in Article 182 of the
 Regulation (EU) No 575/2013, competent authorities shall verify that:
@@ -129,7 +127,7 @@ applied:
   - (vi) the human judgement;
   - (vii) where applicable, the choice of risk drivers.
 
-##### Article 58: Use of conversion factor estimates appropriate for economic downturn
+#### Article 58: Use of conversion factor estimates appropriate for economic downturn
 
 In assessing the requirements for conversion factor estimates as referred to in Article 182 of Regulation (EU) No 575/2013, competent authorities shall verify that:
 
