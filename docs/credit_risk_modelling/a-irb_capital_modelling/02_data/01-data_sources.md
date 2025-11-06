@@ -18,7 +18,7 @@ These sources provide information on the bank's own portfolio and operations. Ro
 These sources provide information from outside the bank, offering a broader perspective on borrower risk. Careful consideration of data quality, licensing, and privacy regulations is essential.
 
 1. **Application Data**: Information provided by customers during the loan application process. This includes income, employment history, assets, liabilities, and other financial information. This is used to assess creditworthiness and estimate PD.
-2. **Credit Bureau Data**: Information from credit bureaus, including credit scores, credit history, payment behaviour, and other relevant credit information (inquiries). This is a critical input for PD estimation and can help to validate internal data. 
+2. **Credit Bureau Data**: Information from credit bureaus, including credit scores, credit history, payment behaviour, and other relevant credit information (inquiries). This is a critical input for PD estimation and can help to validate internal data.
 
 ## Probability of Default (PD)
 

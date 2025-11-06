@@ -6,6 +6,16 @@ While SS4/24 is the most recent standalone issuance, it is part of a broader reg
 
 The PRA is consulting and implementing restated CRR provisions (own funds, definition of capital, credit quality steps, large exposures, etc.) into its UK Rulebook. PS12/25 is a policy statement on the restatement of CRR and Solvency II requirements into the PRA Rulebook, effective 1 January 2026. The “near-final rules” include how CRR’s capital, liquidity, large exposure, and credit risk regimes will be embedded in the PRA’s own rulebook (with modifications to suit the UK context).
 
+## Glosarry (Annex A)
+
+transactor exposure:
+
+- means an exposure to an obligor for the following revolving facilities:
+  - (1) revolving facilities where:
+    - (a) the balance to be repaid at each scheduled repayment date is determined as the amount drawn at a pre-defined reference date (including credit cards and charge cards); and  
+    - (b) the obligor has repaid the balance in full at each scheduled repayment date for the previous 12-month period; and
+  - (2) an overdraft facility which the obligor has not drawn down over the previous 12 month period.  
+
 ## Required Level of Own Funds (CRR) Part (Annex B)
 
 ### Article 92  OWN FUNDS REQUIREMENTS

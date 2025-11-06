@@ -8,7 +8,6 @@ FirstRand’s retail banking business is dominated by FNB, serving individuals a
 
 | Product                             | Provided by           | Status | Description                                                                                          |
 | ----------------------------------- | --------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
-
 | **Current accounts**                | FNB                   | 🟢     | Standard retail current and transactional accounts with digital and app-based banking capabilities.  |
 | **Credit cards**                    | FNB                   | 🟢     | Personal and business credit cards, rewards-linked, and integrated into digital platforms.           |
 | **Personal loans**                  | FNB                   | 🟢     | Unsecured personal and revolving loans for individuals with credit-scoring via FNB’s risk systems.   |
