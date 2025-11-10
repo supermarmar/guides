@@ -25,3 +25,4 @@ REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
 HOME_CREDIT_DB = "home_credit_mds.db"
+DATA_DICTIONARY_FILE = "HomeCredit_columns_description.csv"

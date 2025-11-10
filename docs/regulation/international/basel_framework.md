@@ -499,8 +499,7 @@ CRE20.47.
 20.64 For the purpose of determining risk weighted assets, the
 retail exposure class consists of the follow three sets of exposures:
 
-1. “Regulatory retail” exposures that do not arise from exposures to
-“transactors” (as defined in CRE20.66).
+1. “Regulatory retail” exposures that do not arise from exposures to “transactors” (as defined in CRE20.66).
 2. “Regulatory retail” exposures to “transactors”.
 3. “Other retail” exposures.
 
@@ -523,11 +522,7 @@ diversification of the regulatory retail portfolio. Defaulted retail exposures
 are to be excluded from the overall regulatory retail portfolio when assessing
 the granularity criterion.
 
-20.66 “Transactors” are obligors in relation to facilities such as credit cards and charge
-cards where the balance has been repaid in full at each scheduled repayment
-date for the previous 12 months. Obligors in relation to overdraft facilities would
-also be considered as transactors if there has been no drawdown over the
-previous 12 months
+20.66 “Transactors” are obligors in relation to facilities such as credit cards and charge cards where the balance has been repaid in full at each scheduled repayment date for the previous 12 months. Obligors in relation to overdraft facilities would also be considered as transactors if there has been no drawdown over the previous 12 months
 
 20.67 “Other retail” exposures are defined as exposures to an individual person or
 persons that do not meet all of the regulatory retail criteria in CRE20.65.
