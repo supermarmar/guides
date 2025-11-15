@@ -4,6 +4,8 @@
 
 This repository provides a structured pathway to becoming a proficient credit risk modeller, featuring practical guides, executable code examples, and real-world applications of regulatory frameworks including IFRS 9 impairment modelling and Advanced Internal Ratings-Based (A-IRB) capital models.
 
+[View Repository →](https://github.com/supermarmar/guides)
+
 ## 🎯 Learning Journey
 
 ### **Foundation Level** → **Intermediate** → **Advanced Regulatory Models**
