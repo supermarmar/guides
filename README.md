@@ -1,98 +1,60 @@
-# Project Organization
+# Crop Modelling
 
-```text
+<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
+    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
+</a>
+
+Agricultural crop yield consistency modeling project for pre-credit scoring. This project analyzes SAFEX and StatsSA data to predict crop yields and assess agricultural credit risk.
+
+## Project Organization
+
+```
 ├── LICENSE            <- Open-source license if one is chosen
 ├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
 ├── README.md          <- The top-level README for developers using this project.
 ├── data
 │   ├── external       <- Data from third party sources.
 │   ├── interim        <- Intermediate data that has been transformed.
-│   ├── mappings       <- Data dictionaries.
-│   ├── predictions    <- Model predictions for both training and testing.
-│   ├── processed      <- The **final**, canonical data sets for modeling.
-│   ├── raw            <- The original, immutable data dump.
-│   └── template       <- Standardised Excel templates used for client engagements or model inputs.
+│   ├── processed      <- The final, canonical data sets for modeling.
+│   └── raw            <- The original, immutable data dump.
 │
-├── docs               <- Version-controlled guides, including executable examples and a bibliography
-│   ├── azure          <- An Azure specific guide with team standards on managing the repo
-│   ├── modelling      <- Training and reference guides for all topics (e.g. IFRS 9, Basel 3.1)
-│   └── regulation     <- Latest regulation material for IFRS9, Basel 3.1, PRA etc.
+├── docs               <- A default mkdocs project; see www.mkdocs.org for details
+│
+├── models             <- Trained and serialized models, model predictions, or model summaries
+│
+├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
+│                         the creator's initials, and a short `-` delimited description, e.g.
+│                         `1.0-jqp-initial-data-exploration`.
 │
 ├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         src and configuration for tools like black
+│                         crop_modelling and configuration for tools like black
+│
+├── references         <- Data dictionaries, manuals, and all other explanatory materials.
+│
+├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
+│   └── figures        <- Generated graphics and figures to be used in reporting
 │
 ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
 │                         generated with `pip freeze > requirements.txt`
 │
-├── setup.cfg          <- Configuration file for flake8.
+├── setup.cfg          <- Configuration file for flake8
 │
-└── src   <- Source code for use in this project.
+└── crop_modelling   <- Source code for use in this project.
     │
-    ├── __init__.py             <- Makes src a Python module.
+    ├── __init__.py             <- Makes crop_modelling a Python module
     │
-    ├── config.py               <- Store useful variables and configuration.
+    ├── config.py               <- Store useful variables and configuration
     │
-    └── functions               <- Store all functions that get imported into pipelines.
+    ├── dataset.py              <- Scripts to download or generate data
+    │
+    ├── features.py             <- Code to create features for modeling
+    │
+    ├── modeling                
+    │   ├── __init__.py 
+    │   ├── predict.py          <- Code to run model inference with trained models          
+    │   └── train.py            <- Code to train models
+    │
+    └── plots.py                <- Code to create visualizations
 ```
 
-## Documentation
-
-For detailed information, please refer to the [documentation](docs/index.md).
-
-## Packages
-
-```python
-# visualisation
-matplotlib # 2D plotting library.
-seaborn # Statistical data visualization based on matplotlib.
-plotly # Interactive plotting library.
-
-# data manipulation
-numpy # Numerical computing foundation.
-pandas # Data manipulation and analysis.
-polars # Blazingly fast DataFrames.
-pyarrow #Apache Arrow for columnar data processing using parquet.
-
-# data validation
-pandera # Data validation and schema enforcement for pandas DataFrames.
-
-# data generation & API
-faker # Generate synthetic data for testing and development.
-eikon # Refinitiv Eikon API for financial data (assuming this is the intended use).
-
-# database
-duckdb # In-process analytical SQL database.
-psycopg # PostgreSQL adapter for Python.
-sqlparse # SQL parser for Python.
-pyspark # Apache Spark interface for Python (Big Data processing).
-
-# stats models
-scipy # Scientific computing, including statistics, optimization, etc.
-statsmodels # Statistical models, hypothesis testing, and data exploration.
-
-# ml models
-scikit-learn # General machine learning algorithms.
-xgboost # Gradient boosting library.
-lightgbm
-catboost
-
-# alternative models
-lifelines # Survival analysis.
-nelson-siegel-svensson # Library for Nelson-Siegel-Svensson yield curve fitting.
-
-# natural language processing
-nltk # Natural Language Toolkit.
-spacy
-
-# model interpretability
-lime
-shap
-
-# utility
-tqdm # Progress bars for loops and iterables.
-loguru # Logging library.
-dotenv # Load environment variables from .env files.
-typer # Build command-line interfaces easily.
-ipykernel # IPython kernel for Jupyter notebooks and interactive computing.
-papermill # Tool for parameterizing and executing Jupyter Notebooks.
-```
+--------
