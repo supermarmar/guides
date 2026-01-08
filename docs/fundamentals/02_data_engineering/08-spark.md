@@ -1,22 +1,22 @@
-# **Spark** ⚡
+# Spark ⚡
 
-## **Big Data**
+## Big Data
 
 Big data is a relative concept that can be difficult to grasp. It may be easier to define big data using the features that make it hard to handle in the first place. We can generally categorize big data by what are known as the three Vs: volume, velocity, and variety. Depending on where you look (or who you ask), there may be a different number of Vs. Some will say that there are 4, 5, 10, or even 17 Vs of big data! The three Vs we talk about here are the core of most definitions and give a complete picture of big data’s features.
 
-### **Volume**
+### Volume
 
 Big data is “big”. While this may seem obvious, it’s an important concept to cover. As previously mentioned, the definition of “big” is that the data is bigger than the amount of available computing power. Currently, zettabytes of data are created every year (for reference, a zettabyte is 1 billion terabytes).
 
-### **Velocity**
+### Velocity
 
 Big data has velocity, meaning that it is growing quickly. If data were simply large, but slow-changing, then over time our computing power would eventually catch up to the size of the data. Through means like apps and sensors, data becomes faster, cheaper, and easier to collect automatically and continuously.
 
-### **Variety**
+### Variety
 
 Big data also has variety, meaning that it comes in different, and sometimes complex, forms. In today’s data ecosystem, data comes in many more formats than the data tables of old. Data can be categorized as structured (data tables with rows and columns), semi-structured (think JSON files with nested data), and unstructured (audio, image, and video data). Each of these data formats presents different challenges in processing.
 
-## **PySpark**
+## PySpark
 
 As big data processing needs have grown, new technology has been developed. Spark is an analytics engine originally developed at UC Berkeley and eventually donated to the open-sourced Apache Software Foundation. Spark was designed as a solution for processing big datasets and was specifically developed to build data pipelines for machine learning applications. Like MapReduce, Spark does not have its own file storage system and is designed to be used with distributed file systems like HDFS. However, Spark can also be run on a single node (single computer) in stand-alone mode with a non-distributed dataset.
 
@@ -34,7 +34,7 @@ print("PySpark version:", spark.version)
 print(spark)
 ```
 
-### **Resilient Distributed Datasets**
+### Resilient Distributed Datasets
 
 RDDs are the foundational data structures of Spark. Newer Spark structures like DataFrames are built on top of RDDs. While DataFrames are more commonly used in industry, RDDs are not deprecated and are still called for in certain circumstances. For example, RDDs are useful for processing unstructured data, such as text or images, that don’t fit nicely in the tabular structure of a DataFrame.
 
@@ -86,7 +86,7 @@ Finally, we need to know how to end our SparkSession when we are finished with o
 spark.stop()
 ```
 
-### **Transformation**
+### Transformation
 
 Many of the Spark functions we use on RDDs are similar to those we regularly use in Python. We can also use lambda expressions within RDD functions. Lambdas allow us to apply a simple operation to an object in a single line without defining it as a function.
 
@@ -245,7 +245,7 @@ print(sat_1500)
 
 You may have noticed that each function took an RDD as input and returned an RDD as output. In Spark, functions with this behavior are called transformations. You can find more transformations in the [Official Spark documentation](https://spark.apache.org/docs/latest/rdd-programming-guide.html#transformations).
 
-### **Modules**
+### Modules
 
 The driver program is the core of the Spark application, but there are also modules that have been developed to enhance the utility of Spark. These modules include:
 
@@ -256,8 +256,8 @@ The driver program is the core of the Spark application, but there are also modu
 
 While we can directly analyze data using Spark’s Resilient Distributed Datasets (RDDs), we may not always want to perform complicated analysis directly on RDDs. Luckily, Spark offers a module called Spark SQL that can make common data analysis tasks simpler and faster. The name Spark SQL is an umbrella term, as there are several ways to interact with data when using this module. We’ll cover two of these methods using the PySpark API:
 
-- First, we’ll learn the basics of inspecting and querying data in a **Spark DataFrame**.
-- Then, we’ll perform these same operations using **standard SQL** directly in our PySpark code.
+- First, we’ll learn the basics of inspecting and querying data in a Spark DataFrame.
+- Then, we’ll perform these same operations using standard SQL directly in our PySpark code.
 
 Before using either method, we must start a `SparkSession`, the entry point to Spark SQL. The session is a wrapper around a `sparkContext` and contains all the metadata required to start working with distributed data. The code below uses `SparkSession.builder` to set configuration parameters and create a new session. In the following example, we set one configuration parameter `(spark.app.name)` and call the `.getOrCreate()` method to initialize the new `SparkSession`.
 
@@ -284,7 +284,7 @@ print(spark.sparkContext)
 
 From here, we can use the `SparkSession` to create `DataFrames`, read external files, register tables, and run SQL queries over saved data. When we’re done with our analysis, we can clear the Spark cache and terminate the session with `SparkSession.stop()`.
 
-### **Spark DataFrame**
+### Spark DataFrame
 
 A PySpark SQL `DataFrame` is a distributed collection of data with a specific row and column structure. Under the hood, `DataFrames` are built on top of RDDs. Like `pandas`, PySpark SQL `DataFrames` allow a developer to analyze data more easily than by writing functions directly on underlying data.
 
@@ -327,7 +327,7 @@ sample_page_views_rdd_restored.collect()
 
 You may notice that the restored RDD is not identical to the original RDD! Although the data is the same, when we converted the data to a DataFrame, PySpark automatically wrapped the original content into a Row. Behind the scenes, rows allow for more efficient calculations over large distributed data.
 
-### **Reading Data**
+### Reading Data
 
 Let’s take a look at the code we might use to read a CSV. You can refer to the PySpark documentation to explore all available [DataFrameReader](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrameReader.html) options and file formats.
 
@@ -379,7 +379,7 @@ wiki_uniq_pandas_df.head(5)
 wiki_uniq_polars_df.head(5)
 ```
 
-### **Cleaning Data**
+### Cleaning Data
 
 Like Pandas, Spark DataFrames offer a series of operations for cleaning, inspecting, and transforming data.
 
@@ -458,7 +458,7 @@ wiki_uniq_pandas_df.rename(columns={"article_title": "page_title"}, inplace=True
 wiki_uniq_polars_df.rename({"article_title": "page_title"}, in_place=True)
 ```
 
-### **Querying Data**
+### Querying Data
 
 PySpark SQL DataFrames have a variety of built-in methods that can help with analyzing data. However, working with DataFrame methods still requires some practice, and the code can become quite verbose. Luckily, we can analyze data in Spark with standard SQL through the `SparkSession.sql()` method.
 
@@ -468,7 +468,7 @@ Before querying a DataFrame with SQL in Spark, it must be saved to the SparkSess
 wiki_uniq_df.createOrReplaceTempView('wiki_uniq')
 ```
 
-#### **Selecting Columns**
+#### Selecting Columns
 
 This is analogous to a SQL `SELECT` clause.
 
@@ -490,7 +490,7 @@ wiki_uniq_pandas_df[["language_code", "page_title", "hourly_count"]].head(5)
 wiki_uniq_polars_df.select(["language_code", "page_title", "hourly_count"]).head(5)
 ```
 
-#### **Ordering Rows**
+#### Ordering Rows
 
 This is analogous to a SQL `ORDER BY` clause.
 
@@ -513,7 +513,7 @@ wiki_uniq_pandas_df.sort_values(by="hourly_count", ascending=False).head(5)
 wiki_uniq_polars_df.sort("hourly_count", reverse=True).head(5)
 ```
 
-#### **Filtering Rows**
+#### Filtering Rows
 
 This is analogous to a SQL `WHERE` clause.
 
@@ -536,7 +536,7 @@ wiki_uniq_pandas_df = wiki_uniq_pandas_df[wiki_uniq_pandas_df.language_code == "
 wiki_uniq_polars_df = wiki_uniq_polars_df.filter(wiki_uniq_polars_df.language_code == "kw.m")
 ```
 
-#### **Aggregating Rows**
+#### Aggregating Rows
 
 This is analogous to a SQL `GROUP BY` clause.
 
@@ -559,7 +559,7 @@ wiki_uniq_pandas_df.groupby("language_code").size()
 wiki_uniq_polars_df.groupby("language_code").agg(pl.count("language_code"))
 ```
 
-### **Writing Data**
+### Writing Data
 
 Once you’ve done some analysis, the next step is often saving the transformed data back to disk for others to use. Similar to the S`parkSession.read()` method, Spark offers a `SparkSession.write()` method.
 

@@ -1,0 +1,3 @@
+# Stratified Clustered Random Sampling
+
+Accordingly, we use stratified clustered random sampling by extracting from $D$ the full credit histories of 200,000 loans, comprising 14,314,925 monthly observations over a period of 192 months. These loan keys are randomly selected within each stratum, where strata are formed by grouping $D$ based on the date of loan origination, e.g., Jan-2007. Of these 200,000 loans, 70% are randomly relegated into the training set $D_𝑇 ∈ D_𝑆$ whilst the remainder are sorted into the validation set $D_𝑉 ∈ D_𝑆$; both of which are used in fitting the MLR-models. Regarding the resampling scheme for BR-models, we aggregate both $D_𝑇$ and $D_𝑉$ to the portfolio-level in calculating the respective transition rates.

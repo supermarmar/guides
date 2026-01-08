@@ -1,10 +1,11 @@
-# **Normalisation** 🧙🏻‍♂️
+# Normalisation 🧙🏻‍♂️
 
 Normalization is a process in database design that organizes data to reduce redundancy and improve data integrity. The goal is to divide large tables into smaller ones and establish relationships between them using primary and foreign keys. This process follows a series of "normal forms" (rules), each building on the previous one.
 
 The goal of normalization is efficiency in transactional databases (OLTP systems). A *Star Schema* is a denormalized data model primarily used in data warehousing and analytics tools like Power BI to optimize query performance for reporting and analysis.
 
-Unnormalized Table (UNF)
+## Unnormalized Table (UNF)
+
 Imagine a table storing information about customers and their orders:
 
 | CustomerID | CustomerName | OrderID | Product | Quantity |
@@ -19,7 +20,7 @@ Problems:
 - Insertion anomaly: Adding a new customer without an order is problematic.
 - Deletion anomaly: Deleting all orders of a customer also removes their details.
 
-## **First Normal Form (1NF)**
+## First Normal Form (1NF)
 
 1NF removes duplicate columns and ensures each field contains only atomic (indivisible) values.
 
@@ -29,7 +30,7 @@ Problems:
 | 1 | Alice | 102 | Smartphone | 1 |
 | 2 | Bob | 103 | Tablet | 1 |
 
-## **Second Normal Form (2NF)**
+## Second Normal Form (2NF)
 
 2NF eliminates partial dependencies. A table is in 2NF if:
 
@@ -38,14 +39,14 @@ Problems:
 
 In the table above, CustomerName depends only on CustomerID, not the entire key (CustomerID, OrderID).
 
-### **Customers Table 2NF**
+### Customers Table 2NF
 
 | CustomerID | CustomerName |
 |------------|--------------|
 | 1          | Alice        |
 | 2          | Bob          |
 
-### **Orders Table 2NF**
+### Orders Table 2NF
 
 | OrderID | CustomerID | Product    | Quantity |
 |---------|------------|------------|----------|
@@ -53,7 +54,7 @@ In the table above, CustomerName depends only on CustomerID, not the entire key 
 | 102     | 1          | Smartphone | 2        |
 | 103     | 2          | Tablet     | 1        |
 
-## **Third Normal Form (3NF)**
+## Third Normal Form (3NF)
 
 3NF eliminates transitive dependencies. A table is in 3NF if:
 
@@ -62,14 +63,14 @@ In the table above, CustomerName depends only on CustomerID, not the entire key 
 
 If we add a Category column to the Orders table that describes the product (e.g., "Electronics"), this creates a dependency between Product and Category.
 
-### **Customers Table 3NF**
+### Customers Table 3NF
 
 | CustomerID | CustomerName |
 |------------|--------------|
 | 1          | Alice        |
 | 2          | Bob          |
 
-### **Orders Table 3NF**
+### Orders Table 3NF
 
 | OrderID | CustomerID | Product    | Quantity |
 |---------|------------|------------|----------|
@@ -77,7 +78,7 @@ If we add a Category column to the Orders table that describes the product (e.g.
 | 102     | 1          | Smartphone | 2        |
 | 103     | 2          | Tablet     | 1        |
 
-### **Products Table**
+### Products Table
 
 | Product    | Category    |
 |------------|-------------|

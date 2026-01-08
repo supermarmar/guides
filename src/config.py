@@ -24,5 +24,7 @@ MODELS_DIR = PROJ_ROOT / "models"
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
+CREDIT_CARD_BALANCE_CCD = "credit_card_balance_ccd.parquet"
+MRD = "mrd.parquet"
 HOME_CREDIT_DB = "home_credit_mds.db"
 DATA_DICTIONARY_FILE = "HomeCredit_columns_description.csv"

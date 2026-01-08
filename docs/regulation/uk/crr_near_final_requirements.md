@@ -61,6 +61,8 @@ transactor exposure:
 
     In the case of retail exposures, an institution may apply the definition of default laid down in points (a) and (b) of the first subparagraph at the level of an individual credit facility rather than in relation to the total obligations of an obligor.
 
+1D. An institution may, where there is a dispute between the obligor and the seller and such event is related to dilution risk, suspend the counting of days past due until the dispute is resolved.
+
 2. An institution shall apply the following for the purposes of determining days past due in point (b) of paragraph 1:
     - (a) for overdrafts, days past due commence once an obligor has breached an advised limit, has been advised a limit smaller than current outstandings, or has drawn credit without authorisation and the underlying amount is material;
     - (b) for the purposes of point (a), an advised limit comprises any credit limit determined by the institution and about which the obligor has been informed by the institution;
