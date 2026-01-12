@@ -1,14 +1,16 @@
-# Economic Capital
+# Regulatory Capital
 
-<https://www.bankofengland.co.uk/-/media/boe/files/ccbs/resources/modelling-credit-risk>
+What we call regulatory capital differs from what is known as economic capital. In effect there are two approaches to consider the supply and demand of capital. The regulatory approach dictates the rules on which the demand is to be set, as well as the admissibility of supply, while an internal or economic approach considers the internal best estimate of demand and supply. Regulatory capital supply compared to a predetermined scalar of demand is what the regulators determine as adequate for a bank’s operations. Economic capital is what the bank itself views as appropriate for its activities. Usually, it is lower than regulatory capital, in that it incorporates a portfolio effect reflecting diversification of activities, but it may also include an additional small capital cushion or buffer.
 
 ## Credit Risk
+
+<https://www.bankofengland.co.uk/-/media/boe/files/ccbs/resources/modelling-credit-risk>
 
 [Credit]() is money provided by a creditor to a borrower (also referred to as an obligor as he or she has an obligation). [Credit risk]() refers to the risk that a contracted payment will not be made. Markets are assumed to put a price on this risk. This is then included in the market’s purchase price for the contracted payment. The part of the price that is due to credit risk is the credit spread. The role of a typical credit risk model is to take as input the conditions of the general economy and those of the specific firm in question, and generate as output a credit spread.
 
 ## Minimum Capital Requirements (MCR)
 
-The motivation to develop credit risk models stemmed from the need to develop quantitative estimates of the amount of economic capital needed to support a bank’s risk taking activities. 
+The motivation to develop credit risk models stemmed from the need to develop quantitative estimates of the amount of economic capital needed to support a bank’s risk taking activities.
 
 ### Basel I
 
@@ -17,6 +19,8 @@ Minimum capital requirements have been coordinated internationally since the Bas
 $K = 8\% \times \text{RWA}$
 
 Over time, this approach was criticised for being insufficiently granular to capture the cross sectional distribution of risk. All mortgage loans, for instance, received the same capital requirement without regard to the underlying risk profile of the borrower (such as the loan to value or debt to income ratio). This led to concerns that the framework incentivised ‘risk shifting’. To the extent that risk was not being properly priced, it was argued that banks had an incentive to retain only the highest risk exposures on their balance sheets as these were also likely to offer the highest expected return.
+
+Some jurisdictions in emerging markets still apply the Basel I framework. For bank groups, some of their exposure may therefore be subject to Basel I in a specific country, Basel II in another country and Basel III on consolidation.
 
 ### Basel II
 
@@ -30,6 +34,17 @@ These frameworks are designed to arrive at the RWAs, the denominator of four key
 ### Basel III
 
 Under [Basel III](docs\regulation\international\bis\bis.md) the minimum capital requirement was not changed, but stricter rules were introduced to ensure capital was of sufficient quality. There is now a 4.5% minimum CET1 requirement (Basel 3 §RBC 20.1). It also increased levels of capital by introducing usable capital buffers rather than capital minima. Basel III cleaned up the definition of capital, i.e., the numerator of the capital ratio. But it did not seek to materially alter the Basel II risk based framework for measuring risk-weighted assets, i.e., the denominator of the capital ratio; therefore, the architecture of the risk weighted capital regime was left largely unchanged. Basel III seeks to improve the standardised approach for credit risk in a number of ways. This includes strengthening the link between the standardised approach the internal ratings-based (IRB) approach.
+
+### Basel 3.1
+
+Banks will need to start implementing and allowing for Basel 3.1 (IV) as it is to be in effect from January 2023.
+
+### Banks Act
+
+In South Africa, Basel II implementation became effective 1 January 2008. Basel III became effective 1 January 2012 but is subject to transition elements that will continue
+until 2023.
+
+In South Africa, minimum capital included the sum of its Tier 1 and Tier 2 capital and primary and secondary unimpaired reserve funds. This amount could not at any time be less than the greater of R250 million or 10% (previously 8%) of risk-weighted assets. Tier 1 must make up at least 50% of a bank’s capital base.
 
 ## Credit Loss Distribution
 
