@@ -2,6 +2,12 @@
 
 ## Probability of Default (PD)
 
+|Metadata|Notation|Description|Reference|
+|-|-|-|-|
+|Dependent Variable (Target)|$D^*_{i,t}(12,p)$|Indicator of defualt in line with IRB (regulatory) DoD. However, depending on the asset the PD measuers either for the next 12 months (Stage 1) or for the remainign life of the financial instrument (Stage 2 and 3).  | |
+|Independent Variables (Features)|$I(x_{i},x_{i,t},m_{t'})$|Same set of risk drivers as IRB + forecasts of future economic conditions| |
+|Measurement Period|$[t'_0,t'_n]$|No requirement on historical data but current and expectedfuture conditions. | |
+
 - Typically, to calibrate your PDs the dataset has monthly loan performance (e.g. 20-year mortgage loan) observations for each loan 𝑖 = 1, ..., 𝑁.
 - Each loan 𝑖 is therefore observed over discrete time $𝑡 = 1, ..., T_𝑖$ from the time of its first month-end observation up to the end of its lifetime $T_𝑖$.
 - These loans are sampled between two dates, during which time new mortgages were continuously originated.

@@ -12,6 +12,12 @@ Banks commonly specified three payments (or 90 DPD) in arrears as a pragmatic po
 
 ## Definition of Default (DoD)
 
+IFRS 9 statest that when definining default for the purposes of determining the risk of a defualt occuring, an entity shall apply a default defintion that is consistent with the definition used for internal credit risk management purposes. HOwefverm there is a rebuttable presumption that default does not occur later than wehn a financial assete is 90 dyas past due unless an entity has reasonable and supportable information to demonstrate that a more lagging default criterion is more appropriate.
+
+The DoD for impairment models should therefore be aligned to the IRB model DoD where such models exist.
+
+### Days Past Due (DPD)
+
 One can compare $𝑔_0(𝑡)$ at time 𝑡 against the specifiable threshold 𝑑=3. Thus the default status at time t can be denoted as:
 
 $D_t= [g_0(t) \geq d]$ where $d=3$
@@ -23,8 +29,6 @@ The loan’s resulting binary-valued default indicator, can now be used within a
 In preparing the modelling dataset, we observe all predictive information of loan $𝑖$ at a particular time 𝑡. Then, the loan’s future default-status at time $𝑡 + 𝑣$ is merged to the observations at 𝑡, thereby taking a snapshot between two points in time, or a cross-section. However, the chosen value for this third parameter $𝑣 ≥ 0$ (or outcome period) is what we will define as our $𝑣$-month default indicator which will then be used to determine our $𝑣$-month PD.
 
 More formally, a process $Z_𝑡(𝑑, 𝑣) = D_{t+𝑣}$ prepares a given loan’s monthly performance history by evaluating $D_t$ at ‘future’ time $𝑡 + 𝑣$, though assigns the result to time 𝑡.
-
-### Days Past Due (DPD)
 
 ### Return to Default
 

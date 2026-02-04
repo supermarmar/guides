@@ -118,7 +118,7 @@ When an entity first recognises a financial asset, it classifies it based on the
 
 5.5.2 An entity shall apply the impairment requirements for the recognition and measurement of a loss allowance for financial assets that are measured at fair value through other comprehensive income in accordance with paragraph 4.1.2A. However, the loss allowance shall be recognised in other comprehensive income and shall not reduce the carrying amount of the financial asset in the statement of financial position.
 
-#### Lifetime ECL
+#### SICR
 
 5.5.3 Subject to paragraphs 5.5.13⁠–⁠5.5.16, at each reporting date, an entity shall measure the loss allowance for a financial instrument at an amount equal to the lifetime expected credit losses if the credit risk on that financial instrument has increased significantly since initial recognition.
 
@@ -127,8 +127,6 @@ When an entity first recognises a financial asset, it classifies it based on the
 5.5.4 The objective of the impairment requirements is to recognise lifetime expected credit losses for all financial instruments for which there have been significant increases in credit risk since initial recognition — whether assessed on an individual or collective basis — considering all reasonable and supportable information, including that which is forward-looking.
 
 > *The transition to Stage 2 is not based on actual default, but rather on the bank’s forward-looking assessment of credit risk. The IFRS 9 model requires that even if a loan is still performing (i.e., no payments are yet missed), a significant increase in credit risk should trigger a shift to lifetime ECL recognition. The bank considers all available information, including industry-wide economic downturns and the borrower’s weakened financial metrics. The updated lifetime ECL of R400,000 is now booked as a loss allowance, increasing the impairment expense in the income statement.*
-
-#### 12-Month ECL
 
 5.5.5 Subject to paragraphs 5.5.13⁠–⁠5.5.16, if, at the reporting date, the credit risk on a financial instrument has not increased significantly since initial recognition, an entity shall measure the loss allowance for that financial instrument at an amount equal to 12‑month expected credit losses.
 
@@ -148,7 +146,7 @@ When an entity first recognises a financial asset, it classifies it based on the
 
 > *Impairment gain/loss affects the income statement, reflecting changes in ECL or loss allowance. At the inital measurement the impairment will simply be the ECL. Increases in ECL → Impairment losses. Decreases in ECL → Impairment gains.*
 
-#### SICR
+#### Determining SICR
 
 5.5.9 At each reporting date, an entity shall assess whether the credit risk on a financial instrument has increased significantly since initial recognition. When making the assessment, an entity shall use the change in the risk of a default occurring over the expected life of the financial instrument instead of the change in the amount of expected credit losses. To make that assessment, an entity shall compare the risk of a default occurring on the financial instrument as at the reporting date with the risk of a default occurring on the financial instrument as at the date of initial recognition and consider reasonable and supportable information, that is available without undue cost or effort, that is indicative of significant increases in credit risk since initial recognition.
 
@@ -171,7 +169,7 @@ When an entity first recognises a financial asset, it classifies it based on the
 - (a) the risk of a default occurring at the reporting date (based on the modified contractual terms); and
 - (b) the risk of a default occurring at initial recognition (based on the original, unmodified contractual terms).
 
-#### Probability-Weighted Discounted Cashflows
+#### Measurement of ECL
 
 5.5.17 An entity shall measure expected credit losses of a financial instrument in a way that reflects:
 
@@ -305,9 +303,50 @@ B5.4.3 Fees that are not an integral part of the effective interest rate of a fi
 
 B5.4.8 Transaction costs include fees and commission paid to agents (including employees acting as selling agents), advisers, brokers and dealers, levies by regulatory agencies and security exchanges, and transfer taxes and duties. Transaction costs do not include debt premiums or discounts, financing costs or internal administrative or holding costs.
 
+### SICR Quantitative Triggers
+
+B5.5.9 The significance of a change in the credit risk since initial recognition depends on the risk of a default occurring as at initial recognition. Thus, a given change, in absolute terms, in the risk of a default occurring will be more significant for a financial instrument with a lower initial risk of a default occurring compared to a financial instrument with a higher initial risk of a default occurring.
+
 ### SICR Qualitative Trigger Options
 
-B5.5.17
+B5.5.17 The following non-exhaustive list of information may be relevant in assessing changes in credit risk:
+
+- (a) significant changes in internal price indicators of credit risk as a result of a change in credit risk since inception, including, but not limited to, the credit spread that would result if a particular financial instrument or similar financial instrument with the same terms and the same counterparty were newly originated or issued at the reporting date.
+- (b) other changes in the rates or terms of an existing financial instrument that would be significantly different if the instrument was newly originated or issued at the reporting date (such as more stringent covenants, increased amounts of collateral or guarantees, or higher income coverage) because of changes in the credit risk of the financial instrument since initial recognition.
+- (c) significant changes in external market indicators of credit risk for a particular financial instrument or similar financial instruments with the same expected life. Changes in market indicators of credit risk include, but are not limited to:
+  - (i) the credit spread;
+  - (ii) the credit default swap prices for the borrower;
+  - (iii) the length of time or the extent to which the fair value of a financial asset has been less than its amortised cost; and
+  - (iv) other market information related to the borrower, such as changes in the price of a borrower’s debt and equity instruments.
+- (d) an actual or expected significant change in the financial instrument’s external credit rating.
+- (e) an actual or expected internal credit rating downgrade for the borrower or decrease in behavioural scoring used to assess credit risk internally. Internal credit ratings and internal behavioural scoring are more reliable when they are mapped to external ratings or supported by default studies.
+- (f) existing or forecast adverse changes in business, financial or economic conditions that are expected to cause a significant change in the borrower’s ability to meet its debt obligations, such as an actual or expected increase in interest rates or an actual or expected significant increase in unemployment rates.
+- (g) an actual or expected significant change in the operating results of the borrower. Examples include actual or expected declining revenues or margins, increasing operating risks, working capital deficiencies, decreasing asset quality, increased balance sheet leverage, liquidity, management problems or changes in the scope of business or organisational structure (such as the discontinuance of a segment of the business) that results in a significant change in the borrower’s ability to meet its debt obligations.
+- (h) significant increases in credit risk on other financial instruments of the same borrower.
+- (i) an actual or expected significant adverse change in the regulatory, economic, or technological environment of the borrower that results in a significant change in the borrower’s ability to meet its debt obligations, such as a decline in the demand for the borrower’s sales product because of a shift in technology.
+- (j) significant changes in the value of the collateral supporting the obligation or in the quality of third-party guarantees or credit enhancements, which are expected to reduce the borrower’s economic incentive to make scheduled contractual payments or to otherwise have an effect on the probability of a default occurring. For example, if the value of collateral declines because house prices decline, borrowers in some jurisdictions have a greater incentive to default on their mortgages.
+- (k) a significant change in the quality of the guarantee provided by a shareholder (or an individual’s parents) if the shareholder (or parents) have an incentive and financial ability to prevent default by capital or cash infusion.
+- (l) significant changes, such as reductions in financial support from a parent entity or other affiliate or an actual or expected significant change in the quality of credit enhancement, that are expected to reduce the borrower’s economic incentive to make scheduled contractual payments. Credit quality enhancements or support include the consideration of the financial condition of the guarantor and/or, for interests issued in securitisations, whether subordinated interests are expected to be capable of absorbing expected credit losses (for example, on the loans underlying the security).
+- (m) expected changes in the loan documentation including an expected breach of contract that may lead to covenant waivers or amendments, interest payment holidays, interest rate step-ups, requiring additional collateral or guarantees, or other changes to the contractual framework of the instrument.
+- (n) significant changes in the expected performance and behaviour of the borrower, including changes in the payment status of borrowers in the group (for example, an increase in the expected number or extent of delayed contractual payments or significant increases in the expected number of credit card borrowers who are expected to approach or exceed their credit limit or who are expected to be paying the minimum monthly amount).
+- (o) changes in the entity’s credit management approach in relation to the financial instrument; ie based on emerging indicators of changes in the credit risk of the financial instrument, the entity’s credit risk management practice is expected to become more active or to be focused on managing the instrument, including the instrument becoming more closely monitored or controlled, or the entity specifically intervening with the borrower.
+- (p) past due information, including the rebuttable presumption as set out in paragraph 5.5.11.
+
+B5.5.18 In some cases, the qualitative and non-statistical quantitative information available may be sufficient to determine that a financial instrument has met the criterion for the recognition of a loss allowance at an amount equal to lifetime expected credit losses. That is, the information does not need to flow through a statistical model or credit ratings process in order to determine whether there has been a significant increase in the credit risk of the financial instrument. In other cases, an entity may need to consider other information, including information from its statistical models or credit ratings processes. Alternatively, the entity may base the assessment on both types of information, ie qualitative factors that are not captured through the internal ratings process and a specific internal rating category at the reporting date, taking into consideration the credit risk characteristics at initial recognition, if both types of information are relevant.
+
+### Expected Credit Losses
+
+B5.5.28 Expected credit losses are a probability-weighted estimate of credit losses (ie the present value of all cash shortfalls) over the expected life of the financial instrument. A cash shortfall is the difference between the cash flows that are due to an entity in accordance with the contract and the cash flows that the entity expects to receive. Because expected credit losses consider the amount and timing of payments, a credit loss arises even if the entity expects to be paid in full but later than when contractually due.
+
+B5.5.29 For financial assets, a credit loss is the present value of the difference between:
+
+- (a) the contractual cash flows that are due to an entity under the contract; and
+- (b) the cash flows that the entity expects to receive.
+
+B5.5.30 For undrawn loan commitments, a credit loss is the present value of the difference between:
+
+- (a) the contractual cash flows that are due to the entity if the holder of the loan commitment draws down the loan; and
+- (b) the cash flows that the entity expects to receive if the loan is drawn down.
 
 ### Default Defintion
 
@@ -321,11 +360,19 @@ B5.5.41 The purpose of estimating expected credit losses is neither to estimate 
 
 B5.5.42 Paragraph 5.5.17(a) requires the estimate of expected credit losses to reflect an unbiased and probability-weighted amount that is determined by evaluating a range of possible outcomes. In practice, this may not need to be a complex analysis. In some cases, relatively simple modelling may be sufficient, without the need for a large number of detailed simulations of scenarios. For example, the average credit losses of a large group of financial instruments with shared risk characteristics may be a reasonable estimate of the probability-weighted amount. In other situations, the identification of scenarios that specify the amount and timing of the cash flows for particular outcomes and the estimated probability of those outcomes will probably be needed. In those situations, the expected credit losses shall reflect at least two outcomes in accordance with paragraph 5.5.18.
 
+### Lifetime ECL vs 12-Month ECL
+
+B5.5.43 For lifetime expected credit losses, an entity shall estimate the risk of a default occurring on the financial instrument during its expected life. 12‑month expected credit losses are a portion of the lifetime expected credit losses and represent the lifetime cash shortfalls that will result if a default occurs in the 12 months after the reporting date (or a shorter period if the expected life of a financial instrument is less than 12 months), weighted by the probability of that default occurring. Thus, 12‑month expected credit losses are neither the lifetime expected credit losses that an entity will incur on financial instruments that it predicts will default in the next 12 months nor the cash shortfalls that are predicted over the next 12 months.
+
 ### Time Value of Money
 
 B5.5.44 Expected credit losses shall be discounted to the reporting date, not to the expected default or some other date, using the effective interest rate determined at initial recognition or an approximation thereof.
 
 B5.5.45 For purchased or originated credit-impaired financial assets, expected credit losses shall be discounted using the credit-adjusted effective interest rate determined at initial recognition.
+
+### Data
+
+B5.5.52 Historical information is an important anchor or base from which to measure expected credit losses. However, an entity shall adjust historical data, such as credit loss experience, on the basis of current observable data to reflect the effects of the current conditions and its forecasts of future conditions that did not affect the period on which the historical data is based, and to remove the effects of the conditions in the historical period that are not relevant to the future contractual cash flows. In some cases, the best reasonable and supportable information could be the unadjusted historical information, depending on the nature of the historical information and when it was calculated, compared to circumstances at the reporting date and the characteristics of the financial instrument being considered. Estimates of changes in expected credit losses should reflect, and be directionally consistent with, changes in related observable data from period to period (such as changes in unemployment rates, property prices, commodity prices, payment status or other factors that are indicative of credit losses on the financial instrument or in the group of financial instruments and in the magnitude of those changes). An entity shall regularly review the methodology and assumptions used for estimating expected credit losses to reduce any differences between estimates and actual credit loss experience.
 
 ## COVID 19
 

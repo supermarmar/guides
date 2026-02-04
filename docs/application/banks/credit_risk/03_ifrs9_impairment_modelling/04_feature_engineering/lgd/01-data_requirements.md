@@ -1,4 +1,17 @@
-# mlAccount & Recovery Data (Post-default)ml
+
+# Data Requirements
+
+## Loss Given Default (LGD)
+
+|Metadata|Notation|Description|Reference|
+|-|-|-|-|
+|Dependent Variable (Target)||Same as IRB but the intention is to estimate a best estimate or forward looking LGD to reflect impact of future economic scenarios| |
+|Independent Variables (Features)|$I(x_{i},x_{i,t},m_{t'})$|Same set of risk drivers as IRB + forecasts of future economic conditions|  |
+|Collection Cost||Considers only costs directly attributable to the collection of recoveries|  |
+|Discount rate||Depends on the type of instrument but is broadly based on EIR|  |
+|Measurement Period|$[t'_0,t'_n]$|No requirement about historical data of either observations or collection| |
+
+## Account & Recovery Data (Post-default)
 
 The dataset for modeling PWGD should track the state of accounts post-default over time. This includes transitions between different states, such as in collections, write-off, and cure.
 

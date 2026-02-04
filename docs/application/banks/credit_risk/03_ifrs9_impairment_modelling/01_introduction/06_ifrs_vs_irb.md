@@ -71,3 +71,9 @@ The impact of migrations between ratings is considered by using migration matric
 |Feature|IFRS 9|IRB|
 |-|-|-|
 |Amortisation|Model includes expected lifetime changes in the balance outstanding that are permitted by the contractual terms: amortization, repayments and (partial) prepayments.|Amortization not included.|
+
+## ECL vs EL
+
+In IRB the $EL = PD \times LGD \times EAD$ but for IFRS9 it is the PD times the present value of cash shortfalls. This represents a probabiltiy weigthed estimate of credit losses.
+
+The economic assumptions under IRB reflects a downturn or a macro economimc stress conditions in the EAD and LGD. Under IFRS9 it reflects an unbiased probability weighted amoutn, determined by evaluating a range of possibel outcomes.

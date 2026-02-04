@@ -119,7 +119,7 @@ $\text{ECL Stage 1}_{i,t,t'} =\displaystyle\sum_{k=1}^{12} \text{PD}_{i,t,t'}^\t
 
 ### Stage 2 (Underperforming Assets)
 
-Assets that have deteriorated quite significantly in their credit quality or where there has been a significant increase in credit risk (SICR) but no default from the point of origination (recognition) (§5.5.3). Impairment is based on Lifetime ECL (expected credit losses over the entire remaining life of the asset) ($5.5.19 and $5.5.20). The backstop criteria for Stage 2 is 30 days past due (§5.5.11).
+Assets that have deteriorated quite significantly in their credit quality or where there has been a significant increase in credit risk (SICR) but no default from the point of origination (recognition) (§5.5.3). Impairment is based on Lifetime ECL (expected credit losses over the entire remaining life of the asset) (§5.5.19 and §5.5.20). The backstop criteria for Stage 2 is 30 days past due (§5.5.11).
 
 $\text{ECL Stage 2}_{i,t,t'} =\displaystyle\sum_{k=1}^{n} \text{PD}_{i,t,t'}^\text{FiT}(k,x_{i},x_{i,t})\times \text{LGD}_{t}^\text{PiT} \times \text{EAD}_{t}^\text{PiT} \times (1+\text{EIR})^{-k}$
 

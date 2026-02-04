@@ -39,6 +39,31 @@ transactor exposure:
 
 ## Credit Risk: Standardised Approach (CRR) Part (Annex D)
 
+### Article 111 EXPOSURE VALUE
+
+1. The exposure value of:
+
+- (a) an asset item shall be its accounting value remaining after specific credit risk adjustments (in accordance with Credit Risk: General Provisions (CRR) Part Article 110 and Commission Delegated Regulation (EU) No 183/2014), additional value adjustments in accordance with Article 34 of CRR and Trading Book (CRR) Part Article 105 and own funds reductions related to the asset item have been applied;  
+- (b) subject to point (c), an off-balance sheet item listed in Column A of Table A1 shall be the product of:
+  - (i) its nominal value after reduction of specific credit risk adjustments (in accordance with Credit Risk: General Provisions (CRR) Part Article 110 and Commission Delegated Regulation (EU) No 183/2014); and
+  - (ii) the applicable conversion factor (the percentage specified in the corresponding row of Column B)
+- (c) a commitment to issue an off-balance sheet item listed in Table A1 shall be calculated in accordance with point (b) of paragraph 1, but using the lower of:  
+  - (i) the percentage specified in Column B that is applicable to the off-balance sheet item on which the commitment is made; and
+  - (ii) the percentage specified in Column B that is applicable to the type of commitment,
+  instead of the percentage specified in point (b)(ii) of paragraph 1.  
+
+#### Table A1
+
+| Column A: Issued off-balance sheet items and commitments | Column B: Applicable conversion factor |
+|-|-|
+| The following issued off-balance sheet items: financial guarantees having the character of credit substitutes, (including guarantees for the good payment of credit facilities); credit derivatives; acceptances; endorsements on bills not bearing the name of another institution or investment firm; irrevocable standby letters of credit having the character of credit substitutes; and any other issued off-balance sheet items that have the character of credit substitutes. | 100% |
+| The following types of commitment: transactions with recourse (including factoring and invoice discount facilities); assets purchased under outright forward purchase agreements; asset sale and repurchase agreements: including agreements where the transferee is merely entitled to return the assets at the purchase price or for a different amount agreed in advance on a date specified or to be specified; and excluding agreements where the transferor is not entitled to show in their balance sheets the assets transferred; and forward deposits; the unpaid portion of partly-paid shares and securities; and  other commitments that have similar economic substance as the types of commitments in points (a) to (e), in particular with regard to having certain drawdowns. | 100% |
+|Other issued off-balance sheet items that do not have the character of credit substitutes. | 50% |
+|The following commitments: note issuance facilities and revolving underwriting facilities; and  UK residential mortgage commitments that are not subject to a conversion factor of 10% or 100%. | 50% |
+|Any other commitment that is not subject to a conversion factor of 10%, 50% or 100%. | 40% |
+|The following issued off-balance sheet items:  (a) documentary credits issued or confirmed and other selfliquidating transactions; (b) warranties, tender bonds, performance bonds, advance payment guarantees, retention guarantees, and guarantees not having the character of credit substitutes;  (c) irrevocable standby letters of credit not having the character of credit substitutes; and (d) shipping guarantees, customs and tax bonds.| 20% |
+|Undrawn commitments which may be cancelled unconditionally at any time without notice, or that effectively provide for automatic cancellation due to a deterioration in an obligor’s creditworthiness. Retail credit lines may be considered as unconditionally cancellable if the terms permit the institution to cancel them to the full extent allowable under the applicable consumer protection and related leg. | 10% |
+
 ## Credit Risk: Internal Ratings Based Approach (CRR) Part (Annex E)
 
 ### Article 144 HIGH-LEVEL REQUIREMENTS FOR USING THE IRB APPROACH
@@ -52,6 +77,25 @@ transactor exposure:
     - (a) 0.1% for qualifying revolving retail exposures, as set out in Article 147(5A), that are non transactor exposures;
     - (b) 0.1% for retail exposures secured by residential immovable property located in the UK; and
     - (c) 0.05% for all other retail exposures.
+
+### Article 166A EXPOSURE VALUE FOR CORPORATES, INSTITUTIONS AND RETAIL: GENERAL PROVISIONS
+
+1. An institution shall, subject to Article 166B, calculate the exposure value for off-balance sheet items in accordance with Article 166C where it is using the Foundation IRB Approach or the Slotting Approach, and in accordance with Article 166D where it is using the Advanced IRB Approach.
+
+2. Unless otherwise provided for in this Part, the exposure value of on-balance sheet items shall be the accounting value measured without taking into account any credit risk adjustments made. This requirement also applies to assets purchased at a price different than the amount owed.
+
+### Article 166C EXPOSURE VALUE FOR CORPORATES AND INSTITUTIONS: THE FOUNDATION IRB APPROACH AND THE SLOTTING APPROACH
+
+1. An institution shall determine the exposure value for off-balance sheet items in respect of which it uses the Foundation IRB Approach or the Slotting Approach in accordance with Article 147A by multiplying the conversion factor that would be applicable to the off-balance sheet item under the Standardised Approach, as set out in Credit Risk: Standardised Approach (CRR) Part Article 111, by the item’s nominal value.
+
+2. An institution shall, in order to reflect the effect of funded credit protection in respect of exposures for which it uses the Slotting Approach, apply the methods set out in the Credit Risk Mitigation (CRR) Part.  
+
+### Article 166D EXPOSURE VALUE FOR CORPORATES, INSTITUTIONS AND RETAIL: THE ADVANCED IRB APPROACH  
+
+1. An institution shall, subject to paragraph 3, determine the exposure value for off-balance sheet items in respect of which it uses the Advanced IRB Approach in accordance with Article 147A by multiplying the item’s nominal value by:
+
+- (a) for revolving loan commitments which would not be subject to a 100% conversion factor under Credit Risk: Standardised Approach (CRR) Part Article 111: an own estimate of conversion factor that the institution shall provide in accordance with Section 6;
+- (b) for all other off-balance sheet items: the conversion factor that would be applicable to the off-balance sheet item under the Standardised Approach, as set out in Credit Risk: Standardised Approach (CRR) Part Article 111.
 
 ### Article 178 RISK QUANTIFICATION DEFAULT OF AN OBLIGOR OR FACILITY
 
