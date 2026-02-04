@@ -10,15 +10,13 @@ In April 2001 the International Accounting Standards Board (Board) adopted IAS 3
 
 The Board had always intended that IFRS 9 Financial Instruments would replace IAS 39 in its entirety. However, in response to requests from interested parties that the accounting for financial instruments should be improved quickly, the Board divided its project to replace IAS 39 into three main phases. As the Board completed each phase, it issued chapters in IFRS 9 that replaced the corresponding requirements in IAS 39.
 
-In November 2009 the Board issued the chapters of IFRS 9 relating to the classification and measurement of financial assets. In October 2010 the Board added the requirements related to the classification and measurement of financial liabilities to IFRS 9. This includes requirements on embedded derivatives and how to account for changes in own credit risk on financial liabilities designated under the fair value option.
-
-In October 2010 the Board also decided to carry forward unchanged from IAS 39 the requirements related to the derecognition of financial assets and financial liabilities. Because of these changes, in October 2010 the Board restructured IFRS 9 and its Basis for Conclusions. In December 2011 the Board deferred the mandatory effective date of IFRS 9.
-
-In November 2013 the Board added a Hedge Accounting chapter. IFRS 9 permits an entity to choose as its accounting policy either to apply the hedge accounting requirements of IFRS 9 or to continue to apply the hedge accounting requirements in IAS 39. Consequently, although IFRS 9 is effective (with limited exceptions for entities that issue insurance contracts and entities applying the IFRS for SMEs Standard), IAS 39, which now contains only its requirements for hedge accounting, also remains effective.
+1. In November 2009 the Board issued the chapters of IFRS 9 relating to the classification and measurement of financial assets.
+2. In October 2010 the Board added the requirements related to the classification and measurement of financial liabilities to IFRS 9. This includes requirements on embedded derivatives and how to account for changes in own credit risk on financial liabilities designated under the fair value option. In October 2010 the Board also decided to carry forward unchanged from IAS 39 the requirements related to the derecognition of financial assets and financial liabilities. Because of these changes, in October 2010 the Board restructured IFRS 9 and its Basis for Conclusions. In December 2011 the Board deferred the mandatory effective date of IFRS 9.
+3. In November 2013 the Board added a Hedge Accounting chapter. IFRS 9 permits an entity to choose as its accounting policy either to apply the hedge accounting requirements of IFRS 9 or to continue to apply the hedge accounting requirements in IAS 39. Consequently, although IFRS 9 is effective (with limited exceptions for entities that issue insurance contracts and entities applying the IFRS for SMEs Standard), IAS 39, which now contains only its requirements for hedge accounting, also remains effective.
 
 In July 2014 the Board issued the completed version of IFRS 9. The Board made limited amendments to the classification and measurement requirements for financial assets by addressing a narrow range of application questions and by introducing a ‘fair value through other comprehensive income’ measurement category for particular simple debt instruments. The Board also added the impairment requirements relating to the accounting for an entity’s expected credit losses on its financial assets and commitments to extend credit. A new mandatory effective date was also set.
 
-IFRS 9 was effective for annual periods beginning on or after 1 January 2018 with early application permitted.
+IFRS 9 was effective for annual periods beginning on or after 1 January 2018 with early application permitted. The IFRS Standard is an international standard although the US has a similar but slightly different standard under GAAP.
 
 ## Chapter 4: Classification
 
@@ -186,6 +184,32 @@ When an entity first recognises a financial asset, it classifies it based on the
 5.5.19 The maximum period to consider when measuring expected credit losses is the maximum contractual period (including extension options) over which the entity is exposed to credit risk and not a longer period, even if that longer period is consistent with business practice.
 
 5.5.20 However, some financial instruments include both a loan and an undrawn commitment component and the entity’s contractual ability to demand repayment and cancel the undrawn commitment does not limit the entity’s exposure to credit losses to the contractual notice period. For such financial instruments, and only those financial instruments, the entity shall measure expected credit losses over the period that the entity is exposed to credit risk and expected credit losses would not be mitigated by credit risk management actions, even if that period extends beyond the maximum contractual period.
+
+## Chapter 6: Hedge Accounting
+
+### 6.1 Objective and Scope
+
+6.1.1 The objective of hedge accounting is to represent, in the financial statements, the effect of an entity’s risk management activities that use financial instruments to manage exposures arising from particular risks that could affect profit or loss (or other comprehensive income, in the case of investments in equity instruments for which an entity has elected to present changes in fair value in other comprehensive income in accordance with paragraph 5.7.5). This approach aims to convey the context of hedging instruments for which hedge accounting is applied in order to allow insight into their purpose and effect.
+
+6.1.2 An entity may choose to designate a hedging relationship between a hedging instrument and a hedged item in accordance with paragraphs 6.2.1⁠–⁠6.3.7 and B6.2.1⁠–⁠B6.3.25. For hedging relationships that meet the qualifying criteria, an entity shall account for the gain or loss on the hedging instrument and the hedged item in accordance with paragraphs 6.5.1⁠–⁠6.5.14 and B6.5.1⁠–⁠B6.5.28. When the hedged item is a group of items, an entity shall comply with the additional requirements in paragraphs 6.6.1⁠–⁠6.6.6 and B6.6.1⁠–⁠B6.6.16.
+
+### 6.2 Hedging instruments
+
+#### Qualifying instruments
+
+6.2.1 A derivative measured at fair value through profit or loss may be designated as a hedging instrument, except for some written options (see paragraph B6.2.4).
+
+6.2.2 A non-derivative financial asset or a non-derivative financial liability measured at fair value through profit or loss may be designated as a hedging instrument unless it is a financial liability designated as at fair value through profit or loss for which the amount of its change in fair value that is attributable to changes in the credit risk of that liability is presented in other comprehensive income in accordance with paragraph 5.7.7. For a hedge of foreign currency risk, the foreign currency risk component of a non-derivative financial asset or a non-derivative financial liability may be designated as a hedging instrument provided that it is not an investment in an equity instrument for which an entity has elected to present changes in fair value in other comprehensive income in accordance with paragraph 5.7.5.
+
+6.2.3 For hedge accounting purposes, only contracts with a party external to the reporting entity (ie external to the group or individual entity that is being reported on) can be designated as hedging instruments.
+
+### 6.5 Accounting for qualifying hedging relationships
+
+6.5.2 There are three types of hedging relationships:
+
+- (a) fair value hedge: a hedge of the exposure to changes in fair value of a recognised asset or liability or an unrecognised firm commitment, or a component of any such item, that is attributable to a particular risk and could affect profit or loss.
+- (b) cash flow hedge: a hedge of the exposure to variability in cash flows that is attributable to a particular risk associated with all, or a component of, a recognised asset or liability (such as all or some future interest payments on variable-rate debt) or a highly probable forecast transaction, and could affect profit or loss.
+- (c) hedge of a net investment in a foreign operation as defined in IAS 21.
 
 ## Appendix A: Defined Terms
 

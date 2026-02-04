@@ -2,6 +2,13 @@
 
 IAS 39 and IFRS 9 are accounting standards issued by the IASB for financial instruments, particularly their recognition, measurement, and impairment. IFRS 9 replaced IAS 39 in 2018 to address the limitations and complexity of IAS 39 “incurred loss” framework, providing a more forward-looking and simplified approach. Under IAS 39, losses were recognized only when there was objective evidence of impairment (e.g., default or delinquency). Hence it was backward-looking, meaning it relied on historical data and loss events already incurred. This delayed provisioning during the 2008 financial crisis, leading to underestimation of risks.
 
+The two significant updates brought in with this replacement were:
+
+- To replace the incurred loss model of IAS 39, in which credit losses were only recognised when there was objective evidence of a loan’s impairment, to a Standard which recognised expected credit losses for all loans even if no actual loss had taken place.
+- To incorporate forward looking information into the assessment of the expected credit losses of a loan.
+
+The benefits of these two changes are to ensure that banks increase the impairments held against loans where there is expected deterioration in the credit risk of a loan due to potential deterioration in the underlying behavioural risk of a loan (see an explanation of SICR below) or due to deteriorating economic circumstances. This is intended to make sure that banks incorporate future information (as opposed to only past and current information in IAS 39) when calculating the expected credit losses on loans.
+
 The principle is to forfeit a portion of income today (also known as an **impairment charge** coming thorugh the income statement) into a **loss provision** (coming through as a reduction in the asset value not necessarily a liability) that ideally offsets amounts that may be written-off tomorrow. Doing so helps to smooth overall earnings volatility, which is itself a central tenet of risk management.
 
 ## Expected Credit Losses
@@ -12,9 +19,11 @@ IFRS 9 requires that this loss provision be regularly updated based on a statist
 - (2) a certain horizon ...
 - (3) incorporating forward-looking information as per §5.5.17.
 
+In other words, this is calculated by calculating the present value of all future shortfalls resulting from various default scenarios. The impairment is the probability weighted sum of these various scenarios. For banks this translates to calculating impairments in a similar manner to that done when calculating capital requirements. However, where capital requirements use a conservative approach, an ECL calculation would use a best estimate (“expected”) approach, i.e. the bank’s best estimate of the PD, LGD, and EAD are used.
+
 The calculated ECL is recorded as a loss allowance on the balance sheet (§5.5.1).
 
-> *Loss allowance reduces the gross carrying amount of loans (on the balance sheet) calculated at the amortised cost.  It reflects a provision set aside to cover anticipated losses due to credit risk.*
+> *Loss allowance reduces the gross carrying amount of loans (on the balance sheet) calculated at the amortised cost. It reflects a provision set aside to cover anticipated losses due to credit risk.*
 
 <https://www.bis.org/fsi/fsisummaries/ifrs9.pdf>
 
@@ -45,7 +54,7 @@ Changes in the ECL (e.g., new impairments or reversals) are recognized as impair
 
 ## EIR
 
-ECL is the present value of expected cash shortfalls. Use the effective interest rate (EIR) of the financial asset to discount future losses to their present value. The Effective Interest Rate (EIR) is the internal rate of return (IRR) on the expected future cash flows of a financial instrument over its life, accounting for:
+A component of the ECL is the effective interest rate (EIR), which is the rate that will discount all expected future cashflows over an account’s life to the gross carrying amount of that account. The calculation of EIR is done to ensure that banks recognise interest revenue / expenses and fees on an account in a similar consistent manner. The EIR is the rate that should be used when discounting in the ECL calculation. The EIR is the internal rate of return (IRR) on the expected future cash flows of a financial instrument over its life, accounting for:
 
 - **Contractual Interest Rate**: The nominal interest rate stated in the loan agreement.
 - **Transaction Costs**: Fees directly attributable to the acquisition or issuance of the financial instrument (e.g., initiation fees).
@@ -108,6 +117,8 @@ graph LR;
     C --Cure--> B
 
 ```
+
+Both Stage 2 and Stage 3 accounts have a lifetime ECL calculated, i.e. the present value of all future cashflows are considered as opposed to only 12 months of cashflows considered for Stage 1 accounts.
 
 ### Stage 1 (Performing Assets)
 
