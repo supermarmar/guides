@@ -14,13 +14,34 @@ The motivation to develop credit risk models stemmed from the need to develop qu
 
 ### Basel I
 
-Minimum capital requirements have been coordinated internationally since the Basel Accord of 1998. Under [Basel 1](docs\regulation\international\bis\bis.md), a bank’s assets were allotted via a simple rule of thumb to one of four broad risk categories, each with a ‘risk weighting’ that ranged from 0%-100%. A portfolio of corporate loans, for instance, received a risk weight of 100%, while retail mortgages – perceived to be safer – received a more favourable risk weighting of 50%. Minimum capital $K$ was then set in proportion to the weighted sum of these risk-weighted assets (RWAs).
+Minimum capital requirements have been coordinated internationally since the Basel Accord of 1998. Under [Basel 1](docs\regulation\international\bis\basel_1.md), a bank’s assets were allotted via a simple rule of thumb to one of four broad risk categories, each with a ‘risk weighting’ that ranged from 0%-100%. A portfolio of corporate loans, for instance, received a risk weight of 100%, while retail mortgages – perceived to be safer – received a more favourable risk weighting of 50%. 
 
-$K = 8\% \times \text{RWA}$
+Minimum capital $K$ was then set in proportion to the weighted sum of these risk-weighted assets (RWAs).
 
-Over time, this approach was criticised for being insufficiently granular to capture the cross sectional distribution of risk. All mortgage loans, for instance, received the same capital requirement without regard to the underlying risk profile of the borrower (such as the loan to value or debt to income ratio). This led to concerns that the framework incentivised ‘risk shifting’. To the extent that risk was not being properly priced, it was argued that banks had an incentive to retain only the highest risk exposures on their balance sheets as these were also likely to offer the highest expected return.
+$K \geq 8\% \times \text{RWA}$
+
+This can also be expressed in terms of capital adequacy ratio (CAR)
+
+$\frac{K}{\text{RWA}} \geq 8\% $
+
+Additional to this, Tier 1 capital should make up 50% of the capital base. When determining what tier is applicable for capital, the following items are considered:
+
+1. Permanence: Will the asset be around for a long time? The longer the term of the asset and the more stable an asset is, the higher the tier.
+2. Freedom: What is the ability of this asset to absorb losses on an ongoing basis? The better the asset at absorbing losses, the higher the tier.
+3. Subordination: Where does this asset rank relative to depositors and other creditors? The closer the ranking to these counterparties, the better quality the capital.
+
+Note that the original Basel I Accord only considered credit risk in the RWA. However, an amendment in 1996 then included an RWA associated with market risk as well.
 
 Some jurisdictions in emerging markets still apply the Basel I framework. For bank groups, some of their exposure may therefore be subject to Basel I in a specific country, Basel II in another country and Basel III on consolidation.
+
+#### Shortcomings
+
+While Basel I improved and standardised the way capital requirements were determined, it did have significant weaknesses, namely:
+
+1. Lack of differentiation: Under this accord, all loans by a bank to a corporation had a risk weight of 100% and required the same amount of capital. A loan to a company with an AAA credit rating was treated in the same way as one to a corporation with a B rating (much riskier).
+2. Lack of correlation: There was no model of default correlation to assess how the risk of assets were correlated (especially in times of stress) or how diversification may benefit the bank
+3. Lack of breadth: The original Basel I Accord did not consider market, operational and liquidity risk. While there was an amendment made in 1996 to include market risk, the requirements for assessing risk in the trading book, including value at risk (VaR) methodologies, were rudimentary and failed to recognise the risk inherent in the books
+4. Static measure of credit risk: It assumes that a minimum 8% CAR is adequate at all times and that the credit risk posed by counterparties does not change as the credit exposure ages.
 
 ### Basel II
 

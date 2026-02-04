@@ -167,7 +167,7 @@ In May 1983, the Concordat was revised and re-issued as Principles for the super
 
 ![alt text](images/basel/may_1983.png)
 
-### **Basel Capital Accord** 🔴
+### **Basel Capital Accord**
 
 With the foundations for supervision of internationally active banks laid, capital adequacy soon became the main focus of the Committee's activities. In the early 1980s, the onset of the Latin American debt crisis heightened the Committee's concerns that the capital ratios of the main international banks were deteriorating at a time of growing international risks. Backed by the G10 Governors, Committee members resolved to halt the erosion of capital standards in their banking systems and to work towards greater convergence in the measurement of capital adequacy. This resulted in a broad consensus on a weighted approach to the measurement of risk, both on and off banks' balance sheets.
 
@@ -175,17 +175,15 @@ There was strong recognition within the Committee of the overriding need for a m
 
 The document consists of two main sections, which cover (a) the definition of capital and (b) the structure of risk weights. Two shorter sections define the target standard ratio and the transitional and implementing arrangements. There are four technical annexes covering the definition of capital, the counterparty risk weights, the credit conversion factors for off-balance-sheet items and the transitional arrangements.
 
-<https://www.bis.org/publ/bcbs04a.htm>
-
 The Basel Accord is not a law.
 
-### **Market Risk Amendment** 🔴
+#### **Market Risk Amendment**
 
 The Committee also refined the framework to address risks other than credit risk, which was the focus of the 1988 Accord. In January 1996, following two consultative processes, the Committee issued the Amendment to the Capital Accord to incorporate market risks (or Market Risk Amendment), to take effect at the end of 1997. This was designed to incorporate within the Accord a capital requirement for the market risks arising from banks' exposures to foreign exchange, traded debt securities, equities, commodities and options. An important aspect of the Market Risk Amendment was that banks were, for the first time, allowed to use internal models (value-at-risk models) as a basis for measuring their market risk capital requirements, subject to strict quantitative and qualitative standards. Much of the preparatory work for the market risk package was undertaken jointly with securities regulators.
 
 <https://www.bis.org/publ/bcbs24a.htm>
 
-### **Basel II** 🔴
+### **Basel II**
 
 In June 1999, the Committee issued a proposal for a new capital adequacy framework to replace the 1988 Accord. This led to the release of a revised capital framework in June 2004. Generally known as "Basel II", the revised framework comprised three pillars:
 
@@ -203,7 +201,7 @@ Following the June 2004 release, which focused primarily on the banking book, th
 
 <https://www.bis.org/publ/bcbs128.htm>
 
-### **Basel III** 🔴
+### **Basel III**
 
 Even before Lehman Brothers collapsed in September 2008, the need for a fundamental strengthening of the Basel II framework had become apparent. The banking sector entered the financial crisis with too much leverage and inadequate liquidity buffers. These weaknesses were accompanied by poor governance and risk management, as well as inappropriate incentive structures. The dangerous combination of these factors was demonstrated by the mispricing of credit and liquidity risks, and excess credit growth.
 
