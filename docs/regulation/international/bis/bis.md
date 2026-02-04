@@ -191,7 +191,12 @@ In June 1999, the Committee issued a proposal for a new capital adequacy framewo
 2. supervisory review of an institution's capital adequacy and internal assessment process
 3. effective use of disclosure as a lever to strengthen market discipline and encourage sound banking practices
 
-The new framework was designed to improve the way regulatory capital requirements reflect underlying risks and to better address the financial innovation that had occurred in recent years. The changes aimed at rewarding and encouraging continued improvements in risk measurement and control.  
+The new framework was designed to improve the way regulatory capital requirements reflect underlying risks and to better address the financial innovation that had occurred in recent years. The changes aimed at rewarding and encouraging continued improvements in risk measurement and control. The goals of the new accord were:
+
+1. To maintain an adequate amount of regulatory capital, which addressed the risk inherent in asset exposure and their default correlation and incorporated operational risk (i.e. to ensure that capital allocation was more risk-sensitive)
+2. To enhance disclosure requirements to allow market participants to be able to more easily compare the capital adequacy of different institutions
+3. To ensure that risk assessment for credit, operation, and market risk were performed using quantifiable techniques
+4. To attempt to better align economic and regulatory capital to reduce the scope for regulatory arbitrage.
 
 The framework's publication in June 2004 followed almost six years of intensive preparation. During this period, the Basel Committee consulted extensively with banking sector representatives, supervisory agencies, central banks and outside observers in order to develop significantly more risk-sensitive capital requirements.
 
