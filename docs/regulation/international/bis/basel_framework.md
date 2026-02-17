@@ -1224,8 +1224,7 @@ that are not in default, risk weights are defined based on the following formula
 
 Correlation $= R = 0.04$
 
-Capital Req $=K=\text{LGD}[N(\Large\frac{G(PD)+\sqrt{R}\times G(0.999)}{\sqrt{1-R}})$
-$-PD]$
+Capital Req $=K=\text{LGD}[N(\Large\frac{G(PD)+\sqrt{R}\times G(0.999)}{\sqrt{1-R}})$ -PD]$
 
 RWA $=12.5\times K\times$ EAD
 

@@ -125,9 +125,3 @@ The sum of tier 1 and tier 2 elements will be eligible for inclusion in the capi
 ## Annex 3 Credit conversion factors for off-balance-sheet items
 
 The framework takes account of the credit risk on off-balance-sheet exposures by applying credit conversion factors to the different types of off-balance-sheet instrument or transaction. The credit conversion factors would be multiplied by the weights applicable to the category of the counterparty for an on-balance-sheet transaction (see Annex 2).
-
-## Annex 4 Transitional arrangements
-
-||Initial |End-1990|
-|-|-|-|
-|1. Minimum standard | The level prevailing at end-1987 | 7.25% | 8.0% |

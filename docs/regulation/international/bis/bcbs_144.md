@@ -1,0 +1,38 @@
+# Principles for Sound Liquidity Risk Management and Supervision
+
+<https://www.bis.org/publ/bcbs144.pdf>
+
+## Introduction
+
+1. Liquidity is the ability of a bank1 to fund increases in assets and meet obligations as they come due, without incurring unacceptable losses. The fundamental role of banks in the maturity transformation of short-term deposits into long-term loans makes banks inherently vulnerable to liquidity risk,2 both of an institution-specific nature and that which affects markets as a whole. Virtually every financial transaction or commitment has implications for a bank’s liquidity. Effective liquidity risk management helps ensure a bank's ability to meet cash flow obligations, which are uncertain as they are affected by external events and other agents' behaviour. Liquidity risk management is of paramount importance because a liquidity shortfall at a single institution can have system-wide repercussions. Financial market developments in the past decade have increased the complexity of liquidity risk and its management.
+
+2. The market turmoil that began in mid-2007 re-emphasised the importance of liquidity to the functioning of financial markets and the banking sector. In advance of the turmoil, asset markets were buoyant and funding was readily available at low cost. The reversal in market conditions illustrated how quickly liquidity can evaporate and that illiquidity can last for an extended period of time. The banking system came under severe stress, which necessitated central bank action to support both the functioning of money markets and, in a few cases, individual institutions.  
+
+Basel has stated 13 principles of sound liquidity management, which are:
+
+## Fundamental principle for the management and supervision of liquidity risk
+
+1. Robust liquidity risk management framework:  A bank should establish a robust liquidity risk management framework that ensures it maintains sufficient liquidity, including a cushion of unencumbered, high quality liquid assets, to withstand a range of stress events, including those involving the loss or impairment of both unsecured and secured funding sources.
+
+## Governance of liquidity risk management
+
+2. Clearly articulated liquidity risk tolerance: A bank should clearly articulate a liquidity risk tolerance that is appropriate for its business strategy and its role in the financial system.  
+
+3. Strategies, policies, and practices: Senior management should develop a strategy, policies and practices to manage liquidity risk in accordance with the risk tolerance and to ensure that the bank maintains sufficient liquidity. Senior management should continuously review information on the bank’s liquidity developments and report to the board of directors on a regular basis. A bank’s board of directors should review and approve the strategy, policies and practices related to the management of liquidity at least annually and ensure that senior management manages liquidity risk effectively. 
+
+4. Product pricing and performance management: A bank should incorporate liquidity costs, benefits and risks in the internal pricing, performance measurement and new product approval process for all significant business activities (both on- and off-balance sheet), thereby aligning the risk-taking incentives of individual business lines with the liquidity risk exposures their activities create for the bank as a whole. 
+
+## Measurement and management of liquidity risk
+
+5. Processes to identify, measure, monitor, and control liquidity risk: A bank should have a sound process for identifying, measuring, monitoring and controlling liquidity risk. This process should include a robust framework for comprehensively projecting cash flows arising from assets, liabilities and off-balance sheet items over an appropriate set of time horizons.  
+6. Management of liquidity risk exposure across legal entities, business lines, and currencies:  A bank should actively monitor and control liquidity risk exposures and funding needs within and across legal entities, business lines and currencies, taking into account legal, regulatory and operational limitations to the transferability of liquidity.  
+7. Funding strategy designed to support funding diversification and liquidity objectives: A bank should establish a funding strategy that provides effective diversification in the sources and tenor of funding. It should maintain an ongoing presence in its chosen funding markets and strong relationships with funds providers to promote effective diversification of funding sources. A bank should regularly gauge its capacity to raise funds quickly from each source. It should identify the main factors that affect its ability to raise funds and monitor those factors closely to ensure that estimates of fund raising capacity remain valid. 
+8. Management of daily and intra-daily liquidity positions: A bank should actively manage its intraday liquidity positions and risks to meet payment and settlement obligations on a timely basis under both normal and stressed conditions and thus contribute to the smooth functioning of payment and settlement systems. 
+9.  Management of collateral positions, differentiating between encumbered and unencumbered assets:  A bank should actively manage its collateral positions, differentiating between encumbered and unencumbered assets. A bank should monitor the legal entity and physical location where collateral is held and how it may be mobilised in a timely manner.
+10. Stress testing for institution specific and market wide stress scenarios:  A bank should conduct stress tests on a regular basis for a variety of short-term and protracted institution-specific and market-wide stress scenarios (individually and in combination) to identify sources of potential liquidity strain and to ensure that current exposures remain in accordance with a bank’s established liquidity risk tolerance. A bank should use stress test outcomes to adjust its liquidity risk management strategies, policies, and positions and to develop effective contingency plans.
+11. Contingency funding and liquidity plans:  A bank should have a formal contingency funding plan (CFP) that clearly sets out the strategies for addressing liquidity shortfalls in emergency situations. A CFP should outline policies to manage a range of stress environments, establish clear lines of responsibility, include clear invocation and escalation procedures and be regularly tested and updated to ensure that it is operationally robust.  
+12. Cushion of high-quality assets which can be used to meet stress funding requirements:  A bank should maintain a cushion of unencumbered, high quality liquid assets to be held as insurance against a range of liquidity stress scenarios, including those that involve the loss or impairment of unsecured and typically available secured funding sources. There should be no legal, regulatory or operational impediment to using these assets to obtain funding. 
+
+## Public disclosure
+
+1.  Public disclosure: A bank should publicly disclose information on a regular basis that enables market participants to make an informed judgement about the soundness of its liquidity risk management framework and liquidity position. 

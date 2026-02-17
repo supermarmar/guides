@@ -1,60 +1,124 @@
 # Regulatory Capital
 
-What we call regulatory capital differs from what is known as economic capital. In effect there are two approaches to consider the supply and demand of capital. The regulatory approach dictates the rules on which the demand is to be set, as well as the admissibility of supply, while an internal or economic approach considers the internal best estimate of demand and supply. Regulatory capital supply compared to a predetermined scalar of demand is what the regulators determine as adequate for a bank’s operations. Economic capital is what the bank itself views as appropriate for its activities. Usually, it is lower than regulatory capital, in that it incorporates a portfolio effect reflecting diversification of activities, but it may also include an additional small capital cushion or buffer.
+What we call regulatory capital differs from what is known as economic capital. In effect there are two approaches to consider the supply and demand of capital. The regulatory approach dictates the rules on which the demand is to be set, as well as the admissibility of supply, while an internal or economic approach considers the internal best estimate of demand and supply. Regulatory capital supply compared to a predetermined scalar of demand is what the regulators determine as adequate for a bank’s operations. Economic capital is what the bank itself views as appropriate for its activities. Usually, it is lower than regulatory capital, in that it incorporates a portfolio effect reflecting diversification of activities, but it may also include an additional small capital cushion or buffer.****
 
-## Credit Risk
+## Pillar 1: Minimum Capital Requirements (MCR)
 
-<https://www.bankofengland.co.uk/-/media/boe/files/ccbs/resources/modelling-credit-risk>
-
-[Credit]() is money provided by a creditor to a borrower (also referred to as an obligor as he or she has an obligation). [Credit risk]() refers to the risk that a contracted payment will not be made. Markets are assumed to put a price on this risk. This is then included in the market’s purchase price for the contracted payment. The part of the price that is due to credit risk is the credit spread. The role of a typical credit risk model is to take as input the conditions of the general economy and those of the specific firm in question, and generate as output a credit spread.
-
-## Minimum Capital Requirements (MCR)
-
-The motivation to develop credit risk models stemmed from the need to develop quantitative estimates of the amount of economic capital needed to support a bank’s risk taking activities.
+The motivation to develop credit risk models stemmed from the need to develop quantitative estimates of the amount of regulatory and economic capital needed to support a bank’s risk taking activities.
 
 ### Basel I
 
-Minimum capital requirements have been coordinated internationally since the Basel Accord of 1998. Under [Basel 1](docs\regulation\international\bis\basel_1.md), a bank’s assets were allotted via a simple rule of thumb to one of four broad risk categories, each with a ‘risk weighting’ that ranged from 0%-100%. A portfolio of corporate loans, for instance, received a risk weight of 100%, while retail mortgages – perceived to be safer – received a more favourable risk weighting of 50%.
+Minimum capital requirements have been coordinated internationally since the Basel Accord of 1998. Under [Basel 1](docs\regulation\international\bis\basel_1.md), a bank’s assets were allotted via a **simple** rule of thumb to one of four broad risk categories, each with a ‘risk weighting’ that ranged from 0%-100%. A portfolio of corporate loans, for instance, received a risk weight of 100%, while retail mortgages – perceived to be safer – received a more favourable risk weighting of 50%.
 
 Minimum capital $K$ was then set in proportion to the weighted sum of these risk-weighted assets (RWAs).
 
-$K \geq 8\% \times \text{RWA}$
+```math
+K \geq 8\% \times \text{RWA}
+\\
+\text{RWA} = \text{Exposure} \times w
+```
 
 This can also be expressed in terms of capital adequacy ratio (CAR)
 
-$\frac{K}{\text{RWA}} \geq 8\% $
+```math
+\frac{K}{\text{RWA}} \geq 8\% 
+```
 
-Additional to this, Tier 1 capital should make up 50% of the capital base. When determining what tier is applicable for capital, the following items are considered:
-
-1. Permanence: Will the asset be around for a long time? The longer the term of the asset and the more stable an asset is, the higher the tier.
-2. Freedom: What is the ability of this asset to absorb losses on an ongoing basis? The better the asset at absorbing losses, the higher the tier.
-3. Subordination: Where does this asset rank relative to depositors and other creditors? The closer the ranking to these counterparties, the better quality the capital.
-
-Note that the original Basel I Accord only considered credit risk in the RWA. However, an amendment in 1996 then included an RWA associated with market risk as well.
-
-Some jurisdictions in emerging markets still apply the Basel I framework. For bank groups, some of their exposure may therefore be subject to Basel I in a specific country, Basel II in another country and Basel III on consolidation.
-
-#### Shortcomings
-
-While Basel I improved and standardised the way capital requirements were determined, it did have significant weaknesses, namely:
-
-1. Lack of differentiation: Under this accord, all loans by a bank to a corporation had a risk weight of 100% and required the same amount of capital. A loan to a company with an AAA credit rating was treated in the same way as one to a corporation with a B rating (much riskier).
-2. Lack of correlation: There was no model of default correlation to assess how the risk of assets were correlated (especially in times of stress) or how diversification may benefit the bank
-3. Lack of breadth: The original Basel I Accord did not consider market, operational and liquidity risk. While there was an amendment made in 1996 to include market risk, the requirements for assessing risk in the trading book, including value at risk (VaR) methodologies, were rudimentary and failed to recognise the risk inherent in the books
-4. Static measure of credit risk: It assumes that a minimum 8% CAR is adequate at all times and that the credit risk posed by counterparties does not change as the credit exposure ages.
+Note that the original Basel I Accord only considered credit risk in the RWA. However, an amendment in 1996 then included an RWA associated with market risk as well. Some jurisdictions in emerging markets still apply the Basel I framework. For bank groups, some of their exposure may therefore be subject to Basel I in a specific country, Basel II in another country and Basel III on consolidation
 
 ### Basel II
 
-In response, [Basel II](docs\regulation\international\bis\bis.md) had a much more granular approach to risk weighting. Under Basel II, the credit risk management techniques under can be classified under:
+Under Basel II, Pillar 1, the minimum capital requirement for credit risk in the banking book, is calculated in a new way that reflects the credit ratings of counterparties. The capital requirement for market risk remained unchanged from the 1996 Amendment, but there was a new capital charge for operational risk. The general requirement in Basel I, that banks hold a total capital equal to 8% of RWAs, remained unchanged. In response, Basel II had a much more granular approach to risk weighting. Under Basel II, the credit risk management techniques under can be classified under:
 
 - Standardised approach: this involves a simple categorisation of obligors, without considering their actual credit risks. It includes reliance on external credit ratings.
 - Internal ratings-based (IRB) approach: here banks are allowed to use their ‘internal models’ to calculate the regulatory capital requirement for credit risk.
 
-These frameworks are designed to arrive at the RWAs, the denominator of four key capitalisation ratios (Total capital, Tier 1, Core Tier 1, Common Equity Tier 1). Under Basel II, banks following the IRB approach may compute capital requirements based on a formula approximating the Vasicek model of portfolio credit risk.
+These frameworks are designed to arrive at the RWAs, the denominator of four key capitalisation ratios (Total capital, Tier 1, Core Tier 1, Common Equity Tier 1).
+
+#### Standardised Approach
+
+The standardised approach has been used by banks which are not sufficiently sophisticated enough (in the view of the regulators) to use the internal ratings approaches. The standardised approach is similar to Basel I except for the calculation of risk weights.
+
+##### Risk Weights
+
+The risk weight for a country (sovereign) exposure ranges from 0% to 150%, and the risk weight for an exposure to another bank or a corporation ranges from 20% to 150%. Supervisors are allowed to apply lower risk weights (20% rather than 50%, 50% rather than 100%, and 100% rather than 150%) when exposures are to the country in which the bank is incorporated or to that country’s central bank.
+
+For claims on banks, the rules are somewhat complicated. Instead of using the standard risk weights, national supervisors can choose to base capital requirements on the rating of the country in which the bank is incorporated.
+
+The standard rule for retail lending is that a risk weight of 75% be applied, compared with 100% in Basel I. When claims are secured by a residential mortgage the risk weight is 35%, compared with 50% in Basel I. Due to poor historical loss experience, the risk weight for claims secured by commercial real estate is 100%.
+
+##### Collateral Adjustment
+
+There are two ways that banks can adjust risk weights for collateral. The first is called the simple approach and is similar to the approach used in Basel I. The second is called the comprehensive approach. Banks have a choice as to which approach is used in the banking book, but they must use the comprehensive approach to calculate capital for counterparty credit risk in the trading book.
+
+Under the simple approach, the risk weight of the counterparty is replaced by the risk weight of the collateral for the part of the exposure covered by the collateral (the exposure is calculated after netting). For any exposure not covered by the collateral, the risk weight of the counterparty is used. The minimum level for the risk weight applied to the collateral is 20%. A requirement is that the collateral must be revalued at least every 6 months and must be pledged for at least the life of the exposure.
+
+Under the comprehensive approach, banks adjust the size of their exposure upwards to allow for possible decreases in the value of the collateral. (The adjustments depend on the volatility of the exposure and the collateral.) A new exposure equal to the excess of the adjusted exposure over the adjusted value of the collateral is calculated and the counterparty’s risk weight is applied to this exposure. The adjustments applied to the exposure and the collateral can be calculated using rules specified in Basel II or, with regulatory approval, using a bank’s internal models. Where netting arrangements apply, exposures and collateral are separately netted and the adjustments made are weighted averages.
+
+#### IRB Approach
+
+Under the internal ratings-based (IRB) approach, regulators base the capital requirement on the value at risk calculated using a 1-year time horizon and a 99,9% confidence level. They recognise that expected losses are usually covered by the manner in which a financial institution prices its products (for example, the interest charged by a bank on a loan is designed to recover expected loan losses). The value at risk is calculated using a Gaussian copula model (single factor Vašíček) of time to default.
+
+```math
+
+\text{UL} = \text{VaR}_{99.9^{th}} = \text{EAD}_\text{Reg} × \text{LGD}_\text{Reg} × \text{WCDR}
+\\
+\text{EL} = \text{EAD}_\text{Reg} × \text{LGD}_\text{Reg} × \text{PD}_\text{Reg}
+\\
+```
+
+The capital given by the above equations is intended to be enough to cover unexpected losses over a 1-year period that we are 99,9% certain will not be exceeded. The WCDR is the probability of default that (theoretically) happens once every thousand bank years. The capital required is therefore the value at risk minus the expected loss.
+
+```math
+K = (\text{UL} - \text{EL}) \times MA
+\\
+K = \text{EAD}_\text{Reg} × \text{LGD}_\text{Reg} × (\text{WCDR}-\text{PD}_\text{Reg}) \times MA
+```
+
+When the capital requirement for a risk is calculated in a way that does not involve RWAs, it is multiplied by 12,5 to convert it to an RWA. This approach has been adopted given the original Basel I approach to assess risk as a percentage of the value of an asset rather than calculating the capital requirement explicitly.
+
+```math
+\text{RWA} = K \times 12.5
+```
+
+The Basel Committee reserves the right to apply a scaling factor (less than or greater than 1,0) to the result of the calculations, if it finds that the aggregate capital requirements are too high or low.
+
+A scaling factor of 1,06 has been applied by the SARB consistent with international practice.
+
+##### Maturity Adjustment
+
+The maturity adjustment is designed to allow for the fact that, if an instrument lasts longer than 1 year, there is a 1-year credit exposure arising from a possible decline in the creditworthiness of the counterparty as well as from a possible default by the counterparty.
+
+##### F-IRB
+
+Under the foundation IRB approach, banks supply PD, while the LGD, EAD, and maturity M are supervisory values set by the Basel Committee.
+
+- PD is subject to a floor of 0,03% for bank and corporate exposures, while the LGD is set at 45% for senior claims and 75% for subordinated claims.
+- When there is eligible collateral, in order to correspond to the comprehensive approach that was described earlier, the LGD is reduced by the ratio of the adjusted value of the collateral to the adjusted value of the exposure, both calculated using the comprehensive approach.
+- The EAD is calculated in a way similar to the credit equivalent amount in Basel I and includes the impact of netting.
+- M is set at 2,5 in most cases.
+
+##### A-IRB
+
+Under the advanced IRB approach, banks supply their own estimates of the PD, LGD, EAD, and M for corporate, sovereign, and bank exposures, subject to regulatory approval and therefore not necessarily the same as internal estimates.
+
+- The PD can be reduced by credit mitigants such as credit triggers.
+- The two main factors influencing the LGD are the seniority of the debt and the collateral.
+- In calculating the EAD, banks can, with regulatory approval, use their own estimates of credit conversion factors.
+
+> Suppose the assets of a bank consist of R1 billion of loans to BBB-rated corporations. The PD for the corporations is estimated as 0,1% and the LGD is 60%. Average maturity of the corporate loans is 2,5 years. Adjusted maturity is 1,59, which according to our equation makes the WCDR 3,4%. An implied value of p equal to 0,4 is used under the Basel II IRB approach, the RWAs for the corporate loans are: 12,5 × 1000 × 0,6 × (0,034 – 0,0001) × 1,59 = 393 or R393 million. This compares with R1 billion under Basel I and R1 billion under the standardised approach of Basel II.
+
+The model underlying the calculation of capital for retail exposures is similar to that underlying the calculation of corporate, sovereign, and bank exposures. However, the foundation IRB and advanced IRB approaches are merged, and all banks using the A-IRB approach provide their own estimates of the PD, LGD, and EAD. There is no maturity adjustment.
+
+> Suppose the assets of a bank consist of R500 million of residential mortgages where the PD is 0,005 and the LGD is 20%. In this case, p = 0,15 and WCDR = 0,67. The risk-weighted assets are: 12,5 × 500 × 0,2 × (0,067 – 0,005) = 78 or R78 million. This compares with R250 million under Basel I and R175 million under the standardised approach of Basel II.
+
+In determining capital requirements for defaulted assets, the WCDR formula above sets N and PD equal to 1, and both EAD and LGD have to be estimated. The RWA formula then evaluates to LGD x EAD.
 
 ### Basel III
 
-Under [Basel III](docs\regulation\international\bis\bis.md) the minimum capital requirement was not changed, but stricter rules were introduced to ensure capital was of sufficient quality. There is now a 4.5% minimum CET1 requirement (Basel 3 §RBC 20.1). It also increased levels of capital by introducing usable capital buffers rather than capital minima. Basel III cleaned up the definition of capital, i.e., the numerator of the capital ratio. But it did not seek to materially alter the Basel II risk based framework for measuring risk-weighted assets, i.e., the denominator of the capital ratio; therefore, the architecture of the risk weighted capital regime was left largely unchanged. Basel III seeks to improve the standardised approach for credit risk in a number of ways. This includes strengthening the link between the standardised approach the internal ratings-based (IRB) approach.
+Basel III seeks to improve the standardised approach for credit risk in a number of ways. This includes strengthening the link between the standardised approach the internal ratings-based (IRB) approach..
+
+It also increased levels of capital by introducing usable capital buffers rather than capital minima.  
 
 ### Basel 3.1
 
@@ -62,8 +126,7 @@ Banks will need to start implementing and allowing for Basel 3.1 (IV) as it is t
 
 ### Banks Act
 
-In South Africa, Basel II implementation became effective 1 January 2008. Basel III became effective 1 January 2012 but is subject to transition elements that will continue
-until 2023.
+In South Africa, Basel II implementation became effective 1 January 2008. Basel III became effective 1 January 2012 but is subject to transition elements that will continue until 2023.
 
 In South Africa, minimum capital included the sum of its Tier 1 and Tier 2 capital and primary and secondary unimpaired reserve funds. This amount could not at any time be less than the greater of R250 million or 10% (previously 8%) of risk-weighted assets. Tier 1 must make up at least 50% of a bank’s capital base.
 
@@ -109,6 +172,8 @@ $\text{UL} = \displaystyle\sum_{i=1}^N\sigma_i\rho_i$
 
 where $\sigma_i$ denotes the stand-alone standard deviation of credit losses for the $i$th facility, and $\rho_i$ denotes the correlation between credit losses on the ith facility and those on the overall portfolio. The parameter captures the ith facility’s correlation/diversification effects with other instruments in the bank’s credit portfolio. Other things being equal, higher correlations among credit instruments – represented by higher $\rho_i$ lead to a higher standard deviation of credit losses for the portfolio as a whole.
 
+In the case of corporate, sovereign and bank exposures, Basel II assumes a relationship between the correlation parameter $\rho$ and the probability of default PD in an equation based on empirical research. A lower PD is associated with higher levels of correlation.
+
 ### Conditional Expected Losses
 
 Another way of looking at it is through the following:
@@ -153,7 +218,7 @@ Where $A_i$ is the value of the ݅ith firm’s assets, $\mu_i$ and $\sigma_i$ ar
 
 $A_i(T)=e^{\small A(0) + \mu_iT-\frac{1}{2}\sigma_i^2T+\sigma_i\sqrt T X_i}$
 
-The $݅i$ th firm defaults if $A_i(T)<B$ so the probability of such an event is
+The $݅i$-th firm defaults if $A_i(T)<B$ so the probability of such an event is
 
 $P[A_i(T)<B]=P[X_i<c_i]=p^*$
 
@@ -161,7 +226,7 @@ where $c_i$ is easily derived from equation (1). That is, default of a single ob
 
 **$p^*$ is the average loss rate in 1-year or the 1-year through-the-cycle (TTC) PD.**
 
-Correlation between defaults is introduced by assuming correlation in the $A_i$ processes, and thus in the terminal values, $A_i(T)$. In particular, it is assumed that the $X_i$ s in equation (1) are pair-wise correlated according to factor $\rho$. The higher $\rho$, the more dependent the borrowers are on systematic environment. When $\rho = 0$ this implies total independence between borrowers.
+Assume that a bank has a very large number of obligors, all of which have the same 1-year PD. Correlation between defaults is introduced by assuming correlation in the $A_i$ processes, and thus in the terminal values, $A_i(T)$. In particular, it is assumed that the $X_i$ s in equation (1) are pair-wise correlated according to factor $\rho$. The higher $\rho$, the more dependent the borrowers are on systematic environment. When $\rho = 0$ this implies total independence between borrowers.
 
 Being normal and equi-correlated, each random variable can then be represented as the sum of two other random variables: one common across firms, and the other idiosyncratic that are both standard normal ~$N(0,1)$.
 
@@ -175,11 +240,9 @@ $= P[\text{S}_{t'}\sqrt{\rho}+Z_i\sqrt{1-\rho}<N^{-1}(p^*)]$
 $= P[Z_i<\frac{N^{-1}(p^*)-\text{S}_{t'}\sqrt{\rho}}{\sqrt{1-\rho}}]$
 $= N(\large\frac{N^{-1}(p^*)-\text{S}_{t'}\sqrt{\rho}}{\sqrt{1-\rho}})$
 
-By taking the inverse of the standard normal distribution applied to confidence level one can derive conservative value of systematic factor $S$.
+By taking the inverse of the standard normal distribution applied to confidence level one can derive conservative value of systematic factor $S$. Rewriting this in terms of the 99.9% quantile for Basel we end up with the WCDR. The WCDR denotes the “worst-case default rate”, in that we are 99,9% certain will not be exceeded next year provided all exposures are equal and no correlation exists between LGD and PD.
 
-Rewriting this in terms of the 99.9% quantile for Basel
-
-$\text{PD}_{i}^\text{SysPiT}(12,x_{i}|\text{S}_{99.9^{th}}=N^{-1}(0.999)) = N(\large\frac{N^{-1}(p^*)+\sqrt{\rho}N^{-1}(0.999)}{\sqrt{1-\rho}})$
+$\text{WCDR} = \text{PD}_{i}^\text{SysPiT}(12,x_{i}|\text{S}_{99.9^{th}}=N^{-1}(0.999)) = N(\large\frac{N^{-1}(p^*)+\sqrt{\rho}N^{-1}(0.999)}{\sqrt{1-\rho}})$
 
 where $p^* = \text{PD}_{i}^\text{TTC}(12,x_{i},[t_a',t_b'])$
 
