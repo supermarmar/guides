@@ -32,7 +32,7 @@ A bank’s risk data aggregation capabilities and risk reporting practices shoul
 
 (29) A bank’s risk data aggregation capabilities and risk reporting practices should be:
 
-- (a) **Fully documented** and subject to **high standards of validatio**n. This validation should be independent and review the bank’s compliance with the Principles in this document. Common practices suggest that the independent validation of risk data aggregation and risk reporting practices should be conducted using staff with specific IT, data and reporting expertise.
+- (a) **Fully documented** and subject to **high standards of validation**. This validation should be independent and review the bank’s compliance with the Principles in this document. Common practices suggest that the independent validation of risk data aggregation and risk reporting practices should be conducted using staff with specific IT, data and reporting expertise.
 - (b) When **considering a material acquisition**, a bank’s due diligence process should assess the risk data aggregation capabilities and risk reporting practices of the acquired entity, as well as the impact on its own risk data aggregation capabilities and risk reporting practices.
 - (c)  In particular, risk data aggregation capabilities should be independent from the choices a bank makes regarding its legal organisation and geographical presence.
 

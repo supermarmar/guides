@@ -9,7 +9,7 @@ The Basel Framework is a consolidated version of the full set of standards of th
 The framework comprises the 14 standards listed below. Each standard is divided into chapters, and many chapters have multiple versions, eg a chapter may have a version that is applicable now and one that will become applicable after the Basel III reforms have been implemented.
 
 | Acronym | Standard names |
-|-|-|
+| - | - |
 | SCO | Scope and definitions |
 | CAP | Definition of capital |
 | RBC | Risk-based capital requirements |
@@ -88,8 +88,7 @@ This chapter sets out the eligibility criteria for regulatory capital. Three cat
   - Minimum original maturity of at least five years
   - Recognition in regulatory capital in the remaining five years before maturity will be amortised on a straight line basis.
 
-10.18 Under the standardised approach to credit risk, provisions or loan-loss reserves held against future, presently unidentified losses are freely available to meet losses which subsequently materialise and therefore qualify for inclusion within Tier 2. Provisions ascribed to identified deterioration of particular assets or known liabilities, whether individual or grouped, should be excluded. Furthermore, general provisions/general loan-loss reserves eligible for inclusion in Tier 2, measured gross of tax effects, will be limited to a maximum of 1.25% of credit risk-weighted assets (RWA) calculated under the standardised
-approach.
+10.18 Under the standardised approach to credit risk, provisions or loan-loss reserves held against future, presently unidentified losses are freely available to meet losses which subsequently materialise and therefore qualify for inclusion within Tier 2. Provisions ascribed to identified deterioration of particular assets or known liabilities, whether individual or grouped, should be excluded. Furthermore, general provisions/general loan-loss reserves eligible for inclusion in Tier 2, measured gross of tax effects, will be limited to a maximum of 1.25% of credit risk-weighted assets (RWA) calculated under the standardised approach.
 
 10.19 Under the internal ratings based approach, where the total expected loss amount is less than total eligible provisions (measured gross of tax effects), as explained in CRE35, banks may recognise the difference in Tier 2 capital up to a maximum of 0.6% of credit risk-weighted assets calculated under the internal ratings-based approach. At national discretion, a limit lower than 0.6% may be applied.
 
@@ -233,10 +232,7 @@ requirements, but would have a zero conservation buffer and therefore be subject
 
 30.6 Losses incurred in the banking sector can be extremely large when a downturn is preceded by a period of excess credit growth. These losses can destabilise the banking sector and spark a vicious circle, whereby problems in the financial system can contribute to a downturn in the real economy that then feeds back on to the banking sector. These interactions highlight the particular importance of the banking sector building up additional capital defences in periods where the risks of system-wide stress are growing markedly.
 
-30.7 The countercyclical buffer aims to ensure that banking sector capital requirements take account of the macro-financial environment in which banks
-operate. It will be deployed by national jurisdictions when excess aggregate credit growth is judged to be associated with a build-up of system-wide risk to
-ensure the banking system has a buffer of capital to protect it against future potential losses. This focus on excess aggregate credit growth means that
-jurisdictions are likely to only need to deploy the buffer on an infrequent basis. The buffer for internationally-active banks will be a weighted average of the buffers deployed across all the jurisdictions to which it has credit exposures. This means that they will likely find themselves subject to a small buffer on a more frequent basis, since credit cycles are not always highly correlated across jurisdictions.
+30.7 The countercyclical buffer aims to ensure that banking sector capital requirements take account of the macro-financial environment in which banks operate. It will be deployed by national jurisdictions when excess aggregate credit growth is judged to be associated with a build-up of system-wide risk to ensure the banking system has a buffer of capital to protect it against future potential losses. This focus on excess aggregate credit growth means that jurisdictions are likely to only need to deploy the buffer on an infrequent basis. The buffer for internationally-active banks will be a weighted average of the buffers deployed across all the jurisdictions to which it has credit exposures. This means that they will likely find themselves subject to a small buffer on a more frequent basis, since credit cycles are not always highly correlated across jurisdictions.
 
 #### National CCyB Requirements
 
@@ -338,58 +334,30 @@ This chapter sets out the standardised approach for credit risk as it applies to
 
 #### General Corporate Exposures
 
-20.42 For corporate exposures of banks incorporated in jurisdictions that allow the use
-of external ratings for regulatory purposes, banks will assign "base" risk weights
-according to Table 10.
+20.42 For corporate exposures of banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes, banks will assign "base" risk weights according to Table 10.
 
-20.43 Unrated corporate exposures of banks incorporated in jurisdictions that allow the
-use of external ratings for regulatory purposes will receive a 100% risk weight,
-with the exception of unrated exposures to corporate small or medium-sized
-entities (SMEs), as described in CRE20.47.
+20.43 Unrated corporate exposures of banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes will receive a 100% risk weight, with the exception of unrated exposures to corporate small or medium-sized entities (SMEs), as described in CRE20.47.
 
 ![alt text](images/basel/corp_rws.png)
 
-20.44 For corporate exposures of banks incorporated in jurisdictions that do not allow
-the use of external ratings for regulatory purposes, banks will assign a 100% risk
-weight to all corporate exposures, with the exception of:
+20.44 For corporate exposures of banks incorporated in jurisdictions that do not allow the use of external ratings for regulatory purposes, banks will assign a 100% risk weight to all corporate exposures, with the exception of:
 
 1. exposures to corporates identified as “investment grade” in CRE20.46; and
 2. exposures to corporate SMEs in CRE20.47
 
-20.46 Banks in jurisdictions that do not allow the use of external ratings for regulatory
-purposes may assign a 65% risk weight to exposures to "investment grade"
-corporates. An "investment grade" corporate is a corporate entity that has
-adequate capacity to meet its financial commitments in a timely manner and its
-ability to do so is assessed to be robust against adverse changes in the economic
-cycle and business conditions.
+20.46 Banks in jurisdictions that do not allow the use of external ratings for regulatory purposes may assign a 65% risk weight to exposures to "investment grade" corporates. An "investment grade" corporate is a corporate entity that has adequate capacity to meet its financial commitments in a timely manner and its ability to do so is assessed to be robust against adverse changes in the economic cycle and business conditions.
 
 #### SMEs
 
-20.47 Corporate SMEs are defined as corporate exposures where the reported annual
-sales for the consolidated group of which the corporate counterparty is a part is
-less than or equal to €50 million for the most recent financial year. In some
-jurisdictions (eg emerging economies), national supervisors might deem it
-appropriate to define SMEs in a more conservative manner (ie with a lower level
-of sales). For unrated exposures to corporate SMEs in jurisdictions that allow the
-use of external ratings for regulatory purposes, and for all exposures to corporate
-SMEs in jurisdictions that do not allow the use of external ratings for regulatory
-purposes, an 85% risk weight will be applied. Exposures to SMEs that meet the
-criteria in CRE20.65(1) to CRE20.65(3) will be treated as regulatory retail SME
-exposures and risk weighted at 75%.
+20.47 Corporate SMEs are defined as corporate exposures where the reported annual sales for the consolidated group of which the corporate counterparty is a part is less than or equal to €50 million for the most recent financial year. In some jurisdictions (eg emerging economies), national supervisors might deem it appropriate to define SMEs in a more conservative manner (ie with a lower level of sales). For unrated exposures to corporate SMEs in jurisdictions that allow the use of external ratings for regulatory purposes, and for all exposures to corporate SMEs in jurisdictions that do not allow the use of external ratings for regulatory purposes, an 85% risk weight will be applied. Exposures to SMEs that meet the criteria in CRE20.65(1) to CRE20.65(3) will be treated as regulatory retail SME exposures and risk weighted at 75%.
 
 #### Specialised Lending
 
-20.48 A corporate exposure will be treated as a specialised lending exposure if such
-lending possesses some or all of the following characteristics, either in legal form
-or economic substance:
+20.48 A corporate exposure will be treated as a specialised lending exposure if such lending possesses some or all of the following characteristics, either in legal form or economic substance:
 
-- The exposure is not related to real estate and is within the definitions of
-object finance, project finance or commodities finance under CRE20.49. If the
-activity is related to real estate, the treatment would be determined in
-accordance with CRE20.69 to CRE20.91;
+- The exposure is not related to real estate and is within the definitions of object finance, project finance or commodities finance under CRE20.49. If the activity is related to real estate, the treatment would be determined in accordance with CRE20.69 to CRE20.91;
 
-20.49 Exposures described in CRE20.48 will be classified in one of the following three
-subcategories of specialised lending:
+20.49 Exposures described in CRE20.48 will be classified in one of the following three subcategories of specialised lending:
 
 1. Project finance refers to the method of funding in which the lender looks
 primarily to the revenues generated by a single project, both as the source of

@@ -116,19 +116,37 @@ In determining capital requirements for defaulted assets, the WCDR formula above
 
 ### Basel III
 
-Basel III seeks to improve the standardised approach for credit risk in a number of ways. This includes strengthening the link between the standardised approach the internal ratings-based (IRB) approach..
-
-It also increased levels of capital by introducing usable capital buffers rather than capital minima.  
+Basel III seeks to improve the standardised approach for credit risk in a number of ways. This includes strengthening the link between the standardised approach the internal ratings-based (IRB) approach. It also increased levels of capital by introducing usable capital buffers rather than capital minima.  
 
 ### Basel 3.1
 
 Banks will need to start implementing and allowing for Basel 3.1 (IV) as it is to be in effect from January 2023.
 
-### Banks Act
+### Additional MCR
 
-In South Africa, Basel II implementation became effective 1 January 2008. Basel III became effective 1 January 2012 but is subject to transition elements that will continue until 2023.
+Minimum capital requirements may be based on the jurisdiction in which a bank operates. The minimum capital requirements, however, are always set in line with the capital requirements set out by the Bank of International settlements (BIS) in their Basel guidelines.
 
-In South Africa, minimum capital included the sum of its Tier 1 and Tier 2 capital and primary and secondary unimpaired reserve funds. This amount could not at any time be less than the greater of R250 million or 10% (previously 8%) of risk-weighted assets. Tier 1 must make up at least 50% of a bank’s capital base.
+In South Africa, Basel II implementation became effective 1 January 2008. Basel III became effective 1 January 2012 but is subject to transition elements that will continue until 2023. In South Africa, minimum capital included the sum of its Tier 1 and Tier 2 capital and primary and secondary unimpaired reserve funds. This amount could not at any time be less than the greater of R250 million or 10% (previously 8%) of risk-weighted assets. Tier 1 must make up at least 50% of a bank’s capital base.
+
+### TLAC
+
+Eligible instruments for [Total Loss-Absorbing Capacity TLAC]() should be stable and not subject to legal claim in the event of the bank’s resolution. TLAC is to be gradually phased in by 1 January 2022 with the following being met: TLAC must be 18% of RWAs and 6,75% of the Basel III leverage ratio denominator.
+
+It should also be noted that TLAC must be held in addition to minimum capital requirements. Generally, instruments which are eligible for CET1 are also eligible for TLAC, but they may not be included in both.
+
+![alt text](images/tlac.png)
+
+### MREL
+
+Minimum requirement for own funds and eligible liabilities (MREL) is a European standard introduced in 2016 that is conceptually similar to TLAC in that its implementation is supposed to ensure that banks have sufficient capacity to absorb losses and improve their ability to recapitalise in times of stress. While TLAC is based on percentages of RWA and leverage ratio (i.e. focusing on measures associated with Pillar 1 under Basel), MREL is equal to the loss-absorption amount plus a recapitalisation amount. These components are made up of:
+
+- Loss-absorption amount: The higher of the sum of Pillar 1 and Pillar 2A risk-weighted capital requirements, leverage requirement, or the Basel I capital floor. This is intended to reflect the fact that a bank post-resolution would have to comply with these capital requirements
+- Recapitalisation amount: A percentage from 0%–100% which is determined by local regulators. This percentage is larger for larger banks which are more systemically important.
+
+![alt text](images/mrel.png)
+
+The intent of MREL is that it broadly aligns to TLAC for G-SIBs and allows for the potential for
+additional capital requirements (for the purpose of recapitalisation) for smaller non-SIBs.
 
 ## Credit Loss Distribution
 

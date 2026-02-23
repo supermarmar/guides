@@ -171,7 +171,7 @@ In May 1983, the Concordat was revised and re-issued as Principles for the super
 
 With the foundations for supervision of internationally active banks laid, capital adequacy soon became the main focus of the Committee's activities. In the early 1980s, the onset of the Latin American debt crisis heightened the Committee's concerns that the capital ratios of the main international banks were deteriorating at a time of growing international risks. Backed by the G10 Governors, Committee members resolved to halt the erosion of capital standards in their banking systems and to work towards greater convergence in the measurement of capital adequacy. This resulted in a broad consensus on a weighted approach to the measurement of risk, both on and off banks' balance sheets.
 
-There was strong recognition within the Committee of the overriding need for a multinational accord to strengthen the stability of the international banking system and to remove a source of competitive inequality arising from differences in national capital requirements. Following comments on a consultative paper published in December 1987, a capital measurement system commonly referred to as the Basel Capital Accord was approved by the G10 Governors and released to banks in July 1988. The 1988 Accord called for a minimum ratio of capital to risk-weighted assets of 8% to be implemented by the end of 1992. Additional to this, Tier 1 capital should make up 50% of the capital base. The standards were almost entirely addressed to credit risk, the main risk incurred by banks. 
+There was strong recognition within the Committee of the overriding need for a multinational accord to strengthen the stability of the international banking system and to remove a source of competitive inequality arising from differences in national capital requirements. Following comments on a consultative paper published in December 1987, a capital measurement system commonly referred to as the Basel Capital Accord was approved by the G10 Governors and released to banks in July 1988. The 1988 Accord called for a minimum ratio of capital to risk-weighted assets of 8% to be implemented by the end of 1992. Additional to this, Tier 1 capital should make up 50% of the capital base. The standards were almost entirely addressed to credit risk, the main risk incurred by banks.
 
 The document consists of two main sections, which cover (a) the definition of capital and (b) the structure of risk weights. Two shorter sections define the target standard ratio and the transitional and implementing arrangements. There are four technical annexes covering the definition of capital, the counterparty risk weights, the credit conversion factors for off-balance-sheet items and the transitional arrangements.
 
@@ -292,7 +292,7 @@ Common Equity Tier 1 (CET1) capital consists in principle of share capital, shar
 - Instruments issued by the bank that meet the criteria for inclusion in Additional Tier 1 capital (and are not included in Common Equity Tier 1)
 - Stock surplus (share premium) resulting from the issue of instruments included in Additional Tier 1 capital
 - Instruments issued by consolidated subsidiaries of the bank and held by third parties that meet the criteria for inclusion in Additional Tier 1 capital and are not included in Common Equity Tier 1. Note criteria being applied
-- Regulatory adjustments applied in the calculation of Additional Tier 1 Capital 
+- Regulatory adjustments applied in the calculation of Additional Tier 1 Capital
 
 ##### T2
 
@@ -370,9 +370,11 @@ In 2005, the Basel Committee became concerned that banks were reducing their cap
 
 Another proposal involves what is called stressed value at risk (sVaR). The usual approach for calculating VaR is based on how market variables behaved over the most recent 2 to 4 years. A stressed VaR is calculated from the movements in market variables during a 1-year period of significant losses (such as 2007 or 2008). Basel II proposes that the capital for market risk be supplemented by a calculation involving stressed VaR, at least doubling the capital that banks have to keep for market risks.
 
-### Basel III Reforms | 3.1 | Endgame
+### Basel III Reforms | 3.1 | IV
 
-Basel 3.1 refers to the final set of banking reforms developed by the Basel Committee on Banking Supervision, aimed at strengthening the regulation, supervision, and risk management within the banking sector. These reforms are an extension of the original Basel III framework, often termed the "Basel III Endgame," and are known as Basel 3.1 in the UK.
+Basel 3.1 (IV) refers to the final set of banking reforms developed by the Basel Committee on Banking Supervision, aimed at strengthening the regulation, supervision, and risk management within the banking sector. These reforms are an extension of the original Basel III framework, often termed the "Basel III Endgame," and are known as Basel 3.1 in the UK.
+
+#### Pre-2017 Reforms
 
 From 2011, the Committee turned its attention to improvements in the calculation of capital requirements. The risk-based capital requirements set out in the Basel II framework were expanded to cover:
 
@@ -383,10 +385,87 @@ From 2011, the Committee turned its attention to improvements in the calculation
 - in 2016, a revised market risk framework that followed a fundamental review of trading book capital requirements
 - a consolidated and enhanced framework for disclosure requirements to reflect the development of the Basel standards
 
-The Committee completed its Basel III post-crisis reforms in 2017, with the publication of new standards for the calculation of capital requirements for credit risk, credit valuation adjustment risk and operational risk. The final reforms also include a revised leverage ratio, a leverage ratio buffer for global systemically important banks and an output floor, based on the revised standardised approaches, which limits the extent to which banks can use internal models to reduce risk-based capital requirements. These final reforms address shortcomings of the pre-crisis regulatory framework and provide a regulatory foundation for a resilient banking system that supports the real economy.
+##### Revised approach for market risk
+
+Under the Basel III revisions, key enhancements have been made when calculating market risk:
+
+- A revised boundary between the banking and trading books
+- Revised Internal Model Approach: The revised IMA allows for two modellable and one non-modellable component(s).
+- A revised Standardised Approach (SA): In the new SA, three components are considered.
+- A shift from VaR to expected shortfall (ES) of risk under stress.
+- A way of incorporating the risk of market illiquidity.
+
+#### 2017 Reforms
+
+The Committee completed its Basel III post-crisis reforms in 2017, with the publication of new standards for the calculation of capital requirements for credit risk, credit valuation adjustment risk and operational risk. The main revisions relate to the following areas:
+
+- Standardised approach for credit risk
+- Internal ratings based (IRB) approach for credit risk
+- Credit value adjustment (CVA) framework
+- Operational risk capital
+- Leverage framework
+- Capital output floors.
 
 <https://www.bis.org/bcbs/publ/d424.htm>
 
 <https://www.bis.org/bcbs/publ/d424_hlsummary.pdf>
 
-A key objective of the revisions was to reduce excessive variability of risk-weighted assets (RWA). At the peak of the global financial crisis, a wide range of stakeholders lost faith in banks' reported risk-weighted capital ratios. The Committee's own empirical analyses also highlighted a worrying degree of variability in banks' calculation of RWA. The revisions to the regulatory framework will help restore credibility in the calculation of RWA by enhancing the robustness and risk sensitivity of the standardised approaches for credit risk and operational risk, constraining internally modelled approaches and complementing the risk-based framework with a revised leverage ratio and output floor.
+A key objective of the revisions was to reduce excessive variability of risk-weighted assets (RWA). At the peak of the global financial crisis, a wide range of stakeholders lost faith in banks' reported risk-weighted capital ratios. The Committee's own empirical analyses also highlighted a worrying degree of variability in banks' calculation of RWA. The revisions seek to restore credibility in the calculation of risk-weighted assets (RWAs) and improve the comparability of banks’ capital ratios by:
+
+- Enhancing the robustness and risk sensitivity of the standardised approaches for credit risk, credit valuation adjustment (CVA) risk, and operational risk
+- Constraining the use of the internal model approaches, by placing limits on certain inputs used to calculate capital requirements under the internal ratings-based (IRB) approach for credit risk and by removing the use of the internal model approaches for CVA risk and for operational risk
+- Introducing a leverage ratio buffer to further limit the leverage of global systemically important banks (G-SIBs)
+- Replacing the existing Basel II output floor with a more robust risk-sensitive floor based on the Committee’s revised Basel III standardised approaches.
+
+##### Revised standardised approach for credit risk
+
+- A more granular approach was introduced for unrated exposures to banks and corporates.
+- Risk weights were recalibrated for exposures to banks.
+- Corporate exposures are split between corporate and SME exposures and a specific risk weight applies to exposures to SMEs.
+- A standalone treatment was also introduced for project finance, object finance and commodities
+finance.
+- Risk weights for retail mortgage exposures now depend on the LTV ratio.
+- A more granular approach for retail exposures was introduced that splits the exposure by type (for example, revolving credit facility vs transactional loan).
+- Other exposures where more risk sensitive approaches have been developed include commercial real estate, subordinated debt and equity, and off-balance-sheet items.
+
+##### Revised IRB models approach for credit risk
+
+The BCBS introduced the following revisions to address these shortcomings:
+
+- The option to use the advanced IRB (A-IRB) approach was removed for asset classes that cannot be robustly modelled, such as large and mid-size corporates, and banks and other financial institutions.
+- Parameter floors (input floors) were introduced to ensure bank estimated parameters (EAD, PD, and LGD) are sufficiently conservative.
+- There is greater parameter estimation specification to reduce RWA variability among banks.
+
+##### Revised CVA framework
+
+The internally modelled approach was removed and replaced with a standardised approach and a basic approach. As CVA is a market risk, these two approaches were calibrated to be in line with the revised market risk framework. The CVA framework was revised to achieve the following:
+
+- Enhance its risk sensitivity
+- Strengthen its robustness
+- Improve its consistency
+
+##### Revised approach for operational risk
+
+Under the final Basel III reforms, there is a single risk-sensitive standardised approach to be used by all banks. This ensures that banks have a consistent operational risk capital calculation methodology as well as reducing any capital benefit held by larger banks who utilise the AMA approach.
+
+The new standardised approach for operational risk determines a bank’s operational risk capital requirements based on two components:
+
+- (i) A measure of a bank’s income
+- (ii) A measure of a bank’s historical losses. Conceptually, it assumes:
+  - a. Operational risk increases at an increasing rate with a bank’s income
+  - b. Banks which have experienced greater operational risk losses historically are assumed to be more likely to experience operational risk losses in the future.
+
+##### Leverage ratio buffer for G-SIBs
+
+In addition to the minimum leverage ratio introduced by the initial Basel III capital requirements, the finalised requirements introduce a leverage ratio for globally systemically important banks (G-SIBs).
+
+This leverage ratio requirement must be met with Tier 1 capital and is set at 50% of a G-SIB’s risk weighted higher-loss absorbency requirements.
+
+In addition to the introduction of the G-SIB buffer, the Committee has agreed to make various refinements to the definition of the leverage ratio exposure measure. These refinements include modifying the way in which derivatives are reflected in the exposure measure and updating the treatment of off-balance-sheet exposures to ensure consistency with their measurement in the standardised approach to credit risk. The Committee has also agreed that jurisdictions may exercise national discretion in periods of exceptional macro-economic circumstances to exempt central bank reserves from the leverage ratio exposure measure on a temporary basis. Jurisdictions that exercise this discretion would be required to recalibrate the minimum leverage ratio requirement commensurately to offset the impact of excluding central bank reserves and require their banks to disclose the impact of this exemption on their leverage ratios.
+
+##### Revised output floor
+
+Under the revised output floor, banks’ risk-weighted assets must be calculated as the higher of:
+
+1. The total risk-weighted assets calculated using the approaches that the bank has supervisory approval to use in accordance with the Basel capital framework (including both standardised and internal model-based approaches)
+2. 72,5% of the total risk-weighted assets calculated using only the standardised approaches.

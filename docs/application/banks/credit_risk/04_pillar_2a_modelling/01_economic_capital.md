@@ -33,3 +33,7 @@ In South Africa, a CCoB was introduced in January 2016 with full implementation 
 Figure 2.1 below that illustrates the governance structure of the ICAAP framework at a typical commercial bank, mapping the components of the ICAAP to the internal processes, governance, and approvals, ultimately for regulatory review (SREP).
 
 ![alt text](images/icaap_governance.png)
+
+### Pillar 2B
+
+Each jurisdiction may require additional buffers over and above the Basel requirements so as to ensure that banks within the system are adequately capitalised and there is a reduced systemic risk. Usually, additional capital buffers are required once a regulatory review has taken place of the stress testing framework. This additional capital buffer is known as the Pillar 2B capital add-on. It is imperative that the prudential regulator balances the need for additional capital with a bank having excess capital that may result in capital inefficiencies.
