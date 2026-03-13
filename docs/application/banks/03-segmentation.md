@@ -1,55 +1,5 @@
 # Segmentation
 
-## Products
-
-### Retail Banking Products
-
-FirstRand’s retail banking business is dominated by FNB, serving individuals and small to medium enterprises (SMEs) across South Africa and the wider SADC region. WesBank complements this with specialist vehicle and asset finance solutions.
-
-| Product                             | Provided by           | Status | Description                                                                                          |
-| ----------------------------------- | --------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
-| Current accounts                | FNB                   | 🟢     | Standard retail current and transactional accounts with digital and app-based banking capabilities.  |
-| Credit cards                    | FNB                   | 🟢     | Personal and business credit cards, rewards-linked, and integrated into digital platforms.           |
-| Personal loans                  | FNB                   | 🟢     | Unsecured personal and revolving loans for individuals with credit-scoring via FNB’s risk systems.   |
-| Vehicle finance loans           | WesBank               | 🟢     | Instalment finance for vehicles, equipment, and fleet management. A key business line for the group. |
-| Mortgages                       | FNB                   | 🟢     | Residential mortgage products with variable and fixed-rate options.                                  |
-| Credit insurance                | FNB, FirstRand Life   | 🟢     | Loan-linked credit protection and life insurance products.                                           |
-| Instant access savings accounts | FNB                   | 🟢     | On-demand savings and hybrid transactional-savings accounts.                                         |
-| Notice accounts                 | FNB                   | 🟢     | Fixed notice savings with flexible withdrawal periods.                                               |
-| Term deposits                   | FNB                   | 🟢     | Fixed-term investments ranging from 30 days to several years.                                        |
-| Money market mutual funds       | Ashburton Investments | 🟢     | Retail and institutional money market funds managed under Ashburton’s investment platform.           |
-
-### Corporate Banking Products
-
-Corporate banking services within FirstRand are delivered jointly through FNB Business (serving SMEs and mid-sized corporates) and RMB (serving large corporates, multinationals, and public sector clients).
-
-| Product                            | Provided by       | Status | Description                                                                                |
-| ---------------------------------- | ----------------- | ------ | ------------------------------------------------------------------------------------------ |
-| Payments                       | FNB, RMB          | 🟢     | Domestic and cross-border payment solutions; participation in National Payment System.     |
-| Foreign exchange               | RMB, FNB          | 🟢     | FX spot, forward, and hedging products for trade and investment flows.                     |
-| Savings and deposits           | FNB, RMB          | 🟢     | Corporate call accounts and structured deposits for institutional clients.                 |
-| Corporate loans                | FNB Business, RMB | 🟡     | Term loans and revolving facilities; offered to mid and large corporates.                  |
-| Project finance                | RMB               | 🟢     | Structured project finance, particularly in energy, infrastructure, and resources sectors. |
-| Syndicated loans               | RMB               | 🟢     | Participation in local and cross-border loan syndications.                                 |
-| Commercial real estate lending | FNB, RMB          | 🟢     | Development and investment property finance.                                               |
-| Equipment leasing              | WesBank           | 🟢     | Asset-based and equipment leasing for business clients.                                    |
-| Trade financing                | RMB               | 🟢     | Documentary credits, guarantees, and trade finance facilities supporting imports/exports.  |
-
-### Investment Banking Products
-
-RMB, the group’s investment banking arm, focuses on structured finance, capital markets, advisory, and risk management solutions for corporate, institutional, and government clients.
-
-| Product                                                          | Provided by | Status | Description                                                                                       |
-| ---------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------- |
-| Swaps                                                        | RMB         | 🟢     | Interest rate, currency, and commodity swaps for hedging and structuring solutions.               |
-| Credit Default Swaps (CDS)                                   | RMB         | 🟢     | Used for credit risk transfer and portfolio management.                                           |
-| Options                                                      | RMB         | 🟢     | Derivative options for FX, rates, and equity exposure.                                            |
-| Asset-Backed Securities (ABS)                                | RMB         | 🟡     | Securitisation of vehicle and loan portfolios, typically issued via WesBank or FNB channels.      |
-| Mergers & Acquisitions (M&A)                                 | RMB         | 🔴     | RMB provides advisory services but not on the same scale as global bulge-bracket firms.           |
-| Initial Public Offerings (IPOs) and Leveraged Buyouts (LBOs) | RMB         | 🔴     | Occasionally participates as a local advisor or arranger, especially in South African markets.    |
-| Bond issuance                                                | RMB         | 🔴     | Acts as arranger or underwriter for corporate and government bond issues.                         |
-| Equity issuance                                              | RMB         | 🔴     | Limited involvement in primary equity markets; may support through structured financing products. |
-
 ## Customer Segmentation
 
 A universal bank such as FirstRand Limited typically serves a wide spectrum of customers — from individual consumers to large multinational corporations — each with unique financial needs, risk profiles, and value potential. To manage this diversity, the bank employs a multi-dimensional segmentation strategy, combining demographic, geographic, psychographic, behavioral, technographic, value-based, needs-based, and lifecycle segmentation.

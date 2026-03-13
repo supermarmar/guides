@@ -43,6 +43,20 @@ The EAD target is more complex due to the variety of ways in which utilisation a
 
 #### 3.2.2 Transformed EAD Targets
 
+This section describes the choice of target variable for EAD modelling, It discusses the merlts of
+direct EAD estimation and transformations of EAD. The concept of a transformation is attractive,
+because it allows the application of a broader set of standard modelling techniques to find and
+select modelled assumptions with an appropriate goodness-of-fit, holdout performance/stability,
+and alignment to business requirements such as intuitiveness.
+SS4/24 Paragraph 17.1 states, in part, "Firms may choose to provide own estimates of EAD in
+place of the own estimates of CF in accordance with Article 166D(3) of the Credit Rlsk: Internal
+Ratings Based Approach (CRR) Part." Paragraph 17.2 reads, "The PRA considers that there are a
+number of potentially complant approaches to estimate EAD and that an acceptable approach is
+to estimate EAD as a percentage of total limit (Limit Factor estimation)."
+
+Table 7.2-1 lists the candidate target variables considered for EAD modelling with their
+associated strengths, weaknesses, ranges, and limits.
+
 Different target variable transformations are applied to better align with model performance, business use, and interpretability. Each has distinct pros and cons:
 
 | Target   | Formula                                                                   | Description                         | Strengths                                                                           | Weaknesses                                                                                               | Typical Range               |

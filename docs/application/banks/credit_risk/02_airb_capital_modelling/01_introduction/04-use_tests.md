@@ -2,19 +2,44 @@
 
 The Basel Use Test (CRR Article 144.1(b)) requires that internal models are primarily built and deployed for risk management and decision-making purposes, not solely for the calculation of Risk-Weighted Assets (RWAs).
 
+"*Internal ratings and default and loss estimates used in the calculation of own funds requirements and associated systems and processes shail play an essential role in the risk management and decision-making process, and in the credit approval. Internal capital allocation and corporate governance functions of the institution;*"
+
+This means they must serve as the basis of decisions made concerning, for example, risk, limits, pricing, provisioning, and capital management, i.e. they must not be simply for regulatory risk capital calculations.
+
 While no prescriptive list of applications exists—since these depend on each institution’s business model and context—the IRB model’s risk parameters (PD, LGD, and EAD) are widely used and well-embedded across the Bank’s core risk management, capital allocation, and governance processes.
 
-## Front Book
+## Minimum Usage Requirements
 
-- Refers to newly originated or recently booked exposures — accounts, loans, or facilities that have been approved under current credit policies and pricing standards.
-- Used to assess current underwriting quality and the forward-looking risk profile of new lending. The performance of the front book shows how recent strategy and model changes are working.
-- Front book exposures are important for ongoing monitoring and model application — ensuring that new lending is consistent with current risk appetite and that models remain predictive under current origination practices.
+To use the IRB approach, a bank must:
 
-## Back Book
+- Define a risk grading methodology based on an assessment horizon reflected in the bank’s rating philosophy (shorter or longer term).
+- Maintain at least seven borrower grades for non-defaulted exposures, and one for those in default.
+- Assign ratings to all borrowers.
+- Review ratings annually.
+- Review the model annually.
+- Stress test the rating system under adverse economic and market conditions.
+- Document the rating system with clear definitions and criteria to enable the replication of ratings by auditors or other independent parties.
+- Provide adequate disclosure and data and demonstrate the model’s use over 3 years.
+- Obtain approval from national supervisors
 
-- Refers to existing exposures that were originated under past policies, before current standards or models were applied.
-- Used to assess legacy risk still on the balance sheet. The back book often reflects older vintages with potentially different risk characteristics, pricing, or credit criteria.
-- Back book exposures are key for model validation, backtesting, and calibration — they provide historical performance evidence and show how well models would have predicted defaults or losses over time.
+### National Usage Requirements
+
+As mentioned, Basel offers requirements that must be met in order for banks to use the IRBA. One of these requirements is supervisory approval. Supervisors may, in addition to the Basel requirements, outline further requirements to be met by banks in their jurisdiction.
+
+The Prudential Authority, under the South African Reserve Bank (SARB), requires additional governance requirements when the IRBA is used, such as:
+
+- The board of directors and senior management must approve the bank’s rating and risk measurement processes.
+- Governance processes and models’ compliance to regulatory requirements must be selfassessed annually by the board.
+- Completion of self-assessment templates where banks must qualitatively and quantitatively assess their models.
+
+The FCA, in the United Kingdom, also applies further restrictions. For example:
+
+- The credit risk control unit that manages the IRB models and related processes should be independent and unbiased.
+- Internal outsourcing (within a group) of the above is allowed only under specific circumstances.
+- Accuracy of the rating systems must be tested, with respect to specific guidelines.
+- The “use test” is expanded and more detailed requirements are provided.
+
+Supervisors often seek to provide more clarity and detail on the Basel requirements when outlining their own requirements, and generally provide more measurable requirements. These requirements will also align more closely with the economic environment and structure within the jurisdiction.
 
 ## Applications
 

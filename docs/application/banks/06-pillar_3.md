@@ -11,3 +11,5 @@ Regulatory disclosures are likely to be different in form from accounting disclo
 5. Capital requirements for credit, market, and operational risk
 6. Other general information on the risks to which a bank is exposed and the assessment methods used by the bank for different categories of risk
 7. The structure of the risk management function and how it operates.
+
+For credit risk, this means banks should adequately disclose the risk measurement techniques used and provide detailed explanations on the entire risk management process for credit risk. Disclosures of the existing credit exposures are also required, in various summarised formats (e.g. by asset class).

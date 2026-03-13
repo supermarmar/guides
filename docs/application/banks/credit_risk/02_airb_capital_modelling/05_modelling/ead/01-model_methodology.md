@@ -1,6 +1,8 @@
 
 # **Model Methodology – EAD**
 
+Basel also provides specific conditions when calculating the EADs for off-balance-sheet assets (e.g. securitisations, letters of credit, and guarantees), and a separate methodology for derivatives (these are viewed as incurring counterparty credit risk rather than pure credit risk).
+
 ## **Rating Philosophy**
 
 * The model follows a **Point-in-Time (PiT)** rating philosophy.

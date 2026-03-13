@@ -223,6 +223,26 @@ Following the June 2004 release, which focused primarily on the banking book, th
 
 <https://www.bis.org/publ/bcbs128.htm>
 
+#### Pillars
+
+Basel II introduced three pillars related to risk and capital management, and Basel III further refined this methodology. Simply put, the pillars ensure that banks measure and manage their risk appropriately, supervisors monitor and enforce this, and that stakeholders and the market are kept wellinformed.
+
+##### Pillar 1 – MCR
+
+This pillar’s purpose is to ensure that banks have adequate capital to prevent individual failures which can contribute to systemic risk and financial crises, and that this capital is managed adequately. This pillar is focused primarily on credit, market, and operational risk.
+
+In terms of credit risk measurement, Pillar 1 is the most applicable as this covers the measurement of credit risk in order to calculate the required capital to be held.
+
+##### Pillar 2 – Supervisory review process
+
+This pillar’s purpose is to ensure that supervisors are actively involved in reviewing banks’ risk management systems and policies, so adherence to regulation is adequately enforced and additional capital is held where deemed necessary by the regulator.
+
+Pillar 2 also seeks to ensure that risks that are not fully considered under Pillar 1 are adequately managed (e.g. Interest rate risk in the banking book).
+
+###### Pillar 3 – Market discipline
+
+This pillar’s purpose is to ensure that banks’ disclosure is appropriate and transparent, and stakeholders are adequately informed of risk. Good corporate governance is also required under this pillar.
+
 #### Credit Risk Approach Changes
 
 For credit risk, three approaches of calculation were introduced under Basel II, namely:
@@ -314,7 +334,7 @@ Basel III introduces an additional 2,5% capital conservation buffer (2,5% of RWA
 
 Basel III further introduces an additional countercyclical buffer, ranging from 0–2,5%, to withstand future stresses. Implementation of this measure is also from 2016 to 2019. This buffer aims to reduce procyclicality that occurs in market conditions, which results in excessive credit growth.
 
-In South Africa this is set by the SARB. In the UK, the Bank of England’s Financial Policy Committee sets the countercyclical capital buffer.
+The Financial Stability Committee of the SARB is responsible for setting the CCyB and uses a credit-to-GDP gap as the main indicator to inform what the CCyB should be. In the UK, the Bank of England’s Financial Policy Committee sets the countercyclical capital buffer.
 
 #### Additional buffer for SIBs
 

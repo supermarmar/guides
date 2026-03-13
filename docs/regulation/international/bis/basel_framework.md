@@ -1500,8 +1500,7 @@ data collection and IT systems that support the assessment of credit risk, the
 assignment of internal risk ratings, and the quantification of default and loss
 estimates.
 
-36.10 Within each asset class, a bank may utilise multiple rating methodologies
-/systems.
+36.10 Within each asset class, a bank may utilise multiple rating methodologies/systems.
 
 ##### Corporate, Sovereign and  Banks
 

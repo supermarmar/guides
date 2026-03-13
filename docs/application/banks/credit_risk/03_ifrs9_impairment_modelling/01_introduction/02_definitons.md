@@ -49,6 +49,44 @@ When preparing the training dataset for PIT PD calibration:
 - Include Cure Behavior: Incorporate cured accounts into the dataset, showing their risk of redefault or returning to performing status.
 - Track Time Since Cure: Include "time since cure" as a feature, as the likelihood of redefault often decreases the longer an account remains cured.
 
+## Impairment
+
+As discussed earlier, definitions of default vary. Impairment can be described generally as when an exposure is judged by management to have deteriorated so there is no longer a reasonable expectation as to the collection of the full amount as scheduled. In other words, there has not been a default by definition, but a default is very likely or almost certain given the increased credit risk.
+
+Banks can analyse several triggers for borrower deterioration to determine whether an asset is impaired:
+- Macro-economic deterioration
+  - Deterioration of national or local economic conditions relevant to the asset class
+  - Reduction in GDP
+  - Increased unemployment rate
+  - Reduced property prices for mortgages
+  - Industry (or sector) declines.
+- Company deterioration
+  - Borrower requests for forbearance
+  - Breach of contract or covenants
+  - Decline in credit rating
+  - Debt service capacity reduction
+  - Reduced financial performance
+  - Issues with cashflow
+  - Reduced net worth
+  - Decrease in turnover
+  - Loss of customers or market share
+  - Diversion of cashflows from earning assets to support non-earning assets
+  - Poor prospects of the guarantors
+  - Poor collateral quality or reduced value thereof
+  - Increased country risks.
+- Mortgage portfolio deterioration
+  - Decrease in rents received
+  - Absence of refinancing options
+- Retail portfolio deterioration
+  - Early delinquency (e.g. one payment in arrears)
+  - Continual high utilisation of facilities
+  - Steady increase in total debt for the client
+  - Income less than total debt repayments
+  - Occurrence of risk events, such as a deceased estate, fraud, abscondence, insurance shortfall, or some total loss event experienced (e.g. vehicle theft for a motor vehicle loan).
+
+A performing asset is not assumed to be likely to default, so capital is primarily held in case of a loss, expected or unexpected, with provisions held being far less in most cases. An impaired asset, however, is very likely to default (almost certain in many cases), so an amount needs to be set aside, in the form of provisions, to prepare for this loss. Capital and provisions are used jointly to ensure a bank is adequately prepared for defaults in the case of credit risk, and generally have an effect on each other – though capital affects the balance sheet and provisions affect the income statement.
+
+For example, loans generally appear on bank balance sheets as assets using nominal principal values. Once a loan is identified as impaired, the current probability of default and loss given default is applied and discounted to establish the new value. Both the loan and capital (shareholders’ equity) are marked down on the balance sheet. Impairment provisions appear on the income statement as an expense. Debate as to the optimal balance accounting for loans is ongoing, with some arguing that constant marking-to-market is needed.
 
 ## SICR
 
