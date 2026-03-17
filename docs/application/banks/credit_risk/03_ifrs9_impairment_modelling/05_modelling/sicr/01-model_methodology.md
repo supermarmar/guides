@@ -1,6 +1,6 @@
 # SICR
 
-Under IFRS 9: Financial Instruments, the concept of a Significant Increase in Credit Risk (SICR) is a critical component of the impairment model. It requires financial institutions to assess whether the credit risk of a financial asset has significantly increased since its initial recognition. If there is a SICR, the asset transitions from Stage 1 to Stage 2 in the Expected Credit Loss (ECL) framework. This increases the ECL since we are now using a lifetime PD and EAD.
+
 
 The IFRS 9 standard does not prescribe a single method for determining a SICR but provides principles and guidelines. IFRS 9 allows institutions to design their SICR framework, which introduces variability across entities.
 
@@ -74,6 +74,10 @@ The basis of ‘SICR-modelling’ is then finding a statistical relationship bet
 In fact, IFRS 9 already requires the use of "all reasonable and supportable information" to identify a SICR-event (cf. §5.5.4, §5.5.9, §5.5.11, §5.5.17), which further supports statistical modelling.
 
 It is not strictly necessary to compare explicit PD-estimates at two points, provided that the evolution of default risk over time is incorporated in some other way. In principle, and when viewed retrospectively, a SICR-event should reasonably preempt a default event such that the **timings of both events do not coincide**, lest we contravene §B5.5.21. This principle suggests using loan delinquency (and its pre-default evolution) directly in defining a SICR-event, at least retrospectively.
+
+### Deliquency Measure
+
+A delinquency measure quantifies the gradual erosion of trust between bank and borrower in honouring the credit agreement. The $𝑔_0$-measure (or the unweighted number of payments in arrears) which is constructed from days past due (DPD) is used for its intuitive appeal and industry-wide ubiquity.
 
 ### SICR Indicators
 

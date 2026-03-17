@@ -1,59 +1,46 @@
 # Definitions
 
-## Obligor
+## Gross Carrying Amount
 
-## Facility
+The gross carrying amount of a financial asset under IFRS 9 represents its original or amortized cost, before any adjustments for impairment losses (i.e., loss allowances). It reflects the contractual amounts due from the borrower and excludes any deductions for expected credit losses (IFRS9 §5.1.1).
 
-## Deliquency Measure
+> *Example: A bank issues a loan of £100,000 with £500 in legal fees at 10% interest. If the loan is measured at amortised cost, the bank records an initial gross carrying amount of £100,500.*
 
-A delinquency measure quantifies the gradual erosion of trust between bank and borrower in honouring the credit agreement. The $𝑔_0$-measure (or the unweighted number of payments in arrears) which is constructed from days past due (DPD) is used for its intuitive appeal and industry-wide ubiquity.
+The gross carrying amount includes:
 
-Banks commonly specified three payments (or 90 DPD) in arrears as a pragmatic point of ‘default’ [B5.5.37](a), long before the introduction of the Basel II Capital Accords. That said, this threshold can generally range between 30–180 days based on managerial discretion and some analysis.
+- Principal Outstanding: The unpaid balance of the loan or credit facility.
+- Accrued Interest: Any interest income that has been earned but not yet received.
+- Transaction Costs (for amortized cost assets): Costs directly attributable to issuing or acquiring the financial asset.
+- Amortization: Adjustments made due to the effective interest rate (EIR) method.
 
-## Definition of Default (DoD)
+## Net Carrying Amount
 
-IFRS 9 statest that when definining default for the purposes of determining the risk of a defualt occuring, an entity shall apply a default defintion that is consistent with the definition used for internal credit risk management purposes. HOwefverm there is a rebuttable presumption that default does not occur later than wehn a financial assete is 90 dyas past due unless an entity has reasonable and supportable information to demonstrate that a more lagging default criterion is more appropriate.
+The net carrying amount (often referred to simply as amortized cost) is the value of a financial asset after adjusting for repayments, amortization of premiums/discounts, and the Expected Credit Loss (ECL) allowance (IFRS9 §5.2.2).
 
-The DoD for impairment models should therefore be aligned to the IRB model DoD where such models exist.
+$\text{Net Carrying Amount} = \text{Gross Carrying Amount} - \text{ECL}$
 
-### Days Past Due (DPD)
+> *Example: A retail customer borrows £100,000 from the bank, plus 500 in legal fees. After 6 months, it owes the bank £93,200. The bank plans to hold the loan to collect outstanding principal + interest, so it's measured at amortised cost. The bank applies ECL (£2,000) to reduce the net value of the loan on the balance sheet (£91,200).*
 
-One can compare $𝑔_0(𝑡)$ at time 𝑡 against the specifiable threshold 𝑑=3. Thus the default status at time t can be denoted as:
+Financial assets are generally presented on the "asset side" at their net carrying amount (Amortized Cost). This means the gross carrying amount is reduced by the ECL allowance to reflect the amount the entity actually expects to collect. The allowance is not typically presented as a "provision" on the liability side for existing assets. However, for off-balance sheet exposures (such as undrawn loan commitments or financial guarantees), the estimated ECL is presented as a provision (liability) because there is no recognized asset to reduce.
 
-$D_t= [g_0(t) \geq d]$ where $d=3$
+Changes in the ECL (e.g., new impairments or reversals) are recognized as impairment charges in the income statement. (⬆️ECL → ⬆️Loss Provision → ⬇️Assets and ⬆️ECL → Impairment Loss → ⬇️Income → ⬇️Retained Earnings → ⬇️Equity)
 
-Where [𝑎] are Iverson brackets that outputs 1 if the enclosed statement 𝑎 is true and 0 otherwise.
+## Impairments
 
-The loan’s resulting binary-valued default indicator, can now be used within a typical cross-sectional modelling setup for predicting future default-outcomes.
+Impairment can be described generally as when an exposure is judged by management to have deteriorated so there is no longer a reasonable expectation as to the collection of the full amount as scheduled. In other words, there has not been a default by definition, but a default is very likely or almost certain given the increased credit risk.
 
-In preparing the modelling dataset, we observe all predictive information of loan $𝑖$ at a particular time 𝑡. Then, the loan’s future default-status at time $𝑡 + 𝑣$ is merged to the observations at 𝑡, thereby taking a snapshot between two points in time, or a cross-section. However, the chosen value for this third parameter $𝑣 ≥ 0$ (or outcome period) is what we will define as our $𝑣$-month default indicator which will then be used to determine our $𝑣$-month PD.
+Impairments cannot be technically recognised as defaults yet, but should not be treated as performing owing to the increased likelihood of default. A performing asset is not assumed to be likely to default, so capital is primarily held in case of a loss, expected or unexpected, with provisions held being far less in most cases. An impaired asset, however, is very likely to default (almost certain in many cases), so an amount needs to be set aside, in the form of provisions, to prepare for this loss.
 
-More formally, a process $Z_𝑡(𝑑, 𝑣) = D_{t+𝑣}$ prepares a given loan’s monthly performance history by evaluating $D_t$ at ‘future’ time $𝑡 + 𝑣$, though assigns the result to time 𝑡.
+### SICR
 
-### Return to Default
+The concept of a Significant Increase in Credit Risk (SICR) is a critical component of the impairment model. It requires financial institutions to assess whether the credit risk of a financial asset has significantly increased since its initial recognition. If there is a SICR, the asset transitions from Stage 1 to Stage 2 in the Expected Credit Loss (ECL) framework. This increases the ECL since we are now using a lifetime PD and EAD.
 
-When calibrating  PDs, accounts that redefault (default after curing) and cure (recover from default) require special treatment to ensure accurate modeling of credit risk dynamics. These events introduce complexities because they alter the time-to-default patterns and can influence the term structure of PDs.
+> *At each reporting date, the bank is required to assess whether the credit risk of a loan has increased significantly compared to its risk at initial recognition. Let’s say a bank issued a 5-year loan to a mid-sized logistics company in 2022. At the time of origination, the borrower had a healthy balance sheet, steady cash flow, and an external credit rating equivalent to BBB, reflecting a low probability of default. Now, in 2025, during a new reporting cycle, the bank reassesses the risk of default over the remaining life of the loan. It notices that the borrower has experienced a significant drop in revenue, is taking longer to pay other creditors, and is on credit watch for a potential downgrade. Although the actual ECL amount hasn't changed drastically yet, the risk of default occurring over the life of the loan has materially increased when compared to 2022. Therefore, this loan would move from Stage 1 to Stage 2, and the bank would now recognise lifetime expected credit losses instead of just 12-month ECLs. This results in a higher loss allowance and an impairment loss on the income statement, even if actual cash shortfalls haven't occurred yet.*
 
-Ignoring redefaults may underestimate the default probabilities for certain risk segments. Overlooking cures may lead to overestimation of default probabilities.
+### SICR Triggers
 
-Include key states in the credit lifecycle.
+Banks should disclose impairment triggers to supervisors. Banks can analyse several triggers for borrower deterioration to determine whether an asset is impaired:
 
-- Performing: Accounts with no arrears.
-- Curing: Accounts that have recovered from default.
-- Defaulted: Accounts in default.
-- Redefaulting: Cured accounts that default again.
-
-When preparing the training dataset for PIT PD calibration:
-
-- Separate Redefault Events: Treat redefault events as distinct observations to reflect the elevated risk of these accounts. 
-- Include Cure Behavior: Incorporate cured accounts into the dataset, showing their risk of redefault or returning to performing status.
-- Track Time Since Cure: Include "time since cure" as a feature, as the likelihood of redefault often decreases the longer an account remains cured.
-
-## Impairment
-
-As discussed earlier, definitions of default vary. Impairment can be described generally as when an exposure is judged by management to have deteriorated so there is no longer a reasonable expectation as to the collection of the full amount as scheduled. In other words, there has not been a default by definition, but a default is very likely or almost certain given the increased credit risk.
-
-Banks can analyse several triggers for borrower deterioration to determine whether an asset is impaired:
 - Macro-economic deterioration
   - Deterioration of national or local economic conditions relevant to the asset class
   - Reduction in GDP
@@ -84,25 +71,36 @@ Banks can analyse several triggers for borrower deterioration to determine wheth
   - Income less than total debt repayments
   - Occurrence of risk events, such as a deceased estate, fraud, abscondence, insurance shortfall, or some total loss event experienced (e.g. vehicle theft for a motor vehicle loan).
 
-A performing asset is not assumed to be likely to default, so capital is primarily held in case of a loss, expected or unexpected, with provisions held being far less in most cases. An impaired asset, however, is very likely to default (almost certain in many cases), so an amount needs to be set aside, in the form of provisions, to prepare for this loss. Capital and provisions are used jointly to ensure a bank is adequately prepared for defaults in the case of credit risk, and generally have an effect on each other – though capital affects the balance sheet and provisions affect the income statement.
+## Definition of Default (DoD)
 
-For example, loans generally appear on bank balance sheets as assets using nominal principal values. Once a loan is identified as impaired, the current probability of default and loss given default is applied and discounted to establish the new value. Both the loan and capital (shareholders’ equity) are marked down on the balance sheet. Impairment provisions appear on the income statement as an expense. Debate as to the optimal balance accounting for loans is ongoing, with some arguing that constant marking-to-market is needed.
+IFRS 9 statest that when definining default for the purposes of determining the risk of a defualt occuring, an entity shall apply a default defintion that is consistent with the definition used for internal credit risk management purposes. However there is a rebuttable presumption that default does not occur later than when a financial assete is 90 daas past due unless an entity has reasonable and supportable information to demonstrate that a more lagging default criterion is more appropriate.
 
-## SICR
+The DoD for impairment models should therefore be aligned to the IRB model DoD where such models exist.
 
-§5.5.4
+### Days Past Due (DPD)
 
-> *The transition to Stage 2 is not based on actual default, but rather on the bank’s forward-looking assessment of credit risk. The IFRS 9 model requires that even if a loan is still performing (i.e., no payments are yet missed), a significant increase in credit risk should trigger a shift to lifetime ECL recognition. The bank considers all available information, including industry-wide economic downturns and the borrower’s weakened financial metrics. The updated lifetime ECL of R400,000 is now booked as a loss allowance, increasing the impairment expense in the income statement.*
+Banks commonly specified three payments (or 90 DPD) in arrears as a pragmatic point of ‘default’ [B5.5.37](a), long before the introduction of the Basel II Capital Accords. That said, this threshold can generally range between 30–180 days based on managerial discretion and some analysis.
 
-§5.5.9
+### Return to Default
 
-> *At each reporting date, the bank is required to assess whether the credit risk of a loan has increased significantly compared to its risk at initial recognition. Let’s say a bank issued a 5-year loan to a mid-sized logistics company in 2022. At the time of origination, the borrower had a healthy balance sheet, steady cash flow, and an external credit rating equivalent to BBB, reflecting a low probability of default. Now, in 2025, during a new reporting cycle, the bank reassesses the risk of default over the remaining life of the loan. It notices that the borrower has experienced a significant drop in revenue, is taking longer to pay other creditors, and is on credit watch for a potential downgrade. Although the actual ECL amount hasn't changed drastically yet, the risk of default occurring over the life of the loan has materially increased when compared to 2022. Therefore, this loan would move from Stage 1 to Stage 2, and the bank would now recognise lifetime expected credit losses instead of just 12-month ECLs. This results in a higher loss allowance and an impairment loss on the income statement, even if actual cash shortfalls haven't occurred yet.*
+When calibrating PDs, accounts that redefault (default after curing) and cure (recover from default) require special treatment to ensure accurate modeling of credit risk dynamics. These events introduce complexities because they alter the time-to-default patterns and can influence the term structure of PDs.
+
+Ignoring redefaults may underestimate the default probabilities for certain risk segments. Overlooking cures may lead to overestimation of default probabilities.
+
+Include key states in the credit lifecycle.
+
+- Performing: Accounts with no arrears.
+- Curing: Accounts that have recovered from default.
+- Defaulted: Accounts in default.
+- Redefaulting: Cured accounts that default again.
+
+When preparing the training dataset for PIT PD calibration:
+
+- Separate Redefault Events: Treat redefault events as distinct observations to reflect the elevated risk of these accounts.
+- Include Cure Behavior: Incorporate cured accounts into the dataset, showing their risk of redefault or returning to performing status.
+- Track Time Since Cure: Include "time since cure" as a feature, as the likelihood of redefault often decreases the longer an account remains cured.
 
 ## Cure
-
-$5.5.7
-
-> *In a later reporting period, suppose the borrower that had previously moved into Stage 2 due to a temporary dip in financial performance now shows signs of recovery. For example, their revenues improve, debt ratios normalize, and their credit rating is upgraded. After evaluating all available and forward-looking information, the bank concludes that the significant increase in credit risk no longer exists. As a result, the loan transitions back to Stage 1, and the loss allowance is adjusted from a lifetime ECL (e.g., R400,000) back down to a 12-month ECL (e.g., R75,000). The reduction of R325,000 is recognised in the income statement as an impairment gain, improving the bank's profitability for that period. This transition also reduces the loss allowance shown on the balance sheet, increasing the net carrying amount of the asset.*
 
 IFRS 9 is not prescriptive in terms of defining when an account has cured [5.5.7](a). Hence, a default flag can be created under the following alternatives of cure.
 
@@ -111,23 +109,60 @@ IFRS 9 is not prescriptive in terms of defining when an account has cured [5.5.7
 
 ## Write Offs
 
-§5.4.4
 
-> *In the context of expected credit loss (ECL) modelling, paragraph 5.4.4 refers to the process of writing off a financial asset—such as a bank loan—when the bank has no reasonable expectation of full or partial recovery. This typically happens after significant default and exhaustive recovery efforts have failed. At this point, the bank derecognises the written-off portion of the loan by directly reducing the gross carrying amount of the asset. For example, suppose a bank has a loan with a gross carrying amount of R100,000. After default and collection efforts, it expects to recover only R20,000. The remaining R80,000 is written off. If the bank later recovers R5,000 through post-write-off legal action, that recovery is treated as income, but the written-off portion remains derecognised.*
-
-## Loss
-
-## Maximum recovery period
-
-## PWOR
+### PWOR
 
 Post Write-Off Recoveries refer to the collections or repayments a bank manages to recover from borrowers after their loans have been written off as bad debts. In accounting terms, a write-off occurs when the bank deems that a loan is unlikely to be repaid and removes it from the active accounts receivable or loan book. However, even after a write-off, the bank can continue pursuing recovery actions through legal means, collection agencies, or other strategies.
 
 A loan is written off when the bank believes there is minimal likelihood of full repayment based on its internal policies and regulations (e.g., after a certain period of nonpayment or legal default). The loan balance is removed from the bank's financial statements as an asset. Any recoveries after the write-off are recorded as recovery income in the bank’s income statement, not as a reversal of the write-off.
 
-
-## Write Off Rule
+### Write Off Rule
 
 If banks are recovering a significant portion of bad debts post write-off, it raises questions about the effectiveness and timing of their write-off policy. If a bank writes off loans too early (e.g., before fully exhausting all reasonable collection efforts), it might recover more post write-off. This could indicate overly conservative policies or inefficiencies in pre-write-off collection strategies. This leads to higher than expected LGWs which increases the ECL.
 
 If post-write-off recoveries are consistently high, the bank may need to adjust its write-off criteria to better align with the actual recovery potential. 
+
+## EIR
+
+A component of the ECL is the effective interest rate (EIR), which is the rate that will discount all expected future cashflows over an account’s life to the gross carrying amount of that account. The calculation of EIR is done to ensure that banks recognise interest revenue / expenses and fees on an account in a similar consistent manner. The EIR is the rate that should be used when discounting in the ECL calculation. The EIR is the internal rate of return (IRR) on the expected future cash flows of a financial instrument over its life, accounting for:
+
+- **Contractual Interest Rate**: The nominal interest rate stated in the loan agreement.
+- **Transaction Costs**: Fees directly attributable to the acquisition or issuance of the financial instrument (e.g., initiation fees).
+- **Other Adjustments**: Any premiums, discounts, or deferred fees.
+
+The EIR is derived by solving the following equation:
+
+$\text{Initial Loan Amount} = \Large\Sigma_{t=1}^n\frac{\text{CF}_t}{(1+\text{EIR})^t}$
+$\text{CF}_t$ The expected cash inflows/outflows (e.g., interest payments, principal repayments, fees).
+$\text{Initial Loan Amount}$ The net amount disbursed to the borrower after fees and costs.
+
+Use numerical methods (e.g., Newton-Raphson method or financial software) to find the discount rate (EIR) that equates the present value of future cash flows to the initial loan amount. The EIR is found to be approximately higher than the contractual rate due to the initiation fee.
+
+Reflects the true cost of borrowing or yield on lending. Allows borrowers or investors to compare financial instruments with different fee structures or terms.
+
+## Interest Revenue
+
+The distinction between gross and net carrying amounts is critical for calculating interest income (§5.4.1):
+
+- Stage 1 & 2 Assets: Interest income is calculated using the gross carrying amount (only depreciation is accounted for).
+- Stage 3 Assets (Credit-Impaired): Interest income must be calculated using the net carrying amount (gross minus ECL). If the asset is very likely to default, the losses will affect the interest revenue. This interest revenue is considered impaired and is termed “interest in suspense” (ISP). This ensures the entity only recognizes interest on the portion of the loan it actually expects to recover.
+
+> *Let’s say a bank lends R1,000,000 (no transaction costs) to a corporate client at 10% interest over 5 years. Here’s how the rules apply at different stages of credit quality. At initial recognition, the loan is performing. Use the effective interest rate (EIR) — say 10% — to calculate interest on the gross carrying amount (i.e., full R1,000,000). (Paragraph 5.4.1 (b)) Suppose after 2 years, the original loan defaults or moves to Stage 3 under ECL. From that point, interest must be calculated using EIR (still 10%) but on the amortised cost — i.e., gross amount minus lifetime ECL.*
+
+<!-- > Quick check: if EIR increases then ECL should get bigger since it is negative. -->
+
+## Financial Metrics
+
+### Coverage Ratio
+
+A coverage ratio is a financial metric used to assess an entity's ability to meet its financial obligations, such as debt repayments, interest expenses, or other liabilities. In an IFRS 9 context it is the ECL over the total outstanding loan amounts.
+
+$\Large\frac{\text{ECL}_{i,t,t'}}{\text{Balance}_{i,t}}$ where $\text{ECL}_{i,t,t'} = \displaystyle\sum_{s=1}^{3}\text{ECL Stage } s_{i,t,t'}$
+
+Investors use this to compare companies and it is used to see if the book is getting better or worse. But could be also used to see if a change in strategy has worked or will work. Usually is grouped by new business vs existing business and on the new busienss side it is used to see if any updates to an application scorecard are working.
+
+### NPL Ratio
+
+You can determine the non-performing loan ratio by taking the proportion of loans in stage 3 divded by the total loan book to see how badly your book is performing.
+
+$\Large\frac{\text{ECL Stage 3}_{i,t,t'}}{\text{Balance}_{i,t}}$

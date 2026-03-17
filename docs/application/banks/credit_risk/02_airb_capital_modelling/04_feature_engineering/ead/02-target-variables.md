@@ -1,28 +1,42 @@
-Here's the continuation of the **Data Manipulation / Feature Transformation** section, focusing on the **target variables for PD, EAD, and LGD**. This write-up keeps the structure suitable for regulatory documentation or internal model governance reporting, linking the target variable choices to both regulatory standards and practical modelling trade-offs.
+## Exposure at Default (EAD)
 
----
+Whilst EAD is commonly positioned or understood as account balance at the point of default, there exists a number of nuances that can lead to a misalignment between account balance, IFRS accounting value, accounting value gross of specific credit risk adjustments and the adjustments required by SS4/24 to derive a compliant "outstanding amount" that serves as both the LGD denominator and EAD untransformed
+dependent variable. Additionally, there are motivations to model a transformation of EAD. The sections below cover:
 
-## 3. 🎯 Target Variables for PD, EAD, and LGD Models
+- Deriving a compliant outstanding amount and demonstrating equivalence to account balance and IFRS accouniting value; and
+- Applying a transformation to help improve overall holdout goodness-of-fit as well as consistency of goodness-of-fit across key strata of the live portfolio.
 
-### 3.1 📉 Probability of Default (PD)
+### Outstanding Amount
 
-#### Target Variable
+The definition of EAD for AIRB model estimation must comply with rules set out in the CRR and SS4/24. This section discusses the EAD definition and introduces the concept of "outstanding amount" per SS4/24 Paragraph 13.1, which reflects the accounting value gross of impairment, plus some specific adjustments menitioned in regulation.
 
-* The **dependent variable** for PD modelling is the **default indicator** over a 12-month outcome window.
-* The column (e.g., `m12_default`) flags whether the obligor defaults **at any time** within the 12 months following the observation date.
-* This binary classification is in accordance with **CRR Article 180(2)(a)**, which requires the estimation of **1-year default rates**.
-* The identification of default is based on the rules and classifications already described in the **Definition of Default (DoD)** section and includes both **90+ DPD** and **Unlikeliness to Pay (UTP)** events.
+#### Accounting Value Equivalence to Customer Balance
 
-#### Key Characteristics
+In its purest form, CRR Article 166A(2) defines exposure value as the accounting value without considering Specific Credit Risk Adjustments (SCRA). SRCA are IFRS 9 impairments on assets measured at Amortised Cost (AC), or the credit component of Fair Value (FV) discounted to par value for assets measured at Fair Value. At present there are no credit card exposures measured at FV and none are anticipated.
 
-* **Type**: Binary (1 = default, 0 = no default)
-* **Window**: Rolling 12 months from each observation date
-* **Coverage**: Includes all IRB-eligible exposures in the development population
-* **Usage**: Core target for PD model development, calibration, and performance tracking
+- For exposures measured at AC in the IFRS accounts: Although interest accrues daily. it is allocated to accounts as a monthly debit. Thus, month-end balance snapshots are equivalent to the AC Cost accounting value at month-end. Impairment liabilities are held separately and do not need to be removed from balances that are already gross of SCRA. Therefore, a customer account with a $100 balance has an outstanding amount for EAD purposes of $100.
+- A special case with features of both AC and FV assets is acquired portfolios. These are typically measured at FV (i.e. the transaction price) at day zero, with a day-one transfer to AC.
+  - In this scenario the AC gross accounting value would in theory be set to $95 and unwound via a credit-adjusted Effective Interest Rate (EIR), up to $100 at the facility's behavioural life.
+  - The IFRS 9 impairment liability is measured with respect to the $95 and set to $0 at initial recognition. (If the credit risk increases to $6 from an initial estimate of $4 factored into the FV, then an impairment liability of $2 is recognised and the gross accounting value remains $95). Being a gross amount, in line with AC as described above, no further adjustment for SCRA is needed
+  - Technically, the outstanding amount is $95. The operational challenges associated with allocating the FV adjustment to individual facilities would result in exposure values that float because of accounting policy and not due to credit-related action or behaviour. As a general principle, Basel seeks estimates that are agnostic to accounting policy (e.g. the economic loss calculation can include cash flows that occur after the point of accounting derecognition and looks through restructures onto new accounts). To maintain RWA consistency with exposures originated within USCB and to develop an intuitive model that is agnostic to accounting treatment, the outstanding amount has been set to the customer balance (in this example $100) in line with CRR Article 3.
 
----
+#### Outstanding Amount for Performing Facilities
 
-### 3.2 💰 Exposure at Default (EAD)
+CRR Article 182(1)(ca)(i) and SS4/24 Paragraph 13.11 require that additional drawings between observation and default are reflected in Conversion Factors (CFs). Such drawings are reflected in both the customer balance and accounting value, therefore, no adjustments are required to incorporate this requirement. Thus, the outstanding amount for performing facilities is the customer balance at default, which includes all principal, interest and fees.
+
+#### Outstanding Amount for Defaulted Facilities
+
+For facilities in default, the LGD rules within SS4/24 also require the following of the outstanding amount:
+
+- Adding back previous partial write-offs (SS4/24 Paragraph 13.5).
+- Late fees not capitalised per CRR Article 181(1)(i) and SS4/24 Paragraph 13.9
+- Interest not capitalised (SS4/24 Paragraph 13.10)
+
+Thus, the outstanding amount for defaulted facilities is the customer balance (which includes all principal, interest and fees), with no further adjustments.
+
+#### Treatment of Related Facilities
+
+The concept of a "related facility" is not explicitly defined in the CRR. However, for the purposes of unbiased estimation, firms are required to look through restructures and account number changes to connect post-default drawings and cash flows with facilities at-observation (SS4/24 Paragraph 13.8). As an example, a related facility may arise if an account is restricted to a new facility number or transferred to a fixed term loan to clear the debt.
 
 The EAD target is more complex due to the variety of ways in which utilisation and credit availability can change over time, especially for revolving products like credit cards or overdrafts.
 
@@ -181,40 +195,3 @@ We plotted historical trends of **EADF** across the portfolio, including:
 * Stability of EADF distributions in different portfolio segments
 
 These showed strong and stable behaviour over time, adding to the robustness of this choice.
-
----
-
-Let me know if you'd like the accompanying plots or summary tables drafted as well.
-
-
----
-
-### 3.3 💸 Loss Given Default (LGD)
-
-LGD is modelled using a **component-based approach** to capture the complex nature of post-default outcomes. The target is not a single value but built from two or more sub-models:
-
-#### 3.3.1 Component Targets
-
-1. **Loss Rate (LGW)**
-
-   * Formula: `(EAD_tD – Total Recoveries) / EAD_tD`
-   * This continuous variable captures the **loss severity** as a proportion of exposure.
-
-2. **Probability of Loss / Recovery (PWGD or PR)**
-
-   * Binary flag indicating whether **any recovery occurs** post-default.
-   * Enhances model granularity by predicting whether the account will experience full, partial, or no recovery.
-
-#### 3.3.2 Considerations
-
-* Losses and recoveries are tracked over a **maximum resolution period**, typically **5 years**, in accordance with **Basel and PRA** expectations.
-* LGD estimates should reflect **long-run average (LRA)** and **downturn (DT)** conditions, with proper segmentation by:
-
-  * Security type (secured vs. unsecured),
-  * Product type,
-  * Recovery channels (e.g., internal collection, legal, third-party),
-  * Default and recovery vintage.
-
----
-
-Would you like a comparison matrix or visual decision tree added to help stakeholders choose between EAD target definitions for different products or portfolios?
