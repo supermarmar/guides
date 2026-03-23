@@ -8,11 +8,11 @@ Supra-national organisations refer to a multinational organisation that provides
 
 ### BCBS
 
-At the highest level, banks are influenced by supranational regulatory bodies that set global or regional standards. The [Basel Committee on Banking Supervision (BCBS)](guides\docs\regulation\international\basel\bis.md), hosted by the [Bank for International Settlements (BIS)](\docs\regulation\international\basel\bis.md), issues internationally recognised frameworks such as [Basel III](\docs\regulation\international\basel\basel_framework.md). Although not legally binding, these standards are adopted into national legislation and enforced by domestic regulators.
+At the highest level, banks are influenced by supranational regulatory bodies that set global or regional standards. The [Basel Committee on Banking Supervision (BCBS)](international\bis\bis.md), hosted by the [Bank for International Settlements (BIS)](international\bis\bis.md), issues internationally recognised frameworks such as Basel III. Although not legally binding, these standards are adopted into national legislation and enforced by domestic regulators.
 
 ### FSB
 
-Globally Systemically Important Banks (G-SIBs) are subject to heightened regulatory scrutiny due to their potential impact on the wider financial system. Globally, these are monitored under frameworks developed by the [Financial Stability Board (FSB)](\docs\regulation\international\fsb\fsb.md). In 2015, the Financial Stability Board (FSB) published the “Principles on Loss-absorbing and Recapitalisation Capacity of G-SIBs in Resolution” standard [(TLAC)](), which was aimed at ensuring that G-SIBs had sufficient recapitalisation capacity available in the event of a resolution, such that the impact of the bank’s failure would be minimised.
+Globally Systemically Important Banks (G-SIBs) are subject to heightened regulatory scrutiny due to their potential impact on the wider financial system. Globally, these are monitored under frameworks developed by the [Financial Stability Board (FSB)](international\fsb\fsb.md). In 2015, the Financial Stability Board (FSB) published the “Principles on Loss-absorbing and Recapitalisation Capacity of G-SIBs in Resolution” standard [(TLAC)](international\fsb\tlac.md), which was aimed at ensuring that G-SIBs had sufficient recapitalisation capacity available in the event of a resolution, such that the impact of the bank’s failure would be minimised. For the application of TLAC and MREL in the context of bank capital management, see [Capital — TLAC](..\application\banks\04-capital.md).
 
 ## National Regulators & Regulations
 

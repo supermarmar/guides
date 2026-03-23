@@ -2,13 +2,15 @@
 
 What we call regulatory capital differs from what is known as economic capital. In effect there are two approaches to consider the supply and demand of capital. The regulatory approach dictates the rules on which the demand is to be set, as well as the admissibility of supply, while an internal or economic approach considers the internal best estimate of demand and supply. Regulatory capital supply compared to a predetermined scalar of demand is what the regulators determine as adequate for a bank’s operations. Economic capital is what the bank itself views as appropriate for its activities. Usually, it is lower than regulatory capital, in that it incorporates a portfolio effect reflecting diversification of activities, but it may also include an additional small capital cushion or buffer.
 
+For the broader treatment of bank capital management (sources of capital, Pillar 1/2/3 framework, buffers, TLAC/MREL, leverage ratio, capital allocation, and economic capital), see [Capital](..\..\..\..\04-capital.md). For the historical evolution of the Basel accords, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md). This file focuses on the **computation of risk-weighted assets (RWAs) for credit risk** under each Basel framework.
+
 ## Pillar 1: Minimum Capital Requirements (MCR)
 
 The motivation to develop credit risk models stemmed from the need to develop quantitative estimates of the amount of regulatory and economic capital needed to support a bank’s risk taking activities. Pillar 1 provides detailed approaches to measuring the primary risks banks face, one of which is credit risk.
 
 ### Basel I
 
-Minimum capital requirements have been coordinated internationally since the Basel Accord of 1998. Under [Basel 1](docs\regulation\international\bis\basel_1.md), a bank’s assets were allotted via a **simple** rule of thumb to one of four broad risk categories, each with a ‘risk weighting’ that ranged from 0%-100%. A portfolio of corporate loans, for instance, received a risk weight of 100%, while retail mortgages – perceived to be safer – received a more favourable risk weighting of 50%.
+Under [Basel I](..\..\..\..\..\..\regulation\international\bis\bis.md), a bank’s assets were allotted via a **simple** rule of thumb to one of four broad risk categories, each with a ‘risk weighting’ that ranged from 0%-100%. A portfolio of corporate loans, for instance, received a risk weight of 100%, while retail mortgages – perceived to be safer – received a more favourable risk weighting of 50%.
 
 Minimum capital $K$ was then set in proportion to the weighted sum of these risk-weighted assets (RWAs).
 
@@ -21,14 +23,14 @@ K \geq 8\% \times \text{RWA}
 This can also be expressed in terms of capital adequacy ratio (CAR)
 
 ```math
-\frac{K}{\text{RWA}} \geq 8\% 
+\frac{K}{\text{RWA}} \geq 8\%
 ```
 
-Note that the original Basel I Accord only considered credit risk in the RWA. However, an amendment in 1996 then included an RWA associated with market risk as well. Some jurisdictions in emerging markets still apply the Basel I framework. For bank groups, some of their exposure may therefore be subject to Basel I in a specific country, Basel II in another country and Basel III on consolidation
+Note that the original Basel I Accord only considered credit risk in the RWA. However, an amendment in 1996 then included an RWA associated with market risk as well. Some jurisdictions in emerging markets still apply the Basel I framework. For bank groups, some of their exposure may therefore be subject to Basel I in a specific country, Basel II in another country and Basel III on consolidation.
 
 ### Basel II
 
-Under Basel II, Pillar 1, the minimum capital requirement for credit risk in the banking book, is calculated in a new way that reflects the credit ratings of counterparties. The capital requirement for market risk remained unchanged from the 1996 Amendment, but there was a new capital charge for operational risk. The general requirement in Basel I, that banks hold a total capital equal to 8% of RWAs, remained unchanged. In response, Basel II had a much more granular approach to risk weighting. Under Basel II, the credit risk management techniques under can be classified under:
+Under Basel II, Pillar 1, the minimum capital requirement for credit risk in the banking book, is calculated in a new way that reflects the credit ratings of counterparties. The capital requirement for market risk remained unchanged from the 1996 Amendment, but there was a new capital charge for operational risk. The general requirement in Basel I, that banks hold a total capital equal to 8% of RWAs, remained unchanged. In response, Basel II had a much more granular approach to risk weighting. Under Basel II, the credit risk management techniques can be classified under:
 
 - Standardised approach: this involves a simple categorisation of obligors, without considering their actual credit risks. It includes reliance on external credit ratings.
 - Internal ratings-based (IRB) approach: here banks are allowed to use their ‘internal models’ to calculate the regulatory capital requirement for credit risk.
@@ -170,22 +172,10 @@ Minimum capital requirements may be based on the jurisdiction in which a bank op
 
 In South Africa, Basel II implementation became effective 1 January 2008. Basel III became effective 1 January 2012 but is subject to transition elements that will continue until 2023. In South Africa, minimum capital included the sum of its Tier 1 and Tier 2 capital and primary and secondary unimpaired reserve funds. This amount could not at any time be less than the greater of R250 million or 10% (previously 8%) of risk-weighted assets. Tier 1 must make up at least 50% of a bank’s capital base.
 
-### TLAC
+### TLAC & MREL
 
-Eligible instruments for [Total Loss-Absorbing Capacity TLAC]() should be stable and not subject to legal claim in the event of the bank’s resolution. TLAC is to be gradually phased in by 1 January 2022 with the following being met: TLAC must be 18% of RWAs and 6,75% of the Basel III leverage ratio denominator.
-
-It should also be noted that TLAC must be held in addition to minimum capital requirements. Generally, instruments which are eligible for CET1 are also eligible for TLAC, but they may not be included in both.
+For the application of TLAC and MREL requirements in the context of bank capital management, see [Capital — TLAC](..\..\..\..\04-capital.md). For the full FSB regulatory term sheet, see [TLAC Principles and Term Sheet](..\..\..\..\..\..\regulation\international\fsb\tlac.md).
 
 ![alt text](images/tlac.png)
 
-### MREL
-
-Minimum requirement for own funds and eligible liabilities (MREL) is a European standard introduced in 2016 that is conceptually similar to TLAC in that its implementation is supposed to ensure that banks have sufficient capacity to absorb losses and improve their ability to recapitalise in times of stress. While TLAC is based on percentages of RWA and leverage ratio (i.e. focusing on measures associated with Pillar 1 under Basel), MREL is equal to the loss-absorption amount plus a recapitalisation amount. These components are made up of:
-
-- Loss-absorption amount: The higher of the sum of Pillar 1 and Pillar 2A risk-weighted capital requirements, leverage requirement, or the Basel I capital floor. This is intended to reflect the fact that a bank post-resolution would have to comply with these capital requirements
-- Recapitalisation amount: A percentage from 0%–100% which is determined by local regulators. This percentage is larger for larger banks which are more systemically important.
-
 ![alt text](images/mrel.png)
-
-The intent of MREL is that it broadly aligns to TLAC for G-SIBs and allows for the potential for
-additional capital requirements (for the purpose of recapitalisation) for smaller non-SIBs.

@@ -340,6 +340,13 @@ Swaps are a form of derivative contract under which two parties agree to swap pa
 - **Currency swaps**: The two parties agree to exchange interest and/or principal payments on a notional or actual amount in different currencies.
 - **Credit Default Swaps (CDS)**: A CDS provides a form of credit insurance. It is an OTC derivative agreed between two parties and is the most common form of credit derivative. The **buyer of a CDS** (protection buyer) pays the seller (protection seller) an agreed premium for an agreed period. If the reference entity defaults during this period, the buyer of the CDS is compensated. This allows credit risk to be transferred without the need to sell the underlying financial asset. The credit spread, stated in basis points, indicates how much the seller of a CDS needs to receive to justify taking on the credit risk. Banks use CDSs to allow them to offer large loans to key corporate clients while avoiding excessive credit concentration risk. CDSs can also be used for trading by speculative investors who think the creditworthiness of underlying assets is likely to decline.
 
+##### Futures and Forwards
+
+Futures and forwards are similar to options, the difference being that each counterparty is **obligated** to respectively buy or sell the underlying asset at the agreed price at or before the agreed date (rather than having the right to do so).
+
+- **Futures** are exchange-traded and therefore carry less counterparty credit risk than forwards, as the exchange acts as a central counterparty and margining is applied.
+- **Forwards** are traded over the counter (OTC), meaning there is a bilateral risk of loss to both the buyer and the seller — either party could default before settlement.
+
 ##### Options
 
 An option is a form of derivative contract that gives the buyer the right, but not the obligation, to buy or to sell an asset at an agreed price at or up to an agreed date in the future.
@@ -349,6 +356,22 @@ An option is a form of derivative contract that gives the buyer the right, but n
 - **European options** can only be exercised on the agreed date; **American options** can be exercised at any time up to the agreed date (though it generally does not make financial sense to exercise early if the option is priced correctly).
 - **Exchange-traded ("vanilla") options**: Based on defined contracts issued by an exchange (e.g., the Chicago Options Exchange Board). Firms selling options on an exchange post collateral margin to demonstrate they are able to meet their obligations as the option value changes.
 - **OTC ("exotic") options**: Not traded on an exchange — bilateral contracts offering more flexibility to design bespoke derivatives with payout structures that meet the needs of individual companies. Can include features such as path dependency (where the payoff of an option depends on the price history of an underlying asset), or dependency on two assets simultaneously.
+
+##### Long Settlement Transactions
+
+Long settlement transactions are similar to derivatives but are longer term, and thus may present higher counterparty credit risk due to the extended period over which a counterparty could default before the transaction settles.
+
+##### Securities Financing Transactions (Repo)
+
+A repurchase agreement (repo) is a form of short-term borrowing where one party sells an asset (typically a government bond or other high-quality security) and agrees to repurchase it at a specified price on a future date. The difference between the sale price and the repurchase price constitutes the interest (the repo rate). Repos involve counterparties using owned assets to secure funding. If counterparties default, they could lose their assets or make losses on selling assets.
+
+Repos are a key tool for:
+
+- **Liquidity management**: Banks use repo to access short-term funding against their securities holdings.
+- **Trading strategies**: Repo allows investment banks to finance long positions in securities.
+- **Central bank operations**: Central banks use repos as a primary monetary policy tool.
+
+OTC derivatives (swaps, forwards) and securities financing transactions (repo) carry **counterparty credit risk (CCR)** — the risk that the counterparty defaults before settlement, requiring the position to be replaced at a worse price. For the regulatory capital treatment of CCR and CVA arising from these instruments, see [Regulatory Capital (Trading Book)](credit_risk\05_counterparty_modelling\01_introduction\01-regulatory_capital.md).
 
 #### Asset-Backed Securities (ABS)
 

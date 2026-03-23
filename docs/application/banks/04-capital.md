@@ -29,7 +29,7 @@ Liquidity and capital can easily be confused. The important distinction is that 
 
 A bank’s capital position and the measurement of capital position is of utmost importance to ensure a bank remains a going concern. Bank capital can be considered as the funding set aside by the bank to cover expected and unexpected losses. The strategy of the bank is therefore closely linked to its capital position and will determine the composition of the capital base.
 
-The need for capital arises due to credit, market, operational, and other financial and non-financial risks that could lead to financial losses. A bank with an adequate capital base will be able to absorb these losses and remain solvent. These losses are categorised as expected losses and unexpected losses. The calculations for capital to be held for expected losses and unexpected losses are set out in the Basel regulations and enforced by national regulators.
+The need for capital arises due to credit, market, operational, and other financial and non-financial risks that could lead to financial losses. A bank with an adequate capital base will be able to absorb these losses and remain solvent. These losses are categorised as expected losses and unexpected losses. The calculations for capital to be held for expected losses and unexpected losses are set out in the [Basel regulations](..\..\regulation\international\bis\bis.md) and enforced by national regulators.
 
 Banks’ normal course of business involves exposing themselves to risk of loss due to customer loan defaults as well as other risks. Credit losses will vary from one year to the next and are, unsurprisingly, closely correlated to the economic cycle. The extent of losses will be dictated by the amount of exposure, product type, customer credit quality, and the existence of collateral.
 
@@ -38,12 +38,11 @@ Obviously, it is not possible to know in advance what the exact extent of losses
 - The level of future balance sheet expansion and lending levels
 - The rate of interest charged to customers.
 
-Banks must also, however, account for unexpected losses. This should be self-evident: it would not be possible to estimate accurately what future losses will be. It is common for actual loss rates to far exceed expected loss rates, especially if historical rates were used to estimate
-expected losses.
+Banks must also, however, account for unexpected losses. This should be self-evident: it would not be possible to estimate accurately what future losses will be. It is common for actual loss rates to far exceed expected loss rates, especially if historical rates were used to estimate expected losses.
 
 It is for these unexpected losses that banks require a buffer of capital to absorb, and if the bank is to manage itself on a going concern basis, this buffer must be sufficient to absorb losses and still remain above the regulatory minimum. Otherwise, of course, it would no longer be a going concern. This is because a bank that falls even 1 basis point below the regulator’s minimum may suffer a loss of confidence and potentially a run on the bank (as well as the inevitable credit rating downgrade). In most cases, it is the unexpected losses that can lead to the failure of a bank, rather than the expected losses.
 
-Unexpected losses are harder to estimate than expected losses and can arise due to a variety of events, including operational losses. The capital the bank holds therefore needs to cover not only expected losses, but unexpected losses as well. In fact, expected losses should be covered by the spread or profit margin of the products sold for a mature bank.
+Unexpected losses are harder to estimate than expected losses and can arise due to a variety of events, including operational losses. The capital the bank holds therefore needs to cover not only expected losses, but unexpected losses as well. In fact, expected losses should be covered by the spread or profit margin of the products sold for a mature bank. For a detailed treatment of the credit loss distribution, expected losses, unexpected losses, and the Vasicek model underpinning the IRB capital formula, see [Credit Losses](credit_risk\02_airb_capital_modelling\01_introduction\02-credit_losses.md).
 
 Different banks will have different methodologies to determine the size of their unexpected losses and consequently the required size of their capital base. The size of the bank, the risk they are exposed to, and the operating model are all factors that will determine how the bank manages their capital
 
@@ -88,6 +87,10 @@ The features that make a long-dated liability eligible as Additional Tier 1 (AT1
 | Call Features | May be callable by the Issuer only after a minimum of 5 years. With regulatory approval; Cannot create an expectation of call. Expected that early redemption for "unforseen" changes in regulator treatment, tax treatment or potential accounting treatment will be permitted. | May be callable by the issuer only after a minimum of 5 years. With regulatory approval; Cannot create an expectation of call. Expected that early redemption for "unforseen" changes in regulator treatment, tax treatment or potential accounting treatment will be permitted. |
 | Going Concern Loss Absorbency | Instruments must have principal loss absorption through either conversion to shares or a write-down mechanism which allocates losses to the instrument, at a trigger point of at least 5.875% (5.125% in the UK) CET1 when the instrument is liability accounted. (Contractual write-off or conversion is also possible at higher levels of CET1). Has following effects: Reduces claim of instrument on liquidation; Reduces the amount re-paid when a call is exercised; Partially or fully reduces coupon / dividend payments on the instruments. | N/A |
 | Gone Concern Loss Absorbency | Write-off or conversion to equity at the point of non-viability as determined by the local regulator, either included in contractual terms of the instrument or provided for in statutory framework. | Write-off or conversion to equity at the point of non-viability as determined by the local regulator, either included in contractual terms of the instrument or provided for in statutory framework. |
+
+### Preference Shares
+
+Banks issued preference shares historically prior to the introduction of Basel. These instruments are preferred to equity on a going concern basis and were historically pari passu to equity on a liquidation basis. Preference shares are generally not recognised under the qualifying regulatory capital under Basel III. Many banks are phasing out these instruments.
 
 ## Capital Model
 
@@ -155,11 +158,11 @@ Pillar 1 uses the risk-weighted assets (RWA) method. Each type of asset the bank
 
 Pillar 1 requirements are determined by considering the credit, market, and operational risks of the bank:
 
-- For credit risk, a bank can apply the standardised approach, foundation internal ratings based (F-IRB) approach, or advanced IRB (A-IRB) approach.
+- For credit risk, a bank can apply the standardised approach, foundation internal ratings based (F-IRB) approach, or advanced IRB (A-IRB) approach. For the detailed computation of RWAs under each approach, see [Regulatory Capital](credit_risk\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md).
 - For market risk, the bank can apply the standardised approach or an internal value at risk (VaR) model.
 - For operational risk, the basic indicator approach, standardised approach, or advanced measurement approach can be used. With the coming updates to Basel III, the advanced measurement approach will, however, be falling away.
 
-By applying the various Basel framework capital quantification principles, the total riskweighted assets (RWA) of the bank is determined. The total required capital for the bank under Pillar 1 is then set at 8% of RWAs.
+The above methods were all described in the preceding chapters and the details around them will not be discussed here. By applying the various Basel framework capital quantification principles, the total risk-weighted assets (RWA) of the bank is determined. The total required capital for the bank under Pillar 1 is then set at 8% of RWAs.
 
 ### Pillar 2: Additional Capital Requirements
 
@@ -222,10 +225,114 @@ The last type of capital buffer is the systemically important banks’ buffer. T
 
 ### TLAC
 
+For the full regulatory detail on TLAC, see [TLAC Principles and Term Sheet](..\..\regulation\international\fsb\tlac.md).
+
 Over and above the capital requirements outlined in the Basel framework, the Financial Stability Board has also introduced a term sheet containing a separate capital structure over and above Basel prescribed minimums. The Financial Stability Board is an international body that makes recommendations about, and monitors, the global financial system. This structure is applicable to G-SIBS (Global Systemically Important Banks) only, but some authorities are considering its application potentially for D-SIBS (Domestic Systemically Important Banks) as well. The framework is referred to as TLAC or total loss absorbing capacity. The primary aim is to ensure sufficient liabilities are available to bail in in the event of a resolution and, if deemed appropriate, recapitalise the bank without the need for a taxpayer bail-out. Other resolution techniques are also available. In South Africa, a D-SIB buffer of up to 2,5% is set by the Prudential Authority. The first 1% of the specified D-SIB capital requirement, up to a maximum of 1% of a bank’s risk-weighted exposures, must be fully met by CET 1 capital and reserve funds.
 
 Any additional requirement, up to the first 1,5% of risk-weighted exposures may be met by Tier 1 capital and reserve funds. Any additional requirement to the aforementioned requirement, up to 2,5% of risk-weighted exposures, may be met with total capital and reserve funds.
 
-## Economic Cpaital
+### MREL
+
+Minimum requirement for own funds and eligible liabilities (MREL) is a European standard introduced in 2016 that is conceptually similar to TLAC in that its implementation is supposed to ensure that banks have sufficient capacity to absorb losses and improve their ability to recapitalise in times of stress. While TLAC is based on percentages of RWA and leverage ratio (i.e. focusing on measures associated with Pillar 1 under Basel), MREL is equal to the loss-absorption amount plus a recapitalisation amount. These components are made up of:
+
+- **Loss-absorption amount**: The higher of the sum of Pillar 1 and Pillar 2A risk-weighted capital requirements, leverage requirement, or the Basel I capital floor. This is intended to reflect the fact that a bank post-resolution would have to comply with these capital requirements.
+- **Recapitalisation amount**: A percentage from 0%–100% which is determined by local regulators. This percentage is larger for larger banks which are more systemically important.
+
+The intent of MREL is that it broadly aligns to TLAC for G-SIBs and allows for the potential for additional capital requirements (for the purpose of recapitalisation) for smaller non-SIBs.
+
+### Leverage Ratio
+
+The leverage ratio limit is a Basel III requirement. It has been implemented as a Pillar 2 measure from January 2016. The leverage ratio measures a bank’s Tier 1 capital relative to its total assets. With a higher ratio a bank is able to better withstand shocks to its balance sheet. The higher the ratio, the more coverage there is for its assets in case of emergencies. This ratio therefore serves as an additional risk measure to protect the solvency of a bank.
+
+In South Africa, the Prudential Authority has applied a minimum 4% (3% in the Basel text) ratio limit, and the numerator is given by the Tier 1 capital amount.
+
+The leverage ratio is defined as T1 capital divided by a total exposure measure. The simplest form is given by:
+
+**Leverage ratio = Tier 1 capital / Funded assets**
+
+The exposure measure is the sum of:
+
+- On-balance-sheet exposures
+- Derivative exposures
+- Securities financing exposures (for example, repo)
+- Off-balance-sheet exposures.
+
+## Key Considerations for Capital Adequacy
+
+For a bank to ensure that it has adequate capital to support its business, it must consider the following:
+
+- Risk appetite and risk profile
+- Regulatory requirements
+- Credit rating agency (for example, S&P, Moody’s, Fitch) considerations
+- Equity investor expectations
+- Growth and business plans
+- Accounting practices
+- Stress testing scenarios
+- Economic capital requirements
+- Dividend policy
+- Targeted leverage levels.
+
+Regulatory requirements will be the primary driver of the bank’s capital structure, involving the consideration of a number of metrics across the regulatory spectrum. The board sets the risk appetite of the firm. One of the risk appetite metrics will consider the level of friction the bank wishes to endure before breaching regulatory requirements. Capital in excess of the minimum will be held as a buffer to minimise regulatory friction.
+
+Equity investor considerations around dividend capacity and ROC expectations would also influence the capital mix as it is important to take into account the requirements of investors.
+
+### Rating Agency Considerations
+
+A rating agency will consider drivers including: business profitability, current and future levels of growth, dividend policy, access to bank financing, issuance capability in the capital markets, implicit support from government or a foreign parent, and the price the bank has to pay to raise long-term funding.
+
+In proceeding with issuance of an AT1 or T2 hybrid capital instrument, the capital planning process will consider the treatment of the instrument by the international credit rating agencies (for example, S&P, Moody’s, Fitch), which will look at the above-mentioned factors. Ideally, the instruments issued will be eligible as capital, therefore strengthening the capital base to the benefit of the bank’s final rating from the agencies. S&P, for instance, issue guidelines for eligibility for their Risk Adjusted Capital (RAC) ratio.
+
+### Analyst Considerations
+
+Optimal capital structures are also determined by investment analyst considerations. Unlike regulatory considerations, equity analysts might identify opportunities that require a higher level of risk appetite. As a consequence, more focus might be placed on the early payment of dividends, potential special dividends, and growth opportunities to utilise excess capital. From the bank’s point of view, it is important to always first ensure solvency both on a going concern and in stressed scenarios. The capital management team can then consider a range of options to address the growth and dividend considerations.
+
+### Capital Need by Peer Group of Banks
+
+Banks do not only ensure that their level of capital is sufficient to meet regulatory requirements; they also tend to compare their capital ratios with their peers. This ensures that they do not appear to have too little capital relative to their counterparts. For example, a bank with a low CET1 ratio relative to its peers (even well above the regulatory minimum) may be perceived to be of higher risk.
+
+The tables and figures in the F107 textbook show some form of "herd behaviour" where banks have similar levels of capital ratios relative to their peers. In South Africa, the four largest banks (ABG, FSR, NED, SBK) maintained total capital ratios of approximately 14–17% from 2018 to 2020, with CET1 comprising the largest portion.
+
+### Outlook for GDP and Expected Credit Losses (ECL)
+
+As changes in provisions are included in impairments in banks’ income statements, they reduce / increase banks’ retained earnings and capital resources when provisions (ECL as per IFRS 9 requirements) increase / reduce year on year. For banks under the standardised approach for credit risk, accounting provisions are split into general (GP) and specific provisions (SP). GPs may be included in Tier 2 capital up to a maximum of 1,25% of the credit RWAs. SPs may not be included in Tier 2 capital but are used to reduce the asset exposure before applying the RWAs. The impact on CET1 capital therefore depends on the size of the accounting provisions (ECL) and the split between SP and GP. (SP and GP definitions are prescribed by local regulators.)
+
+For banks under the IRB approach, there is no split between GP and SP. Where ECL is higher than regulatory expected losses, the difference may be added to Tier 2 capital up to a maximum of 0,6% of credit RWAs (measured under IRB). In the case where regulatory EL is higher than ECL, the difference is subtracted from the regulatory capital.
+
+Provisions for expected credit losses are heavily dependent on GDP forecasts. Banks tend to build forward-looking models with GDP as a key factor. When GDP growths are expected to decrease, PDs and LGDs are usually expected to increase. More loans are also expected to migrate to lower stages (from stage 1 to 2/3) with higher ECL percentages. When economies therefore go from expected growth to expected recessionary periods, as happened in 2020 due to Covid-19, there is likely to be a substantial rise in provisions leading to a reduction in capital adequacy. This may cause banks to dip into their capital buffers, but they must not go below their total capital requirements.
+
+Central banks’ actions and their impact on banks’ capital levels need to be considered, especially during times of recessionary periods. Central banks may decrease banks’ capital requirements, for example, in South Africa the Prudential Authority decreased the Pillar 2A capital requirement from 1% to 0% in 2020. Central banks may also influence the way in which banks calculate their ECLs. For example, in South Africa the Prudential Authority issued a directive whereby loans with payment holidays may be held in stage 1 (IFRS 9 classification for a performing loan) even if the customer did not pay for a few months. These loans had to be in good standing before the payment holiday and expected to meet their payments after the payment holiday period. Another example is from 2020 in the EU: To prevent a large fall in banks’ capital ratios that might have made them reluctant to support new lending, banks were allowed to phase in the impact of an increase in provisions for expected credit losses (see EU ‘Quick Fix’ below). This was, however, not the case in South Africa where the increase in ECL was recognised in full.
+
+### Hypothetical Example: Vanilla Commercial Bank
+
+To illustrate the considerations involved from a first-principles basis, an assumed example of a UK commercial bank that is being set up from scratch, with an inherited portfolio, is considered. What would be the primary factors driving the capital planning process? The balance sheet risk-weighted assets (RWA) breakdown is as follows:
+
+| Segment | RWA (£m) |
+|---|---|
+| Mid-corp | 2 841 |
+| SME | 6 984 |
+| Retail | 3 181 |
+
+The main factors a review would consider include: profitability, asset mix (for example, whether there is a concentration in assets); advanced-versus foundation-IRB being applied; industry comparisons by asset class; Pillar 2 impacts; stress buffers required; and regulatory requirements. With a total balance sheet RWA of just over GBP 13 billion, the bank is below 1% of UK GDP in size, so the countercyclical, G-SIFI, and ring-fence buffers do not apply. (The Prudential Authority applies its own criteria regarding systemic importance when identifying D-SIBs. None of the South African banks are G-SIFI but an equivalent ZAR 13 billion would be a small bank with resulting high regulatory requirements.)
+
+Under Pillar 1, a total capital amount of 10,5% has to be held before Pillar 2 requirements. The bank can then complete its own supervisory review under the Pillar 2 requirements and in this example, this could lead to an additional 4,5% over and above the 10,5% regulatory minimum. This would argue for a capital structure of at least 15%, which the bank now has to decide on how to achieve.
+
+As this is a fairly small portfolio, the individual capital guidance received from the regulator will more likely impose a higher requirement. Two plausible scenarios are considered. The first is Scenario 1, the all-equity scenario, while Scenario 2 describes an equity plus other capital structure.
+
+The all-equity scenario presents the following features:
+
+- It is the most robust form from a regulatory perspective
+- It may result in an incremental rating benefit
+- As the most expensive structure, it is least efficient from a shareholder return perspective
+- Compared to the equity plus other capital format, there is a substantial decrease in ROC.
+
+The equity plus other capital liability structure has the following features:
+
+- It is a more efficient capital structure
+- Ultimately, it remains subject to national regulatory approval
+- The rating agency position towards this structure may be neutral to negative
+- The T2 issuance would of course be subject to investor demand for this paper
+- The structure allows for further gearing / leverage of the capital base. The level of leverage is restricted under Basel III and, in particular, in South Africa.
+
+## Economic Capital
 
 Another form of capital is economic capital. Economic capital is internally calculated by the bank and is a measure of the bank’s total risk as they see it, without reference to regulatory prescriptions.
