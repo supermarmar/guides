@@ -16,7 +16,11 @@ Globally Systemically Important Banks (G-SIBs) are subject to heightened regulat
 
 ## National Regulators & Regulations
 
-Each jurisdiction applies these international standards through its national regulators. In South Africa, the [South African Reserve Bank (SARB)](\docs\regulation\south_africa\sarb.md) is the primary prudential regulator responsible for maintaining financial stability and supervising banks. In the United Kingdom, the regulatory framework follows the Twin Peaks model similar to South Africa with the [Bank of England](docs\regulation\uk\bank_of_england.md) being the main regulator.
+Each jurisdiction applies these international standards through its national regulators.
+
+In South Africa, the [South African Reserve Bank (SARB)](\docs\regulation\south_africa\sarb.md) is the primary prudential regulator responsible for maintaining financial stability and supervising banks.
+
+In the United Kingdom, the regulatory framework follows the Twin Peaks model similar to South Africa with the [Bank of England](docs\regulation\uk\bank_of_england.md) being the main regulator.
 
 The regulators can increase the required capital depending on a bank’s risk assets, thereby ensuring that an adequate amount of capital and reserves is maintained to safeguard the bank’s solvency.
 

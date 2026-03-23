@@ -24,7 +24,7 @@ IFRS 9 was effective for annual periods beginning on or after 1 January 2018 wit
 
 When an entity first recognises a financial asset, it classifies it based on the entity’s business model for managing the asset and the asset’s contractual cash flow characteristics, as follows:
 
-#### Retail & Corporate Loans
+#### Amortised Cost
 
 4.1.2 A financial asset shall be measured at amortised cost if both of the following conditions are met:
 
@@ -33,7 +33,7 @@ When an entity first recognises a financial asset, it classifies it based on the
 
 > *In laymans terms, This classification is used when a bank’s objective is to hold a financial asset to collect regular payments (principal + interest). Example: A bank gives a customer a home loan or corporate loan. The bank expects to collect monthly repayments that include interest and principal. Since the bank doesn't plan to sell the loan to another party and only wants the cash flows, the loan is measured at amortised cost. The loan sits on the balance sheet and accrues interest income over time, adjusted for credit impairments (e.g. IFRS 9 Expected Credit Losses).*
 
-#### Corporate Bonds
+#### FVOCI
 
 4.1.2A financial asset shall be measured at fair value through other comprehensive income if both of the following conditions are met:
 
@@ -49,7 +49,7 @@ When an entity first recognises a financial asset, it classifies it based on the
 - (a) principal is the fair value of the financial asset at initial recognition. Paragraph B4.1.7B provides additional guidance on the meaning of principal.
 - (b) interest consists of consideration for the time value of money, for the credit risk associated with the principal amount outstanding during a particular period of time and for other basic lending risks and costs, as well as a profit margin. Paragraphs B4.1.7A and B4.1.9A⁠–⁠B4.1.9E provide additional guidance on the meaning of interest, including the meaning of the time value of money.
 
-#### Derivates
+#### FVPL
 
 4.1.4 A financial asset shall be measured at fair value through profit or loss unless it is measured at amortised cost in accordance with paragraph 4.1.2 or at fair value through other comprehensive income in accordance with paragraph 4.1.2A. However an entity may make an irrevocable election at initial recognition for particular investments in equity instruments that would otherwise be measured at fair value through profit or loss to present subsequent changes in fair value in other comprehensive income (see paragraphs 5.7.5⁠–⁠5.7.6).
 

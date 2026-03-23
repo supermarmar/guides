@@ -99,7 +99,7 @@ Barclays Group also includes several non-bank financial services subsidiaries th
 
 These subsidiaries are regulated under the FCA and relevant UK and EU financial services legislation, such as the Financial Services and Markets Act 2000 (FSMA) and the Markets in Financial Instruments Directive II (MiFID II).
 
-## Bank Type
+## Types of Banks
 
 FirstRand Limited is a universal banking group, meaning it provides a full spectrum of financial services — from traditional retail and commercial banking to investment banking, insurance, and asset management. It operates primarily through its main licensed banking subsidiary, FirstRand Bank Limited, and its major branded divisions:
 
@@ -113,3 +113,65 @@ FirstRand Limited is a universal banking group, meaning it provides a full spect
 | Mutual bank                     | ⚪             | It is a listed corporate entity, not a member-owned cooperative.                                                                                          |
 | Wholesale-funded bank           | 🟢            | The group raises substantial funding through institutional and capital markets, especially through RMB.                                               |
 | Development bank                | ⚪             | It is a private-sector institution, not a development finance body.                                                                                       |
+
+### Traditional Deposit-Taking Banks
+
+Firms need a banking licence to call themselves banks and to accept retail deposits. Traditional deposit-taking banks include:
+
+#### Retail Banks
+
+Take deposits, offer current accounts, and lend through overdrafts, loans, credit cards, and mortgages to individuals and small businesses (many of which are sole traders). They are regulated and supervised by their national regulator, and are normally listed and owned by shareholders.
+
+#### Commercial banks
+
+Often active in retail banking and, in addition, take deposits from, make loans to, and offer payment and other services to companies of all sizes.
+
+### Investment Banks
+
+Investment banks help companies to raise equity and debt capital. They help with relevant documents and processes, arrange meetings with potential investors, underwrite new shares or bonds, and help with their distribution to investors. Investment banks also:
+
+- Support secondary markets through their sales and trading activities, and may take positions in securities on their own account (proprietary trading)
+- Help companies with mergers and acquisitions, often identifying targets and supporting negotiations
+- Find buyers for businesses and help companies defend against unsolicited bids
+- Are active in derivative instruments such as futures, options, and swaps, in connection with risk management services offered to customers
+
+Specialised lending such as project finance, trade finance, or commodity finance is also often housed in an investment bank.
+
+### Universal Banks
+
+Universal banks comprise commercial banking (including retail banking) and investment banking, and often include other activities such as wealth management, fund management, and bancassurance. Universal banks have been the common model for large banks.
+
+A concern about universal banks is that deposits made by customers of the commercial bank may be put at risk by losses from trading activities in the investment bank.
+
+### Challenger Banks
+
+The move to online banking has reduced barriers to entry. New entrant banks are likely to have low-cost operations and can challenge large incumbent banks despite their limited economies of scale. A further development is the standardisation of open APIs (interfaces built to a common standard), allowing the transfer of data between banks and approved third parties — encouraged by PSD2 (Payment Services Directive 2) in the EU and Open Banking in the UK.
+
+Fintech firms, with skills and experience in data science, are well-placed to take advantage of this opportunity. In the UK, new banks such as Atom and Monzo offer easy-to-use banking apps. Some effective challengers are not banks: ANT from China, PayPal and Stripe from the US, and Revolut from the UK have made good progress in digital payments. M-Pesa, a payment platform/money transfer service available through network operators, uses technology to provide banking services in Kenya, Tanzania, and Ghana.
+
+### Shadow Banks
+
+Shadow banks offer certain banking services but do not have banking licences and are less regulated. They cannot accept retail deposits and typically offer credit financed by wholesale borrowing. They are often more highly leveraged than regulated banks. Shadow banks are generally regarded as including asset managers, hedge funds, private equity funds, securitisation companies, and money market funds.
+
+A challenge for shadow banks is that if their wholesale funding is limited in periods of stress, they may be forced to sell assets at depressed prices. It is thought that such behaviour by shadow banks made a substantial contribution to the banking crisis of 2007–2008.
+
+### Mutual Banks
+
+Mutual banks, such as building societies, are owned by their members. They typically have strong values and a commitment to their members and communities. A disadvantage is that they are not able to raise equity capital to cover their losses in periods of recession or to finance new investments such as those associated with the move to online and mobile banking.
+
+A broader definition of such banks includes community banks, credit unions, and rotating savings and credit associations such as South Africa's stokvels.
+
+### Wholesale-Funded Banks
+
+Some banks make greater use of wholesale funding and less use of retail deposits. They typically concentrate on loans to medium and large corporate customers. Compared to deposit-taking banks, wholesale-funded banks are likely to have:
+
+- Relatively low NIM and margins — because of lower interest rates received on low-risk corporate loans and higher interest rates paid on wholesale funding than on low-cost retail deposits
+- Lower credit losses — because of the high quality of their borrowers
+- Lower costs — because of their simpler business model
+- A lower regulatory burden where they are not subject to the same regulations as deposit-taking institution.
+
+### Development Banks
+
+Generally speaking, development financial institutions (DFIs) are alternative financial institutions including community development institutions and microfinance institutions. These entities fill a critical role in providing credit through higher-risk loans, equity stakes, and risk guarantee instruments for private sector initiatives to aid companies investing in developing countries. They are typically owned and supported by countries with developed economies.
+
+Examples of multilateral development banks include the World Bank, European Investment Bank (EIB), Asia Development Bank (ADB), Inter-American Development Bank (IADB), and African Development Bank (AfDB). Regional entities in Africa include the Trade and Development Bank, which operates in the Common Market for Eastern and Southern Africa (COMESA), the Arab Bank for Economic Development in Africa, and the Land and Agricultural Development Bank of South Africa.
