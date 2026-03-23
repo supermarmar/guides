@@ -149,8 +149,6 @@ The distinction between gross and net carrying amounts is critical for calculati
 
 > *Let’s say a bank lends R1,000,000 (no transaction costs) to a corporate client at 10% interest over 5 years. Here’s how the rules apply at different stages of credit quality. At initial recognition, the loan is performing. Use the effective interest rate (EIR) — say 10% — to calculate interest on the gross carrying amount (i.e., full R1,000,000). (Paragraph 5.4.1 (b)) Suppose after 2 years, the original loan defaults or moves to Stage 3 under ECL. From that point, interest must be calculated using EIR (still 10%) but on the amortised cost — i.e., gross amount minus lifetime ECL.*
 
-<!-- > Quick check: if EIR increases then ECL should get bigger since it is negative. -->
-
 ## Financial Metrics
 
 ### Coverage Ratio

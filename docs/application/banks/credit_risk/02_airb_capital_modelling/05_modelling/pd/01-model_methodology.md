@@ -1,3 +1,7 @@
+# Model Methodology
+
+A further consideration when developing a model, is that models must be able to provide a PD in both unstressed and stressed economic scenarios. Higher interest rates, which make debt more costly, can be integral to stress scenarios. PIT PDs will be volatile as the economy evolves, while TTC PDs will be more stable. Obligors must be classified as to how they are likely to respond to the economic cycle at both peaks and troughs.
+
 ## Model Methodology – PD Rating Philosophy
 
 ### Regulatory Requirements

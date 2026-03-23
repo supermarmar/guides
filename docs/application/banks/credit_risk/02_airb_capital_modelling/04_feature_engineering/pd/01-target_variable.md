@@ -1,5 +1,7 @@
 # Target Variable
 
+
+
 * The **dependent variable** for PD modelling is the **default indicator** over a 12-month outcome window.
 * The column (e.g., `m12_default`) flags whether the obligor defaults **at any time** within the 12 months following the observation date.
 * This binary classification is in accordance with **CRR Article 180(2)(a)**, which requires the estimation of **1-year default rates**.

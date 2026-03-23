@@ -1,5 +1,10 @@
 ## Loss Given Default (LGD)
 
+The most common LGD measure is “gross” (where the LGD is represented as a percentage of the EAD) because it is simple to calculate and requires the least data. Another LGD measure is losses divided by the unsecured portion of a credit line, which is important when a bank has significant collateralisation. As a conservative measure, a “haircut” is applied to the collateral in the calculation to allow for a fall in value, thereby increasing the LGD.
+
+LGD can be difficult to calculate as bank recovery rates vary and workouts take different lengths of time, so peer data is not always useful. Formulas have been developed to best achieve comparability. Models should “time weight” LGD, meaning historical data is not analysed simply by averaging losses corresponding to each default, but also by considering the time periods in the economic cycle when they are likely to occur. For example, more and larger losses would be expected in an economic downturn for some asset classes, while other asset classes will not experience the same variation.
+
+In terms of data, Basel (and regulators) details requirements that should be met, such as the minimum historical time period covered (7 years or minimum 5 years depending on the asset class). In line with the above, data used for modelling period should cover at least one economic cycle.
 
 LGD is modelled using a **component-based approach** to capture the complex nature of post-default outcomes. The target is not a single value but built from two or more sub-models:
 

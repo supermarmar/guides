@@ -1,6 +1,4 @@
-# IRB Approach
-
-## Credit Loss Distribution
+# Credit Losses
 
 When estimating the amount of economic capital needed to support their credit risk activities, banks employ an analytical framework that relates the overall required economic capital for credit risk to their portfolio’s probability density function (PDF) of credit losses, also known as loss distribution of a credit portfolio. Figure below shows this relationship. Although the various modelling approaches would differ, all of them would consider estimating such a PDF.
 
@@ -43,6 +41,8 @@ For example, if the EAD is 65%, the LGD is 30%, and the PD is 15%, then for an a
 - The amount that is likely to be lost is 3 (100 x 65% x 30% x 15%), if a default occurs.
 
 ## Unexpected Losses
+
+Banks must also, however, account for unexpected losses. This should be self-evident: it would not be possible to estimate accurately what future losses will be. It is common for actual loss rates to far exceed expected loss rates, especially if historical rates were used to estimate expected losses.
 
 Unlike EL, total UL is not an aggregate of individual ULs but rather depends on loss correlations between all loans in the portfolio. The deviation of losses from the EL is usually measured by the standard deviation of the loss variable. The UL, or the portfolio’s standard deviation of credit losses can be decomposed into the contribution from each of the individual credit facilities:
 
@@ -90,7 +90,7 @@ The downturn LGD enters the Basel II capital function in two ways. The downturn 
 
 The mapping function used to derive systemically conditional PDs from average PDs is derived from an adaptation of Merton’s (1974) single asset model to credit portfolios. According to Merton’s model, borrowers default if they cannot completely meet their obligations at a fixed assessment horizon (e.g. one year) because the value of their assets is lower than the due amount. Merton modelled the value of assets of a borrower as a variable whose value can change over time. He described the change in value of the borrower’s assets with a normally distributed random variable.
 
-Vasicek (cf. Vasicek, 2002) showed that under certain conditions, Merton’s model can naturally be extended to a specific ASRF credit portfolio model. With a view on Merton’s and Vasicek’s ground work, the Basel Committee decided to adopt the assumptions of a normal distribution for the systematic and idiosyncratic risk factors.
+Vasicek (cf. Vasicek, 2002) showed that under certain conditions, Merton’s model can naturally be extended to a specific asymptotic single risk factor (ASRF) credit portfolio model. With a view on Merton’s and Vasicek’s ground work, the Basel Committee decided to adopt the assumptions of a normal distribution for the systematic and idiosyncratic risk factors.
 
 ### Vasicek Model
 
@@ -143,3 +143,18 @@ Given a macroeconomic scenario, a time series $S_t'$ can be computed, which can 
 A portfolio with high correlations produces greater default oscillations over the cycle $S_t'$, compared with a portfolio with lower correlations. Correlations do not affect the timing of the default; higher correlations do not imply that defaults earlier or later than other portfolios. Thus, during good times a portfolio with high correlations will produce fewer defaults than a portfolio with low correlations. While in bad times the opposite is true, high correlations are creating more defaults. Some benchmark values of ρ are available from the regulatory regimes. The Basel II IRB risk-weighted formulae, which are based on the Vasicek model, prescribes, for corporate exposures, correlations between 12% and 24%, where the actual number is computed as a probability of default weighted average.
 
 Following the Vasicek framework, two borrowers are correlated because they are both linked to the common factor $S_t'$. Clearly this is a simplification of the true correlation structure.
+
+### Time to Default (TTD)
+
+An important concept in PD is “distance to default” or “time to default”. PD increases as the market value of the assets of a company decreases towards the book value of the liabilities. Issues considered are:
+
+- The current asset value
+- The distribution of asset values over the time horizon
+- The volatility of the future assets’ values over the time horizon
+- The level of the default point over the time horizon
+- The expected rate of growth in the asset value over the time horizon
+- The length of the time horizon.
+  
+The default point is sometimes when the two values, assets and liabilities, converge; although
+companies may continue to trade if the liabilities are longer term and creditors believe in the
+business.

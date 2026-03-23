@@ -1,4 +1,3 @@
-
 # Bank Structure
 
 ## Group Structure

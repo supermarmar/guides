@@ -2,6 +2,8 @@
 
 LGD and EAD for corporate, sovereign, and bank exposures are based on a Basel required period of no shorter than 7 years. Estimates for retail exposures are based on at least 5 years of data unless the bank demonstrates that recent data is a better predictor.
 
+Given the challenges involved in calibrating LGD models, banks often reference external data sources, such as Global Credit Data (GCD), S&P LossStat and Paris Club restructure data.
+
 ## Loss Given Default (LGD)
 
 |Metadata|Notation|Description|Reference|

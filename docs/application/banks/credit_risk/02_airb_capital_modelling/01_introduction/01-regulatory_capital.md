@@ -1,4 +1,4 @@
-# Regulatory Capital
+# Regulatory Capital (Banking Book)
 
 What we call regulatory capital differs from what is known as economic capital. In effect there are two approaches to consider the supply and demand of capital. The regulatory approach dictates the rules on which the demand is to be set, as well as the admissibility of supply, while an internal or economic approach considers the internal best estimate of demand and supply. Regulatory capital supply compared to a predetermined scalar of demand is what the regulators determine as adequate for a bank’s operations. Economic capital is what the bank itself views as appropriate for its activities. Usually, it is lower than regulatory capital, in that it incorporates a portfolio effect reflecting diversification of activities, but it may also include an additional small capital cushion or buffer.
 
@@ -72,9 +72,9 @@ Under the internal ratings-based (IRB) approach, regulators base the capital req
 
 ```math
 
-\text{UL} = \text{VaR}_{99.9^{th}} = \text{EAD}_\text{Reg} × \text{LGD}_\text{Reg} × \text{WCDR}
+\text{UL} = \text{VaR}_{99.9^{th}} = \text{LGD}_\text{Reg} × \text{WCDR}
 \\
-\text{EL} = \text{EAD}_\text{Reg} × \text{LGD}_\text{Reg} × \text{PD}_\text{Reg}
+\text{EL} =  \text{LGD}_\text{Reg} × \text{PD}_\text{Reg}
 \\
 ```
 
@@ -83,7 +83,11 @@ The capital given by the above equations is intended to be enough to cover unexp
 ```math
 K = (\text{UL} - \text{EL}) \times MA
 \\
+K = \text{EAD}_\text{Reg} × (\text{LGD}_\text{Reg} \text{WCDR}-\text{LGD}_\text{Reg}\text{PD}_\text{Reg}) \times MA
+\\
 K = \text{EAD}_\text{Reg} × \text{LGD}_\text{Reg} × (\text{WCDR}-\text{PD}_\text{Reg}) \times MA
+\\
+K=\text{EAD}_\text{Reg}\times\text{LGD}_\text{Reg}\times[N(\frac{G(\text{PD})+\sqrt{R}\times G(0.999)}{\sqrt{1-R}})-\text{PD}]\times \text{MA}
 ```
 
 When the capital requirement for a risk is calculated in a way that does not involve RWAs, it is multiplied by 12,5 to convert it to an RWA. This approach has been adopted given the original Basel I approach to assess risk as a percentage of the value of an asset rather than calculating the capital requirement explicitly.
@@ -92,13 +96,40 @@ When the capital requirement for a risk is calculated in a way that does not inv
 \text{RWA} = K \times 12.5
 ```
 
+For credit risk, the total RWA amount would be calculated as the sum of the RWA for banking book exposures, including RWAs for:
+
+- Counterparty credit risk (arising from banking or trading book exposures)
+- Equity investments in funds held in the banking book
+- Securitisation exposures in the banking book
+- Exposures to central counterparties in both the banking and trading book.
+
 The Basel Committee reserves the right to apply a scaling factor (less than or greater than 1,0) to the result of the calculations, if it finds that the aggregate capital requirements are too high or low.
 
 A scaling factor of 1,06 has been applied by the SARB consistent with international practice.
 
+##### Defaulted Assets
+
+The capital requirement (as a percentage of the outstanding balance) for defaulted assets is calculated as:
+
+```math
+K = \max(0,\text{LGD}_\text{Reg}\times \text{BEEL}
+```
+
+LGDs for defaulted assets should reflect the need for potential additional losses over the recovery period. The best estimate of expected loss (BEEL) is the estimate of loss set by the bank taking into account the current economic climate and the status of the facility. The BEEL is usually the specific provision loss estimate of that facility.
+
 ##### Maturity Adjustment
 
 The maturity adjustment is designed to allow for the fact that, if an instrument lasts longer than 1 year, there is a 1-year credit exposure arising from a possible decline in the creditworthiness of the counterparty as well as from a possible default by the counterparty.
+
+```math
+\text{MA}=\frac{(1+(m-2.5)b)}{(1-1.5b)}
+\\
+b = [0.11852 – 0.05478\ln(\text{PD})]^2
+```
+
+where$ b$ is the adjustment factor and $m$ is the effective maturity.
+
+For most retail exposures, the capital requirement is calculated as follows, where there is no maturity adjustment included as maturities of retail assets will be the same within portfolios
 
 ##### F-IRB
 

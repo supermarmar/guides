@@ -229,9 +229,7 @@ Basel II introduced three pillars related to risk and capital management, and Ba
 
 ##### Pillar 1 – MCR
 
-This pillar’s purpose is to ensure that banks have adequate capital to prevent individual failures which can contribute to systemic risk and financial crises, and that this capital is managed adequately. This pillar is focused primarily on credit, market, and operational risk.
-
-In terms of credit risk measurement, Pillar 1 is the most applicable as this covers the measurement of credit risk in order to calculate the required capital to be held.
+This pillar’s purpose is to ensure that banks have adequate capital to prevent individual failures which can contribute to systemic risk and financial crises, and that this capital is managed adequately.
 
 ##### Pillar 2 – Supervisory review process
 
@@ -299,28 +297,9 @@ The enhanced Basel framework revises and strengthens the three pillars establish
 - liquidity requirements - a minimum liquidity ratio, the Liquidity Coverage Ratio (LCR), intended to provide enough cash to cover funding needs over a 30-day period of stress; and a longer-term ratio, the Net Stable Funding Ratio (NSFR), intended to address maturity mismatches over the entire balance sheet
 - additional requirements for systemically important banks, including additional loss absorbency and strengthened arrangements for cross-border supervision and resolution
 
-#### Revised Capital
+#### Revised Capital Sources
 
 Basel III cleaned up the definition of capital, i.e., the numerator of the capital ratio. But it did not seek to materially alter the Basel II risk based framework for measuring risk-weighted assets, i.e., the denominator of the capital ratio; therefore, the architecture of the risk weighted capital regime was left largely unchanged.
-
-##### CET1
-
-Common Equity Tier 1 (CET1) capital consists in principle of share capital, share premium, and retained earnings attributed as regulatory capital. Certain deductions apply.
-
-##### AT1
-
-- Instruments issued by the bank that meet the criteria for inclusion in Additional Tier 1 capital (and are not included in Common Equity Tier 1)
-- Stock surplus (share premium) resulting from the issue of instruments included in Additional Tier 1 capital
-- Instruments issued by consolidated subsidiaries of the bank and held by third parties that meet the criteria for inclusion in Additional Tier 1 capital and are not included in Common Equity Tier 1. Note criteria being applied
-- Regulatory adjustments applied in the calculation of Additional Tier 1 Capital
-
-##### T2
-
-- Instruments issued by the bank that meet the criteria for inclusion in Tier 2 capital (and are not included in Tier 1 capital)
-- Stock surplus (share premium) resulting from the issue of instruments included in Tier 2 capital
-- Instruments issued by consolidated subsidiaries of the bank and held by third parties that meet the criteria for inclusion in Tier 2 capital and are not included in Tier 1 capital
-- Certain loan loss provisions
-- Regulatory adjustments applied in the calculation of Tier 2 capital.
 
 #### Revised MCR
 
@@ -328,9 +307,9 @@ Under Basel III the minimum capital requirement was not changed, but stricter ru
 
 #### Capital Conservation Buffer (CCoB)
 
-Basel III introduces an additional 2,5% capital conservation buffer (2,5% of RWA) to withstand future stress periods. This was to be implemented from 2016 onwards and consists of CET1 capital. This buffer is applied by the national regulator. In the pandemic, regulators reduced the CCoB to 0% to allow for a reduction in the capital requirements.
+Basel III introduces an additional 2,5% capital conservation buffer (2,5% of RWA) to withstand future stress periods. This was to be implemented from 2016 onwards and consists of CET1 capital. This buffer is applied by the national regulator.
 
-#### Countercyclical capital buffer (CCyB)
+#### Countercyclical Capital Buffer (CCyB)
 
 Basel III further introduces an additional countercyclical buffer, ranging from 0–2,5%, to withstand future stresses. Implementation of this measure is also from 2016 to 2019. This buffer aims to reduce procyclicality that occurs in market conditions, which results in excessive credit growth.
 

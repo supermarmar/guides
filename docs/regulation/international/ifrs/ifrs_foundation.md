@@ -82,6 +82,43 @@ Members are appointed by the Trustees of the IFRS Foundation through an open and
 
 Since its creation in 2001, the IFRS Foundation has transformed the global landscape of financial information by introducing IFRS Accounting Standards developed by the International Accounting Standards Board (IASB). The Standards have in effect become the global language of financial statements—trusted by investors worldwide and required for use by more than 140 jurisdictions. We are continually developing and improving the Standards.
 
+#### IAS 39 (Incurred Losses)
+
+Under IAS 39, losses were recognized only when there was objective evidence of impairment (e.g., default or delinquency). Hence it was backward-looking, meaning it relied on historical data and loss events already incurred. This delayed provisioning during the 2008 financial crisis, leading to underestimation of risks.
+
+After the financial crisis, it was noted that IAS 39 was flawed and contributed to banks’ losses. The following weaknesses in the latter provided as reasons:
+
+- IAS 39’s incurred loss methodology only allows for losses to be recognised as they occur, which can result in “cliff effects” where a large number of losses are recognised at once.
+- IAS 39 does not account for expected future conditions, only those that have occurred historically.
+- Many banks felt the use of different impairment models for different asset classes, and the classification of financial assets into these asset classes, under IAS 39 was overly complex.
+- Those affected by an entity’s performance (e.g. shareholders) generally use financial statements to assess this. However, under IAS 39 some entities postponed losses and so ECLs were not always adequately disclosed.
+
+#### IFRS 9 (Expected Forward Looking Losses)
+
+IFRS 9 addresses these weaknesses (as well as other weaknesses not directly related to credit risk, such as changes to hedge accounting) and has significantly changed the treatment of impaired assets – with many banks having taken years to adjust their risk management processes accordingly. Some significant improvements made are:
+
+- ECLs will be recognised at all times, reducing “cliff effects”.
+- To incorporate forward looking information into the assessment of the expected credit losses of a loans.
+- Only one impairment model is used and a simpler classification system for assets.
+- Improved disclosure, as banks are required to disclose the entire process to determine their ECLs in detail.
+
+The benefits of these changes are to ensure that banks increase the impairments held against loans where there is expected deterioration in the credit risk of a loan due to potential deterioration in the underlying behavioural risk of a loan (SICR component) or due to deteriorating economic circumstances (FLI component). This is intended to make sure that banks incorporate future information (as opposed to only past and current information in IAS 39) when calculating the expected credit losses on loans.
+
+IFRS 9 should not be viewed in isolation to other guidance, and the BIS has addressed IFRS 9 in many of its guidance documents on credit risk. It is important that the methodologies are aligned, subject to supervisory guidance, to ensure that risk management practices and processes are consistent. In practice, many banks have chosen to leverage their existing Basel compliant models to implement the IFRS 9 methodology.
+
+##### Transition Impacts
+
+The impacts of IFRS 9 are varied. There are risk management benefits, owing to the weaknesses
+of IAS 39 being addressed, but these come at a cost, including:
+
+- Direct costs: Costs directly related to the implementation of the new methodology, such as the redevelopment of systems and training or hiring of staff. Some of these costs will be once-off, others long-term.
+- Income volatility: Provisions directly affect profit and loss on the income statement, and IFRS 9 requires provisions to be changed at each reporting date if significant changes in credit risk occur. Those assets that use fair values to inform expected credit losses will experience volatility in these figures.
+- Increased recognition of ECLs: Under IAS 39, ECLs would only be calculated when losses were incurred on defaulting assets. Under IFRS 9, ECLs need to be calculated on all eligible assets and provisions held for these assets. This results in higher provisions being held earlier.
+- Increased disclosure: As discussed, banks will need to provide more detailed disclosures on the risk management processes followed under the new methodology.
+- Capital impact: There will be varied impacts on capital. For example, under Pillar 1, Core Equity Tier 1 (CET1) capital is made up largely of retained earnings and increased provisions under IFRS 9 will reduce these earnings, thus reducing capital resources. Other affected areas will include stress testing and capital buffers. These impacts will be more significant for banks relying on the standardised approach.
+
+The impacts of IFRS 9 can be significant, but they also present an opportunity for banks to re-examine their risk management systems and models, and to improve efficiencies and management in order to reduce the impact. The improved assessment of credit risk will also help reduce the impacts of defaults and improve financial stability.
+
 ## **Interpretations Committee**
 
 The IFRS Interpretations Committee (Committee) works with the IASB in maintaining and supporting the consistent application of IFRS Accounting Standards. The Committee responds to questions about the application of the Accounting Standards and does other work at the request of the IASB.

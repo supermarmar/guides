@@ -2,9 +2,36 @@
 
 Banks around the globe leverage their well-established IRB models as starting point to satisfy the IFRS 9 modelling needs. The IRB PD, LGD and EAD parameters are typically TTC with some flooring and Margin of Conservatism (MoC) added. IFRS 9 requires the use of forward looking PIT parameters or conditional FiT parameters. The outcome of the IRB models is adjusted for IFRS 9 purposes to reflect forward looking and macro-economic information.
 
-## PD
+IRB models will be designed and implemented to estimate PDs and LGDs in order to calculate capital requirements. IFRS9 models are designed to estimate PDs and LGDs in order to calculate provision requirements. It should be noted that, though the purposes and calculations may differ, many banks choose to combine elements of the modelling process for these different risk parameters in order to reduce costs.
 
-### Through-the-Cycle (TTC) PDs
+The level of provisions will not necessarily affect capital requirements but will affect the amount of capital available to meet these requirements.
+
+## Standards & Setters
+
+- IRB: Based on Basel Accords created by BIS. Specific approaches and guidance per asset class.
+- IFRS 9: Based on IFRS9 accounting regulation produced by IASB. Guidance and different approaches based on business models and cash flow characteristics of the assets.
+
+## Purpose
+
+- IRB: Focused on estimation of PDs and LGDs for use in the calculation of regulatory capital requirements. Focused on identifying possible defaults on assets and setting aside capital for these. Ensures banks can estimate and prepare for unexpected losses.
+- IFRS 9: Focused on estimation of PDs and LGDs for use in the calculation of regulatory provision requirements. Focused on identifying impaired assets and setting aside provisions for these. Ensures banks can estimate and prepare for expected losses.
+
+## Data
+
+- IRB: Explicit data requirements (e.g. 7 years for non-retail exposures)
+- IFRS 9: Data requirements are outcomes-focused and not explicit
+
+## Modelling Methodology
+
+- IRB: Multiple modelling approaches, including both FIRB and AIRB approaches. A more conservative approach is used to estimate losses, including the use of floors outlined in the IRBA.
+- IFRS 9: A general or simplified approach is possible. A best-estimate basis is used to estimate losses, over multiple economic scenarios.
+
+## PDs
+
+- IRB: Combinations of PIT and TTC PDs used when estimating default within the next 12 months
+- IFRS 9: PIT PDs estimating default within the next 12 months (Stage 1) or over the remaining lifetime (Stage 2/3).
+
+<!-- ### Through-the-Cycle (TTC) PDs
 
 Credit rating systems focus mostly on producing a conservative PD-estimate that remains static (but stressed) over the lifetime of each loan, often by design.
 
@@ -56,24 +83,29 @@ The impact of migrations between ratings is considered by using migration matric
 - Two migration matrices are multiplied with each other to obtain the 2-year migration matrix, The last column of the resulting matrix now represents a 2-year cumulative PD.
 - The 12-month PD for the second year is obtained by subtracting the 1-year PD from the 2-year cumulative PD.
 - Going forward, the n-th year cumulative PD is obtained from multiplying n migration matrices, and the n-th year 12-month PD is obtained by subtracting the (n - 1)th year cumulative PD from the n-th year cumulative PD.
-- In order for the lifetime PD to represent current and future macro-economic conditions, the migration matrices used in this calculation are made PiT by linking it to the “state of the economy” per year in the future.
+- In order for the lifetime PD to represent current and future macro-economic conditions, the migration matrices used in this calculation are made PiT by linking it to the “state of the economy” per year in the future. -->
 
 ## LGD
 
-|Feature|IFRS 9|IRB|
-|-|-|-|
-|LGD Types|PIT (Point-in-Time) view with forward looking adjustment (no downturn required)|TTC (Through-the-Cycle) view with Downturn adjustment|
-|Flooring|No Floor|Floor on certain types of assets|
-|Defaulted Loans|LGD on lifetime default for Stage 2 assets|LGD on 1-year default|
+- IRB: Downturn LGDs used to estimate expected losses, using conservative scenarios, and these include both direct and indirect costs related to recoveries. Floor on certain types of assets.
+- IFRS 9: “PIT” LGDs used to estimate losses, using a range of economic scenarios, and these include only direct costs related to recoveries. No floor.
 
 ## EAD
 
-|Feature|IFRS 9|IRB|
-|-|-|-|
-|Amortisation|Model includes expected lifetime changes in the balance outstanding that are permitted by the contractual terms: amortization, repayments and (partial) prepayments.|Amortization not included.|
+- IRB: Amortization not included.
+- IFRS 9: Model includes expected lifetime changes in the balance outstanding that are permitted by the contractual terms: amortization, repayments and (partial) prepayments.
 
-## ECL vs EL
+## Outpus
 
-In IRB the $EL = PD \times LGD \times EAD$ but for IFRS9 it is the PD times the present value of cash shortfalls. This represents a probabiltiy weigthed estimate of credit losses.
+- IRB: Outputs of models to be used to calculate risk-weighted assets (RWAs), and risk parameters to be refreshed annually
+- IFRS 9: Outputs of models to be used to calculate expected credit losses (ECLs) on an ongoing, continuous basis
 
-The economic assumptions under IRB reflects a downturn or a macro economimc stress conditions in the EAD and LGD. Under IFRS9 it reflects an unbiased probability weighted amoutn, determined by evaluating a range of possibel outcomes.
+## AFS
+
+- IRB: Capital estimates will primarily affect the balance sheet statement.
+- IFRS 9: Provisions will affect the balance sheet and income statement, primarily profit and loss
+
+## Disclosures
+
+- IRB: Specific disclosures detailed (e.g. ICAAP), primarily within risk-based functions
+- IFRS 9: Detailed disclosures requiring linkages between risk and accounting / finance functions

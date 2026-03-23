@@ -1,7 +1,18 @@
 ## Exposure at Default (EAD)
 
-Whilst EAD is commonly positioned or understood as account balance at the point of default, there exists a number of nuances that can lead to a misalignment between account balance, IFRS accounting value, accounting value gross of specific credit risk adjustments and the adjustments required by SS4/24 to derive a compliant "outstanding amount" that serves as both the LGD denominator and EAD untransformed
-dependent variable. Additionally, there are motivations to model a transformation of EAD. The sections below cover:
+Exposure at default (EAD) is the gross total of extended credit plus estimated additional drawings for 1 year or until maturity. EAD modelling is relatively simpler than PD and LGD modelling, as for many products the EAD may simply be estimated as the exposure to the obligor, or client.
+
+Where EAD modelling becomes more complex is where this exposure is not fixed and can fluctuate over time. Off-balance-sheet exposures, for example, that incur counterparty credit risk (derivatives, etc.) are required to be treated separately from other exposures, as detailed by Basel.
+
+The greatest analytical challenge is setting credit conversion factors (CCFs) (or loan equivalents). This involves estimating additional drawings. Globally, unused commitments are huge, and it is logical that a corporation would seek to draw down in stress scenarios. Products where CCF modelling is needed include committed loan, liquidity facilities, and credit cards. Once the CCF is calculated as a percentage of the undrawn exposure, an EAD estimate can be calculated as follows:
+
+```math
+\text{EAD} = \text{Drawn Balance} + \text{CCF} \times \text{Undrawn Balance}
+```
+
+Strong information management systems are vital in assessing EAD, as the bank must ensure that troubled entities draw only under the terms permitted by the facility and up to the limit. Collateral must be monitored, priced, and margined. The bank must act efficiently and quickly in default situations to reduce losses and limit additional drawings where possible.
+
+Whilst EAD is commonly positioned or understood as account balance at the point of default, there exists a number of nuances that can lead to a misalignment between account balance, IFRS accounting value, accounting value gross of specific credit risk adjustments and the adjustments required by SS4/24 to derive a compliant "outstanding amount" that serves as both the LGD denominator and EAD untransformed dependent variable. Additionally, there are motivations to model a transformation of EAD. The sections below cover:
 
 - Deriving a compliant outstanding amount and demonstrating equivalence to account balance and IFRS accouniting value; and
 - Applying a transformation to help improve overall holdout goodness-of-fit as well as consistency of goodness-of-fit across key strata of the live portfolio.

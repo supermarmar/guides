@@ -19,3 +19,4 @@ These sources provide information from outside the bank, offering a broader pers
 
 1. **Application Data**: Information provided by customers during the loan application process. This includes income, employment history, assets, liabilities, and other financial information. This is used to assess creditworthiness and estimate PD.
 2. **Credit Bureau Data**: Information from credit bureaus, including credit scores, credit history, payment behaviour, and other relevant credit information (inquiries). This is a critical input for PD estimation and can help to validate internal data.
+3. **Ratings Agencies**: The simplest and most widely used source throughout the world is rating agency ratings – primarily when using the SA under Basel.

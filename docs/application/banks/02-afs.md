@@ -4,26 +4,42 @@
 
 ### Assets
 
-- Loans / Advances
+- Loans / Advances (net of provisions)
+  - Retail
+  - Wholesale
+- Undrawn Commitments / Off Balance Sheet Loans
 - HQLAs
 - Securities
 - Property
 - Derivatives
 - Intangible assets
 
+#### Banking Book
+
+#### Trading Book
+
+Trading book exposures are managed actively and held for “trading intent”, or short-term gain. Basel defines the boundary between the trading book and banking book quite strictly, classifying exposures that satisfy any of the following as trading book exposures:
+
+- Assets held for short-term gain
+- Assets traded to profit from short-term price movements
+- Assets held in order to profit from arbitrage
+- Assets held to hedge risks incurred by the above three points.
+
+Assets included should be “financial instruments, foreign exchange (FX), and commodities”, and banks should be able to hedge these assets completely (i.e. the bank should be able to purchase the exact same asset in the opposite direction).
+
 ### Liabilities
 
 - Deposits
-- Wholesale funding
-- Provisions
-- Debt capital
-- Preference shares
+  - Retail
+  - Wholesale funding
+- Debt Securities Issued
+- Preference Shares
 
 ### Equities
 
-- Common shares
-- Share premium
-- Reserves / Retained earnings
+- Share Capital / Common Shares
+- Share Premium
+- Reserves / Retained Earnings
 
 ## Income Statement
 

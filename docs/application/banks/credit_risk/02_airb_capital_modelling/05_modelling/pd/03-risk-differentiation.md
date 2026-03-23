@@ -1,8 +1,13 @@
-Here’s how I would rewrite and structure your **Risk Differentiation** section so it reads clearly, flows logically, and meets regulatory-style documentation standards while keeping all your technical detail intact.
+# Risk Differentiation
 
----
+As PDs are estimates of likelihoods, statistical methods are used to estimate PDs. These include:
 
-## Risk Differentiation
+- Linear or logistic regression (most commonly used)
+- Discriminant analysis
+- Logit and probit models
+- Panel models
+- Cox proportional hazards model
+- Neural networks
 
 ### Model Design
 
