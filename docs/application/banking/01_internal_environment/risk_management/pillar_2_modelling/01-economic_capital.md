@@ -4,23 +4,19 @@ Economic capital is internally calculated by the bank and is a measure of the ba
 
 For the broader treatment of the Pillar 2 capital framework (Pillar 2A/2B add-ons, buffers, capital requirements table), see [Capital — Pillar 2](..\..\04-capital.md). This file focuses on the **computation mechanics of economic capital** used in the ICAAP, including Pillar 2A risk-specific quantification and Pillar 2B stress capital.
 
-## Economic Capital vs Regulatory Capital
-
 While Pillar 1 regulatory capital is a rule-prescribed floor, economic capital is the bank's own best estimate of required capital. The two measures differ in several important dimensions:
 
 | Dimension | Regulatory Capital (Pillar 1) | Economic Capital (ICAAP) |
 |---|---|---|
 | **Confidence level** | 99.9% (1-in-1000 year loss) | Typically 99.95%–99.97% (1-in-2000 to 1-in-3333 year loss) |
-| **PD calibration** | Through-the-cycle (TTC) | Point-in-time (PIT) — reflects current conditions |
 | **Diversification** | Not recognised (ASRF assumes infinite granularity and no sector correlation) | Recognised via portfolio simulation or correlation assumptions |
 | **Risk coverage** | Credit, market, operational risk only | All material risks incl. IRRBB, pension, concentration, model, strategic, reputational |
-| **LGD calibration** | Downturn LGD | May use PIT or DT LGD depending on modelling philosophy |
 | **Formula** | Prescribed (ASRF / Vasicek) | Bank-defined (internal models) |
 | **Output** | RWA × 8% | VaR at target confidence level minus EL |
 
 Economic capital is generally lower than regulatory capital for well-diversified banks because it captures diversification benefits that the ASRF model (which assumes a single systematic risk factor and infinite granularity) cannot. However, for concentrated or small banks, EC may exceed regulatory capital.
 
-### Credit Risk Economic Capital
+## Credit Risk Losses
 
 Economic capital for credit risk is conceptually computed using the same Vasicek/ASRF framework as the IRB formula — a portfolio loss distribution is modelled and capital is set at VaR minus EL:
 
@@ -35,7 +31,7 @@ Key differences from the IRB regulatory capital formula (see [Regulatory Capital
 - **Multi-factor models**: Unlike the single-factor ASRF, internal EC models may use multi-factor approaches (sector-specific systematic factors) to better capture concentration and diversification.
 - **Diversification benefit**: Portfolio EC < sum of individual-obligor ECs. The difference — the diversification benefit — is recognised in EC but not in Pillar 1.
 
-### Aggregation Across Risk Types
+## Risk Aggregation
 
 Once economic capital has been computed for each risk type, the total economic capital is not a simple sum. Risks are not perfectly correlated, so there is a diversification benefit at the firm level:
 
@@ -58,11 +54,7 @@ In terms of credit risk, Pillar 2 requires the bank to detail and disclose to re
 
 ### ICAAP
 
-#### Components of Capital Assessment
-
 The ICAAP is the primary mechanism through which a bank determines its Economic Capital — the amount of capital it believes it needs based on its own risk appetite and strategy. This may require additional credit risk measurement approaches.
-
-An important step in the process is stress testing, where the required capital is assessed under stressed conditions to determine if the amount is sufficient. These stress tests require both quantitative and qualitative elements. Quantitative elements include identifying and applying stress scenarios. Qualitative elements include assessing the ability of the bank to absorb losses under these scenarios and determining steps that should be taken to mitigate these risk scenarios. The ICAAP process also includes assessing the correlations between risk types, as when risk is being assessed on an aggregate level, certain risks will be correlated and there may be a "diversification benefit".
 
 The key components required in an ICAAP include the following two types of capital assessment:
 
@@ -75,7 +67,7 @@ The key components required in an ICAAP include the following two types of capit
    - Qualitative: Assessing the bank's ability to absorb losses and identifying mitigation steps.
    - Pillar 2B (Capital Planning Buffer (CPB)): A buffer set to the level of additional capital required in a downturn to ensure the bank remains in surplus. This buffer is drawn upon when there is a downturn in the economic environment and adverse circumstances appear in the economic cycle.
 
-#### Governance & Regulatory Review
+An important step in the process is stress testing, where the required capital is assessed under stressed conditions to determine if the amount is sufficient (Pillar 2B). These stress tests require both quantitative and qualitative elements. Quantitative elements include identifying and applying stress scenarios. Qualitative elements include assessing the ability of the bank to absorb losses under these scenarios and determining steps that should be taken to mitigate these risk scenarios. The ICAAP process also includes assessing the correlations between risk types, as when risk is being assessed on an aggregate level, certain risks will be correlated and there may be a "diversification benefit".
 
 Regulators place significant emphasis on the usage of the ICAAP in practice. Banks are encouraged not to simply comply with the regulation, but to use the processes in practice.
 
@@ -180,34 +172,3 @@ Other risks assessed under Pillar 2A include:
 - **Legal risk**: Capital held against material legal proceedings and potential regulatory fines.
 - **Climate and sustainability risk**: An emerging Pillar 2A category requiring banks to assess physical risk (extreme weather events affecting collateral values) and transition risk (stranded asset risk from decarbonisation).
 - **Cyber risk**: Operational risk-adjacent; quantified via loss scenario analysis or insurance-gap analysis.
-
-### Pillar 2B
-
-Pillar 2B is the forward-looking component of Pillar 2 capital, determined through stress testing rather than point-in-time assessment. Each jurisdiction may require additional buffers over and above Basel requirements so as to ensure that banks within the system are adequately capitalised and there is a reduced systemic risk.
-
-#### Stress Testing Mechanics
-
-The purpose of Pillar 2B stress testing is to quantify the capital required for the bank to remain above its Pillar 1 + Pillar 2A requirements throughout an adverse macroeconomic scenario. The capital planning buffer (CPB) is the peak shortfall observed over the stress horizon:
-
-$$\text{CPB} = \max_{t \in [0,T]}\left(\text{Pillar 1} + \text{Pillar 2A} - \text{CET1}(t)\right)$$
-
-where $\text{CET1}(t)$ is the CET1 ratio at time $t$ under the stress scenario, modelled as:
-
-$$\text{CET1}(t) = \text{CET1}(0) + \sum_{s=1}^{t} \left[\text{Revenue}(s) - \text{Impairments}(s) - \text{Dividends}(s)\right] - \Delta\text{RWA}(s)$$
-
-The key drivers modelled in a stress scenario are:
-
-- **Impairment charges**: PD migrations and LGD increases driven by macroeconomic shocks (GDP decline, unemployment rise, property price falls). PD and LGD models feed forward-looking ECL calculations (IFRS 9 Stage 2/3 flows), which directly reduce retained earnings.
-- **Revenue compression**: Net interest margin compression from lower rates or higher funding costs; non-interest income falls from lower business activity.
-- **RWA inflation**: Portfolio downgrades shift borrowers to higher risk weight buckets; models may also produce higher RWAs under stressed PDs (for banks using non-modelled overlays).
-- **Dividend and payout policy**: Most banks would suspend or reduce dividends in a stress scenario.
-
-#### Scenario Design
-
-Stress scenarios are designed to be "severe but plausible". Supervisors (e.g., PRA in the UK, PA in South Africa) may prescribe baseline stress assumptions, but banks must also design their own scenarios relevant to their specific risk profile. Standard scenario types include:
-
-- **Macroeconomic downside**: GDP contraction, unemployment spike, property price decline, interest rate shock.
-- **Idiosyncratic stress**: A scenario specific to the bank (e.g., a major operational failure, a reputational event, or a concentrated sector loss).
-- **Reverse stress test**: Instead of asking "what happens to capital if X occurs?", the reverse stress test asks "what scenario would cause the business model to fail?" and then assesses its plausibility.
-
-The Pillar 2B add-on is generally not disclosed publicly and is bank-specific. In South Africa, the Pillar 2B requirement (referred to as the Individual Capital Requirement (ICR)) combines both the stress-driven capital and any ad-hoc risks identified by the PA that are not captured in Pillar 2A.

@@ -324,6 +324,14 @@ In some cases, a portion of the capital base is allocated for use as “working 
 
 The treatment of the capital base from an accounting perspective is therefore dictated by the bank’s own structure and strategy. Regardless of how capital is allocated, the allocation should not skew the financial results of the bank and artificially alter disclosed value added. Capital allocations are used as a risk management and incentive tool and benefits arising from it should be managed accordingly.
 
+### Risk-based Capital
+
+Allocation of risk-based capital is not only about risk but must also be linked to potential rewards. In order to increase returns, the bank will need to take on additional risk, and it is necessary to optimise risk capital allocation to the portfolio in seeking higher profitability. Banker and trader pay must be linked not only to returns, but also to the amount of risk-based capital used in its generation, as higher risk positions attract higher regulatory and economic capital.
+
+Capital must be allocated with a view towards sustainability. Business plans must anticipate ongoing capital needs, costs, and availability, without which growth and continued competitiveness will not be attainable. Consideration must be given to the time value of money, tax consequences, and varying rates when assessing returns.
+
+In allocating capital, banks can perform a comparison between the economic capital and regulatory capital charges applicable to different areas of their business. In doing so, they can identify those areas of their business which attract high amounts of regulatory capital, but low amounts of economic capital — and those which attract low amounts of regulatory capital, but high amounts of economic capital. This type of analysis will help the bank with strategic business planning and in setting growth and performance targets for the future.
+
 ### Hypothetical Example: Vanilla Commercial Bank
 
 To illustrate the considerations involved from a first-principles basis, an assumed example of a UK commercial bank that is being set up from scratch, with an inherited portfolio, is considered. What would be the primary factors driving the capital planning process? The balance sheet risk-weighted assets (RWA) breakdown is as follows:
