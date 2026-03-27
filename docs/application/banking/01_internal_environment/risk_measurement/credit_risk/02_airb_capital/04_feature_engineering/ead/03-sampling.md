@@ -14,7 +14,7 @@ The sampling methodology for EAD is tailored to reflect accurate utilisation beh
 
 ---
 
-### 4.2.2 Development Sample (Risk Differentiation)
+### 4.2.2 Development Sample ([[03-risk-differentiation|Risk Differentiation]])
 
 For model development, a **Point-in-Time (PiT)** approach was used with data drawn from the **2023 portfolio**:
 
@@ -30,8 +30,8 @@ For model development, a **Point-in-Time (PiT)** approach was used with data dra
   * Each month’s defaulted cohort formed its own segment (e.g., the "Jan23" cohort), ensuring clean fixed-horizon behaviour tracking.
 * This results in a **fixed 12-month window approach**, which:
 
-  * Aligns with **Basel III requirements** for EAD modelling (Art. 182(1)(g)),
-  * Meets the **CRR representativeness requirement** (Art. 174(c)),
+  * Aligns with **[[basel_framework|Basel III]] requirements** for EAD modelling (Art. 182(1)(g)),
+  * Meets the **[[crr|CRR]] representativeness requirement** (Art. 174(c)),
   * Differs from the **cohort-based approach** used for PD where accounts defaulting at *any* point over the horizon are included.
 * **Full dataset usage**:
 
@@ -43,7 +43,7 @@ The calibration sample is composed of 37 quarterly snapshots taken over the LRA 
 
 ---
 
-### 4.2.3 Calibration Sample (Risk Quantification)
+### 4.2.3 Calibration Sample ([[07-risk_quantification|Risk Quantification]])
 
 * Long-Run Average (LRA) and Downturn (DT) periods were selected from historical data for **EAD calibration**.
 * These periods reflect:

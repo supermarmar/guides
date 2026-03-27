@@ -1,8 +1,8 @@
 # Overview
 
-## Purpose & Use Tests
+## Purpose & [[05-use_tests|Use Tests]]
 
-The primary purpose of the impairment models requrieed to calculate the expected credit losses (ECL), as described in the IFRS9 impairment requirements.
+The primary purpose of the impairment models requrieed to calculate the expected [[02-credit_losses|credit losses]] (ECL), as described in the [[ifrs9_standard|IFRS9]] impairment requirements.
 
 The ECL is calculated using the banks's own estimates of PD, LGD and EAD, subejct to minimum requirements. 
 
@@ -21,7 +21,7 @@ The models should cover specified exposures and other portoflios are out of scop
 
 2. Data Quality and Reconciliation: Extensive data reconciliation and quality checks are performed to ensure accuracy and consistency. Missing accounts and data gaps are addressed through validation and enrichment processes.
 
-3. Data Representativeness: To ensure the development data reflected the entire portfolio, an analysis of variable distributions is conducted across time. This assessment tries to confirm that the development data adequately represents both the current and historical portfolio composition. -->
+3. [[04-data-representativeness|Data Representativeness]]: To ensure the development data reflected the entire portfolio, an analysis of variable distributions is conducted across time. This assessment tries to confirm that the development data adequately represents both the current and historical portfolio composition. -->
 
 ## Portfolio Description
 
@@ -29,7 +29,7 @@ The models should cover specified exposures and other portoflios are out of scop
 
 ## Modelling
 
-IFRS 9 states that an entity should measure ECL in a way that reflects:
+[[ifrs9_standard|IFRS 9]] states that an entity should measure ECL in a way that reflects:
 
 - an unbiased and probabiltiy weighted amount that is determiend by ecaluating a range of possible outcomes
 - time value of money
@@ -66,19 +66,19 @@ The MEV scenario generation, scenario weights and EIR Inputs are sometimes input
 
 <!-- - Model owners should be involved throughout development, overseeing readiness for the independent validation team reviews and documentation through each tollgate.
 - Indepedent validation teams should perform independent challenge testing at each tollgate, maintaining a challenge log and ensuring all issues are tracked to resolution.
-- Model design decisions should be reviewed via peer reviews by quants and feedback from leadership ensuring alignment across all risk differentiation and quantification steps. -->
+- [[02-model-design|Model design]] decisions should be reviewed via peer reviews by quants and feedback from leadership ensuring alignment across all [[03-risk-differentiation|risk differentiation]] and quantification steps. -->
 
 ## Materiality and Complexity
 
-<!-- 1. Materiality: These models are highly material due to their direct impact on capital requirements, ECL estimation, and risk management processes.
+<!-- 1. Materiality: These models are highly material due to their direct impact on capital requirements, ECL estimation, and [[01-risk_management|risk management]] processes.
 2. Complexity: These models are usually highly complex due to their:
 
 - Multi-source data integration
 - Advanced statistical and machine learning techniques
-- Dual compliance with IFRS 9 and IRB regulatory frameworks -->
+- Dual compliance with [[ifrs9_standard|IFRS 9]] and IRB regulatory frameworks -->
 
 ## Compliance
 
-<!-- - These models should be fully aligned with PRA and IFRS 9 requirements.
+<!-- - These models should be fully aligned with [[pra|PRA]] and [[ifrs9_standard|IFRS 9]] requirements.
 - Material gaps are addressed through data reconciliation, enhanced quality checks, and model monitoring.
 - Immaterial gaps (with negligible impact on performance) are documented, with mitigating controls in place. -->

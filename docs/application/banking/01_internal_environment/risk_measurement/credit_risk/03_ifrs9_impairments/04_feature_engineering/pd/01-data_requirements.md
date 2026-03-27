@@ -45,7 +45,7 @@ A **forward-in-time (FIT)** rating system produces more **dynamic** PD-estimates
 
 $\text{PD}_{i,t,t'}^\text{FiT}(k,x_{i},x_{i,t})=\text{PD}_{i,t}^\text{PiT}(k,x_{i},x_{i,t})\times\text{FLI}_{t'}$
 
-In fact, the introduction of the IFRS 9 accounting standard by the IASB (2014) provided additional impetus for such dynamicity in PD-modelling. Under IFRS 9, a financial asset’s value should be comprehensively adjusted according to a bank’s (evolving) expectation of the asset’s credit risk over time, i.e., the potential loss induced by default.
+In fact, the introduction of the [[ifrs9_standard|IFRS 9]] accounting standard by the IASB (2014) provided additional impetus for such dynamicity in PD-modelling. Under [[ifrs9_standard|IFRS 9]], a financial asset’s value should be comprehensively adjusted according to a bank’s (evolving) expectation of the asset’s credit risk over time, i.e., the potential loss induced by default.
 
 ### Term Structure of PDs
 
@@ -63,7 +63,7 @@ However, there are certain modelling challenges to rendering such dynamic and ti
 
 #### Challenge 2: Competing Risks
 
-Another major modelling challenge arises from the fact that ‘default’ is not the only ailure-inducing event, despite its importance in credit risk modelling. Other events that may ultimately affect the risk of loss under IFRS 9 include prepayments (or early settlement), write-offs, and restructures. These competing risks will preclude the default-event from occurring, as well as affect the size of the risk set over time.
+Another major modelling challenge arises from the fact that ‘default’ is not the only ailure-inducing event, despite its importance in credit risk modelling. Other events that may ultimately affect the risk of loss under [[ifrs9_standard|IFRS 9]] include prepayments (or early settlement), write-offs, and restructures. These competing risks will preclude the default-event from occurring, as well as affect the size of the risk set over time.
 
 ```mermaid
 ---

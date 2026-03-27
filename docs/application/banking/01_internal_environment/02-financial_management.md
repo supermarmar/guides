@@ -25,7 +25,7 @@ Assets are regarded as being held to maturity and do not have to be marked to ma
 
 #### Trading Book
 
-Trading book exposures are managed actively and held for “trading intent”, or short-term gain. Basel defines the boundary between the trading book and banking book quite strictly, classifying exposures that satisfy any of the following as trading book exposures:
+Trading book exposures are managed actively and held for “trading intent”, or short-term gain. [[bis|Basel]] defines the boundary between the trading book and banking book quite strictly, classifying exposures that satisfy any of the following as trading book exposures:
 
 - Assets held for short-term gain
 - Assets traded to profit from short-term price movements
@@ -57,15 +57,15 @@ For structured products and non-standard derivatives, there are no market values
 
 ## Income Statement (IS)
 
-### Net Interest Income (NII)
+### [[03-nii_nim|Net Interest Income]] ([[03-nii_nim|NII]])
 
-Net interest income (NII) is defined as gross interest income on loans and securities less gross interest paid on funding instruments such as deposits and borrowing from other banks — i.e. gross interest income less cost of funding (COF).
+[[03-nii_nim|Net interest income]] ([[03-nii_nim|NII]]) is defined as gross interest income on loans and securities less gross interest paid on funding instruments such as deposits and borrowing from other banks — i.e. gross interest income less cost of funding (COF).
 
 Banks that accept deposits and make loans expect to make a positive spread on this activity. Banks attempt to fund themselves at low rates relative to the prevailing interest rate environment, and to lend money at higher rates.
 
-- NII is a significant part of retail and commercial banks' total income as banks aim to make money by borrowing funds at low rates and lending them at higher rates.
+- [[03-nii_nim|NII]] is a significant part of retail and commercial banks' total income as banks aim to make money by borrowing funds at low rates and lending them at higher rates.
 - It's relatively stable compared to trading income but can come under pressure due to factors like competition leading to lower loan prices, interest rate changes, and reluctance to impose negative rates on deposits when interest rates are very low.
-- NII is a function of your interest-earning assets (loans, HQLAs and securities e.g. deposits with central banks) and interest-bearing liabilities (deposits and wholesale funding).
+- [[03-nii_nim|NII]] is a function of your interest-earning assets (loans, HQLAs and securities e.g. deposits with [[05-central_banks|central banks]]) and interest-bearing liabilities (deposits and wholesale funding).
 - The interest beard on deposits is a function of the price, relative to the reference rate, the type of deposit (instant, notice or fixed) and the volume of deposits received.
 - The interest beard on wholesale funding in a function of Treasury’s rate (which relates to the repo rate and/or JIBAR rate), the type of instrument and the exposure.
 - The interest earned on loans is a function of the price, relative to the reference rate, the type of loan product (mortgage, credit card) and the volume of the loans issued.
@@ -102,11 +102,11 @@ Costs can also be grouped based if they are initial, ongoing or at termination.
 
 #### Cost of Credit
 
-For a bank, credit losses are a cost of doing business, as mortality costs are for life insurance and claims costs for general insurance. However, for banks, credit losses are considerably higher in periods of recession than in periods of economic growth.
+For a bank, [[02-credit_losses|credit losses]] are a cost of doing business, as mortality costs are for life insurance and claims costs for general insurance. However, for banks, [[02-credit_losses|credit losses]] are considerably higher in periods of recession than in periods of economic growth.
 
-- Under IFRS 9, banks must hold provisions for ECLs for each loan which is allocated to three stages. Once loans have been allocated these stages banks must hold provisions for ECL. Provisions also reduce the carrying value of loan assets on the balance sheet.
-- Changes in provisions impact the income statement as an impairment charge, reducing retained earnings. They impact the timing of loss recognition but not the actual loss amount. These are credit losses, which are higher during recessions.
-- Write-offs (full or partial) against provisions typically occur after default events, considering “reasonable expectations of future recoveries” (IFRS 9) and following the collections process.
+- Under [[ifrs9_standard|IFRS 9]], banks must hold provisions for ECLs for each loan which is allocated to three stages. Once loans have been allocated these stages banks must hold provisions for ECL. Provisions also reduce the carrying value of loan assets on the balance sheet.
+- Changes in provisions impact the income statement as an impairment charge, reducing retained earnings. They impact the timing of loss recognition but not the actual loss amount. These are [[02-credit_losses|credit losses]], which are higher during recessions.
+- Write-offs (full or partial) against provisions typically occur after default events, considering “reasonable expectations of future recoveries” ([[ifrs9_standard|IFRS 9]]) and following the collections process.
 
 This cost of credit is calculated as the change in provisions, less interest earned on stage 3 accounts, plus gross write-offs (net of debt collection), less PWOR and plus MGL.
 
@@ -116,7 +116,7 @@ Banks pay corporation tax on their profit before tax. Corporation tax rates are 
 
 ### Profit & Loss (P&L)
 
-- Total income = NII + NIR
+- Total income = [[03-nii_nim|NII]] + NIR
 - EBIT = total income - operating expenses - cost of credit
 - Profit = EBIT - tax - debt interest
 - Earnings = profit - preference shareholder dividends
@@ -126,7 +126,7 @@ Banks pay corporation tax on their profit before tax. Corporation tax rates are 
 
 ### Stability of income (IS)
 
-A high NII-to-total income ratio shows that most of a bank's income is net interest income, which is generally regarded as more stable than NIR.
+A high [[03-nii_nim|NII]]-to-total income ratio shows that most of a bank's income is [[03-nii_nim|net interest income]], which is generally regarded as more stable than NIR.
 
 ### Efficiency (IS)
 
@@ -142,11 +142,11 @@ Growth in EPS is an important measure for investors to compare it with other com
 
 The **net interest spread (NIS)** is the difference between the average interest rate received on assets and the average interest rate paid on deposits.
 
-#### Net Interest Margin (NIM)
+#### [[03-nii_nim|Net Interest Margin]] ([[03-nii_nim|NIM]])
 
-The **net interest margin (NIM)** is a bank's total net interest income (interest received from assets less interest paid on deposits and liabilities) divided by average interest-earning assets.
+The **[[03-nii_nim|net interest margin]] ([[03-nii_nim|NIM]])** is a bank's total [[03-nii_nim|net interest income]] (interest received from assets less interest paid on deposits and liabilities) divided by average interest-earning assets.
 
-An increasing NIM over time indicates improving profitability, but this could be the result of a move to higher-risk lending with higher margins and greater credit losses. Also, different levels of net interest margins at different banks may reflect different levels of risk and may be offset by different levels of credit losses.
+An increasing [[03-nii_nim|NIM]] over time indicates improving profitability, but this could be the result of a move to higher-risk lending with higher margins and greater [[02-credit_losses|credit losses]]. Also, different levels of net interest margins at different banks may reflect different levels of risk and may be offset by different levels of [[02-credit_losses|credit losses]].
 
 #### Return on Assets (ROA)
 
@@ -166,4 +166,4 @@ CET1 capital-to-total RWAs ratio of different banks have only limited value beca
 
 ### Liquidity strength (BS)
 
-The higher the LCR the better a bank will be at sustaining short term liquidity needs during times of stress. For the full treatment of liquidity metrics (LDR, LRF, HQLA tiers, LCR, NSFR), see [Liquidity Metrics](liquidity_risk/01_introduction/02-liquidity_metrics.md).
+The higher the [[04-lcr|LCR]] the better a bank will be at sustaining short term liquidity needs during times of stress. For the full treatment of [[02-liquidity_metrics|liquidity metrics]] (LDR, LRF, HQLA tiers, [[04-lcr|LCR]], [[05-nsfr|NSFR]]), see [Liquidity Metrics](liquidity_risk/01_introduction/02-liquidity_metrics.md).

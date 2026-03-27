@@ -1,6 +1,6 @@
 # Downturn LGD
 
-Unlike PD estimates, where Basel has provided more detailed guidelines, LGD estimates follow a principles-based approach where Basel describes what the resulting LGD should include and account for but does not necessarily provide guidelines on how it should be estimated.
+Unlike PD estimates, where [[bis|Basel]] has provided more detailed guidelines, LGD estimates follow a principles-based approach where [[bis|Basel]] describes what the resulting LGD should include and account for but does not necessarily provide guidelines on how it should be estimated.
 
 LGD estimates are based on historical recoveries (including collateral) in economic downturn conditions and used in calculating regulatory capital.
 

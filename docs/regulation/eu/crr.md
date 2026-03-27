@@ -1,6 +1,6 @@
 # **Capital Requirements Regulation (CRR)**
 
-In response to the global financial crisis of 2008-2009, the Union embarked on a wide-ranging reform of the prudential framework for institutions, as defined in Regulation (EU) No 575/2013 of the European Parliament and of the Council (4) with a view to increasing the resilience of the Union banking sector. One of the main elements of the reform consisted of the implementation of the international standards agreed in 2010 by the Basel Committee on Banking Supervision (BCBS), specifically the so-called ‘Basel III reform’ and the resulting Basel III standards. Thanks to that reform, the Union banking sector entered the COVID-19 crisis on a resilient footing. However, while the overall level of capital in institutions in the Union is now generally satisfactory, some of the problems that were identified in the wake of the global financial crisis have yet to be addressed.
+In response to the global financial crisis of 2008-2009, the Union embarked on a wide-ranging reform of the prudential framework for institutions, as defined in Regulation (EU) No 575/2013 of the European Parliament and of the Council (4) with a view to increasing the resilience of the Union banking sector. One of the main elements of the reform consisted of the implementation of the international standards agreed in 2010 by the [[bis|Basel Committee on Banking Supervision]] ([[bis|BCBS]]), specifically the so-called ‘[[basel_framework|Basel III]] reform’ and the resulting [[basel_framework|Basel III]] standards. Thanks to that reform, the Union banking sector entered the COVID-19 crisis on a resilient footing. However, while the overall level of capital in institutions in the Union is now generally satisfactory, some of the problems that were identified in the wake of the global financial crisis have yet to be addressed.
 
 <https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=OJ:L_202401623>
 
@@ -23,16 +23,16 @@ In response to the global financial crisis of 2008-2009, the Union embarked on a
    - (c) institutions' estimates of conversion factors shall reflect the possibility of additional drawings by the obligor up to and after the time a default event is triggered. The conversion factor estimate shall incorporate a larger margin of conservatism where a stronger positive correlation can reasonably be expected between the default frequency and the magnitude of conversion factor;
    - (f) if institutions use different estimates of conversion factors for the calculation of risk-weighted exposure amounts and internal purposes it shall be documented and be reasonable.
 
-2. For exposures to corporates, institutions and central governments and central banks, estimates of conversion factors shall be based on data over a minimum of five years, increasing by one year each year after implementation until a minimum of seven years is reached, for at least one data source. If the available observation period spans a longer period for any source, and the data is relevant, this longer period shall be used.
+2. For exposures to corporates, institutions and central governments and [[05-central_banks|central banks]], estimates of conversion factors shall be based on data over a minimum of five years, increasing by one year each year after implementation until a minimum of seven years is reached, for at least one data source. If the available observation period spans a longer period for any source, and the data is relevant, this longer period shall be used.
 3. For retail exposures, institutions may reflect future drawings either in their conversion factors or in their LGD estimates.
 For retail exposures, estimates of conversion factors shall be based on data over a minimum of five years. By way of derogation from point (a) of paragraph 1, an institution need not give equal importance to historic data if more recent data is a better predictor of draw downs. Subject to the permission of competent authorities, institutions may use, when they implement the IRB Approach, relevant data covering a period of two years. The period to be covered shall increase by one year each year until relevant data cover a period of five years.
-4. EBA shall develop draft regulatory technical standards to specify the following:
+4. [[eba|EBA]] shall develop draft regulatory technical standards to specify the following:
    - (a) the nature, severity and duration of an economic downturn referred to in paragraph 1;
    - (b) conditions according to which a competent authority may permit and institution to use relevant data covering a period of two years at the time an institution first implements the IRB Approach.
 
-EBA shall submit those draft regulatory technical standards to the Commission by 31 December 2014.
+[[eba|EBA]] shall submit those draft regulatory technical standards to the Commission by 31 December 2014.
 
-By 31 December 2026, EBA shall issue guidelines, in accordance with Article 16 of Regulation (EU) No 1093/2010, to specify the methodology that institutions are to apply in order to estimate IRB-CCF.
+By 31 December 2026, [[eba|EBA]] shall issue guidelines, in accordance with Article 16 of Regulation (EU) No 1093/2010, to specify the methodology that institutions are to apply in order to estimate IRB-CCF.
 
 ## Regulatory Technical Standards (RTS)
 
@@ -40,16 +40,16 @@ By 31 December 2026, EBA shall issue guidelines, in accordance with Article 16 o
 
 The Capital Requirements Regulation (CRR) and the Capital Requirements Directive (CRD) set out
 prudential requirements for banks and other financial institutions which have been applied from
-1 January 2014. Among others, the CRR contains specific mandates for the EBA to develop draft
+1 January 2014. Among others, the CRR contains specific mandates for the [[eba|EBA]] to develop draft
 regulatory technical standards (RTS) to specify the assessment methodology competent
 authorities shall follow in assessing the compliance of an institution with the requirements to use
 the Internal Ratings Based Approach (IRB Approach).
 
-These final draft RTS are considered an integral part of the efforts of the EBA to ensure
+These final draft RTS are considered an integral part of the efforts of the [[eba|EBA]] to ensure
 consistency in model outputs and comparability of risk weighted exposure amounts. It is
 expected that these final draft RTS will enable harmonisation of the supervisory assessment
 methodology across all EU Member States. They will therefore rectify the issues identified in this
-regard in the EBA report on the comparability of IRB models and provide enhanced clarity on
+regard in the [[eba|EBA]] report on the comparability of IRB models and provide enhanced clarity on
 various aspects of the application of the IRB Approach.
 
 These final draft RTS set out standards for competent authorities in assessing an institution’s
@@ -59,7 +59,7 @@ Approach for certain types of exposures in accordance with the sequential implem
 applies for implementation of material changes to the IRB Approach or applies to return to the use
 of less sophisticated approaches.
 
-## Chapter 8: Assessment methodology for risk quantification
+## Chapter 8: Assessment methodology for [[07-risk_quantification|risk quantification]]
 
 ### Section 2: Overall Risk Parameter Quantification
 
@@ -75,8 +75,8 @@ estimates, including where there are high estimation errors;
    - (b) relevant deficiencies in the methods, information and data have been identified
 by the credit risk control unit, validation function or internal audit function or
 any other function of the institution;
-   - (c) relevant changes to the standards of underwriting or recovery policies or changes
-in the institution’s risk appetite.
+   - (c) relevant changes to the standards of [[00_underwriting|underwriting]] or recovery policies or changes
+in the institution’s [[02-risk_appetite|risk appetite]].
 2. The requirements laid down in paragraph 1 shall not prevent an application of the
 requirements laid down in Article 146 of Regulation (EU) No 575/2013 and any related
 corrective actions by the institution, but shall apply in addition to them.

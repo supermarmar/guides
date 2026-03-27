@@ -1,6 +1,6 @@
 # Risk Mitigation
 
-Before focusing on technical and complicated risk management matters, management should always know and be thinking about a few basic questions: What are the bank's largest individual, sector, product, and regional exposures? In what circumstances should these exposures be reduced or grown? And, very importantly, what are the means and options for reducing these exposures under a range of circumstances? The bank would also want to understand how to grow certain exposures to meet their strategic and business objectives, without taking on excessive risk.
+Before focusing on technical and complicated [[01-risk_management|risk management]] matters, management should always know and be thinking about a few basic questions: What are the bank's largest individual, sector, product, and regional exposures? In what circumstances should these exposures be reduced or grown? And, very importantly, what are the means and options for reducing these exposures under a range of circumstances? The bank would also want to understand how to grow certain exposures to meet their strategic and business objectives, without taking on excessive risk.
 
 ## Risk Transfer
 
@@ -14,7 +14,7 @@ A more direct approach is the outright sale of loan and bond positions. Selling 
 
 ### Securitisation
 
-At its simplest, securitisation involves transforming assets into securities. Assets are sold to a bankruptcy-remote special purpose vehicle (SPV), which issues securities backed by the assets. Benefits include enhanced liquidity, balance sheet management, diversification, and risk management.
+At its simplest, securitisation involves transforming assets into securities. Assets are sold to a bankruptcy-remote special purpose vehicle (SPV), which issues securities backed by the assets. Benefits include enhanced liquidity, balance sheet management, diversification, and [[01-risk_management|risk management]].
 
 Banks have securitised — with varying success — most types of assets. These range from straightforward government bonds to trade, auto, and credit card receivables; mortgages; auto leases; and loans to the more exotic future streams of rock star royalties, football gate receipts, pharmaceutical patents, and funeral home burials.
 
@@ -48,7 +48,7 @@ Banks have securitised — with varying success — most types of assets. These 
 
 ### Hedging
 
-Best-practice credit risk management discipline dictates that banks apply a sound credit policy at origination — prevention is better than cure. Credit risk is, for practical purposes, difficult to hedge. The optimum approach to credit risk for most banks involves diversification of the loan book, avoiding concentration with one borrower or sector, and the operation of conservative origination principles.
+Best-practice credit [[01-risk_management|risk management]] discipline dictates that banks apply a sound credit policy at origination — prevention is better than cure. Credit risk is, for practical purposes, difficult to hedge. The optimum approach to credit risk for most banks involves diversification of the loan book, avoiding concentration with one borrower or sector, and the operation of conservative origination principles.
 
 For a more proactive approach, historically the means of hedging credit risk was to short the bonds of the borrower or similar borrowers. However, it is not always possible to borrow the bonds in sufficient size, and the repo rate can be prohibitively expensive. Basis risk can again be a challenge.
 
@@ -65,9 +65,9 @@ In the early years of credit derivatives, there were controversies in agreeing e
 
 Hedging of various other risks via financial derivatives can be used to protect against interest rate and exchange rate risk.
 
-### Loan Underwriting Criteria
+### Loan [[00_underwriting|Underwriting]] Criteria
 
-New loans must be sanctioned only within the context of the risk appetite statement and risk-weighted capital criteria:
+New loans must be sanctioned only within the context of the [[02-risk_appetite|risk appetite]] statement and risk-weighted capital criteria:
 
 - **Corporate and wholesale banking**: A request to provide credit should involve the completion of a form to be submitted to a separate entity from the relationship bankers, whether it be a credit committee or (in the case of smaller banks) executive management and ALCO. The request will contain all the information needed for the committee to discuss the risk and return of the loan, terms, and the customer, so a determination can be made as to whether it fits into the broader strategy.
 - **Retail banking**: New loans can be granted via automated applications, which will be approved or referred to by loan origination officers.
@@ -83,8 +83,8 @@ Beyond the credit risk of the borrower and the rate charged, the bank must also 
 - Fixed or floating rate
 - Prepayment options
 
-Within the bank, many of the items should align with credit risk policies and procedures as laid out in the bank's risk appetite framework. Some specifics will require legal consultation and others may require input from various committees and levels of staff.
+Within the bank, many of the items should align with credit risk policies and procedures as laid out in the bank's [[02-risk_appetite|risk appetite]] framework. Some specifics will require legal consultation and others may require input from various committees and levels of staff.
 
-#### KYC
+#### [[05-aml_kyc|KYC]]
 
-"Know Your Customer" (KYC) is a key element of the loan origination process. For corporate and wholesale banking, relationship bankers should have an extensive dialogue with customers to have a thorough understanding of their business, strategy, and risks. For retail banking, the bank will maintain behavioural scorecards and delinquency information to monitor loan performance and take action should the loan be at risk of defaulting.
+"[[05-aml_kyc|Know Your Customer]]" ([[05-aml_kyc|KYC]]) is a key element of the loan origination process. For corporate and wholesale banking, relationship bankers should have an extensive dialogue with customers to have a thorough understanding of their business, strategy, and risks. For retail banking, the bank will maintain behavioural scorecards and delinquency information to monitor loan performance and take action should the loan be at risk of defaulting.

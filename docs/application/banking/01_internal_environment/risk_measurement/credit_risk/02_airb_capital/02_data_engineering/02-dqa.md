@@ -1,13 +1,13 @@
 # Data Quality Assessment
 
-A rigorous Data Quality Assessment (DQA) process is a critical step between transforming raw datasets into model-ready inputs and beginning any model development activity. The DQA ensures that all downstream modelling relies on data that is complete, accurate, and suitable for regulatory use—particularly under IFRS 9 and Advanced IRB (A-IRB) frameworks.
+A rigorous Data Quality Assessment (DQA) process is a critical step between transforming raw datasets into model-ready inputs and beginning any model development activity. The DQA ensures that all downstream modelling relies on data that is complete, accurate, and suitable for regulatory use—particularly under [[ifrs9_standard|IFRS 9]] and Advanced IRB (A-IRB) frameworks.
 
-## BCBS 239 Principles
+## [[bcbs_239|BCBS 239]] Principles
 
 The ability to aggregate risk data in a holistic and timely manner is important for banks. The
-ability to do so assists banks with risk reporting, risk management, and the ability to make
+ability to do so assists banks with risk reporting, [[01-risk_management|risk management]], and the ability to make
 decisions. The “Principles for effective risk data aggregation and risk reporting” Standard
-published in BCBS 239 aims to codify this risk data aggregation ability for banks.
+published in [[bcbs_239|BCBS 239]] aims to codify this risk data aggregation ability for banks.
 
 The Standard has 14 principles, summarised
 below:
@@ -39,14 +39,14 @@ communication between supervisors.
 
 | Dimension | Description | Practical Example | Reference |
 | ---------------- | -------------------------------------------------------------------------- | - | - |
-| **Completeness** | Coverage of all required fields; absence of null or missing values. | Proportion of missing values per field. | BCBS 239 §(43) |
-| **Accuracy** | Conformance to source system records; reconciliation to production systems. | Actual distirbution of a data field over a specific time should be validated against its expected distribution. | BCBS 239 §(36)(c) |
+| **Completeness** | Coverage of all required fields; absence of null or missing values. | Proportion of missing values per field. | [[bcbs_239|BCBS 239]] §(43) |
+| **Accuracy** | Conformance to source system records; reconciliation to production systems. | Actual distirbution of a data field over a specific time should be validated against its expected distribution. | [[bcbs_239|BCBS 239]] §(36)(c) |
 | **Consistency** | Logical coherence across variables and time. | No change in definiton of default. | |
-| **Timeliness** | Availability of data within expected processing windows. | Data is updated periodically. | BCBS 239 §(44) |
+| **Timeliness** | Availability of data within expected processing windows. | Data is updated periodically. | [[bcbs_239|BCBS 239]] §(44) |
 | **Uniqueness** | Each record is uniquely identifiable through a primary key. | No duplicates of account ID and date. | |
-| **Robustness** | Data that is constructed to function in multiple settings. It's reusable and hence stable. It can be updated. | Data is auditable at every step. | BCBS 239 §(48) |
+| **Robustness** | Data that is constructed to function in multiple settings. It's reusable and hence stable. It can be updated. | Data is auditable at every step. | [[bcbs_239|BCBS 239]] §(48) |
 
-This process is led by the Risk & Finance Technology (RFT) team in collaboration with model developers and data governance specialists. The RFT team performs the following steps to assess and document data quality.
+This process is led by the Risk & Finance Technology (RFT) team in collaboration with model developers and [[04-data_governance|data governance]] specialists. The RFT team performs the following steps to assess and document data quality.
 
 ## Data Lineage
 

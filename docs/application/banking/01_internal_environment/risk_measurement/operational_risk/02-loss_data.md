@@ -1,6 +1,6 @@
 # Operational Risk: Loss Data and Measurement Concepts
 
-The key to developing operational risk management has been the building of measurement techniques grounded in historical data. Data is gathered and organised into an **internal loss database**, making operational risk measurement more robust, objective, and credible. Rather than relying on expert opinion alone, losses can be replicated, referred to, and compared, leading to a greater understanding of business area processes and backing hard decisions on resources, limits, and capital.
+The key to developing operational [[01-risk_management|risk management]] has been the building of measurement techniques grounded in historical data. Data is gathered and organised into an **internal loss database**, making operational [[04-risk_measurement|risk measurement]] more robust, objective, and credible. Rather than relying on expert opinion alone, losses can be replicated, referred to, and compared, leading to a greater understanding of business area processes and backing hard decisions on resources, limits, and capital.
 
 The data process must consider:
 
@@ -10,7 +10,7 @@ The data process must consider:
 
 ## Loss Database Concepts
 
-**Gross loss** is the loss from an operational risk event before recoveries, which may be recorded for risk management purposes prior to its impact on financial statements. **Net loss** is the loss after recoveries, which may be amended over time. Insurance should be treated as a special recovery category; otherwise it obscures the measurement of the riskiness of the activity.
+**Gross loss** is the loss from an operational risk event before recoveries, which may be recorded for [[01-risk_management|risk management]] purposes prior to its impact on financial statements. **Net loss** is the loss after recoveries, which may be amended over time. Insurance should be treated as a special recovery category; otherwise it obscures the measurement of the riskiness of the activity.
 
 Data capture should include gross loss amounts, dates, any recoveries, and qualitative descriptions of events and causes.
 
@@ -30,7 +30,7 @@ Banks sometimes group several losses into a single loss for efficiency and where
 
 ### Model Granularity, Validation and Monitoring
 
-Limiting the number of loss groupings creates a critical mass of data and overall simplicity, but this may be unsatisfactory if risks within groups are substantially different and independent. Basel text requires that measurement "must be sufficiently granular to capture the major drivers of operational risk affecting the shape of the tail of the loss estimates."
+Limiting the number of loss groupings creates a critical mass of data and overall simplicity, but this may be unsatisfactory if risks within groups are substantially different and independent. [[bis|Basel]] text requires that measurement "must be sufficiently granular to capture the major drivers of operational risk affecting the shape of the tail of the loss estimates."
 
 Methods and models must be monitored and validated periodically, and if necessary reviewed by specialist external parties, covering:
 
@@ -41,9 +41,9 @@ Methods and models must be monitored and validated periodically, and if necessar
 
 The monitoring and validation process should ask whether the framework is a realistic reflection of the operational risk position and highlight any issues or deficiencies.
 
-## Operational Risk Event Types (Basel II)
+## Operational Risk Event Types ([[basel_2|Basel II]])
 
-Basel II specifies seven Level 1 categories of operational risk loss event types, each broken into Level 2 and Level 3 sub-categories.
+[[basel_2|Basel II]] specifies seven Level 1 categories of operational risk loss event types, each broken into Level 2 and Level 3 sub-categories.
 
 | Level 1 Category | Definition | Level 2 Categories |
 |---|---|---|
@@ -55,13 +55,13 @@ Basel II specifies seven Level 1 categories of operational risk loss event types
 | Business disruption and system failures | Losses from disruption of business or system failures | Systems (hardware, software, telecommunications) |
 | Execution, delivery, and process management | Losses from failed transaction processing or process management; relations with trade counterparties and vendors | Transaction capture, execution, and maintenance; Monitoring and reporting; Customer intake and documentation; Customer/client account management; Trade counterparties; Vendors and suppliers |
 
-## Operational Risk Business Lines (Basel II)
+## Operational Risk Business Lines ([[basel_2|Basel II]])
 
 Banks extend the grouping of loss events along eight business lines. Regulators have worked with banks to map business activities to business lines to avoid distortions and arbitrage.
 
 | Level 1 | Level 2 | Activity Groups |
 |---|---|---|
-| Corporate finance | Corporate finance; Municipal/government finance; Merchant banking; Advisory services | M&A, underwriting, privatisations, securitisation, debt, equity, syndications, IPOs |
+| Corporate finance | Corporate finance; Municipal/government finance; Merchant banking; Advisory services | M&A, [[00_underwriting|underwriting]], privatisations, securitisation, debt, equity, syndications, IPOs |
 | Trading and sales | Sales; Market-making; Proprietary positions; Treasury | Fixed income, equity, FX, commodities, credit, funding, lending and repos, brokerage |
 | Retail banking | Retail banking; Private banking; Card services | Retail/private lending and deposits, banking services, trust and estates, cards |
 | Commercial banking | Commercial banking | Project finance, real estate, export finance, trade finance, factoring, leasing, guarantees |

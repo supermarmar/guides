@@ -1,10 +1,10 @@
-Here’s your **Variable Transformation** section — expanded, cleaned up, and consistent in style with your previous steps:
+Here’s your **[[06-variable-transformation|Variable Transformation]]** section — expanded, cleaned up, and consistent in style with your previous steps:
 
 ---
 
-## **Variable Transformation**
+## **[[06-variable-transformation|Variable Transformation]]**
 
-Once the final list of variables was obtained from the Variable Reduction stage, each variable was reviewed and transformed to ensure **linear and monotonic relationships** with the target variable. This process involved three sub-steps:
+Once the final list of variables was obtained from the [[05-variable-reduction|Variable Reduction]] stage, each variable was reviewed and transformed to ensure **linear and monotonic relationships** with the [[01-target_variable|target variable]]. This process involved three sub-steps:
 
 1. **Special Value Treatment**
 2. **Missing Value Imputation**
@@ -43,7 +43,7 @@ Special values are non-standard entries within variables (often external data fe
 
 ---
 
-Do you want me to now continue and **fully detail the Missing Values, Outliers, and Transformation steps** so this section flows all the way to the “ready-for-modelling” dataset? That would make it consistent with the level of detail you’ve given in Variable Reduction.
+Do you want me to now continue and **fully detail the Missing Values, Outliers, and Transformation steps** so this section flows all the way to the “ready-for-modelling” dataset? That would make it consistent with the level of detail you’ve given in [[05-variable-reduction|Variable Reduction]].
 
 Got it — here’s the **Missing Values** section written up cleanly and in the same style as the previous parts.
 
@@ -129,22 +129,22 @@ Here’s a clean, integrated write-up for **Outlier Treatment** and **Variable S
 
 ---
 
-If you want, I can now integrate this with your **special values** and **missing values** write-ups so you have one fully structured **Variable Transformation** section before we move into the modelling stage. That way it’ll read as a single, polished block in your documentation.
+If you want, I can now integrate this with your **special values** and **missing values** write-ups so you have one fully structured **[[06-variable-transformation|Variable Transformation]]** section before we move into the modelling stage. That way it’ll read as a single, polished block in your documentation.
 
-Here’s a polished, detailed version of your **Variable Transformation** section to match the structure of the earlier steps:
+Here’s a polished, detailed version of your **[[06-variable-transformation|Variable Transformation]]** section to match the structure of the earlier steps:
 
 ---
 
-## **5. Variable Transformation**
+## **5. [[06-variable-transformation|Variable Transformation]]**
 
 **Application Timing:**
-Variable transformation was applied **after** the treatment of special values, missing values, and outliers. This ensures that the variables entering the transformation stage already have consistent, valid, and interpretable values.
+[[06-variable-transformation|Variable transformation]] was applied **after** the treatment of special values, missing values, and outliers. This ensures that the variables entering the transformation stage already have consistent, valid, and interpretable values.
 
 ---
 
 **Purpose:**
 
-* The primary objective is to create a **linear relationship** between the transformed covariate and the target variable in **log-odds space**.
+* The primary objective is to create a **linear relationship** between the transformed covariate and the [[01-target_variable|target variable]] in **log-odds space**.
 * Transformation is one of the most **consuming and critical** parts of model development.
 * Care must be taken to avoid:
 
@@ -169,7 +169,7 @@ Variable transformation was applied **after** the treatment of special values, m
 
 1. **Plotting & Diagnosis:**
 
-   * For each selected covariate, the target variable (ODR/log-odds) was plotted against the predictor.
+   * For each selected covariate, the [[01-target_variable|target variable]] (ODR/log-odds) was plotted against the predictor.
    * The functional form of the relationship was visually inspected to guide transformation choice.
 
 2. **Transformation Options Considered:**

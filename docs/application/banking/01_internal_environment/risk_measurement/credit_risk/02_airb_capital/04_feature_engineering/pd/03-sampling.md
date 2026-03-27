@@ -14,9 +14,9 @@ This section outlines the sampling design and logic underpinning the Probability
 
 ---
 
-### 4.3 Development Sample (Risk Differentiation)
+### 4.3 Development Sample ([[03-risk-differentiation|Risk Differentiation]])
 
-The development sample for risk differentiation was carefully selected to ensure robustness and exclusion of distorted periods:
+The development sample for [[03-risk-differentiation|risk differentiation]] was carefully selected to ensure robustness and exclusion of distorted periods:
 
 * **COVID Period Exclusion:** Snapshots between **December 2018 and June 2022** were excluded from development due to multiple distortions:
 
@@ -48,7 +48,7 @@ The development sample for risk differentiation was carefully selected to ensure
 
 ---
 
-### 4.4 Calibration Sample (Risk Quantification / LRA PD)
+### 4.4 Calibration Sample ([[07-risk_quantification|Risk Quantification]] / LRA PD)
 
 * A **Low Risk Adjustment (LRA)** period was defined for **calibration**.
 * This period spans from the **start of a previous downturn** through to the **start of the next peak** in risk, ensuring observed defaults reflect **long-run average default behaviour**.

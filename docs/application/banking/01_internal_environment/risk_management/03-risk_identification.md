@@ -12,7 +12,7 @@ Markets are assumed to put a price on this risk. This is then included in the ma
 
 ## Liquidity Risk
 
-A bank must at all times be able to service its obligations as they fall due on both sides of the balance sheet. It arises structurally from the maturity transformation business model (see [Business Model](01-business_model.md)) — long-dated assets funded by short-dated liabilities — creating a mismatch that must be actively managed.
+A bank must at all times be able to service its obligations as they fall due on both sides of the balance sheet. It arises structurally from the maturity transformation [[01-business_model|business model]] (see [Business Model](01-business_model.md)) — long-dated assets funded by short-dated liabilities — creating a mismatch that must be actively managed.
 
 This is one of the major risks faced by the bank. It can be split into two:
 
@@ -24,17 +24,17 @@ The risk that the bank does not have adequate liquid funding to meet the outflow
 
 This refers to the ability of the bank to convert the assets held into cash.
 
-## Market Risk
+## [[05-market_risk|Market Risk]]
 
-Market risk is the inherent risk that the market in which the bank operates changes adversely, therefore resulting in potential losses for the bank.
+[[05-market_risk|Market risk]] is the inherent risk that the market in which the bank operates changes adversely, therefore resulting in potential losses for the bank.
 
-### Interest Rate Risk in the Banking Book (IRRBB)
+### [[01-irrbb_sources|Interest Rate Risk in the Banking Book]] ([[04-irrbb_measurement|IRRBB]])
 
-Interest Rate Risk in the Banking Book (IRRBB) refers to the risk that prevailing interest rates change significantly, therefore resulting in the bank suffering a change in profit or potentially ending up losing money. This adverse movement in interest rates would result in losses incurred by the bank.
+[[01-irrbb_sources|Interest Rate Risk in the Banking Book]] ([[04-irrbb_measurement|IRRBB]]) refers to the risk that prevailing interest rates change significantly, therefore resulting in the bank suffering a change in profit or potentially ending up losing money. This adverse movement in interest rates would result in losses incurred by the bank.
 
 ### Equity Risk
 
-Equity Risk is defined as the risk associated with changes in price of equities held by the bank. An important distinction exists between Market Risk and Equity Risk: Market Risk relates to assets that are generally held with the intent to trade and make a profit. Equity Risk tends to relate to equity holdings that are held for the purpose of ownership in the underlying firm, and the impact of the fluctuations in these equity valuations on the bank's balance sheet and income statement. These equity holdings are asset holdings on a bank's balance sheet — if they reduce in value this would be captured as a loss on the income statement.
+Equity Risk is defined as the risk associated with changes in price of equities held by the bank. An important distinction exists between [[05-market_risk|Market Risk]] and Equity Risk: [[05-market_risk|Market Risk]] relates to assets that are generally held with the intent to trade and make a profit. Equity Risk tends to relate to equity holdings that are held for the purpose of ownership in the underlying firm, and the impact of the fluctuations in these equity valuations on the bank's balance sheet and income statement. These equity holdings are asset holdings on a bank's balance sheet — if they reduce in value this would be captured as a loss on the income statement.
 
 With the rise of fintech, many banks have adopted an acquisition approach to managing changing markets and consumer needs. As a result, they have increasing equity for non-trading purposes holdings, thus becoming increasingly exposed to Equity Risk.
 
@@ -44,7 +44,7 @@ Interest rates may not change across the entire yield curve uniformly and hence 
 
 ### Basis Risk
 
-For a bank, basis risk occurs when the interest rate it pays on its deposits is different from the interest rate it earns on its loans. This difference can lead to a change in the bank's net interest income since the rates would not move in the same direction nor magnitude necessarily.
+For a bank, basis risk occurs when the interest rate it pays on its deposits is different from the interest rate it earns on its loans. This difference can lead to a change in the bank's [[03-nii_nim|net interest income]] since the rates would not move in the same direction nor magnitude necessarily.
 
 ### Option risk
 
@@ -60,7 +60,7 @@ Operational risk is the risk of potential losses that arise from failures in sys
 
 ### People
 
-Risk of losses due to arising due to customer facing activities or failure to meet a professional obligation e.g. TCF risk, KYC and AML failures
+Risk of losses due to arising due to customer facing activities or failure to meet a professional obligation e.g. TCF risk, [[05-aml_kyc|KYC]] and [[05-aml_kyc|AML]] failures
 
 ### Systems
 
@@ -100,9 +100,9 @@ One of the most important lessons from the banking crisis of 2007–2008 has bee
 
 ### Margin Risk
 
-Margin risk is the risk of a significant fall in a bank's net interest margin. Margin compression may occur as a result of three reasons:
+Margin risk is the risk of a significant fall in a bank's [[03-nii_nim|net interest margin]]. Margin compression may occur as a result of three reasons:
 
-- **Competitive pressure** — leading to lower interest rates on loans without corresponding reductions in deposit rates. Loan prices are not unusual to be reduced in periods of economic growth (with higher lending volumes and low credit losses) and to be increased in periods of recession (with lower lending volumes and high credit losses).
+- **Competitive pressure** — leading to lower interest rates on loans without corresponding reductions in deposit rates. Loan prices are not unusual to be reduced in periods of economic growth (with higher lending volumes and low [[02-credit_losses|credit losses]]) and to be increased in periods of recession (with lower lending volumes and high [[02-credit_losses|credit losses]]).
 - **Interest rate changes on mismatched assets and liabilities** — for example, the negative impact of higher interest rates on a bank with deposits of shorter maturities than its loans, or with fixed-rate loans financed by variable-rate deposits.
 - **Sustained low interest rates** — banks offering loans at historically low rates but being understandably reluctant to impose negative interest rates on retail deposits. Some European banks have charged negative interest rates on large deposits.
 
@@ -139,11 +139,11 @@ Model Risk is defined as the negative outcomes associated with the misuse of mod
 - **Inappropriate use of a model** — for example, if a model used to forecast revenue in one business line is used without any adjustment in another business line, this can lead to inappropriately planning and ultimately lost revenue. Ensuring a strong internal audit environment where models that can have a material effect on business decision making or regulatory reporting are vetted and tracked is essential.
 - **An inherently inaccurate model** — the model itself being inappropriate for the action, or the model parameters being inaccurate. This is largely managed through having a strong internal validation unit who checks that models are built appropriately and scientifically.
 
-### Climate Risk
+### [[climate_risk|Climate Risk]]
 
-Climate risk refers to the potential negative impacts or adverse consequences that result from climate change or climate-related events. This is measured by frequency and severity of the change. Segregation of geography is important in determining realistic climate risk impacts.
+[[climate_risk|Climate risk]] refers to the potential negative impacts or adverse consequences that result from climate change or climate-related events. This is measured by frequency and severity of the change. Segregation of geography is important in determining realistic [[climate_risk|climate risk]] impacts.
 
-The TCFD breaks climate risk into two primary sub-types: **Physical Risk** and **Transition Risk**.
+The TCFD breaks [[climate_risk|climate risk]] into two primary sub-types: **Physical Risk** and **Transition Risk**.
 
 #### Physical Risk
 
@@ -160,7 +160,7 @@ The TCFD breaks climate risk into two primary sub-types: **Physical Risk** and *
 
 | Sub-type | Definition |
 |---|---|
-| **Market Risk** | Risks from shifts in supply and demand in actual marketplaces (financial and non-financial), as markets reprice assets and sectors in response to climate change |
+| **[[05-market_risk|Market Risk]]** | Risks from shifts in supply and demand in actual marketplaces (financial and non-financial), as markets reprice assets and sectors in response to climate change |
 | **Technology Risk** | Risk from the changing technological landscape — a firm's current technology may become obsolete before it generates economic value |
 | **Policy and Legal Risk** | Risk associated with changing policy or legal action specifically due to climate-related activities — e.g. new emissions reduction requirements, or legal action over past or future climate impacts |
 | **Reputational Risk** | Risk of being seen as promoting climate change — e.g. a material impact on market share if a bank is perceived as a driver of climate damage |
@@ -173,6 +173,6 @@ Pension Risk refers to the risk that the bank would need to cover underperforman
 
 ### Concentration Risk
 
-Excessive concentration of credit risk has been identified by global regulators as one of the key causes of bank crises and failures. Traditionally, concentration risk was viewed as the risk of over-exposure to single borrowers, but the emphasis is now on excessive correlation across the entire portfolio. BIS studies have concluded that sector concentrations have had a bigger impact on bank credit portfolios than single-name exposures.
+Excessive concentration of credit risk has been identified by global regulators as one of the key causes of bank crises and failures. Traditionally, concentration risk was viewed as the risk of over-exposure to single borrowers, but the emphasis is now on excessive correlation across the entire portfolio. [[bis|BIS]] studies have concluded that sector concentrations have had a bigger impact on bank credit portfolios than single-name exposures.
 
-Historically, many regulatory regimes across the world set a large exposure limit to a single entity or related entities of 25% of a bank's regulatory capital. In April 2014, the BIS issued a new standard addressing concentration risk, considering exposure to both instrument-based asset classes (e.g. asset-backed securities and collateralised debt obligations) and systemically important financial institutions (SIFIs) and individual companies. The revised framework will help ensure a common minimum standard for measuring, aggregating, and controlling concentration risk across jurisdictions.
+Historically, many regulatory regimes across the world set a large exposure limit to a single entity or related entities of 25% of a bank's regulatory capital. In April 2014, the [[bis|BIS]] issued a new standard addressing concentration risk, considering exposure to both instrument-based asset classes (e.g. asset-backed securities and collateralised debt obligations) and systemically important financial institutions (SIFIs) and individual companies. The revised framework will help ensure a common minimum standard for measuring, aggregating, and controlling concentration risk across jurisdictions.

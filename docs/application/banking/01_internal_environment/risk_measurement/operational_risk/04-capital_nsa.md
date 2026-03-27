@@ -1,10 +1,10 @@
-# Operational Risk Capital: Basel III New Standardised Approach (NSA)
+# Operational Risk Capital: [[basel_framework|Basel III]] New Standardised Approach (NSA)
 
-Basel III introduces a **New Standardised Approach (NSA)** to measuring operational risk capital in response to well-documented weaknesses identified in the Basel II approaches. The NSA is effective from 1 January 2023 and replaces the BIA, TSA/ASA, and AMA.
+[[basel_framework|Basel III]] introduces a **New Standardised Approach (NSA)** to measuring operational risk capital in response to well-documented weaknesses identified in the [[basel_2|Basel II]] approaches. The NSA is effective from 1 January 2023 and replaces the BIA, TSA/ASA, and AMA.
 
-## Shortfalls with the Basel II Approaches
+## Shortfalls with the [[basel_2|Basel II]] Approaches
 
-Post-crisis, the Basel Committee found that despite an increase in the frequency and severity of operational risk loss events, operational risk capital remained steady or in some cases declined. Where banks experienced events that caused revenue (gross income) to decline, the capital assessed under the standardised approaches decreased — when in fact capital should have increased or held steady.
+Post-crisis, the [[bis|Basel]] Committee found that despite an increase in the frequency and severity of operational risk loss events, operational risk capital remained steady or in some cases declined. Where banks experienced events that caused revenue (gross income) to decline, the capital assessed under the standardised approaches decreased — when in fact capital should have increased or held steady.
 
 Other key findings:
 
@@ -23,7 +23,7 @@ The NSA replaces gross income with a **Business Indicator (BI)** as the proxy fo
 |---|---|
 | Business Indicator (BI) | Financial statement-based proxy for operational risk |
 | Business Indicator Component (BIC) | BI multiplied by regulator-determined marginal coefficients ("alphas") |
-| Internal Loss Multiplier (ILM) | Scaling factor determined using the bank's average internal loss data and the BIC |
+| Internal Loss Multiplier (ILM) | Scaling factor determined using the bank's average internal [[02-loss_data|loss data]] and the BIC |
 
 ### Step 1: Business Indicator (BI)
 
@@ -110,4 +110,4 @@ K_{\text{NSA}} = \text{BIC} \times \text{ILM}
 - Banks with **≥ 10 years** of data use the full 10-year average.
 - Banks with **5 to 9 years** of quality data may use the available data.
 - Banks with **< 5 years** of data must base capital requirements solely on the BIC (i.e. ILM = 1), unless the computed ILM from available data exceeds 1 and the supervisor believes the loss experience is representative of the bank's actual risk exposure.
-- For **Bucket 1** banks (BI ≤ €1bn), internal loss data does not affect the capital calculation; the ILM is set equal to 1. Supervisors may permit Bucket 1 banks to incorporate internal loss data if it meets the necessary collection requirements.
+- For **Bucket 1** banks (BI ≤ €1bn), internal [[02-loss_data|loss data]] does not affect the capital calculation; the ILM is set equal to 1. Supervisors may permit Bucket 1 banks to incorporate internal [[02-loss_data|loss data]] if it meets the necessary collection requirements.

@@ -2,7 +2,7 @@
 
 This file covers the **quantitative liquidity risk metrics** used by bank treasury functions and Asset Liability Committees (ALCOs) to monitor and manage liquidity risk, including six baseline management information metrics, and the stock of high-quality liquid assets (HQLA) that forms the liquid asset buffer (LAB).
 
-For the conceptual framework of liquidity risk — definitions, sources of funding, liability stability hierarchy — see [Liquidity Framework](01-liquidity_framework.md). For the balance sheet treatment of HQLA, see [Annual Financial Statements](../../02-afs.md). For the regulatory minimum LCR and NSFR requirements that consume these metrics, see [Basel / BIS](../../../../../regulation/international/bis/bis.md).
+For the conceptual framework of liquidity risk — definitions, sources of funding, liability stability hierarchy — see [Liquidity Framework](01-liquidity_framework.md). For the balance sheet treatment of HQLA, see [Annual Financial Statements](../../02-afs.md). For the regulatory minimum [[04-lcr|LCR]] and [[05-nsfr|NSFR]] requirements that consume these metrics, see [Basel / BIS](../../../../../regulation/international/bis/bis.md).
 
 ## Baseline Liquidity Risk Metrics
 
@@ -24,7 +24,7 @@ Interpretation:
 
 - **LDR > 100%**: Can be an early warning sign of excessive asset growth or loss of customer deposits, indicating potentially risky reliance on wholesale funding. Where wholesale funding is short-dated, this risk is exacerbated.
 - **LDR < 70%**: May imply excessive liquidity and potentially inadequate returns if surplus funds are deployed in low-yielding assets.
-- **LDR 85%–95%**: Generally regarded as business best practice, though the appropriate range varies by business model and jurisdiction.
+- **LDR 85%–95%**: Generally regarded as business best practice, though the appropriate range varies by [[01-business_model|business model]] and jurisdiction.
 
 A level above 100% is not necessarily bad practice where the bank maintains a liquid asset buffer of sufficient size. However, a number significantly above 100% is an indicator of funding stress in the event of market instability.
 
@@ -36,7 +36,7 @@ These ratios measure **gap risk** — the net cash flows (including the cash eff
 
 $$\text{Liquidity ratio}_{[t]} = \frac{\text{Cash inflows}_{[t]} - \text{Cash outflows}_{[t]} + \text{Liquid assets}_{[t]}}{\text{Total liabilities}}$$
 
-They are typically measured against a regulatory limit and are an effective measure of structural liquidity, providing early warning of likely stress points. A worsening ratio approaching an internal or regulatory limit should drive a change in funding strategy or a structural change to balance sheet composition. While these metrics have been largely superseded by the LCR as the primary regulatory measure of short-term liquidity, they provide complementary management information that the LCR does not replicate exactly.
+They are typically measured against a regulatory limit and are an effective measure of structural liquidity, providing early warning of likely stress points. A worsening ratio approaching an internal or regulatory limit should drive a change in funding strategy or a structural change to balance sheet composition. While these metrics have been largely superseded by the [[04-lcr|LCR]] as the primary regulatory measure of short-term liquidity, they provide complementary management information that the [[04-lcr|LCR]] does not replicate exactly.
 
 ### Cumulative Liquidity Model
 
@@ -50,7 +50,7 @@ $$\text{LRF} = \frac{\text{Weighted average tenor of assets (days)}}{\text{Weigh
 
 Tenors are calculated as weighted averages of either the behavioural or contractual tenors (or both), weighted by nominal amounts or actual drawn balances. A higher LRF indicates a larger maturity gap and hence greater liquidity risk being run by the bank.
 
-The LRF has limited value as a one-off number. Its utility lies in **trend monitoring over time** and comparison against long-run averages, to provide early warning of the build-up of a potentially unsustainable funding structure. The limit is set judgementally by the ALCO and varies according to the risk profile and risk tolerance of the individual bank. This metric has been largely superseded by the **net stable funding ratio (NSFR)** as the primary regulatory measure of structural funding risk.
+The LRF has limited value as a one-off number. Its utility lies in **trend monitoring over time** and comparison against long-run averages, to provide early warning of the build-up of a potentially unsustainable funding structure. The limit is set judgementally by the ALCO and varies according to the risk profile and risk tolerance of the individual bank. This metric has been largely superseded by the **[[05-nsfr|net stable funding ratio (NSFR)]]** as the primary regulatory measure of structural funding risk.
 
 ### Concentration and Funding Source Report
 
@@ -66,24 +66,24 @@ The **inter-entity lending report** is relevant for group and consolidated banki
 
 ### Liquid Asset Buffer
 
-All banks are required to hold a buffer of **unencumbered liquid assets** — the **liquid asset buffer (LAB)** — to generate liquidity when a stress event occurs. This was always accepted as sound practice, but the Basel III regime codified it via regulatory minimum standards (see the LCR requirement). A LAB must comprise:
+All banks are required to hold a buffer of **unencumbered liquid assets** — the **liquid asset buffer (LAB)** — to generate liquidity when a stress event occurs. This was always accepted as sound practice, but the [[basel_framework|Basel III]] regime codified it via regulatory minimum standards (see the [[04-lcr|LCR]] requirement). A LAB must comprise:
 
 - Good credit quality assets
 - Funded out of stable or term funding (i.e. not themselves subject to maturity rollover risk)
 - Readily convertible to cash at 1-day notice if required
 
-The stock of assets in the LAB is more commonly known, in the context of the Basel III LCR, as the **stock of high-quality liquid assets (HQLA)**. Regulators expect HQLA to retain both value and market liquidity in a stressed environment — meaning they can be monetised without large discounts in sale or repo markets, even under fire-sale conditions.
+The stock of assets in the LAB is more commonly known, in the context of the [[basel_framework|Basel III]] [[04-lcr|LCR]], as the **stock of high-quality liquid assets (HQLA)**. Regulators expect HQLA to retain both value and market liquidity in a stressed environment — meaning they can be monetised without large discounts in sale or repo markets, even under fire-sale conditions.
 
 Central bank eligibility of an asset is not a criterion for HQLA classification, because central bank funding should not be considered a BAU source of liquidity (see [Liquidity Framework](01-liquidity_framework.md)).
 
-### HQLA Eligibility Tiers (SARB)
+### HQLA Eligibility Tiers ([[sarb|SARB]])
 
-The South African Reserve Bank (SARB) classifies eligible HQLA into three tiers, reflecting their credit quality and expected liquidity under stress:
+The [[sarb|South African Reserve Bank]] ([[sarb|SARB]]) classifies eligible HQLA into three tiers, reflecting their credit quality and expected liquidity under stress:
 
 **Level 1** (highest quality — no haircut applied):
 - Cash (notes and coins)
-- Cash reserves held with the SARB
-- Marketable securities issued by the SARB or Public Sector Entities (PSEs), including:
+- Cash reserves held with the [[sarb|SARB]]
+- Marketable securities issued by the [[sarb|SARB]] or Public Sector Entities (PSEs), including:
   - Treasury bills
   - Security loans
   - Nominal and index-linked government bonds

@@ -1,12 +1,12 @@
-# Basel Framework
+# [[bis|Basel]] Framework
 
 <https://www.bis.org/basel_framework/>
 
 <https://www.bis.org/baselframework/BaselFramework.pdf>
 
-The Basel Framework is a consolidated version of the full set of standards of the Basel Committee on Banking Supervision (BCBS), which is the primary global standard setter for the prudential regulation of banks. The membership of the BCBS has agreed to fully implement these standards and apply them to the internationally active banks in their jurisdictions.
+The [[bis|Basel]] Framework is a consolidated version of the full set of standards of the [[bis|Basel Committee on Banking Supervision]] ([[bis|BCBS]]), which is the primary global standard setter for the prudential regulation of banks. The membership of the [[bis|BCBS]] has agreed to fully implement these standards and apply them to the internationally active banks in their jurisdictions.
 
-The framework comprises the 14 standards listed below. Each standard is divided into chapters, and many chapters have multiple versions, eg a chapter may have a version that is applicable now and one that will become applicable after the Basel III reforms have been implemented.
+The framework comprises the 14 standards listed below. Each standard is divided into chapters, and many chapters have multiple versions, eg a chapter may have a version that is applicable now and one that will become applicable after the [[bis|Basel]] III reforms have been implemented.
 
 | Acronym | Standard names |
 | - | - |
@@ -14,11 +14,11 @@ The framework comprises the 14 standards listed below. Each standard is divided 
 | CAP | Definition of capital |
 | RBC | Risk-based capital requirements |
 | CRE | Calculation of RWA for credit risk |
-| MAR | Calculation of RWA for market risk |
+| MAR | Calculation of RWA for [[05-market_risk|market risk]] |
 | OPE | Calculation of RWA for operational risk |
 | LEV | Leverage ratio |
-| LCR | Liquidity Coverage Ratio |
-| NSF | Net Stable Funding Ratio |
+| [[04-lcr|LCR]] | [[04-lcr|Liquidity Coverage Ratio]] |
+| NSF | [[05-nsfr|Net Stable Funding Ratio]] |
 | LEX | Large exposures |
 | MGN | Margin requirements |
 | SRP | Supervisory review process |
@@ -27,7 +27,7 @@ The framework comprises the 14 standards listed below. Each standard is divided 
 
 ## CAP
 
-This standard describes the criteria that bank capital instruments must meet to be eligible to satisfy the Basel capital requirements, as well as necessary regulatory adjustments and transitional arrangements.
+This standard describes the criteria that bank capital instruments must meet to be eligible to satisfy the [[bis|Basel]] capital requirements, as well as necessary regulatory adjustments and transitional arrangements.
 
 ### CAP10: Eligible Capital
 
@@ -96,15 +96,15 @@ This chapter sets out the eligibility criteria for regulatory capital. Three cat
 
 This chapter describes adjustments that must be made to the components of regulatory capital in order to calculate the amount of a bank's capital resources that may be used to meet prudential requirements.
 
-#### Minimum TLAC
+#### Minimum [[tlac|TLAC]]
 
-30.2 Global systemically important banks (G-SIBs) are required to meet a minimum total loss-absorbing capacity (TLAC) requirement set in accordance with the Financial Stability Board’s (FSB) TLAC principles and term sheet. The criteria for an instrument to be recognised as TLAC by the issuing G-SIB are set out in the FSB’s TLAC Term Sheet. Bank that invest in TLAC or similar instruments may be required to deduct them in the calculation of their own regulatory capital.
+30.2 [[g_sibs|Global systemically important banks (G-SIBs)]] are required to meet a minimum [[tlac|total loss-absorbing capacity]] ([[tlac|TLAC]]) requirement set in accordance with the [[fsb|Financial Stability Board]]’s ([[fsb|FSB]]) [[tlac|TLAC]] principles and term sheet. The criteria for an instrument to be recognised as [[tlac|TLAC]] by the issuing [[g_sibs|G-SIB]] are set out in the [[fsb|FSB]]’s [[tlac|TLAC]] Term Sheet. Bank that invest in [[tlac|TLAC]] or similar instruments may be required to deduct them in the calculation of their own regulatory capital.
 
 <https://www.fsb.org/uploads/TLAC-Principles-and-Term-Sheet-for-publication-final.pdf>
 
-*4. Minimum TLAC must be at least 16% of the resolution group’s RWAs (“TLAC RWA Minimum”) as from 1 January 2019 and at least 18% as from 1 January 2022. This requirement does not include any applicable regulatory capital (Basel III) buffers, which must be met in addition to the TLAC RWA Minimum.*
+*4. Minimum [[tlac|TLAC]] must be at least 16% of the resolution group’s RWAs (“[[tlac|TLAC]] RWA Minimum”) as from 1 January 2019 and at least 18% as from 1 January 2022. This requirement does not include any applicable regulatory capital ([[bis|Basel]] III) buffers, which must be met in addition to the [[tlac|TLAC]] RWA Minimum.*
 
-*5. Minimum TLAC is an additional requirement to minimum regulatory capital requirements.*
+*5. Minimum [[tlac|TLAC]] is an additional requirement to minimum regulatory capital requirements.*
 
 #### Goodwill & Other Intangibles
 
@@ -148,13 +148,13 @@ This chapter sets out the minimum regulatory capital requirements under the risk
 
 #### RWA
 
-20.3 The Basel framework describes how to calculate RWA for credit risk, market risk and operational risk. The requirements for calculating RWA for credit risk and market risk allow banks to use different approaches, some of which banks may only use with supervisory approval.
+20.3 The [[bis|Basel]] framework describes how to calculate RWA for credit risk, [[05-market_risk|market risk]] and operational risk. The requirements for calculating RWA for credit risk and [[05-market_risk|market risk]] allow banks to use different approaches, some of which banks may only use with supervisory approval.
 
 20.4 The RWA that banks must use to determine compliance with the requirements set out in RBC20.1 (and the buffers in RBC30 and RBC40) is the higher of:
 
 1) the sum of the following three elements, calculated using the bank’s nominated approaches:
    - RWA for credit risk (as calculated in RBC20.6 to RBC20.8);
-   - RWA for market risk (as calculated in RBC20.9); and
+   - RWA for [[05-market_risk|market risk]] (as calculated in RBC20.9); and
    - RWA for operational risk (as calculated in RBC20.10); and
 2) 72.5% of the sum of the elements listed in point (1) above, calculated using only the standardised approaches listed in RBC20.11. This element of this requirement is referred to as the output floor, and the RWA amount that is multiplied by 72.5% is referred to as the base of the output floor.
 
@@ -162,25 +162,25 @@ This chapter sets out the minimum regulatory capital requirements under the risk
 
 #### Credit Risk RWA
 
-20.6 RWA for credit risk (including counterparty credit risk) is calculated as the sum of the following:
+20.6 RWA for credit risk (including [[02-counterparty_exposures|counterparty credit risk]]) is calculated as the sum of the following:
 
 1) Credit RWA for banking book exposures, except the RWA listed in (2) to (6) below, calculated using:
    - The standardised approach, set out in CRE20 to CRE22; or
    - The internal ratings-based (IRB) approach, set out in CRE30 to CRE36.
-2) RWA for counterparty credit risk arising from banking book exposures and from trading book instruments (as specified in CRE55), except the exposures listed in (3) to (6) below, using the methods outlined in CRE51.
+2) RWA for [[02-counterparty_exposures|counterparty credit risk]] arising from banking book exposures and from trading book instruments (as specified in CRE55), except the exposures listed in (3) to (6) below, using the methods outlined in CRE51.
 
-#### Market Risk RWA
+#### [[05-market_risk|Market Risk]] RWA
 
-20.9 RWA for market risk is calculated as the sum of the following:
+20.9 RWA for [[05-market_risk|market risk]] is calculated as the sum of the following:
 
-1) RWA for market risk for instruments in the trading book and for foreign exchange risk and commodities risk for exposures in the banking book, calculated using one or more of the following approaches:
-   - The standardised approach for market risk, set out in MAR20 to MAR23;
-   - The internal models approach (IMA) for market risk, set out in MAR30 to MAR33; or
-   - The simplified standardised approach for market risk, set out in MAR40.
+1) RWA for [[05-market_risk|market risk]] for instruments in the trading book and for foreign exchange risk and commodities risk for exposures in the banking book, calculated using one or more of the following approaches:
+   - The standardised approach for [[05-market_risk|market risk]], set out in MAR20 to MAR23;
+   - The internal models approach (IMA) for [[05-market_risk|market risk]], set out in MAR30 to MAR33; or
+   - The simplified standardised approach for [[05-market_risk|market risk]], set out in MAR40.
 2) RWA for credit valuation adjustment (CVA) risk in the banking and trading book, calculated using one of the following methods set out in MAR50:
    - The basic approach to CVA risk (BA-CVA).
    - The standardised approach to CVA risk (SA-CVA).
-   - 100% of the bank’s RWA for counterparty credit risk, for banks that have exposures below a materiality threshold (see MAR50.9).
+   - 100% of the bank’s RWA for [[02-counterparty_exposures|counterparty credit risk]], for banks that have exposures below a materiality threshold (see MAR50.9).
 
 #### Operational Risk RWA
 
@@ -188,7 +188,7 @@ This chapter sets out the minimum regulatory capital requirements under the risk
 
 ### RBC25: Banking vs Trading Book
 
-This chapter sets out the instruments to be included in the trading book (which are subject to market risk capital requirements) and those to be included in the banking book (which are subject to credit risk capital requirements).
+This chapter sets out the instruments to be included in the trading book (which are subject to [[06-market_risk_capital|market risk capital]] requirements) and those to be included in the banking book (which are subject to credit risk capital requirements).
 
 #### Banking Book
 
@@ -205,7 +205,7 @@ This chapter sets out the instruments to be included in the trading book (which 
 - trading-related repo-style transaction; or
 - options including embedded derivatives
 
-Under IFRS (IAS 39) and US GAAP, these instruments would be designated as held for trading. Under IFRS 9, these instruments would be held within a trading business model. These instruments would be fair valued through the P&L account
+Under IFRS (IAS 39) and US GAAP, these instruments would be designated as held for trading. Under [[ifrs9_standard|IFRS 9]], these instruments would be held within a trading [[01-business_model|business model]]. These instruments would be fair valued through the P&L account
 
 ### RBC30: Buffers
 
@@ -218,25 +218,25 @@ This chapter describes buffers that banks are expected to maintain above the min
 30.2 A capital conservation buffer of 2.5%, comprised of Common Equity Tier 1 (CET1), is established above the regulatory minimum capital requirement. Capital distribution constraints will be imposed on a bank when capital levels fall within this range. Banks will be able to conduct business as normal when their capital levels fall into the conservation range as they experience losses. The constraints
 imposed only relate to distributions, not the operation of the bank.
 
-*Common Equity Tier 1 must first be used to meet the minimum capital and total loss-absorbing capacity (TLAC) requirements if necessary (including the 6% Tier 1, 8% Total capital requirements), before the
+*Common Equity Tier 1 must first be used to meet the minimum capital and [[tlac|total loss-absorbing capacity]] ([[tlac|TLAC]]) requirements if necessary (including the 6% Tier 1, 8% Total capital requirements), before the
 remainder can contribute to the capital conservation buffer.*
 
-30.4 The table below shows the minimum capital conservation ratios (CET1 + CCoB) a bank must meet at various levels of CET1 capital ratios. The applicable conservation standards must be recalculated at each distribution date. For example, a bank with a CET1 capital ratio in the range of 5.125% to 5.75% is required to conserve 80% of its earnings in the subsequent payment period (ie pay out no more than 20% in terms of dividends, share buybacks and discretionary bonus payments). If the bank wants to make payments in excess of the constraints imposed by this regime, it would have the option of raising capital in the private sector equal to the amount above the constraint which it wishes to distribute. This would be discussed with the bank’s supervisor as part of the capital planning process. The CET1 ratio includes amounts used to meet the 4.5% minimum CET1 requirement, but excludes any additional CET1 needed to meet the 6% Tier 1 and 8% Total Capital requirements, and also excludes any CET1 needed to meet the total lossabsorbing capacity (TLAC) requirement.
+30.4 The table below shows the minimum capital conservation ratios (CET1 + CCoB) a bank must meet at various levels of CET1 capital ratios. The applicable conservation standards must be recalculated at each distribution date. For example, a bank with a CET1 capital ratio in the range of 5.125% to 5.75% is required to conserve 80% of its earnings in the subsequent payment period (ie pay out no more than 20% in terms of dividends, share buybacks and discretionary bonus payments). If the bank wants to make payments in excess of the constraints imposed by this regime, it would have the option of raising capital in the private sector equal to the amount above the constraint which it wishes to distribute. This would be discussed with the bank’s supervisor as part of the capital planning process. The CET1 ratio includes amounts used to meet the 4.5% minimum CET1 requirement, but excludes any additional CET1 needed to meet the 6% Tier 1 and 8% Total Capital requirements, and also excludes any CET1 needed to meet the total lossabsorbing capacity ([[tlac|TLAC]]) requirement.
 
-For example, a bank with 8% CET1 and no Additional Tier 1 or Tier 2 capital, that has 10% of non-regulatory-capital TLAC instruments, would meet its minimum risk-based capital and risk-based TLAC
+For example, a bank with 8% CET1 and no Additional Tier 1 or Tier 2 capital, that has 10% of non-regulatory-capital [[tlac|TLAC]] instruments, would meet its minimum risk-based capital and risk-based [[tlac|TLAC]]
 requirements, but would have a zero conservation buffer and therefore be subject to the 100% constraint on capital distributions.
 
 ![alt text](images/basel/ccob.png)
 
 #### Countercyclical Buffer (CCyB)
 
-30.6 Losses incurred in the banking sector can be extremely large when a downturn is preceded by a period of excess credit growth. These losses can destabilise the banking sector and spark a vicious circle, whereby problems in the financial system can contribute to a downturn in the real economy that then feeds back on to the banking sector. These interactions highlight the particular importance of the banking sector building up additional capital defences in periods where the risks of system-wide stress are growing markedly.
+30.6 Losses incurred in the banking sector can be extremely large when a downturn is preceded by a period of excess credit growth. These losses can destabilise the banking sector and [[08-spark|spark]] a vicious circle, whereby problems in the financial system can contribute to a downturn in the real economy that then feeds back on to the banking sector. These interactions highlight the particular importance of the banking sector building up additional capital defences in periods where the risks of system-wide stress are growing markedly.
 
 30.7 The countercyclical buffer aims to ensure that banking sector capital requirements take account of the macro-financial environment in which banks operate. It will be deployed by national jurisdictions when excess aggregate credit growth is judged to be associated with a build-up of system-wide risk to ensure the banking system has a buffer of capital to protect it against future potential losses. This focus on excess aggregate credit growth means that jurisdictions are likely to only need to deploy the buffer on an infrequent basis. The buffer for internationally-active banks will be a weighted average of the buffers deployed across all the jurisdictions to which it has credit exposures. This means that they will likely find themselves subject to a small buffer on a more frequent basis, since credit cycles are not always highly correlated across jurisdictions.
 
 #### National CCyB Requirements
 
-30.9 Each Basel Committee member jurisdiction will identify an authority with the responsibility to make decisions on the size of the countercyclical capital buffer. If the relevant national authority judges a period of excess credit growth to be leading to the build up of system-wide risk, they will consider, together with any other macroprudential tools at their disposal, putting in place a countercyclical buffer requirement. This will vary between 0% and 2.5% of risk weighted assets, depending on their judgement as to the extent of the build up of system-wide risk.
+30.9 Each [[bis|Basel]] Committee member jurisdiction will identify an authority with the responsibility to make decisions on the size of the countercyclical capital buffer. If the relevant national authority judges a period of excess credit growth to be leading to the build up of system-wide risk, they will consider, together with any other macroprudential tools at their disposal, putting in place a countercyclical buffer requirement. This will vary between 0% and 2.5% of risk weighted assets, depending on their judgement as to the extent of the build up of system-wide risk.
 
 30.11 To give banks time to adjust to a buffer level, a jurisdiction will pre-announce its decision to raise the level of the countercyclical buffer by up to 12 months.
 
@@ -254,9 +254,9 @@ requirements, but would have a zero conservation buffer and therefore be subject
 
 This chapter describes the higher loss absorbency requirements applying to global and domestic systemically important banks.
 
-#### Higher Loss Absorbency: G-SIBs
+#### Higher Loss Absorbency: [[g_sibs|G-SIBs]]
 
-40.1 Taking into account this going-concern objective, global systemically important banks (G-SIBs) must meet their higher loss absorbency requirement with Common Equity Tier 1 capital only.
+40.1 Taking into account this going-concern objective, [[g_sibs|global systemically important banks (G-SIBs)]] must meet their higher loss absorbency requirement with Common Equity Tier 1 capital only.
 
 40.4 Based on the bucketing approach set out in SCO40.19 to SCO40.22, the magnitude of the higher loss absorbency requirement for each bucket is as follows.
 
@@ -278,7 +278,7 @@ This chapter sets out the standardised approach for credit risk as it applies to
 
 #### Sovereigns
 
-20.7 Exposures to sovereigns and their central banks will be risk-weighted as follows:
+20.7 Exposures to sovereigns and their [[05-central_banks|central banks]] will be risk-weighted as follows:
 
 ![alt text](images/basel/sovereign_rws.png)
 
@@ -286,7 +286,7 @@ This chapter sets out the standardised approach for credit risk as it applies to
 
 ![alt text](images/basel/eca_rws.png)
 
-20.10 Exposures to the Bank for International Settlements, the International Monetary Fund, the European Central Bank, the European Union, the European Stability Mechanism and the European Financial Stability Facility may receive a 0% risk weight.
+20.10 Exposures to the [[bis|Bank for International Settlements]], the International Monetary Fund, the [[ecb|European Central Bank]], the European Union, the European Stability Mechanism and the European Financial Stability Facility may receive a 0% risk weight.
 
 #### Public Sector Entities
 
@@ -449,7 +449,7 @@ volatility and are acquired in anticipation of significant future capital gains.
 
 20.60 Banks will assign a risk weight of 150% to subordinated debt and capital
 instruments other than equities. Any liabilities that meet the definition of “other
-TLAC liabilities” in CAP30.3 to CAP30.5 and that are not deducted from regulatory
+[[tlac|TLAC]] liabilities” in CAP30.3 to CAP30.5 and that are not deducted from regulatory
 capital are considered to be subordinated debt for the purposes of this
 paragraph.
 
@@ -661,7 +661,7 @@ planning consent.
 20.91 ADC exposures to residential real estate may be risk weighted at 100%, provided
 that the following criteria are met:
 20.91
-(1) prudential underwriting standards meet the requirements in CRE20.71 (ie the
+(1) prudential [[00_underwriting|underwriting]] standards meet the requirements in CRE20.71 (ie the
 requirements that are used to classify regulatory real estate exposures)
 where applicable;
 (2) pre-sale or pre-lease contracts amount to a significant portion of total
@@ -674,7 +674,7 @@ value.
 
 #### Derivatives
 
-20.102 For exposures that give rise to counterparty credit risk according to CRE51.4 (ie
+20.102 For exposures that give rise to [[02-counterparty_exposures|counterparty credit risk]] according to CRE51.4 (ie
 OTC derivatives, exchange-traded derivatives, long settlement transactions and
 securities financing transactions), the exposure amount to be used in the
 determination of RWA is to be calculated under the rules set out in CRE50 to
@@ -708,7 +708,7 @@ the outstanding amount of the loan.
 
 20.107 Defaulted residential real estate exposures where repayments do not materially
 depend on cash flows generated by the property securing the loan shall be riskweighted net of specific provisions and partial write-offs at 100%. Guarantees or
-financial collateral which are eligible according to the credit risk mitigation
+financial collateral which are eligible according to the credit [[05-risk_mitigation|risk mitigation]]
 framework might be taken into account in the calculation of the exposure in
 accordance with CRE20.76.
 
@@ -791,7 +791,7 @@ portfolio default rates;
 #### Sovereign Class
 
 30.17 This asset class covers all exposures to counterparties treated as sovereigns under
-the standardised approach. This includes sovereigns (and their central banks),
+the standardised approach. This includes sovereigns (and their [[05-central_banks|central banks]]),
 certain public sector entities (PSEs) identified as sovereigns in the standardised
 approach, multilateral development banks (MDBs) that meet the criteria for a 0%
 risk weight and referred to in the first footnote of CRE20.14 of the standardised
@@ -851,8 +851,8 @@ and
 
 30.24 All of the following criteria must be satisfied for a sub-portfolio to be treated as a
 qualifying revolving retail exposure (QRRE). These criteria must be applied at a
-sub-portfolio level consistent with the bank’s segmentation of its retail activities
-generally. Segmentation at the national or country level (or below) should be the
+sub-portfolio level consistent with the bank’s [[06-segmentation|segmentation]] of its retail activities
+generally. [[06-segmentation|Segmentation]] at the national or country level (or below) should be the
 general rule.
 
 1. The exposures are revolving, unsecured, and uncommitted (both
@@ -980,7 +980,7 @@ context, the relevant assets classes are as follows:
 
 30.46 The Committee recognises that, for many banks, it may not be practicable for
 various reasons to implement the IRB approach for an entire asset class across all
-business units at the same time. Furthermore, once on IRB, data limitations may
+business units at the same time. Furthermore, once on IRB, [[05-data_limitations|data limitations]] may
 mean that banks can meet the standards for the use of own estimates of LGD and
 EAD for some but not all of their exposures within an asset class at the same time
 (for example, exposures that are in the same asset class, but are in different
@@ -1025,7 +1025,7 @@ standardised or foundation approach is permitted only in extraordinary
 circumstances, such as divestiture of a large fraction of the bank’s credit-related
 business in that asset class, and must be approved by the supervisor
 
-30.51 Given the data limitations associated with SL exposures, a bank may remain on
+30.51 Given the [[05-data_limitations|data limitations]] associated with SL exposures, a bank may remain on
 the supervisory slotting criteria approach for one or more of the PF, OF, CF, IPRE
 or HVCRE sub-classes, and move to the foundation or advanced approach for the
 other sub-classes. However, a bank should not move to the advanced approach
@@ -1215,7 +1215,7 @@ RWA $=12.5\times K\times$ EAD
 
 32.1 This chapter presents the calculation of the risk components (PD, LGD, EAD, M)
 that are used in the formulas set out in CRE31. In calculating these components,
-the legal certainty standards for recognising credit risk mitigation under the
+the legal certainty standards for recognising credit [[05-risk_mitigation|risk mitigation]] under the
 standardised approach to credit risk (CRE22) apply for both the foundation and
 advanced internal ratings-based (IRB) approaches.
 
@@ -1487,7 +1487,7 @@ in the following 11 sections:
 4) Risk rating system operations
 5) Corporate governance and oversight
 6) Use of internal ratings
-7) Risk quantification
+7) [[07-risk_quantification|Risk quantification]]
 8) Validation of internal estimates
 9) Supervisory loss-given-default (LGD) and exposure at default (EAD) estimates
 10) Requirements for recognition of leasing
@@ -1540,7 +1540,7 @@ present.
 - Delinquency of exposure: Banks are expected to separately identify
 exposures that are delinquent and those that are not.
 
-#### Section 7: Risk Quantification
+#### Section 7: [[07-risk_quantification|Risk Quantification]]
 
 ##### Overall Requirements
 
@@ -1618,9 +1618,9 @@ EAD weighting, are not permitted.
 
 1. A bank may use data on internal default experience for the estimation of PD.
 A bank must demonstrate in its analysis that the estimates are reflective of
-underwriting standards and of any differences in the rating system that
+[[00_underwriting|underwriting]] standards and of any differences in the rating system that
 generated the data and the current rating system. Where only limited data
-are available, or where underwriting standards or rating systems have
+are available, or where [[00_underwriting|underwriting]] standards or rating systems have
 changed, the bank must add a greater margin of conservatism in its estimate
 of PD. The use of pooled data across institutions may also be recognised. A
 bank must demonstrate that the internal rating systems and criteria of other
@@ -1677,14 +1677,14 @@ cannot be less than the long-run default-weighted average loss rate given defaul
 calculated based on the average economic loss of all observed defaults within the
 data source for that type of facility. In addition, a bank must take into account the
 potential for the LGD of the facility to be higher than the default-weighted
-average during a period when credit losses are substantially higher than average.
+average during a period when [[02-credit_losses|credit losses]] are substantially higher than average.
 For certain types of exposures, loss severities may not exhibit such cyclical
 variability and LGD estimates may not differ materially from the long-run default weighted average. However, for other exposures, this cyclical variability in loss
 severities may be important and banks will need to incorporate it into their LGD
 estimates. For this purpose, banks may make reference to the averages of loss
-severities observed during periods of high credit losses, forecasts based on
+severities observed during periods of high [[02-credit_losses|credit losses]], forecasts based on
 appropriately conservative assumptions, or other similar methods. Appropriate
-estimates of LGD during periods of high credit losses might be formed using
+estimates of LGD during periods of high [[02-credit_losses|credit losses]] might be formed using
 either internal and/or external data. Supervisors will continue to monitor and
 encourage the development of appropriate approaches to this issue.
 
@@ -1694,7 +1694,7 @@ This requirement recognises the potential inability of banks to gain both contro
 of their collateral and liquidate it expeditiously. To the extent that LGD estimates
 take into account the existence of collateral, banks must establish internal
 requirements for collateral management, operational procedures, legal certainty
-and risk management process that are generally consistent with those required
+and [[01-risk_management|risk management]] process that are generally consistent with those required
 for the foundation IRB approach.
 
 36.86 Recognising the principle that realised losses can at times systematically exceed

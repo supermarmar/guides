@@ -1,35 +1,35 @@
-# High-level summary of Basel III reforms
+# High-level summary of [[basel_framework|Basel III]] reforms
 
-This note summarises the main features of the finalised Basel III reforms. The standards text, which provides the full details of the reforms, is published separately and is available on the BIS website at <www.bis.org/bcbs/publ/d424.htm>.
+This note summarises the main features of the finalised [[basel_framework|Basel III]] reforms. The standards text, which provides the full details of the reforms, is published separately and is available on the [[bis|BIS]] website at <www.bis.org/bcbs/publ/d424.htm>.
 
-The Basel III framework is a central element of the Basel Committee’s response to the global financial crisis. It addresses a number of shortcomings in the pre-crisis regulatory framework and provides a foundation for a resilient banking system that will help avoid the build-up of systemic vulnerabilities. The framework will allow the banking system to support the real economy through the economic cycle.
+The [[basel_framework|Basel III]] framework is a central element of the [[bis|Basel]] Committee’s response to the global financial crisis. It addresses a number of shortcomings in the pre-crisis regulatory framework and provides a foundation for a resilient banking system that will help avoid the build-up of systemic vulnerabilities. The framework will allow the banking system to support the real economy through the economic cycle.
 
-The initial phase of Basel III reforms focused on strengthening the following components of the regulatory framework:
+The initial phase of [[basel_framework|Basel III]] reforms focused on strengthening the following components of the regulatory framework:
 
 - improving the quality of bank regulatory capital by placing a greater focus on going-concern loss-absorbing capital in the form of Common Equity Tier 1 (CET1) capital;
 - increasing the level of capital requirements to ensure that banks are sufficiently resilient to withstand losses in times of stress;
-- enhancing risk capture by revising areas of the risk-weighted capital framework that proved to be acutely miscalibrated, including the global standards for market risk, counterparty credit risk and securitisation;
+- enhancing risk capture by revising areas of the risk-weighted capital framework that proved to be acutely miscalibrated, including the global standards for [[05-market_risk|market risk]], [[02-counterparty_exposures|counterparty credit risk]] and securitisation;
 - adding macroprudential elements to the regulatory framework, by:
   - (i) introducing capital buffers that are built up in good times and can be drawn down in times of stress to limit procyclicality;
   - (ii) establishing a large exposures regime that mitigates systemic risks arising from interlinkages across financial institutions and concentrated exposures; and
   - (iii) putting in place a capital buffer to address the externalities created by systemically important banks;
 - specifying a minimum leverage ratio requirement to constrain excess leverage in the banking system and complement the risk-weighted capital requirements; and
-- introducing an international framework for mitigating excessive liquidity risk and maturity transformation, through the Liquidity Coverage Ratio and Net Stable Funding Ratio.
+- introducing an international framework for mitigating excessive liquidity risk and maturity transformation, through the [[04-lcr|Liquidity Coverage Ratio]] and [[05-nsfr|Net Stable Funding Ratio]].
 
-The Committee’s now finalised Basel III reforms complement these improvements to the global regulatory framework. The revisions seek to restore credibility in the calculation of risk-weighted assets (RWAs) and improve the comparability of banks’ capital ratios by:
+The Committee’s now finalised [[basel_framework|Basel III]] reforms complement these improvements to the global regulatory framework. The revisions seek to restore credibility in the calculation of risk-weighted assets (RWAs) and improve the comparability of banks’ capital ratios by:
 
 - enhancing the robustness and risk sensitivity of the standardised approaches for credit risk, credit valuation adjustment (CVA) risk and operational risk;
 - constraining the use of the internal model approaches, by placing limits on certain inputs used to calculate capital requirements under the internal ratings-based (IRB) approach for credit risk and by removing the use of the internal model approaches for CVA risk and for operational risk;
-- introducing a leverage ratio buffer to further limit the leverage of global systemically important banks (G-SIBs); and
-- replacing the existing Basel II output floor with a more robust risk-sensitive floor based on the Committee’s revised Basel III standardised approaches.
+- introducing a leverage ratio buffer to further limit the leverage of [[g_sibs|global systemically important banks (G-SIBs)]]; and
+- replacing the existing [[basel_2|Basel II]] output floor with a more robust risk-sensitive floor based on the Committee’s revised [[basel_framework|Basel III]] standardised approaches.
 
 ## Standardised approach for credit risk
 
-Credit risk accounts for the bulk of most banks’ risk-taking activities and hence their regulatory capital requirements. The standardised approach is used by the majority of banks around the world, including in non-Basel Committee jurisdictions.  The Committee’s revisions to the standardised approach for credit risk enhance the regulatory framework by:
+Credit risk accounts for the bulk of most banks’ risk-taking activities and hence their regulatory capital requirements. The standardised approach is used by the majority of banks around the world, including in non-[[bis|Basel]] Committee jurisdictions.  The Committee’s revisions to the standardised approach for credit risk enhance the regulatory framework by:
 
-- improving its granularity and risk sensitivity. For example, the Basel II standardised approach assigns a flat risk weight to all residential mortgages. In the revised standardised approach mortgage risk weights depend on the loan-to-value (LTV) ratio of the mortgage;
+- improving its granularity and risk sensitivity. For example, the [[basel_2|Basel II]] standardised approach assigns a flat risk weight to all residential mortgages. In the revised standardised approach mortgage risk weights depend on the loan-to-value (LTV) ratio of the mortgage;
 - reducing mechanistic reliance on credit ratings, by requiring banks to conduct sufficient due diligence, and by developing a sufficiently granular non-ratings-based approach for jurisdictions that cannot or do not wish to rely on external credit ratings; and
-- as a result, providing the foundation for a revised output floor to internally modelled capital requirements (to replace the existing Basel I floor) and related disclosure to enhance comparability across banks and restore a level playing field.
+- as a result, providing the foundation for a revised output floor to internally modelled capital requirements (to replace the existing [[basel_1|Basel I]] floor) and related disclosure to enhance comparability across banks and restore a level playing field.
 
 The revisions to the standardised approach for credit risk, relative to the existing standardised approach, are outlined in Table 1. In summary, the key revisions are as follows:
 
@@ -93,7 +93,7 @@ In addition, all IRB approaches are being removed for exposures to equities, whi
 
 ### Specification of input floors
 
-The revised IRB framework also introduces minimum “floor” values for bank-estimated IRB parameters that are used as inputs to the calculation of RWA. These include PD floors for both the F-IRB and A-IRB approaches, and LGD and EAD floors for the A-IRB approach. In some cases, these floors consist of recalibrated values of the existing Basel II floors. In other cases, the floors represent new constraints for banks’ IRB models. Table 3 summarises the set of input floors in the revised IRB framework.
+The revised IRB framework also introduces minimum “floor” values for bank-estimated IRB parameters that are used as inputs to the calculation of RWA. These include PD floors for both the F-IRB and A-IRB approaches, and LGD and EAD floors for the A-IRB approach. In some cases, these floors consist of recalibrated values of the existing [[basel_2|Basel II]] floors. In other cases, the floors represent new constraints for banks’ IRB models. Table 3 summarises the set of input floors in the revised IRB framework.
 
 | Exposure | PD | LGD |
 | - | - | - |
@@ -113,13 +113,13 @@ Given the enhancements to the IRB framework and the introduction of an aggregate
 
 ## CVA risk framework
 
-The initial phase of Basel III reforms introduced a capital charge for potential mark-to-market losses of derivative instruments as a result of the deterioration in the creditworthiness of a counterparty. This risk – known as CVA risk – was a major source of losses for banks during the global financial crisis, exceeding losses arising from outright defaults in some instances.
+The initial phase of [[basel_framework|Basel III]] reforms introduced a capital charge for potential mark-to-market losses of derivative instruments as a result of the deterioration in the creditworthiness of a counterparty. This risk – known as CVA risk – was a major source of losses for banks during the global financial crisis, exceeding losses arising from outright defaults in some instances.
 
 The Committee has agreed to revise the CVA framework to:
 
-- enhance its risk sensitivity: the current CVA framework does not cover an important driver of CVA risk, namely the exposure component of CVA. This component is directly related to the price of the transactions that are within the scope of application of the CVA risk capital charge. As these prices are sensitive to variability in underlying market risk factors, the CVA also materially depends on those factors. The revised CVA framework takes into account the exposure component of CVA risk along with its associated hedges;
-- strengthen its robustness: CVA is a complex risk, and is often more complex than the majority of the positions in banks’ trading books. Accordingly, the Committee is of the view that such a risk cannot be modelled by banks in a robust and prudent manner. The revised framework removes the use of an internally modelled approach, and consists of: (i) a standardised approach; and (ii) a basic approach. In addition, a bank with an aggregate notional amount of non-centrally cleared derivatives less than or equal to €100 billion may calculate their CVA capital charge as a simple multiplier of its counterparty credit risk charge.
-- improve its consistency: CVA risk is a form of market risk as it is realised through a change in the mark-to-market value of a bank’s exposures to its derivative counterparties. As such, the standardised and basic approaches of the revised CVA framework have been designed and calibrated to be consistent with the approaches used in the revised market risk framework. In particular, the standardised CVA approach, like the market risk approaches, is based on fair value sensitivities to market risk factors and the basic approach is benchmarked to the standardised approach.  
+- enhance its risk sensitivity: the current CVA framework does not cover an important driver of CVA risk, namely the exposure component of CVA. This component is directly related to the price of the transactions that are within the scope of application of the CVA risk capital charge. As these prices are sensitive to variability in underlying [[05-market_risk|market risk]] factors, the CVA also materially depends on those factors. The revised CVA framework takes into account the exposure component of CVA risk along with its associated hedges;
+- strengthen its robustness: CVA is a complex risk, and is often more complex than the majority of the positions in banks’ trading books. Accordingly, the Committee is of the view that such a risk cannot be modelled by banks in a robust and prudent manner. The revised framework removes the use of an internally modelled approach, and consists of: (i) a standardised approach; and (ii) a basic approach. In addition, a bank with an aggregate notional amount of non-centrally cleared derivatives less than or equal to €100 billion may calculate their CVA capital charge as a simple multiplier of its [[02-counterparty_exposures|counterparty credit risk]] charge.
+- improve its consistency: CVA risk is a form of [[05-market_risk|market risk]] as it is realised through a change in the mark-to-market value of a bank’s exposures to its derivative counterparties. As such, the standardised and basic approaches of the revised CVA framework have been designed and calibrated to be consistent with the approaches used in the revised [[05-market_risk|market risk]] framework. In particular, the standardised CVA approach, like the [[05-market_risk|market risk]] approaches, is based on fair value sensitivities to [[05-market_risk|market risk]] factors and the basic approach is benchmarked to the standardised approach.  
 
 ## Operational risk framework
 
@@ -153,19 +153,19 @@ At national discretion, supervisors can elect to set ILM equal to one for all ba
 
 ## Leverage ratio framework
 
-### Buffer for global systemically important banks
+### Buffer for [[g_sibs|global systemically important banks]]
 
-The leverage ratio complements the risk-weighted capital requirements by providing a safeguard against unsustainable levels of leverage and by mitigating gaming and model risk across both internal models and standardised risk measurement approaches. To maintain the relative incentives provided by both capital constraints, the finalised Basel III reforms introduce a leverage ratio buffer for G-SIBs. Such an approach is consistent with the risk-weighted G-SIB buffer, which seeks to mitigate the externalities created by G-SIBs.
+The leverage ratio complements the risk-weighted capital requirements by providing a safeguard against unsustainable levels of leverage and by mitigating gaming and model risk across both internal models and standardised [[04-risk_measurement|risk measurement]] approaches. To maintain the relative incentives provided by both capital constraints, the finalised [[basel_framework|Basel III]] reforms introduce a leverage ratio buffer for [[g_sibs|G-SIBs]]. Such an approach is consistent with the risk-weighted [[g_sibs|G-SIB]] buffer, which seeks to mitigate the externalities created by [[g_sibs|G-SIBs]].
 
-The leverage ratio G-SIB buffer must be met with Tier 1 capital and is set at 50% of a G-SIB’s riskweighted higher-loss absorbency requirements. For example, a G-SIB subject to a 2% risk-weighted higher-loss absorbency requirement would be subject to a 1% leverage ratio buffer requirement.
+The leverage ratio [[g_sibs|G-SIB]] buffer must be met with Tier 1 capital and is set at 50% of a [[g_sibs|G-SIB]]’s riskweighted higher-loss absorbency requirements. For example, a [[g_sibs|G-SIB]] subject to a 2% risk-weighted higher-loss absorbency requirement would be subject to a 1% leverage ratio buffer requirement.
 
-The leverage ratio buffer takes the form of a capital buffer akin to the capital buffers in the riskweighted framework. As such, the leverage ratio buffer will be divided into five ranges. As is the case with the risk-weighted framework, capital distribution constraints will be imposed on a G-SIB that does not meet its leverage ratio buffer requirement.
+The leverage ratio buffer takes the form of a capital buffer akin to the capital buffers in the riskweighted framework. As such, the leverage ratio buffer will be divided into five ranges. As is the case with the risk-weighted framework, capital distribution constraints will be imposed on a [[g_sibs|G-SIB]] that does not meet its leverage ratio buffer requirement.
 
-The distribution constraints imposed on a G-SIB will depend on its CET1 risk-weighted ratio and Tier 1 leverage ratio. A G-SIB that meets: (i) its CET1 risk-weighted requirements (defined as a 4.5% minimum requirement, a 2.5% capital conservation buffer and the G-SIB higher loss-absorbency requirement) and; (ii) its Tier 1 leverage ratio requirement (defined as a 3% leverage ratio minimum requirement and the G-SIB leverage ratio buffer) will not be subject to distribution constraints. A G-SIB that does not meet one of these requirements will be subject to the associated minimum capital conservation requirement (expressed as a percentage of earnings). A G-SIB that does not meet both requirements will be subject to the higher of the two associated conservation requirements.
+The distribution constraints imposed on a [[g_sibs|G-SIB]] will depend on its CET1 risk-weighted ratio and Tier 1 leverage ratio. A [[g_sibs|G-SIB]] that meets: (i) its CET1 risk-weighted requirements (defined as a 4.5% minimum requirement, a 2.5% capital conservation buffer and the [[g_sibs|G-SIB]] higher loss-absorbency requirement) and; (ii) its Tier 1 leverage ratio requirement (defined as a 3% leverage ratio minimum requirement and the [[g_sibs|G-SIB]] leverage ratio buffer) will not be subject to distribution constraints. A [[g_sibs|G-SIB]] that does not meet one of these requirements will be subject to the associated minimum capital conservation requirement (expressed as a percentage of earnings). A [[g_sibs|G-SIB]] that does not meet both requirements will be subject to the higher of the two associated conservation requirements.
 
 ### Refinements to the leverage ratio exposure measure
 
-In addition to the introduction of the G-SIB buffer, the Committee has agreed to make various refinements to the definition of the leverage ratio exposure measure. These refinements include modifying the way in which derivatives are reflected in the exposure measure and updating the treatment of off-balance sheet exposures to ensure consistency with their measurement in the standardised approach to credit risk.  
+In addition to the introduction of the [[g_sibs|G-SIB]] buffer, the Committee has agreed to make various refinements to the definition of the leverage ratio exposure measure. These refinements include modifying the way in which derivatives are reflected in the exposure measure and updating the treatment of off-balance sheet exposures to ensure consistency with their measurement in the standardised approach to credit risk.  
 
 ### National discretion during stress
 
@@ -173,17 +173,17 @@ The Committee has also agreed that jurisdictions may exercise national discretio
 
 ## Output floor
 
-The Basel II framework introduced an output floor based on Basel I capital requirements. That floor was calibrated at 80% of the relevant Basel I capital requirements. Implementation of the Basel II floor has been inconsistent across countries, partly because of differing interpretations of the requirement and also because it is based on the Basel I standards, which many banks and jurisdictions no longer apply.
+The [[basel_2|Basel II]] framework introduced an output floor based on [[basel_1|Basel I]] capital requirements. That floor was calibrated at 80% of the relevant [[basel_1|Basel I]] capital requirements. Implementation of the [[basel_2|Basel II]] floor has been inconsistent across countries, partly because of differing interpretations of the requirement and also because it is based on the [[basel_1|Basel I]] standards, which many banks and jurisdictions no longer apply.
 
-The Basel III reforms replace the existing Basel II floor with a floor based on the revised Basel III standardised approaches. Consistent with the original floor, the revised floor places a limit on the regulatory capital benefits that a bank using internal models can derive relative to the standardised approaches. In effect, the output floor provides a risk-based backstop that limits the extent to which banks can lower their capital requirements relative to the standardised approaches. This helps to maintain a level playing field between banks using internal models and those on the standardised approaches. It also supports the credibility of banks’ risk-weighted calculations, and improves comparability via the related disclosures.
+The [[basel_framework|Basel III]] reforms replace the existing [[basel_2|Basel II]] floor with a floor based on the revised [[basel_framework|Basel III]] standardised approaches. Consistent with the original floor, the revised floor places a limit on the regulatory capital benefits that a bank using internal models can derive relative to the standardised approaches. In effect, the output floor provides a risk-based backstop that limits the extent to which banks can lower their capital requirements relative to the standardised approaches. This helps to maintain a level playing field between banks using internal models and those on the standardised approaches. It also supports the credibility of banks’ risk-weighted calculations, and improves comparability via the related disclosures.
 
 Under the revised output floor, banks’ risk-weighted assets must be calculated as the higher of:
 
-- (i) total risk-weighted assets calculated using the approaches that the bank has supervisory approval to use in accordance with the Basel capital framework (including both standardised and internal model-based approaches); and
+- (i) total risk-weighted assets calculated using the approaches that the bank has supervisory approval to use in accordance with the [[bis|Basel]] capital framework (including both standardised and internal model-based approaches); and
 - (ii) 72.5% of the total risk-weighted assets calculated using only the standardised approaches. The standardised approaches to be used when calculating the output floor are as follows:
-  - Credit risk: the standardised approach for credit risk outlined above. When calculating the degree of credit risk mitigation, banks must use the carrying value when applying the simple approach or the comprehensive approach with standard supervisory haircuts. This also includes failed trades and non-delivery-versus-payment transactions as set out in Annex 3 of the Basel II framework (June 2006).
-  - Counterparty credit risk: to calculate the exposure for derivatives, banks must use the standardised approach for measuring counterparty credit risk (SA-CCR). The exposure amounts must then be multiplied by the relevant borrower risk weight using the standardised approach for credit risk to calculate RWA under the standardised approach for credit risk.
-  - Credit valuation adjustment risk: the standardised approach for CVA (SA-CVA), the Basic Approach (BA-CVA) or 100% of a bank’s counterparty credit risk capital requirement (depending on which approach the bank is eligible for and uses for CVA risk).
+  - Credit risk: the standardised approach for credit risk outlined above. When calculating the degree of credit [[05-risk_mitigation|risk mitigation]], banks must use the carrying value when applying the simple approach or the comprehensive approach with standard supervisory haircuts. This also includes failed trades and non-delivery-versus-payment transactions as set out in Annex 3 of the [[basel_2|Basel II]] framework (June 2006).
+  - [[02-counterparty_exposures|Counterparty credit risk]]: to calculate the exposure for derivatives, banks must use the standardised approach for measuring [[02-counterparty_exposures|counterparty credit risk]] (SA-CCR). The exposure amounts must then be multiplied by the relevant borrower risk weight using the standardised approach for credit risk to calculate RWA under the standardised approach for credit risk.
+  - Credit valuation adjustment risk: the standardised approach for CVA (SA-CVA), the Basic Approach (BA-CVA) or 100% of a bank’s [[02-counterparty_exposures|counterparty credit risk]] capital requirement (depending on which approach the bank is eligible for and uses for CVA risk).
   - Securitisation framework: the external ratings-based approach (SEC-ERBA), the standardised approach (SEC-SA) or a 1250% risk weight.
-  - Market risk: the standardised (or simplified standardised) approach of the revised market risk framework. The SEC-ERBA, the SEC-SA or a 1250% risk weight must also be used when determining the default risk charge component for securitisations held in the trading book.
+  - [[05-market_risk|Market risk]]: the standardised (or simplified standardised) approach of the revised [[05-market_risk|market risk]] framework. The SEC-ERBA, the SEC-SA or a 1250% risk weight must also be used when determining the default risk charge component for securitisations held in the trading book.
   - Operational risk: the standardised approach for operational risk.

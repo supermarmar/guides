@@ -1,25 +1,25 @@
 # Regulatory Capital (Trading Book)
 
-Most of the credit risk that has been discussed in the banking book originates where assets are held to maturity. The trading book, on the other hand, consists mainly of market risk, but credit risk also originates here. The trading book is primarily made up of shorter-term trades for outcomes such as short-term gains, hedging risk, and placing trades on the market for clients.
+Most of the credit risk that has been discussed in the banking book originates where assets are held to maturity. The trading book, on the other hand, consists mainly of [[05-market_risk|market risk]], but credit risk also originates here. The trading book is primarily made up of shorter-term trades for outcomes such as short-term gains, hedging risk, and placing trades on the market for clients.
 
-For the broader treatment of bank capital management (Pillar 1/2/3 framework, buffers, TLAC/MREL), see [Capital](..\..\..\..\04-capital.md). For the historical evolution of Basel CCR/CVA reforms, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md). For the mathematical foundations of counterparty exposure measurement (EE, EPE, EEPE, survival curves, Monte Carlo), see [Counterparty Exposures](02-counterparty_exposures.md). For banking book regulatory capital computation (SA, IRB, ASRF), see [Regulatory Capital (Banking Book)](..\..\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). This file focuses on the **computation of regulatory capital for credit risk in the trading book**: CCR and CVA.
+For the broader treatment of bank [[04-capital_management|capital management]] (Pillar 1/2/3 framework, buffers, [[tlac|TLAC]]/[[mrel|MREL]]), see [Capital](..\..\..\..\04-capital.md). For the historical evolution of [[bis|Basel]] CCR/CVA reforms, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md). For the mathematical foundations of counterparty exposure measurement (EE, EPE, EEPE, survival curves, Monte Carlo), see [Counterparty Exposures](02-counterparty_exposures.md). For banking book regulatory capital computation (SA, IRB, ASRF), see [Regulatory Capital (Banking Book)](..\..\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). This file focuses on the **computation of regulatory capital for credit risk in the trading book**: CCR and CVA.
 
 ## Trading Book Boundary
 
-Basel defines the boundary between the trading book and banking book quite strictly. An asset is classified as a trading book exposure if it satisfies any of the following:
+[[bis|Basel]] defines the boundary between the trading book and banking book quite strictly. An asset is classified as a trading book exposure if it satisfies any of the following:
 
 - Held for short-term gain
 - Traded to profit from short-term price movements
 - Held to profit from arbitrage
 - Held to hedge risks incurred by the above three categories.
 
-Assets included must be financial instruments, foreign exchange (FX), and commodities, and banks must be able to hedge these assets completely (i.e. buy the exact same asset in the opposite direction). Trading book assets measure capital primarily in terms of market risk, but certain assets present credit risk components that must be captured separately.
+Assets included must be financial instruments, foreign exchange (FX), and commodities, and banks must be able to hedge these assets completely (i.e. buy the exact same asset in the opposite direction). Trading book assets measure capital primarily in terms of [[05-market_risk|market risk]], but certain assets present credit risk components that must be captured separately.
 
-Trading book exposures are managed actively and held for "trading intent" or short-term gain. Credit risk may occur as the risk of default of the issuer of the securities, as well as in the form of counterparty credit risk — where the counterparty could default before settlement, with the position needing to be replaced at a worse price. However, most securities trade on a delivery-vs-payment (DVP) basis or via Central Clearing Parties (CCPs), so there is little or no settlement risk in exchanging securities and cash.
+Trading book exposures are managed actively and held for "trading intent" or short-term gain. Credit risk may occur as the risk of default of the issuer of the securities, as well as in the form of [[02-counterparty_exposures|counterparty credit risk]] — where the counterparty could default before settlement, with the position needing to be replaced at a worse price. However, most securities trade on a delivery-vs-payment (DVP) basis or via Central Clearing Parties (CCPs), so there is little or no settlement risk in exchanging securities and cash.
 
 ## Trading Book Assets Containing Credit Risk
 
-Basel regulation clearly identifies the trading book asset types that produce credit risk:
+[[bis|Basel]] regulation clearly identifies the trading book asset types that produce credit risk:
 
 - **Derivatives** (OTC): Over-the-counter derivatives are bilateral contracts with substantial CCR that must be carefully measured and managed. Exchange-traded derivatives are margined and guaranteed by exchanges, minimising credit risk. For detailed product descriptions of derivatives (swaps, options, forwards), see [Banking Products](..\..\..\..\06-products.md).
 - **Long settlement transactions**: Similar to derivatives but longer term, and thus present higher credit risk due to the extended period over which a counterparty could default.
@@ -56,15 +56,15 @@ A **hedging set** is a set of transactions within an asset class in the same net
 - Basis transactions (e.g. 3-month vs 6-month reference rate)
 - Volatility transactions (e.g. volatility swap)
 
-## Counterparty Credit Risk (CCR)
+## [[02-counterparty_exposures|Counterparty Credit Risk]] (CCR)
 
-Counterparty credit risk (CCR) is a risk type that borders between market and credit risk. It is the risk that a counterparty to a trade defaults before settlement. CCR is subject to both the creditworthiness of the counterparty to the trade and general market changes that may affect the trade. It is important to note that CCR is applicable in cases where there is a bilateral risk of loss — i.e. either party to a transaction could default.
+[[02-counterparty_exposures|Counterparty credit risk]] (CCR) is a risk type that borders between market and credit risk. It is the risk that a counterparty to a trade defaults before settlement. CCR is subject to both the creditworthiness of the counterparty to the trade and general market changes that may affect the trade. It is important to note that CCR is applicable in cases where there is a bilateral risk of loss — i.e. either party to a transaction could default.
 
 For example, in a derivative trade, if the market moves and this negatively impacts either counterparty, either counterparty could default. This means that the party that would have benefited from a positive position essentially loses that benefit. This is unlike a mortgage, for example, where the bank only considers the unilateral risk of the borrower defaulting.
 
-CCR encompasses OTC and exchange-traded derivatives, and long settlement and securities financing transactions. For the CCR capital charge, the primary concern is estimating the **EAD** (Exposure at Default) of the transaction in question. The PD and LGD of a counterparty are calculated as per the internal processes in the bank for market risk, but the EAD is calculated according to a different methodology from other credit risk and market risk exposures.
+CCR encompasses OTC and exchange-traded derivatives, and long settlement and securities financing transactions. For the CCR capital charge, the primary concern is estimating the **EAD** (Exposure at Default) of the transaction in question. The PD and LGD of a counterparty are calculated as per the internal processes in the bank for [[05-market_risk|market risk]], but the EAD is calculated according to a different methodology from other credit risk and [[05-market_risk|market risk]] exposures.
 
-Basel III allows for banks to use either the **SA-CCR** (standardised approach for CCR) or the **IMM** (Internal Model Method) approach to calculate this EAD estimate. The SA must be used if the bank does not have regulatory approval for the IMM.
+[[basel_framework|Basel III]] allows for banks to use either the **SA-CCR** (standardised approach for CCR) or the **IMM** (Internal Model Method) approach to calculate this EAD estimate. The SA must be used if the bank does not have regulatory approval for the IMM.
 
 ### Standardised Approach (SA-CCR)
 
@@ -82,13 +82,13 @@ The replacement cost also depends on whether or not transactions in a netting se
 - **Unmargined transactions**: The source of larger CCR since there is little to no collateral. If collateral is held, it does not fluctuate according to market movements (no margining requirements).
 - **Margined transactions**: Lower risk, as collateral is posted and updated with market movements. However, margining only limits losses — it does not mitigate them entirely.
 
-Swaps, foreign exchange and interest rate forwards, options, other derivatives, and securities finance transactions (repo) are all subject to fluctuations in value over the life of the contract. Besides replacement cost, credit risk measurement must consider PFE as the maximum expected credit exposure. PFE is important because some transactions have longer maturities where losses may emerge over time, and positions with large downsides in extreme markets (e.g. options sold) are more fully captured.
+Swaps, foreign exchange and interest rate forwards, options, other derivatives, and securities finance transactions (repo) are all subject to fluctuations in value over the life of the contract. Besides replacement cost, credit [[04-risk_measurement|risk measurement]] must consider PFE as the maximum expected credit exposure. PFE is important because some transactions have longer maturities where losses may emerge over time, and positions with large downsides in extreme markets (e.g. options sold) are more fully captured.
 
 The alpha factor of 1.4 in the SA-CCR formula is a regulatory scaling factor designed to provide a conservative estimate, accounting for the uncertainty in the model and the tendency for exposures to be correlated with default events (wrong-way risk). For the mathematical underpinning of exposure measurement (including EE, EPE, and EEPE), see [Counterparty Exposures](02-counterparty_exposures.md).
 
 ### Internal Model Method (IMM)
 
-The IMM approach can be used by banks where both regulatory approval is received and the IMM is used for market risk (either the SA or IRB can be used for credit risk). The IMM approach is applied according to the following formula:
+The IMM approach can be used by banks where both regulatory approval is received and the IMM is used for [[05-market_risk|market risk]] (either the SA or IRB can be used for credit risk). The IMM approach is applied according to the following formula:
 
 $$EAD = 1.4 \times EEPE$$
 
@@ -98,11 +98,11 @@ Under the IMM approach, a specific modelling approach is not prescribed but is l
 
 ## Credit Valuation Adjustment (CVA)
 
-Credit valuation adjustments (CVA) were introduced as part of Basel III, with further amendments finalised in 2019. CVA forms part of risk management alongside CCR and is essentially a capital charge to cover mark-to-market losses from counterparty credit deterioration — which were twice as large as CCR losses from defaults in the 2007–09 financial crisis.
+Credit valuation adjustments (CVA) were introduced as part of [[basel_framework|Basel III]], with further amendments finalised in 2019. CVA forms part of [[01-risk_management|risk management]] alongside CCR and is essentially a capital charge to cover mark-to-market losses from counterparty credit deterioration — which were twice as large as CCR losses from defaults in the 2007–09 financial crisis.
 
 A CVA is applied to eligible trading book assets where a loss may be incurred owing to a reduction in the **creditworthiness** of the counterparty — i.e. a CVA incorporates default risk into capital calculations for trading book assets. Assets will generally decline in value if the creditworthiness of the counterparty declines, which is a risk of loss that the CVA capital charge attempts to cater for.
 
-Transactions through a recognised **central counterparty (CCP)** (e.g. a central clearing house for derivatives) are exempted by Basel.
+Transactions through a recognised **central counterparty (CCP)** (e.g. a central clearing house for derivatives) are exempted by [[bis|Basel]].
 
 CVA capital charges are first assessed on an **individual client/counterparty level**, then on an **aggregate portfolio level**. The entire portfolio eligible for this charge is assessed after adjustments for:
 
@@ -110,9 +110,9 @@ CVA capital charges are first assessed on an **individual client/counterparty le
 - Collateral
 - Offsetting internal and external hedges.
 
-By allowing for these adjustments, Basel aims to incentivise banks to follow efficient risk management.
+By allowing for these adjustments, [[bis|Basel]] aims to incentivise banks to follow efficient [[01-risk_management|risk management]].
 
-Basel outlines three approaches for the calculation of capital requirements for CVA risk:
+[[bis|Basel]] outlines three approaches for the calculation of capital requirements for CVA risk:
 
 | Approach | Description |
 |---|---|
@@ -122,7 +122,7 @@ Basel outlines three approaches for the calculation of capital requirements for 
 
 ### Basic Approach (BA-CVA)
 
-Banks may use either the reduced or full BA-CVA, depending on their business model.
+Banks may use either the reduced or full BA-CVA, depending on their [[01-business_model|business model]].
 
 **Step 1 — Individual counterparty capital requirement:**
 
@@ -144,15 +144,15 @@ Where $K_{\text{hedged}}$ is calculated similarly to $K_{\text{reduced}}$, but t
 
 ### Standardised Approach (SA-CVA)
 
-The SA-CVA is adapted from Basel's market risk standardised approach and is much simpler than an internal model approach, but requires more sophisticated infrastructure. To use the SA-CVA, banks must meet the following criteria:
+The SA-CVA is adapted from [[bis|Basel]]'s [[05-market_risk|market risk]] standardised approach and is much simpler than an internal model approach, but requires more sophisticated infrastructure. To use the SA-CVA, banks must meet the following criteria:
 
-- Ability to calculate and report capital and CVA sensitivities to market risk factors on **at least a monthly basis**
+- Ability to calculate and report capital and CVA sensitivities to [[05-market_risk|market risk]] factors on **at least a monthly basis**
 - A dedicated **CVA desk** that will manage and, if necessary, hedge CVA risk.
 
 Under the SA-CVA, individual counterparty capital requirements are determined using internal estimates of:
 
 - **PD**: Market-implied PDs estimated from credit spreads observable in the market, or from proxy credit spreads for illiquid counterparties. For the derivation of market-implied PDs from credit spreads and survival curves, see [Counterparty Exposures](02-counterparty_exposures.md).
 - **LGD**: Market-implied LGDs estimated using credit spreads in line with the estimation of PDs (credit spreads inherently contain both PD and LGD, so the estimation of one leads to the estimation of the other).
-- **Discounted future exposure**: Determined by discounting all future transactions within the counterparty using a risk-free interest rate and relevant market risk factors. Collateral may be taken into account for margined counterparties.
+- **Discounted future exposure**: Determined by discounting all future transactions within the counterparty using a risk-free interest rate and relevant [[05-market_risk|market risk]] factors. Collateral may be taken into account for margined counterparties.
 
-Alongside the quantitative elements of capital calculation, Basel III includes enhanced management requirements for policies, processes, reporting, and testing for CVA risk, similar to those for credit risk.
+Alongside the quantitative elements of capital calculation, [[basel_framework|Basel III]] includes enhanced management requirements for policies, processes, reporting, and testing for CVA risk, similar to those for credit risk.

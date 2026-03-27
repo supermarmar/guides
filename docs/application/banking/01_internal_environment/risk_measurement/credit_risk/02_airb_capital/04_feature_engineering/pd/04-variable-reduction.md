@@ -1,11 +1,11 @@
-Here’s a clean, structured write-up of your **Variable Reduction** section, based on your notes, with expanded clarity so it reads smoothly in a model development document.
+Here’s a clean, structured write-up of your **[[05-variable-reduction|Variable Reduction]]** section, based on your notes, with expanded clarity so it reads smoothly in a model development document.
 
 ---
 
-## **Variable Reduction**
+## **[[05-variable-reduction|Variable Reduction]]**
 
 The original model ready dataset (**MRD**) contained approximately **1,000 variables**, including trend variables.
-Certain variables were **excluded from the variable reduction process** from the outset because they were either target variables, identifiers, or considered essential baseline predictors. These included:
+Certain variables were **excluded from the [[05-variable-reduction|variable reduction]] process** from the outset because they were either [[01-target-variables|target variables]], identifiers, or considered essential baseline predictors. These included:
 
 * **Default flag, type and date**
 * **Product type**
@@ -143,7 +143,7 @@ Strong predictors become less effective if they are collinear with other predict
 
 Estimated coefficients may become highly sensitive to small changes in the data due to increased variance in the estimates.
 
-Coefficient magnitudes may not accurately reflect the true relationship between predictors and the target variable.
+Coefficient magnitudes may not accurately reflect the true relationship between predictors and the [[01-target_variable|target variable]].
 
 Methodology:
 A “one-drop” approach was used:
@@ -168,15 +168,15 @@ This systematic approach ensured that the final set of predictors retained stron
 
 Final variable candidates were examined individually to confirm:
 
-* Predictive relationship with the target variable.
+* Predictive relationship with the [[01-target_variable|target variable]].
 * Plausibility from a business and risk perspective.
 * Consistency across different time periods and segments.
 
-The final stage of variable reduction involved a detailed univariate assessment of each remaining predictor.
+The final stage of [[05-variable-reduction|variable reduction]] involved a detailed univariate assessment of each remaining predictor.
 
 Purpose:
 
-Ensure that each variable has an intuitive relationship with the target variable.
+Ensure that each variable has an intuitive relationship with the [[01-target_variable|target variable]].
 
 Confirm that patterns are stable and monotonic (i.e., risk consistently increases or decreases with the variable’s value).
 
@@ -208,6 +208,6 @@ By combining distribution review, predictive strength assessment, and stability 
 
 If you like, I can also **add Steps 2.2–5 with more quantitative details** (e.g., correlation thresholds, VIF cut-offs, stability index criteria) so this reads like a regulatory-ready PD model methodology.
 
-Do you want me to expand it in that formal style? That would make it fully consistent with how PRA and ECB expect IRB documentation.
+Do you want me to expand it in that formal style? That would make it fully consistent with how [[pra|PRA]] and [[ecb|ECB]] expect IRB documentation.
 
-Got it 👍 — so now we’re documenting the **Variable Reduction**, **Transformation**, and then the **PiT EAD Estimation** section. Since this mirrors PD, I’ll keep it parallel for consistency but highlight the EAD-specific adjustments you gave. Here’s a draft you can drop in:
+Got it 👍 — so now we’re documenting the **[[05-variable-reduction|Variable Reduction]]**, **Transformation**, and then the **PiT EAD Estimation** section. Since this mirrors PD, I’ll keep it parallel for consistency but highlight the EAD-specific adjustments you gave. Here’s a draft you can drop in:

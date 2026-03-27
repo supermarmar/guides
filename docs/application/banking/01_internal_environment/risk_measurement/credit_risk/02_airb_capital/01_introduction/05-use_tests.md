@@ -1,12 +1,12 @@
 # Use Tests
 
-The Basel Use Test (CRR Article 144.1(b)) requires that internal models are primarily built and deployed for risk management and decision-making purposes, not solely for the calculation of Risk-Weighted Assets (RWAs).
+The [[bis|Basel]] Use Test ([[crr|CRR]] Article 144.1(b)) requires that internal models are primarily built and deployed for [[01-risk_management|risk management]] and decision-making purposes, not solely for the calculation of Risk-Weighted Assets (RWAs).
 
-"*Internal ratings and default and loss estimates used in the calculation of own funds requirements and associated systems and processes shail play an essential role in the risk management and decision-making process, and in the credit approval. Internal capital allocation and corporate governance functions of the institution;*"
+"*Internal ratings and default and loss estimates used in the calculation of own funds requirements and associated systems and processes shail play an essential role in the [[01-risk_management|risk management]] and decision-making process, and in the credit approval. Internal capital allocation and corporate governance functions of the institution;*"
 
-This means they must serve as the basis of decisions made concerning, for example, risk, limits, pricing, provisioning, and capital management, i.e. they must not be simply for regulatory risk capital calculations.
+This means they must serve as the basis of decisions made concerning, for example, risk, limits, pricing, provisioning, and [[04-capital_management|capital management]], i.e. they must not be simply for regulatory risk capital calculations.
 
-While no prescriptive list of applications exists—since these depend on each institution’s business model and context—the IRB model’s risk parameters (PD, LGD, and EAD) are widely used and well-embedded across the Bank’s core risk management, capital allocation, and governance processes.
+While no prescriptive list of applications exists—since these depend on each institution’s [[01-business_model|business model]] and context—the IRB model’s risk parameters (PD, LGD, and EAD) are widely used and well-embedded across the Bank’s core [[01-risk_management|risk management]], capital allocation, and governance processes.
 
 ## Minimum Usage Requirements
 
@@ -24,22 +24,22 @@ To use the IRB approach, a bank must:
 
 ### National Usage Requirements
 
-As mentioned, Basel offers requirements that must be met in order for banks to use the IRBA. One of these requirements is supervisory approval. Supervisors may, in addition to the Basel requirements, outline further requirements to be met by banks in their jurisdiction.
+As mentioned, [[bis|Basel]] offers requirements that must be met in order for banks to use the IRBA. One of these requirements is supervisory approval. Supervisors may, in addition to the [[bis|Basel]] requirements, outline further requirements to be met by banks in their jurisdiction.
 
-The Prudential Authority, under the South African Reserve Bank (SARB), requires additional governance requirements when the IRBA is used, such as:
+The [[pa|Prudential Authority]], under the [[sarb|South African Reserve Bank]] ([[sarb|SARB]]), requires additional governance requirements when the IRBA is used, such as:
 
-- The board of directors and senior management must approve the bank’s rating and risk measurement processes.
+- The board of directors and senior management must approve the bank’s rating and [[04-risk_measurement|risk measurement]] processes.
 - Governance processes and models’ compliance to regulatory requirements must be selfassessed annually by the board.
 - Completion of self-assessment templates where banks must qualitatively and quantitatively assess their models.
 
-The FCA, in the United Kingdom, also applies further restrictions. For example:
+The [[fca|FCA]], in the United Kingdom, also applies further restrictions. For example:
 
 - The credit risk control unit that manages the IRB models and related processes should be independent and unbiased.
 - Internal outsourcing (within a group) of the above is allowed only under specific circumstances.
 - Accuracy of the rating systems must be tested, with respect to specific guidelines.
 - The “use test” is expanded and more detailed requirements are provided.
 
-Supervisors often seek to provide more clarity and detail on the Basel requirements when outlining their own requirements, and generally provide more measurable requirements. These requirements will also align more closely with the economic environment and structure within the jurisdiction.
+Supervisors often seek to provide more clarity and detail on the [[bis|Basel]] requirements when outlining their own requirements, and generally provide more measurable requirements. These requirements will also align more closely with the [[03-economic_envrionment|economic environment]] and structure within the jurisdiction.
 
 ## Applications
 
@@ -48,11 +48,11 @@ Supervisors often seek to provide more clarity and detail on the Basel requireme
 |Allocation of Credit Decisioning Authority | Not applicable to retail portfolios.|
 |Profitability and Performance Management | Return on RWA (RoRWA) and Return on Tangible Equity (ROTE) are reported and targeted. IRB model outputs support acquisition strategy, planning, investment valuation, marketing, and credit strategies. Inputs such as RWA and ECL feed into economic value and return on equity analyses. Existing customer management strategies (Balance Transfer, Proactive Credit Line Increase/Decrease, Account Closure) leverage RWA movements from prior year test/control populations for cost-benefit analysis.|
 |Acquisitions and Divestments|Used in the for potential partnership renewals, portfolio acquisitions, and new partnership assessments. ROTE inputs include RWA and ECL forecasts.|
-|Credit Underwriting and Limit Setting|Modern ML-based underwriting and ECM strategies are used; however, alignment with IRB default definitions and key risk drivers is maintained and will continue going forward.|
-|Accounting (IFRS 9 Impairment)|Point-in-Time (PiT) models can feed IFRS 9 models, ensuring alignment between regulatory and accounting measures.|
+|Credit [[00_underwriting|Underwriting]] and Limit Setting|Modern ML-based [[00_underwriting|underwriting]] and ECM strategies are used; however, alignment with IRB default definitions and key risk drivers is maintained and will continue going forward.|
+|Accounting ([[ifrs9_standard|IFRS 9]] Impairment)|Point-in-Time (PiT) models can feed [[ifrs9_standard|IFRS 9]] models, ensuring alignment between regulatory and accounting measures.|
 |Credit Risk Reporting|Risk profiles for front-book and back-book exposures include balance-weighted PiT PDs derived from IRB models.|
-|Risk Appetite Framework|IRB-derived PD, LGD, and EAD parameters are integral to the Bank’s risk appetite and capital planning processes. RWAs, derived from these parameters, act as proxies for portfolio risk intensity and are embedded in key business metrics such as RoRWA and ROTE. These inform strategic decisions across acquisitions, investment, and credit line management.|
+|Risk Appetite Framework|IRB-derived PD, LGD, and EAD parameters are integral to the Bank’s [[02-risk_appetite|risk appetite]] and capital planning processes. RWAs, derived from these parameters, act as proxies for portfolio risk intensity and are embedded in key business metrics such as RoRWA and ROTE. These inform strategic decisions across acquisitions, investment, and credit line management.|
 |Collections, Recoveries, and Restructuring|PiT LGD models are being evaluated for use in recovery strategies, including forward-flow debt sale decisions.|
-|Pillar 2 Capital and Stress Testing |IRB parameter values feed Pillar 2A capital approaches (e.g., Economic Capital). Stress testing incorporates granular RWA movements and their PD/EAD/LGD drivers under adverse scenarios.|
+|Pillar 2 Capital and [[02-stress_testing|Stress Testing]] |IRB parameter values feed Pillar 2A capital approaches (e.g., [[01-economic_capital|Economic Capital]]). [[02-stress_testing|Stress testing]] incorporates granular RWA movements and their PD/EAD/LGD drivers under adverse scenarios.|
 |Internal Audit Planning |Model outputs may inform prioritization of audit focus areas based on portfolio risk intensity.|
 |Risk-Adjusted Remuneration | Bonuses and salaries can be informed by the level of capital available and possible future performance |

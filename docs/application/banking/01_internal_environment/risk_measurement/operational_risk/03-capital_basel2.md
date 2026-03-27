@@ -1,6 +1,6 @@
-# Operational Risk Capital: Basel II Approaches
+# Operational Risk Capital: [[basel_2|Basel II]] Approaches
 
-The Basel II Accord outlined three approaches to measuring operational risk and the minimum capital required against it. These range from simple approaches used by smaller banks with limited international operations, to more complex internal model approaches. Banks approved for more sophisticated approaches cannot revert to simpler ones without supervisory approval. Risk-weighted assets (RWA) for operational risk under all approaches are calculated as the capital requirement multiplied by 12.5.
+The [[basel_2|Basel II]] Accord outlined three approaches to measuring operational risk and the minimum capital required against it. These range from simple approaches used by smaller banks with limited international operations, to more complex internal model approaches. Banks approved for more sophisticated approaches cannot revert to simpler ones without supervisory approval. Risk-weighted assets (RWA) for operational risk under all approaches are calculated as the capital requirement multiplied by 12.5.
 
 ## 3.1 Basic Indicator Approach (BIA)
 
@@ -53,7 +53,7 @@ where $m = 0.035$ and the betas are as defined in the table above.
 
 ## 3.3 Advanced Measurement Approach (AMA)
 
-The AMA allows banks to use their **internal risk measurement systems** to generate the regulatory capital requirement. There is no prescribed methodology; banks must be able to demonstrate that potentially severe "tail" loss events are captured. VaR must capture aggregate losses (expected and unexpected) over 1 year at a 99.9% confidence level — comparable to the IRB approach for credit risk.
+The AMA allows banks to use their **internal [[04-risk_measurement|risk measurement]] systems** to generate the regulatory capital requirement. There is no prescribed methodology; banks must be able to demonstrate that potentially severe "tail" loss events are captured. VaR must capture aggregate losses (expected and unexpected) over 1 year at a 99.9% confidence level — comparable to the IRB approach for credit risk.
 
 ### Four Required Data Types
 
@@ -82,7 +82,7 @@ K_{\text{LDA}} = \text{VaR}_{99.9\%}\left(\sum_{i,j} \text{AggLoss}_{i,j}\right)
 
 where the summation is across all combinations of business lines ($i$) and risk event types ($j$).
 
-The LDA is easy to use for non-technical stakeholders as every type of business activity can be evaluated using VaR and parameters (time horizon, confidence level) already familiar from credit and market risk. The challenges are complexity, less transparent assumptions, and substantial resource requirements.
+The LDA is easy to use for non-technical stakeholders as every type of business activity can be evaluated using VaR and parameters (time horizon, confidence level) already familiar from credit and [[05-market_risk|market risk]]. The challenges are complexity, less transparent assumptions, and substantial resource requirements.
 
 ### Qualitative Input and Model Validation
 
@@ -90,7 +90,7 @@ Even after extensive quantitative modelling, qualitative analysis is important i
 
 Banks organise regular internal workshops where managers complete **risk scorecards** by business line and event, scoring not only frequency and financial severity but also reputational impact and employee retention.
 
-Qualitative inputs must be assessed for quality — risk management must ask the right people and the right questions without creating bias or anchoring. Qualitative inputs should be converted into metrics for scenario analysis and be forward-looking, clearly defined, and repeatable.
+Qualitative inputs must be assessed for quality — [[01-risk_management|risk management]] must ask the right people and the right questions without creating bias or anchoring. Qualitative inputs should be converted into metrics for scenario analysis and be forward-looking, clearly defined, and repeatable.
 
 ### Key Risk Indicators
 
@@ -100,4 +100,4 @@ Business environment control factors are risk metrics and statistics used to mon
 - **Key control indicators (KCIs)** — monitor effectiveness of controls (e.g. outstanding confirmations, audit exceptions).
 - **Key risk indicators (KRIs)** — a selection of KPIs and KCIs aligned to key risks, used to warn of escalating risk and trigger management attention and action. Composite KRIs can be rolled up to top management.
 
-Indicators must be measurable, not complicated, and representative of the business line and its risk. The Basel Committee regards risk indicators as subjective in nature and cautions against overweighting them.
+Indicators must be measurable, not complicated, and representative of the business line and its risk. The [[bis|Basel]] Committee regards risk indicators as subjective in nature and cautions against overweighting them.

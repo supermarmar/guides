@@ -2,7 +2,7 @@
 
 This file covers the **mathematical foundations of counterparty exposure measurement** used in trading book CCR capital calculation, including the exposure metric definitions (EE, EPE, EEPE), the derivation of market-implied probability of default from credit spreads and survival curves, and the simulation approaches used to compute these exposures.
 
-For the regulatory capital formulas that consume these exposure measures (SA-CCR, IMM, BA-CVA, SA-CVA), see [Regulatory Capital (Trading Book)](01-regulatory_capital.md). For the analogous mathematical foundations for banking book credit risk (Vasicek model, loss distributions, TTC PDs), see [Credit Losses](..\..\02_airb_capital_modelling\01_introduction\02-credit_losses.md). For the historical evolution of Basel's CCR/CVA framework, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md).
+For the regulatory capital formulas that consume these exposure measures (SA-CCR, IMM, BA-CVA, SA-CVA), see [Regulatory Capital (Trading Book)](01-regulatory_capital.md). For the analogous mathematical foundations for banking book credit risk (Vasicek model, loss distributions, TTC PDs), see [Credit Losses](..\..\02_airb_capital_modelling\01_introduction\02-credit_losses.md). For the historical evolution of [[bis|Basel]]'s CCR/CVA framework, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md).
 
 ## Exposure Concepts
 
@@ -14,7 +14,7 @@ The **Expected Exposure (EE)** of a netting set is the average exposure at any f
 
 $$EE(t) = E[\max(V(t), 0)]$$
 
-where $V(t)$ is the mark-to-market value of the netting set at future time $t$ from the perspective of the bank. Only positive values matter — if the mark-to-market is negative, the bank has no exposure (the counterparty owes us nothing). The exposure distribution takes multiple market risk factors into account, such as interest rates, FX rates, equity prices, and commodity prices.
+where $V(t)$ is the mark-to-market value of the netting set at future time $t$ from the perspective of the bank. Only positive values matter — if the mark-to-market is negative, the bank has no exposure (the counterparty owes us nothing). The exposure distribution takes multiple [[05-market_risk|market risk]] factors into account, such as interest rates, FX rates, equity prices, and commodity prices.
 
 ### Expected Positive Exposure (EPE)
 
@@ -94,7 +94,7 @@ Early systems for managing CCR used closed-form approximations with limited and 
 The most common closed-form approximation for CCR was the **Value-at-Risk (VaR) modelling approach** — leveraging existing VaR models to implement CCR models. This approach:
 
 - Is computationally fast
-- Can be implemented with existing market risk infrastructure
+- Can be implemented with existing [[05-market_risk|market risk]] infrastructure
 - Works well for simple, low-dimensional portfolios
 
 However, closed-form approaches struggle to capture correlation, diversification, and credit migration simultaneously, particularly for complex OTC derivatives with path-dependent payoffs.
@@ -111,9 +111,9 @@ Given the complexity, number of dimensions, and uncertainty of the CCR of a bank
 
 In a Monte Carlo simulation model, large numbers of joint scenarios are generated based on numerous risk-based factors pertaining to market conditions, defaults, credit migration, correlations, and recovery over the term of the portfolio. This is especially necessary as credit events and in particular defaults are rare, yet have huge impacts. Monte Carlo simulations are primarily useful for **uncollateralised (OTC) transactions**, as these require more complex modelling owing to the higher inherent credit risk.
 
-Besides estimating risk, the simulations provide many insights into profit maximisation and hedging. This fulfils the requirement of Basel that models should not only be used for capital calculations, but also for general risk management.
+Besides estimating risk, the simulations provide many insights into profit maximisation and hedging. This fulfils the requirement of [[bis|Basel]] that models should not only be used for capital calculations, but also for general [[01-risk_management|risk management]].
 
-Basel specifically makes allowance for the Monte Carlo approach in its framework for modelling market risk under the internal model approach (akin to the IRBA for credit risk). The result of the Monte Carlo simulation feeds directly into the EEPE calculation:
+[[bis|Basel]] specifically makes allowance for the Monte Carlo approach in its framework for modelling [[05-market_risk|market risk]] under the internal model approach (akin to the IRBA for credit risk). The result of the Monte Carlo simulation feeds directly into the EEPE calculation:
 
 $$\text{EEPE} = \sum_{k=1}^{\min(\text{1 year, maturity})} EPE(t_k) \times \Delta t_k$$
 
@@ -133,4 +133,4 @@ Examples:
 - A bank that has written CDS protection (selling credit insurance) to a counterparty on a reference entity that is closely linked to the counterparty's own creditworthiness. If the reference entity deteriorates, the counterparty is most likely to default precisely when the CDS exposure is highest.
 - A bank that has entered into an FX swap with a sovereign counterparty: if the sovereign's currency depreciates sharply (increasing the bank's exposure), the sovereign may simultaneously come under fiscal stress (increasing default probability).
 
-Wrong-way risk is partially addressed by the 1.4 alpha factor in both the SA-CCR and IMM formulas, but sophisticated banks additionally model it explicitly within their Monte Carlo simulations by correlating market risk factors with counterparty default events.
+Wrong-way risk is partially addressed by the 1.4 alpha factor in both the SA-CCR and IMM formulas, but sophisticated banks additionally model it explicitly within their Monte Carlo simulations by correlating [[05-market_risk|market risk]] factors with counterparty default events.

@@ -1,6 +1,6 @@
 # Climate Risk
 
-Climate risk is a rapidly maturing field. As understanding develops, it may eventually warrant inclusion across multiple risk-type chapters. For now, this file provides a self-contained overview of climate risk definitions, reporting frameworks, risk measurement by risk type, and modelling considerations.
+Climate risk is a rapidly maturing field. As understanding develops, it may eventually warrant inclusion across multiple risk-type chapters. For now, this file provides a self-contained overview of climate risk definitions, reporting frameworks, [[04-risk_measurement|risk measurement]] by risk type, and modelling considerations.
 
 ## Background
 
@@ -10,7 +10,7 @@ Achieving the 1.5°C target requires significant reduction in greenhouse gas emi
 
 ### Key institutions
 
-- **NGFS (Network for Greening the Financial System)**: 116 members (as at June 2022) comprising central banks and banking regulators. Publishes carbon emission pathways and climate scenario databases. Advocates for climate risk integration into financial supervision.
+- **NGFS (Network for Greening the Financial System)**: 116 members (as at June 2022) comprising [[05-central_banks|central banks]] and banking regulators. Publishes carbon emission pathways and climate scenario databases. Advocates for climate risk integration into financial supervision.
 - **IPCC (Intergovernmental Panel on Climate Change)**: The United Nations' body for assessing science related to climate change risks. Publishes **Representative Carbon Pathways (RCPs)**, which provide benchmarks for understanding the interrelationship between global warming and total emissions.
 
 ### Greenhouse gases
@@ -60,14 +60,14 @@ Understanding these regional trends matters for segregating exposures by geograp
 
 The **TCFD** is an international body formed in **2015** to increase market transparency on the climate risks that firms (both financial and non-financial) face. It published a comprehensive framework in **2017** providing recommendations for climate-related disclosures, aimed at ensuring shareholders and other stakeholders are aware of a firm's climate impact and the steps being taken to reduce it.
 
-TCFD provides **recommendations** (not mandatory rules) on climate risk reporting, though some central banks and regulators (e.g. the Bank of England) do require firms to follow these recommendations.
+TCFD provides **recommendations** (not mandatory rules) on climate risk reporting, though some [[05-central_banks|central banks]] and regulators (e.g. the [[bank_of_england|Bank of England]]) do require firms to follow these recommendations.
 
 The TCFD recommends that firms disclose information on the following four areas:
 
 | Area | Description |
 |---|---|
 | **Metrics and targets** | Quantitative measures of climate exposure and stated reduction targets |
-| **Risk management** | How climate risks are identified, assessed, and managed |
+| **[[01-risk_management|Risk management]]** | How climate risks are identified, assessed, and managed |
 | **Strategy** | Actual and potential impacts of climate risks on the firm's business strategy |
 | **Governance** | Board and management oversight of climate-related risks and opportunities |
 
@@ -85,9 +85,9 @@ The **World Business Council for Sustainable Development (WBCSD)** provides a re
 
 There is currently no consistent requirement for banks to report Scope 1, 2 and 3 emissions, but many banks are electing to do so as part of opting into the TCFD recommendations.
 
-## Climate Risk Measurement by Risk Type
+## Climate [[04-risk_measurement|Risk Measurement]] by Risk Type
 
-The bulk of climate risk experienced by banks is through their clients. A useful way to measure climate risk is therefore to channel it through **known risk types**, providing a familiar starting point for risk management while enabling use of existing risk management skills. Climate change operates at both micro and macro levels, and can affect firms not directly exposed through **supply chain effects**.
+The bulk of climate risk experienced by banks is through their clients. A useful way to measure climate risk is therefore to channel it through **known risk types**, providing a familiar starting point for [[01-risk_management|risk management]] while enabling use of existing [[01-risk_management|risk management]] skills. Climate change operates at both micro and macro levels, and can affect firms not directly exposed through **supply chain effects**.
 
 ### Credit Risk
 
@@ -95,20 +95,20 @@ Climate risk is expected to impact the financial position of firms and individua
 
 - **PD impact**: At a minimum, physical and transition risks are expected to increase PDs. Climate events that reduce cashflows or increase costs push marginal borrowers into default.
 - **LGD impact**: Where assets used as security on a loan are materially damaged (e.g. a mortgaged house damaged by wildfire), this increases LGD. Financial market disruptions can also devalue collateral assets.
-- **Impairment (IFRS 9)**: Models typically use macroeconomic forecasts to determine impairments. As macroeconomic impacts are expected due to climate change, impairment impacts on credit portfolios will follow. See [international/ifrs/ifrs9_staging.md](international/ifrs/ifrs9_staging.md) for staging framework.
+- **Impairment ([[ifrs9_standard|IFRS 9]])**: Models typically use macroeconomic forecasts to determine impairments. As macroeconomic impacts are expected due to climate change, impairment impacts on credit portfolios will follow. See [international/ifrs/ifrs9_staging.md](international/ifrs/ifrs9_staging.md) for staging framework.
 - **Supply chain effects**: A new emissions policy affecting energy generation can flow through the entire economy — loan exposures on the brink of default could be pushed into full default.
 
 There is currently **no benchmark or best practice approach** for adjusting PDs and LGDs for climate risk. This is an evolving area.
 
-### Market Risk
+### [[05-market_risk|Market Risk]]
 
 There are expected to be several impacts on financial markets as a result of climate change:
 
 - **Asset repricing**: As assets begin to price in climate risk more adequately, there may be **abrupt swings** in asset prices (from no climate risk premium to a material one).
-- **Historical relationship breakdown**: The reliance of firms on historical relationships in market risk models is at risk, due to changing investor sentiment and climate-driven market dynamics.
-- A popular method for incorporating climate risk into market risk is a **Value at Risk (VaR) approach** that accounts for climate risk factors.
+- **Historical relationship breakdown**: The reliance of firms on historical relationships in [[05-market_risk|market risk]] models is at risk, due to changing investor sentiment and climate-driven market dynamics.
+- A popular method for incorporating climate risk into [[05-market_risk|market risk]] is a **[[07-var_limitations|Value at Risk]] (VaR) approach** that accounts for climate risk factors.
 
-There is no consensus on the best way to incorporate climate risk into market risk measurement.
+There is no consensus on the best way to incorporate climate risk into market [[04-risk_measurement|risk measurement]].
 
 ### Operational Risk
 
@@ -134,7 +134,7 @@ Climate change is expected to impact banks' ability to raise and maintain fundin
 
 Several banks have strong ties to insurance firms, either through group ownership or direct collaboration. The insurance-specific climate risk considerations are:
 
-- **Underwriting risk**: The increasing impact of climate change introduces material underwriting risk in a similar way to how climate change impacts credit risk — driven primarily by physical risk events that historically would not have been seen at current frequency or severity.
+- **[[00_underwriting|Underwriting]] risk**: The increasing impact of climate change introduces material [[00_underwriting|underwriting]] risk in a similar way to how climate change impacts credit risk — driven primarily by physical risk events that historically would not have been seen at current frequency or severity.
 - **Bank exposure through mortgage insurance**: Mortgage products typically require insurance cover. If insurance becomes more expensive as insurers price in physical risk, this impacts the ability of banks to write loans.
 
 ## Climate Risk Modelling
@@ -180,7 +180,7 @@ Transition risk makes use of **climate-related data**, such as carbon emissions,
 
 - **Firm emissions data**: The primary data point of interest for transition risk, but a particularly difficult data item to source. Some firms voluntarily post emissions, but this represents a minority of wholesale exposures. For smaller firms, proxies or estimates are required — noting that even firms' own emissions estimates are inherently uncertain.
 - **Sector as proxy**: Sector is commonly used as a proxy for transition risk (different sectors have different carbon intensity), but this is imperfect — e.g. two utilities firms may have very different carbon profiles (coal vs. renewables), yet both are classified as utilities.
-- **Expert-based data sources**: Credit ratings agencies and other data providers are increasingly offering views on climate risk by sector or for key individual exposures.
+- **Expert-based data sources**: Credit [[04-ratings_agencies|ratings agencies]] and other data providers are increasingly offering views on climate risk by sector or for key individual exposures.
 
 #### Stranded Assets
 
@@ -194,15 +194,15 @@ Assessing stranded assets requires a view of a firm's balance sheet and expert j
 
 ### General Considerations
 
-As it stands, there is **no 'best way'** to go about climate risk modelling. Several climate risk stress tests have been run by central banks around the world (e.g. Bank of England's 2021 Biennial Exploratory Scenario for climate-related financial risks), and there is currently **no single benchmark model** being used. Regardless, there are common considerations when choosing the best approach for a specific institution.
+As it stands, there is **no 'best way'** to go about climate risk modelling. Several climate risk stress tests have been run by [[05-central_banks|central banks]] around the world (e.g. [[bank_of_england|Bank of England]]'s 2021 Biennial Exploratory Scenario for climate-related financial risks), and there is currently **no single benchmark model** being used. Regardless, there are common considerations when choosing the best approach for a specific institution.
 
 ## References and Further Reading
 
 - NGFS. (June 2020). *Climate Scenarios Database*. <https://www.ngfs.net/en>
 - NGFS. (April 2019). *A call for action: Climate change as a source of financial risk*.
-- NGFS. (June 2020). *NGFS Climate Scenarios for central banks and supervisors*.
+- NGFS. (June 2020). *NGFS Climate Scenarios for [[05-central_banks|central banks]] and supervisors*.
 - IPCC. (October 2018). *Global Warming of 1.5°C*.
 - IPCC. (October 2014). *AR5 Synthesis Report*.
 - IAA. (February 2021). *Introduction to Climate-Related Scenarios*.
 - TCFD. (June 2017). *Recommendations of the Task Force on Climate-related Financial Disclosures*.
-- Bank of England. (2021). *Key elements of the 2021 Biennial Exploratory Scenario: Financial risks from climate change*. <https://www.bankofengland.co.uk/stress-testing/2021/key-elements-2021-biennialexploratory-scenario-financial-risks-climate-change>
+- [[bank_of_england|Bank of England]]. (2021). *Key elements of the 2021 Biennial Exploratory Scenario: Financial risks from climate change*. <https://www.bankofengland.co.uk/stress-testing/2021/key-elements-2021-biennialexploratory-scenario-financial-risks-climate-change>

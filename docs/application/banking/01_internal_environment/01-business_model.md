@@ -15,7 +15,7 @@ This creates a structural **maturity mismatch** between assets and liabilities: 
 
 Banks therefore assume a continuous ability to roll over or obtain new funding. Were this assumption to fail — if depositors collectively demanded their money back simultaneously (a “bank run”) — a bank could not fund its long-dated assets and would become insolvent. This structural vulnerability is the primary driver of the need for:
 
-- **Liquidity risk management**: Maintaining sufficient liquid assets and stable funding to meet withdrawal demands at all times (see [Liquidity Framework](liquidity_risk/risk_management/01-liquidity_framework.md))
+- **Liquidity [[01-risk_management|risk management]]**: Maintaining sufficient liquid assets and stable funding to meet withdrawal demands at all times (see [Liquidity Framework](liquidity_risk/risk_management/01-liquidity_framework.md))
 - **Capital requirements**: Holding sufficient loss-absorbing capital to protect depositors if assets lose value (see [Capital](04-capital.md))
 
 ## Facilitating Payments

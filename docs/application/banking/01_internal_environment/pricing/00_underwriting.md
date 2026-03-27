@@ -10,7 +10,7 @@ Refers to newly originated or recently booked exposures — accounts, loans, or 
 
 Used to assess current underwriting quality and the forward-looking risk profile of new lending. The performance of the front book shows how recent strategy and model changes are working.
 
-Front book exposures are important for ongoing monitoring and model application — ensuring that new lending is consistent with current risk appetite and that models remain predictive under current origination practices.
+Front book exposures are important for ongoing monitoring and model application — ensuring that new lending is consistent with current [[02-risk_appetite|risk appetite]] and that models remain predictive under current origination practices.
 
 ### Back Book
 
@@ -57,13 +57,13 @@ A corporate borrower is a little more complicated, particularly if it’s a priv
 - Transparency: The openness of management and their willingness to disclose problems promptly.
 - Reporting Integrity: The "timeliness and thoroughness" of audited financial statement
 
-However, this is not a substitute for KYC procedures.
+However, this is not a substitute for [[05-aml_kyc|KYC]] procedures.
 
 #### Capacity (Can they pay during good times)
 
 Capacity really speaks to a borrower’s ability to service debt obligations into the future. A borrower’s capacity, whether personal or corporate, is typically measured using a variety of financial ratios like total debt service (TDS) or debt service coverage (DSC).
 
-- Business Model & Sector: Understanding how the company actually makes money and the specific risks inherent to its industry (e.g., Mining vs. Airlines).
+- [[01-business_model|Business Model]] & Sector: Understanding how the company actually makes money and the specific risks inherent to its industry (e.g., Mining vs. Airlines).
 - Competitive Advantage (Franchise Value): Evaluating "moats" like brand strength, innovation, efficiency, and barriers to entry for new competitors.
 - Market Share: Assessing the company’s dominance and its ability to withstand competitive pressure.
 - Viability & Sustainability: Determining if the business is built for the long term or if it is vulnerable to being disrupted.
@@ -112,7 +112,7 @@ Ratings are intended to capture quantitative information to be considered in lin
 
 Internal ratings are produced by banks to rate the credit risk of their internal clients, both prospective or current clients. These can be produced using internal or external models.
 
-Whereas external ratings agencies were founded in the nineteenth century (mostly to analyse US railroads), bank internal ratings only took off in the 1990s with Basel II.
+Whereas external [[04-ratings_agencies|ratings agencies]] were founded in the nineteenth century (mostly to analyse US railroads), bank internal ratings only took off in the 1990s with [[basel_2|Basel II]].
 
 ### External Ratings
 

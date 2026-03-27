@@ -1,30 +1,30 @@
 # Basel
 
-This file covers the history of the BIS, the BCBS, and the evolution of the Basel accords (I → II → III → 3.1). For the application of these standards in bank capital management, see [Capital](\..\..\..\application\banks\04-capital.md). For the detailed computation of RWAs under each Basel framework for credit risk, see [Regulatory Capital (Banking Book)](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). For the mathematical foundations of the IRB model (Vasicek, loss distributions), see [Credit Losses](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\02-credit_losses.md).
+This file covers the history of the BIS, the BCBS, and the evolution of the Basel accords (I → II → III → 3.1). For the application of these standards in bank [[04-capital_management|capital management]], see [Capital](\..\..\..\application\banks\04-capital.md). For the detailed computation of RWAs under each [[basel_framework|Basel framework]] for credit risk, see [Regulatory Capital (Banking Book)](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). For the mathematical foundations of the IRB model (Vasicek, loss distributions), see [Credit Losses](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\02-credit_losses.md).
 
 ## Bank for International Settlements
 
-The BIS is owned by 63 central banks, representing countries from around the world that together account for about 95% of world GDP including the Bank of England, European Central Bank and South African Reserve Bank.
+The BIS is owned by 63 [[05-central_banks|central banks]], representing countries from around the world that together account for about 95% of world GDP including the [[bank_of_england|Bank of England]], [[ecb|European Central Bank]] and [[sarb|South African Reserve Bank]].
 
-Their mission is to support central banks' pursuit of monetary and financial stability through international cooperation, and to act as a bank for central banks.
+Their mission is to support [[05-central_banks|central banks]]' pursuit of monetary and financial stability through international cooperation, and to act as a bank for [[05-central_banks|central banks]].
 
-- The BIS provides central banks and financial supervisory authorities with a forum for dialogue and cooperation, where they can freely exchange information, forge a common understanding and decide on common actions.
-- It also supports central banks and other financial authorities in the implementation of global regulatory standards and sound supervisory practices.
-- As its name indicates, the BIS also acts as a bank. They offer ﬁnancial services exclusively to central banks, monetary authorities and international organisations, mainly to assist them in the management of their foreign exchange assets.
+- The BIS provides [[05-central_banks|central banks]] and financial supervisory authorities with a forum for dialogue and cooperation, where they can freely exchange information, forge a common understanding and decide on common actions.
+- It also supports [[05-central_banks|central banks]] and other financial authorities in the implementation of global regulatory standards and sound supervisory practices.
+- As its name indicates, the BIS also acts as a bank. They offer ﬁnancial services exclusively to [[05-central_banks|central banks]], monetary authorities and international organisations, mainly to assist them in the management of their foreign exchange assets.
 
 The governance of the Bank is exercised at three levels
 
 1. Board of Directors
-2. General Meetings of member central banks
+2. General Meetings of member [[05-central_banks|central banks]]
 3. BIS Management
 
 ### History
 
-Established in 1930, the Bank for International Settlements is the oldest international financial institution. From its inception to the present day, the BIS has played a number of key roles in the global economy, from settling reparation payments imposed on Germany following the First World War, to serving central banks in their pursuit of monetary and financial stability.
+Established in 1930, the Bank for International Settlements is the oldest international financial institution. From its inception to the present day, the BIS has played a number of key roles in the global economy, from settling reparation payments imposed on Germany following the First World War, to serving [[05-central_banks|central banks]] in their pursuit of monetary and financial stability.
 
 The BIS was set up to take over the functions previously performed by the Agent General for Reparations: managing the collection, administration and distribution of the annuities payable as reparations. The Bank's name is derived from this original role. Finally, the BIS was tasked to promote central bank cooperation more generally.
 
-With the reparations issue out of the way, the BIS focused its activities on the technical cooperation between central banks (including reserve management, foreign exchange transactions, international postal payments, gold deposit and swap facilities) and on providing a forum for regular meetings of central bank Governors and officials.
+With the reparations issue out of the way, the BIS focused its activities on the technical cooperation between [[05-central_banks|central banks]] (including reserve management, foreign exchange transactions, international postal payments, gold deposit and swap facilities) and on providing a forum for regular meetings of central bank Governors and officials.
 
 In July 1944, a United Nations conference met at Bretton Woods in the United States to discuss the postwar international monetary system. The Bretton Woods Conference adopted a resolution calling for the abolition of the BIS "at the earliest possible moment", because it considered that the BIS would have no useful role to play once the newly created World Bank and International Monetary Fund were operational. European central bankers held a different opinion, and successfully lobbied for maintaining the BIS. By early 1948, the BIS liquidation resolution had been put aside. It was understood that henceforth the BIS would focus foremost on European monetary and financial matters.
 
@@ -32,44 +32,44 @@ In July 1944, a United Nations conference met at Bretton Woods in the United Sta
 
 The Basel Process refers to the way in which the BIS promotes international cooperation among monetary authorities and financial supervisory officials.
 
-Governors and other senior officials of BIS member central banks hold bimonthly meetings, usually in Basel, to discuss current developments and the outlook for the world economy and financial markets. They also exchange views and experiences on issues of interest to central banks.
+Governors and other senior officials of BIS member [[05-central_banks|central banks]] hold bimonthly meetings, usually in Basel, to discuss current developments and the outlook for the world economy and financial markets. They also exchange views and experiences on issues of interest to [[05-central_banks|central banks]].
 
 The outcomes of this process are visible to the public in the form of committee reports analysing specific topics and internationally agreed standards. International agreement is the precondition for globally consistent standards produced by the standard-setting committees. But it does not substitute for national legislation. In order to become binding, the agreements reached in Basel have to be approved and implemented at the national level, following due regulatory and legislative processes in each individual jurisdiction.
 
-The Financial Stability Institute assists central banks and financial regulatory and supervisory authorities worldwide in strengthening their financial systems by supporting the implementation of global regulatory standards and sound supervisory practices. It does so through policy work, knowledge-sharing activities and capacity-building.
+The Financial Stability Institute assists [[05-central_banks|central banks]] and financial regulatory and supervisory authorities worldwide in strengthening their financial systems by supporting the implementation of global regulatory standards and sound supervisory practices. It does so through policy work, knowledge-sharing activities and capacity-building.
 
 ### Committees
 
 The BIS hosts six committees, which are overseen by three senior groupings in the context of the Basel Process.
 
 - The Global Economy Meeting (GEM) provides oversight to three committees: the Committee on the Global Financial System, the BIS Committee on Payments and Market Infrastructures and the Markets Committee
-- The All Governors' Meeting, which includes all 63 BIS member central banks, oversees the work of two committees: the Central Bank Governance Forum and the Irving Fisher Committee on Central Bank Statistics
+- The All Governors' Meeting, which includes all 63 BIS member [[05-central_banks|central banks]], oversees the work of two committees: the Central Bank Governance Forum and the Irving Fisher Committee on Central Bank Statistics
 - The Group of Governors and Heads of Supervision (GHOS) provides oversight to the Basel Committee on Banking Supervision (BCBS). The GHOS comprises the central bank Governors and non-central bank heads of supervision from BCBS member jurisdictions.
 
-The committees have their own respective governance arrangements and reporting lines, and their agendas are guided by various groups of central banks and supervisory authorities.
+The committees have their own respective governance arrangements and reporting lines, and their agendas are guided by various groups of [[05-central_banks|central banks]] and supervisory authorities.
 
 1. Basel Committee on Banking Supervision: develops global regulatory standards for banks and seeks to strengthen micro- and macroprudential supervision.
 2. Committee on the Global Financial System: monitors and analyses issues relating to financial markets and systems.
 3. Committee on Payments and Market Infrastructures: establishes and promotes global regulatory/oversight standards for payment, clearing, settlement and other market infrastructures, and monitors and analyses developments in these areas.
 4. Markets Committee: monitors developments in financial markets and their implications for central bank operations.
-5. Central Bank Governance Forum: examines issues related to the design and operation of central banks.
+5. Central Bank Governance Forum: examines issues related to the design and operation of [[05-central_banks|central banks]].
 6. Irving Fisher Committee on Central Bank Statistics: addresses statistical issues relating to economic, monetary and financial stability.
 
 ### Associations
 
 The following associations involved in international cooperation in the area of financial stability also have their secretariats at the BIS, but have their own separate legal identity and governance structure and report to their members.
 
-1. Financial Stability Board: coordinates the work of national authorities and international standard setters  in developing and promoting the implementation of effective regulatory, supervisory and other financial sector policies in the interest of global financial stability.
+1. [[fsb|Financial Stability Board]]: coordinates the work of national authorities and international standard setters  in developing and promoting the implementation of effective regulatory, supervisory and other financial sector policies in the interest of global financial stability.
 2. International Association of Deposit Insurers: sets global standards for deposit insurance systems and promotes cooperation on deposit insurance and bank resolution arrangements.
 3. International Association of Insurance Supervisors: sets global standards for the insurance sector to promote effective and globally consistent supervision for the benefit and protection of policyholders and to contribute to global financial stability.
 
 ## Basel Committee on Banking Supervision
 
-The Basel Committee on Banking Supervision (BCBS) is the primary global standard setter for the prudential regulation of banks and provides a forum for regular cooperation on banking supervisory matters. Its 45 members comprise central banks and bank supervisors from 28 jurisdictions.
+The Basel Committee on Banking Supervision (BCBS) is the primary global standard setter for the prudential regulation of banks and provides a forum for regular cooperation on banking supervisory matters. Its 45 members comprise [[05-central_banks|central banks]] and bank supervisors from 28 jurisdictions.
 
 In 1974, the collapse of Bankhaus Herstatt in Germany and of Franklin National Bank in the United States highlighted the lack of efficient banking supervision of banks' international activities, and prompted the G10 central bank Governors to create the Basel Committee on Banking Supervision. The Basel Committee was initially named the Committee on Banking Regulations and Supervisory Practices.
 
-The Committee's first meeting took place in February 1975, and meetings have been held regularly three or four times a year since. Since its inception, the Basel Committee has expanded its membership from the G10 to 45 institutions from 28 jurisdictions. Starting with the Basel Concordat, first issued in 1975 and revised several times since, the Committee has established a series of international standards for bank regulation, most notably its landmark publications of the accords on capital adequacy which are commonly known as Basel I, Basel II and, most recently, Basel III.
+The Committee's first meeting took place in February 1975, and meetings have been held regularly three or four times a year since. Since its inception, the Basel Committee has expanded its membership from the G10 to 45 institutions from 28 jurisdictions. Starting with the Basel Concordat, first issued in 1975 and revised several times since, the Committee has established a series of international standards for bank regulation, most notably its landmark publications of the accords on capital adequacy which are commonly known as [[basel_1|Basel I]], [[basel_2|Basel II]] and, most recently, [[basel_framework|Basel III]].
 
 ![alt text](images/basel/bcbs_structure.png)
 
@@ -88,7 +88,7 @@ The BCBS seeks to achieve its mandate through the following activities:
 - establishing and promoting global standards for the regulation and supervision of banks as well as guidelines and sound practices;
 - addressing regulatory and supervisory gaps that pose risks to financial stability;
 - monitoring the implementation of BCBS standards in member countries and beyond with the purpose of ensuring their timely, consistent and effective implementation and contributing to a "level playing field" among internationally active banks;
-- consulting with central banks and bank supervisory authorities which are not members of the BCBS to benefit from their input into the BCBS policy formulation process and to promote the implementation of BCBS standards, guidelines and sound practices beyond BCBS member countries; and
+- consulting with [[05-central_banks|central banks]] and bank supervisory authorities which are not members of the BCBS to benefit from their input into the BCBS policy formulation process and to promote the implementation of BCBS standards, guidelines and sound practices beyond BCBS member countries; and
 - coordinating and cooperating with other financial sector standard setters and international bodies, particularly those involved in promoting financial stability.
 
 The BCBS does not possess any formal supranational authority. Its decisions do not have legal force. Rather, the BCBS relies on its members' commitments, as described in Section 5, to achieve its mandate.
@@ -99,7 +99,7 @@ The BCBS does not possess any formal supranational authority. Its decisions do n
 #### II. Membership
 
 (4) BCBS members
-BCBS members include organisations with direct banking supervisory authority and central banks. After consulting the Committee, the BCBS Chair may invite other organisations to become BCBS observers.
+BCBS members include organisations with direct banking supervisory authority and [[05-central_banks|central banks]]. After consulting the Committee, the BCBS Chair may invite other organisations to become BCBS observers.
 
 #### III. Oversight
 
@@ -187,57 +187,57 @@ The Basel Accord is not a law.
 2. Freedom: What is the ability of this asset to absorb losses on an ongoing basis? The better the asset at absorbing losses, the higher the tier.
 3. Subordination: Where does this asset rank relative to depositors and other creditors? The closer the ranking to these counterparties, the better quality the capital.
 
-#### Market Risk Amendemnt
+#### [[05-market_risk|Market Risk]] Amendemnt
 
-The Committee also refined the framework to address risks other than credit risk, which was the focus of the 1988 Accord. In January 1996, following two consultative processes, the Committee issued the Amendment to the Capital Accord to incorporate market risks (or Market Risk Amendment), to take effect at the end of 1997. This was designed to incorporate within the Accord a capital requirement for the market risks arising from banks' exposures to foreign exchange, traded debt securities, equities, commodities and options. An important aspect of the Market Risk Amendment was that banks were, for the first time, allowed to use internal models (value-at-risk models) as a basis for measuring their market risk capital requirements, subject to strict quantitative and qualitative standards. Much of the preparatory work for the market risk package was undertaken jointly with securities regulators.
+The Committee also refined the framework to address risks other than credit risk, which was the focus of the 1988 Accord. In January 1996, following two consultative processes, the Committee issued the Amendment to the Capital Accord to incorporate market risks (or [[05-market_risk|Market Risk]] Amendment), to take effect at the end of 1997. This was designed to incorporate within the Accord a capital requirement for the market risks arising from banks' exposures to foreign exchange, traded debt securities, equities, commodities and options. An important aspect of the [[05-market_risk|Market Risk]] Amendment was that banks were, for the first time, allowed to use internal models (value-at-risk models) as a basis for measuring their [[06-market_risk_capital|market risk capital]] requirements, subject to strict quantitative and qualitative standards. Much of the preparatory work for the [[05-market_risk|market risk]] package was undertaken jointly with securities regulators.
 
 <https://www.bis.org/publ/bcbs24a.htm>
 
-#### Shortcomings: Basel I
+#### Shortcomings: [[basel_1|Basel I]]
 
-While Basel I improved and standardised the way capital requirements were determined, it did have significant weaknesses, namely:
+While [[basel_1|Basel I]] improved and standardised the way capital requirements were determined, it did have significant weaknesses, namely:
 
 1. Lack of differentiation: Under this accord, all loans by a bank to a corporation had a risk weight of 100% and required the same amount of capital. A loan to a company with an AAA credit rating was treated in the same way as one to a corporation with a B rating (much riskier).
 2. Lack of correlation: There was no model of default correlation to assess how the risk of assets were correlated (especially in times of stress) or how diversification may benefit the bank
-3. Lack of breadth: The original Basel I Accord did not consider market, operational and liquidity risk. While there was an amendment made in 1996 to include market risk, the requirements for assessing risk in the trading book, including value at risk (VaR) methodologies, were rudimentary and failed to recognise the risk inherent in the books
+3. Lack of breadth: The original [[basel_1|Basel I]] Accord did not consider market, operational and liquidity risk. While there was an amendment made in 1996 to include [[05-market_risk|market risk]], the requirements for assessing risk in the trading book, including [[07-var_limitations|value at risk]] (VaR) methodologies, were rudimentary and failed to recognise the risk inherent in the books
 4. Static measure of credit risk: It assumes that a minimum 8% CAR is adequate at all times and that the credit risk posed by counterparties does not change as the credit exposure ages.
 
-### Basel II
+### [[basel_2|Basel II]]
 
-In June 1999, the Committee issued a proposal for a new capital adequacy framework to replace the 1988 Accord. This led to the release of a revised capital framework in June 2004. Generally known as "Basel II", the revised framework comprised three pillars:
+In June 1999, the Committee issued a proposal for a new capital adequacy framework to replace the 1988 Accord. This led to the release of a revised capital framework in June 2004. Generally known as "[[basel_2|Basel II]]", the revised framework comprised three pillars:
 
 1. minimum capital requirements, which sought to develop and expand the standardised rules set out in the 1988 Accord
 2. supervisory review of an institution's capital adequacy and internal assessment process
 3. effective use of disclosure as a lever to strengthen market discipline and encourage sound banking practices
 
-The new framework was designed to improve the way regulatory capital requirements reflect underlying risks and to better address the financial innovation that had occurred in recent years. The changes aimed at rewarding and encouraging continued improvements in risk measurement and control. The goals of the new accord were:
+The new framework was designed to improve the way regulatory capital requirements reflect underlying risks and to better address the financial innovation that had occurred in recent years. The changes aimed at rewarding and encouraging continued improvements in [[04-risk_measurement|risk measurement]] and control. The goals of the new accord were:
 
 1. To maintain an adequate amount of regulatory capital, which addressed the risk inherent in asset exposure and their default correlation and incorporated operational risk (i.e. to ensure that capital allocation was more risk-sensitive)
 2. To enhance disclosure requirements to allow market participants to be able to more easily compare the capital adequacy of different institutions
-3. To ensure that risk assessment for credit, operation, and market risk were performed using quantifiable techniques
+3. To ensure that risk assessment for credit, operation, and [[05-market_risk|market risk]] were performed using quantifiable techniques
 4. To attempt to better align economic and regulatory capital to reduce the scope for regulatory arbitrage.
 
-The framework's publication in June 2004 followed almost six years of intensive preparation. During this period, the Basel Committee consulted extensively with banking sector representatives, supervisory agencies, central banks and outside observers in order to develop significantly more risk-sensitive capital requirements.
+The framework's publication in June 2004 followed almost six years of intensive preparation. During this period, the Basel Committee consulted extensively with banking sector representatives, supervisory agencies, [[05-central_banks|central banks]] and outside observers in order to develop significantly more risk-sensitive capital requirements.
 
 <https://www.bis.org/publ/bcbs107.htm>
 
-Following the June 2004 release, which focused primarily on the banking book, the Committee turned its attention to the trading book. In close cooperation with the International Organization of Securities Commissions (IOSCO), the international body of securities regulators, the Committee published in July 2005 a consensus document governing the treatment of banks' trading books under the new framework. For ease of reference, this new text was integrated with the June 2004 text in a comprehensive document released in June 2006: Basel II: International convergence of capital measurement and capital standards: A revised framework - Comprehensive version.
+Following the June 2004 release, which focused primarily on the banking book, the Committee turned its attention to the trading book. In close cooperation with the International Organization of Securities Commissions (IOSCO), the international body of securities regulators, the Committee published in July 2005 a consensus document governing the treatment of banks' trading books under the new framework. For ease of reference, this new text was integrated with the June 2004 text in a comprehensive document released in June 2006: [[basel_2|Basel II]]: International convergence of capital measurement and capital standards: A revised framework - Comprehensive version.
 
 <https://www.bis.org/publ/bcbs128.htm>
 
 #### Pillars
 
-Basel II introduced three pillars related to risk and capital management, and Basel III further refined this methodology. Simply put, the pillars ensure that banks measure and manage their risk appropriately, supervisors monitor and enforce this, and that stakeholders and the market are kept wellinformed.
+[[basel_2|Basel II]] introduced three pillars related to risk and [[04-capital_management|capital management]], and [[basel_framework|Basel III]] further refined this methodology. Simply put, the pillars ensure that banks measure and manage their risk appropriately, supervisors monitor and enforce this, and that stakeholders and the market are kept wellinformed.
 
 ##### Pillar 1 – MCR
 
 This pillar’s purpose is to ensure that banks have adequate capital to prevent individual failures which can contribute to systemic risk and financial crises, and that this capital is managed adequately.
 
-##### Pillar 2 – Supervisory review process
+##### [[02-stress_testing|Pillar 2]] – Supervisory review process
 
-This pillar’s purpose is to ensure that supervisors are actively involved in reviewing banks’ risk management systems and policies, so adherence to regulation is adequately enforced and additional capital is held where deemed necessary by the regulator.
+This pillar’s purpose is to ensure that supervisors are actively involved in reviewing banks’ [[01-risk_management|risk management]] systems and policies, so adherence to regulation is adequately enforced and additional capital is held where deemed necessary by the regulator.
 
-Pillar 2 also seeks to ensure that risks that are not fully considered under Pillar 1 are adequately managed (e.g. Interest rate risk in the banking book).
+[[02-stress_testing|Pillar 2]] also seeks to ensure that risks that are not fully considered under Pillar 1 are adequately managed (e.g. [[01-irrbb_sources|Interest rate risk in the banking book]]).
 
 ###### Pillar 3 – Market discipline
 
@@ -245,7 +245,7 @@ This pillar’s purpose is to ensure that banks’ disclosure is appropriate and
 
 #### Credit Risk Approach Changes
 
-For credit risk, three approaches of calculation were introduced under Basel II, namely:
+For credit risk, three approaches of calculation were introduced under [[basel_2|Basel II]], namely:
 
 1. The standardised approach
 2. The foundation internal ratings based (IRB) approach: Here the bank produces its own probability of default (PD) model but uses prescribed exposure at defaults (EADs), and loss given defaults (LGDs) based on ratings.
@@ -253,93 +253,93 @@ For credit risk, three approaches of calculation were introduced under Basel II,
 
 #### Operational Risk
 
-Besides changing the manner in which banks calculate credit risk capital, Basel II requires banks to keep capital for operational risk. This is the risk of losses from occurrences where the bank’s procedures fail to work as they are meant to, or where there is an adverse external event such as an explosion in a key facility. The effect of the Basel II credit risk calculation is to reduce the credit risk capital requirements for most banks and the capital charge for operational risk has the impact of restoring the total level of capital in the banking system roughly to where it was under Basel I. Three approaches of calculating capital for operational risk were introduced under Basel II, namely:
+Besides changing the manner in which banks calculate credit risk capital, [[basel_2|Basel II]] requires banks to keep capital for operational risk. This is the risk of losses from occurrences where the bank’s procedures fail to work as they are meant to, or where there is an adverse external event such as an explosion in a key facility. The effect of the [[basel_2|Basel II]] credit risk calculation is to reduce the credit risk capital requirements for most banks and the capital charge for operational risk has the impact of restoring the total level of capital in the banking system roughly to where it was under [[basel_1|Basel I]]. Three approaches of calculating capital for operational risk were introduced under [[basel_2|Basel II]], namely:
 
 1. The basic indicator approach
 2. The standardised approach
 3. The advanced measurement approach
 
-The level of sophistication of the bank determines which approach is adopted. The simplest is the basic indicator approach. This sets the operational risk capital equal to the bank’s average annual gross income over the last 3 years, multiplied by 0,15. The standardised approach is similar to the basic indicator approach, from a calculation perspective, except that a different factor is applied to the gross income from different business lines. However, the standardised approach requires much more rigour in operational risk management approaches.
+The level of sophistication of the bank determines which approach is adopted. The simplest is the basic indicator approach. This sets the operational risk capital equal to the bank’s average annual gross income over the last 3 years, multiplied by 0,15. The standardised approach is similar to the basic indicator approach, from a calculation perspective, except that a different factor is applied to the gross income from different business lines. However, the standardised approach requires much more rigour in operational [[01-risk_management|risk management]] approaches.
 
 In the advanced measurement approach, the bank uses its own internal models to calculate the operational risk loss that it is 99,9% certain will not be exceeded in 1 year. One advantage of the advanced measurement approach is that it allows banks to recognise the risk-mitigating impact of insurance contracts subject to certain conditions.
 
-#### Shortcomings: Basel II
+#### Shortcomings: [[basel_2|Basel II]]
 
-While Basel II aimed to address many of the shortcomings of Basel I, it also introduced other issues including:
+While [[basel_2|Basel II]] aimed to address many of the shortcomings of [[basel_1|Basel I]], it also introduced other issues including:
 
 - Additional compliance costs around IT infrastructure and technical modelling staff
 - Additional complexity and model risk introduced via internal models
 - The increased reliance on rating agencies which may not always have perfect information
 - The small-bank disadvantage: smaller banks are unlikely to be able to develop internal models and as such may face more onerous capital charges than larger banks that can develop more specific and nuanced internal models.
 
-### Basel III
+### [[basel_framework|Basel III]]
 
-Even before Lehman Brothers collapsed in September 2008, the need for a fundamental strengthening of the Basel II framework had become apparent. The banking sector entered the financial crisis with too much leverage and inadequate liquidity buffers. These weaknesses were accompanied by poor governance and risk management, as well as inappropriate incentive structures. The dangerous combination of these factors was demonstrated by the mispricing of credit and liquidity risks, and excess credit growth.
+Even before Lehman Brothers collapsed in September 2008, the need for a fundamental strengthening of the [[basel_2|Basel II]] framework had become apparent. The banking sector entered the financial crisis with too much leverage and inadequate liquidity buffers. These weaknesses were accompanied by poor governance and [[01-risk_management|risk management]], as well as inappropriate incentive structures. The dangerous combination of these factors was demonstrated by the mispricing of credit and liquidity risks, and excess credit growth.
 
-Responding to these risk factors, the Basel Committee issued Principles for sound liquidity risk management and supervision in the same month that Lehman Brothers failed.
+Responding to these risk factors, the Basel Committee issued [[bcbs_144|Principles for sound liquidity risk management and supervision]] in the same month that Lehman Brothers failed.
 
 <https://www.bis.org/publ/bcbs144.htm>
 
-In July 2009, the Committee issued a further package of documents to strengthen the Basel II capital framework, notably with regard to the treatment of certain complex securitisation positions, off-balance sheet vehicles and trading book exposures. These enhancements were part of a broader effort to strengthen the regulation and supervision of internationally active banks, in the light of weaknesses revealed by the financial market crisis.
+In July 2009, the Committee issued a further package of documents to strengthen the [[basel_2|Basel II]] capital framework, notably with regard to the treatment of certain complex securitisation positions, off-balance sheet vehicles and trading book exposures. These enhancements were part of a broader effort to strengthen the regulation and supervision of internationally active banks, in the light of weaknesses revealed by the financial market crisis.
 
-In September 2010, the Group of Governors and Heads of Supervision (GHOS) announced higher global minimum capital standards for commercial banks. This followed an agreement reached in July regarding the overall design of the capital and liquidity reform package, now referred to as "Basel III". In November 2010, the new capital and liquidity standards were endorsed at the G20 Leaders' Summit in Seoul and subsequently agreed at the December 2010 Basel Committee meeting.
+In September 2010, the Group of Governors and Heads of Supervision (GHOS) announced higher global minimum capital standards for commercial banks. This followed an agreement reached in July regarding the overall design of the capital and liquidity reform package, now referred to as "[[basel_framework|Basel III]]". In November 2010, the new capital and liquidity standards were endorsed at the G20 Leaders' Summit in Seoul and subsequently agreed at the December 2010 Basel Committee meeting.
 
 <https://www.bis.org/publ/bcbs188.htm>
 
-The proposed standards were issued by the Committee in mid-December 2010 (and have been subsequently revised). The December 2010 versions were set out in Basel III: International framework for liquidity risk measurement, standards and monitoring and Basel III: A global regulatory framework for more resilient banks and banking systems.
+The proposed standards were issued by the Committee in mid-December 2010 (and have been subsequently revised). The December 2010 versions were set out in [[bcbs_188|Basel III: International framework for liquidity risk measurement, standards and monitoring]] and [[basel_framework|Basel III]]: A global regulatory framework for more resilient banks and banking systems.
 
 <https://www.bis.org/publ/bcbs189_dec2010.htm>
 
-The enhanced Basel framework revises and strengthens the three pillars established by Basel II, and extends it in several areas. Most of the reforms are being phased in between 2013 and 2019:
+The enhanced [[basel_framework|Basel framework]] revises and strengthens the three pillars established by [[basel_2|Basel II]], and extends it in several areas. Most of the reforms are being phased in between 2013 and 2019:
 
 - stricter requirements for the quality and quantity of regulatory capital, in particular reinforcing the central role of common equity
 - an additional layer of common equity - the capital conservation buffer - that, when breached, restricts payouts to help meet the minimum common equity requirement
 - a countercyclical capital buffer, which places restrictions on participation by banks in system-wide credit booms with the aim of reducing their losses in credit busts
 - a leverage ratio - a minimum amount of loss-absorbing capital relative to all of a bank's assets and off-balance sheet exposures regardless of risk weighting
-- liquidity requirements - a minimum liquidity ratio, the Liquidity Coverage Ratio (LCR), intended to provide enough cash to cover funding needs over a 30-day period of stress; and a longer-term ratio, the Net Stable Funding Ratio (NSFR), intended to address maturity mismatches over the entire balance sheet
+- liquidity requirements - a minimum liquidity ratio, the [[04-lcr|Liquidity Coverage Ratio (LCR)]], intended to provide enough cash to cover funding needs over a 30-day period of stress; and a longer-term ratio, the [[05-nsfr|Net Stable Funding Ratio (NSFR)]], intended to address maturity mismatches over the entire balance sheet
 - additional requirements for systemically important banks, including additional loss absorbency and strengthened arrangements for cross-border supervision and resolution
 
 #### Revised Capital Sources
 
-Basel III cleaned up the definition of capital, i.e., the numerator of the capital ratio. But it did not seek to materially alter the Basel II risk based framework for measuring risk-weighted assets, i.e., the denominator of the capital ratio; therefore, the architecture of the risk weighted capital regime was left largely unchanged.
+[[basel_framework|Basel III]] cleaned up the definition of capital, i.e., the numerator of the capital ratio. But it did not seek to materially alter the [[basel_2|Basel II]] risk based framework for measuring risk-weighted assets, i.e., the denominator of the capital ratio; therefore, the architecture of the risk weighted capital regime was left largely unchanged.
 
 #### Revised MCR
 
-Under Basel III the minimum capital requirement was not changed, but stricter rules were introduced to ensure capital was of sufficient quality. Basel III has increased the minimum common equity Tier 1, total Tier 1, and total capital adequacy ratios. The base requirement is that a minimum of 4,5% of the 8% of RWA capital requirement needs to be held in CET1 capital, i.e. more than half of the RWA capital requirement is required to be held in CET1 capital. In essence, CET1/RWAs must be greater than 4,5%. An additional 1,5% of the requirement can be held in Additional Tier 1 capital (AT1). The last 2% is allowed to be held in Tier 2 capital. Combined, this is a total of 8% of RWAs and is the minimum amount of capital a bank has to hold.
+Under [[basel_framework|Basel III]] the minimum capital requirement was not changed, but stricter rules were introduced to ensure capital was of sufficient quality. [[basel_framework|Basel III]] has increased the minimum common equity Tier 1, total Tier 1, and total capital adequacy ratios. The base requirement is that a minimum of 4,5% of the 8% of RWA capital requirement needs to be held in CET1 capital, i.e. more than half of the RWA capital requirement is required to be held in CET1 capital. In essence, CET1/RWAs must be greater than 4,5%. An additional 1,5% of the requirement can be held in Additional Tier 1 capital (AT1). The last 2% is allowed to be held in Tier 2 capital. Combined, this is a total of 8% of RWAs and is the minimum amount of capital a bank has to hold.
 
 #### Capital Conservation Buffer (CCoB)
 
-Basel III introduces an additional 2,5% capital conservation buffer (2,5% of RWA) to withstand future stress periods. This was to be implemented from 2016 onwards and consists of CET1 capital. This buffer is applied by the national regulator.
+[[basel_framework|Basel III]] introduces an additional 2,5% capital conservation buffer (2,5% of RWA) to withstand future stress periods. This was to be implemented from 2016 onwards and consists of CET1 capital. This buffer is applied by the national regulator.
 
 #### Countercyclical Capital Buffer (CCyB)
 
-Basel III further introduces an additional countercyclical buffer, ranging from 0–2,5%, to withstand future stresses. Implementation of this measure is also from 2016 to 2019. This buffer aims to reduce procyclicality that occurs in market conditions, which results in excessive credit growth.
+[[basel_framework|Basel III]] further introduces an additional countercyclical buffer, ranging from 0–2,5%, to withstand future stresses. Implementation of this measure is also from 2016 to 2019. This buffer aims to reduce procyclicality that occurs in market conditions, which results in excessive credit growth.
 
-The Financial Stability Committee of the SARB is responsible for setting the CCyB and uses a credit-to-GDP gap as the main indicator to inform what the CCyB should be. In the UK, the Bank of England’s Financial Policy Committee sets the countercyclical capital buffer.
+The Financial Stability Committee of the [[sarb|SARB]] is responsible for setting the CCyB and uses a credit-to-GDP gap as the main indicator to inform what the CCyB should be. In the UK, the [[bank_of_england|Bank of England]]’s Financial Policy Committee sets the countercyclical capital buffer.
 
 #### Additional buffer for SIBs
 
-Basel III further introduces an additional buffer for domestic systemically important banks, ranging from 0–2,5%, to withstand future stresses. The FSB designates the G-SIB status to various global banks.
+[[basel_framework|Basel III]] further introduces an additional buffer for domestic systemically important banks, ranging from 0–2,5%, to withstand future stresses. The [[fsb|FSB]] designates the [[g_sibs|G-SIB]] status to various global banks.
 
-While South Africa does not have any G-SIBs, the SARB does recognise certain D-SIBs based on the following criteria: size, interconnectedness and substitutability, global activity, and complexity. These D-SIBs have higher loss absorbing (HLA) requirements. These HLA requirements were phased in between January 2016 and 2019.
+While South Africa does not have any [[g_sibs|G-SIBs]], the [[sarb|SARB]] does recognise certain D-SIBs based on the following criteria: size, interconnectedness and substitutability, global activity, and complexity. These D-SIBs have higher loss absorbing (HLA) requirements. These HLA requirements were phased in between January 2016 and 2019.
 
 #### Leverage Ratio
 
 The introduction of this ratio succeeded the global financial crisis post 2008. The leverage ratio measures the overall resilience of a bank to balance sheet stress events.
 
-As mentioned above, Basel III introduces a non-risk-based measure of capital structure, called the minimum leverage ratio. This requires banks to keep a minimum Tier 1 ratio of 3%. The SARB requires South African banks to keep a 4% minimum.
+As mentioned above, [[basel_framework|Basel III]] introduces a non-risk-based measure of capital structure, called the minimum leverage ratio. This requires banks to keep a minimum Tier 1 ratio of 3%. The [[sarb|SARB]] requires South African banks to keep a 4% minimum.
 
-The Basel definition for the leverage ratio is Tier 1 capital divided by total assets (including off-balance-sheet exposures). The SARB’s definition of the leverage ratio is Tier 1 capital divided by non-risk sensitive exposure (including off-balance-sheet items).
+The Basel definition for the leverage ratio is Tier 1 capital divided by total assets (including off-balance-sheet exposures). The [[sarb|SARB]]’s definition of the leverage ratio is Tier 1 capital divided by non-risk sensitive exposure (including off-balance-sheet items).
 
-#### Liquidity Coverage Ratio (LCR)
+#### [[04-lcr|Liquidity Coverage Ratio (LCR)]]
 
-The LCR identifies the amount of unencumbered, high quality liquid assets a bank is required to hold in order to offset the cumulative net cash outflows it would encounter under an acute short-term (30-day) stress scenario.
+The [[04-lcr|LCR]] identifies the amount of unencumbered, high quality liquid assets a bank is required to hold in order to offset the cumulative net cash outflows it would encounter under an acute short-term (30-day) stress scenario.
 
-During the Covid-19 pandemic, the LCR was used as a tool to provide some relief to banks. In South Africa, this was done by temporarily reducing the LCR from 100% to 80%. In the UK, the ECB allowed banks to temporarily operate below the minimum LCR.
+During the Covid-19 pandemic, the [[04-lcr|LCR]] was used as a tool to provide some relief to banks. In South Africa, this was done by temporarily reducing the [[04-lcr|LCR]] from 100% to 80%. In the UK, the [[ecb|ECB]] allowed banks to temporarily operate below the minimum [[04-lcr|LCR]].
 
-#### Net Stable Funding Ratio (NSFR)
+#### [[05-nsfr|Net Stable Funding Ratio (NSFR)]]
 
-The NSFR was introduced in conjunction with the Basel III liquidity framework. The Net Stable Funding Ratio (NSFR) measures the amount of longer-term, stable funding sources required by a bank given the liquidity profile of its assets and liabilities and the contingent liquidity risk arising from off-balance-sheet exposures (OBEs). The standard requires a minimum amount of funding that is expected to be stable over a 6-month horizon based on liquidity risk factors assigned to assets / liabilities and OBEs. This is intended to promote longer-term structural funding of a bank’s balance sheet. The NSFR can also be viewed as implementing a maximum limit on the level of mismatch that a bank is able to undertake.
+The [[05-nsfr|NSFR]] was introduced in conjunction with the [[basel_framework|Basel III]] [[01-liquidity_framework|liquidity framework]]. The [[05-nsfr|Net Stable Funding Ratio (NSFR)]] measures the amount of longer-term, stable funding sources required by a bank given the liquidity profile of its assets and liabilities and the contingent liquidity risk arising from off-balance-sheet exposures (OBEs). The standard requires a minimum amount of funding that is expected to be stable over a 6-month horizon based on liquidity risk factors assigned to assets / liabilities and OBEs. This is intended to promote longer-term structural funding of a bank’s balance sheet. The [[05-nsfr|NSFR]] can also be viewed as implementing a maximum limit on the level of mismatch that a bank is able to undertake.
 
 This is calculated as: available stable funding / required funding. This measure is kept at a minimum of 100%. This was gradually introduced over time.
 
@@ -361,36 +361,36 @@ The ILAAP forms an integral part of the going concern of the business. The resul
 
 The stress events included in the ILAAP need to be severe as well as plausible. Usually, the supervisor may prescribe various stress events that need to be simulated.
 
-#### Counterparty Credit Risk (CCR) and Credit Valuation Adjustment (CVA)
+#### [[02-counterparty_exposures|Counterparty Credit Risk]] (CCR) and Credit Valuation Adjustment (CVA)
 
-Counterparty credit risk (CCR) is the risk that a counterparty to a trade defaults before settlement — a bilateral risk applicable to OTC derivatives, exchange-traded derivatives, long settlement transactions, and securities financing transactions (repo). The CVA capital charge complements CCR by capturing mark-to-market losses from counterparty credit *deterioration* (not just default), which were twice as large as CCR default losses during the 2007–09 financial crisis.
+[[02-counterparty_exposures|Counterparty credit risk]] (CCR) is the risk that a counterparty to a trade defaults before settlement — a bilateral risk applicable to OTC derivatives, exchange-traded derivatives, long settlement transactions, and securities financing transactions (repo). The CVA capital charge complements CCR by capturing mark-to-market losses from counterparty credit *deterioration* (not just default), which were twice as large as CCR default losses during the 2007–09 financial crisis.
 
 In 2005, the Basel Committee became concerned that banks were reducing their capital requirements by shifting exposures from the banking book to the trading book. Structured products whose values depended on the creditworthiness of companies were increasingly put in the trading book, despite being less liquid than other instruments. The 10-day, 99% confidence VaR calculation was considered inappropriate for these products. Regulators proposed an “incremental default risk charge” (IDRC) at 99.9% confidence and a 1-year time horizon for trading book instruments sensitive to default risk. In 2008, the Basel Committee recognised that most losses in the credit market turmoil of 2007–08 were from changes in credit ratings, widening credit spreads and loss of liquidity (not solely defaults), and amended proposals accordingly. The IDRC became the **Incremental Risk Charge (IRC)**.
 
-Under the 2014 Basel III reforms, the old Current Exposure Method (CEM) and Standardised Method (SM) for measuring CCR EADs were replaced by the **Standardised Approach for CCR (SA-CCR)** and the **Internal Model Method (IMM)**. The CVA capital charge was introduced as part of Basel III (2010) and was substantially revised in the 2017 Basel III finalisation (effective 2019), replacing the internally modelled CVA approach with a standardised approach (SA-CVA) and a basic approach (BA-CVA). For the full computation mechanics of SA-CCR, IMM, and CVA capital charges, see [Regulatory Capital (Trading Book)](..\..\..\application\banks\credit_risk\05_counterparty_modelling\01_introduction\01-regulatory_capital.md). For the mathematical foundations of EE/EPE/EEPE and survival curve construction, see [Counterparty Exposures](..\..\..\application\banks\credit_risk\05_counterparty_modelling\01_introduction\02-counterparty_exposures.md).
+Under the 2014 [[basel_framework|Basel III]] reforms, the old Current Exposure Method (CEM) and Standardised Method (SM) for measuring CCR EADs were replaced by the **Standardised Approach for CCR (SA-CCR)** and the **Internal Model Method (IMM)**. The CVA capital charge was introduced as part of [[basel_framework|Basel III]] (2010) and was substantially revised in the 2017 [[basel_framework|Basel III]] finalisation (effective 2019), replacing the internally modelled CVA approach with a standardised approach (SA-CVA) and a basic approach (BA-CVA). For the full computation mechanics of SA-CCR, IMM, and CVA capital charges, see [Regulatory Capital (Trading Book)](..\..\..\application\banks\credit_risk\05_counterparty_modelling\01_introduction\01-regulatory_capital.md). For the mathematical foundations of EE/EPE/EEPE and survival curve construction, see [Counterparty Exposures](..\..\..\application\banks\credit_risk\05_counterparty_modelling\01_introduction\02-counterparty_exposures.md).
 
 #### Stressed VaR (sVaR)
 
-Another proposal involves what is called stressed value at risk (sVaR). The usual approach for calculating VaR is based on how market variables behaved over the most recent 2 to 4 years. A stressed VaR is calculated from the movements in market variables during a 1-year period of significant losses (such as 2007 or 2008). Basel II proposes that the capital for market risk be supplemented by a calculation involving stressed VaR, at least doubling the capital that banks have to keep for market risks.
+Another proposal involves what is called stressed [[07-var_limitations|value at risk]] (sVaR). The usual approach for calculating VaR is based on how market variables behaved over the most recent 2 to 4 years. A stressed VaR is calculated from the movements in market variables during a 1-year period of significant losses (such as 2007 or 2008). [[basel_2|Basel II]] proposes that the capital for [[05-market_risk|market risk]] be supplemented by a calculation involving stressed VaR, at least doubling the capital that banks have to keep for market risks.
 
-### Basel III Reforms | 3.1 | IV
+### [[basel_framework|Basel III]] Reforms | 3.1 | IV
 
-Basel 3.1 (IV) refers to the final set of banking reforms developed by the Basel Committee on Banking Supervision, aimed at strengthening the regulation, supervision, and risk management within the banking sector. These reforms are an extension of the original Basel III framework, often termed the "Basel III Endgame," and are known as Basel 3.1 in the UK.
+[[basel_framework|Basel 3.1]] (IV) refers to the final set of banking reforms developed by the Basel Committee on Banking Supervision, aimed at strengthening the regulation, supervision, and [[01-risk_management|risk management]] within the banking sector. These reforms are an extension of the original [[basel_framework|Basel III]] framework, often termed the "[[basel_framework|Basel III]] Endgame," and are known as [[basel_framework|Basel 3.1]] in the UK.
 
 #### Pre-2017 Reforms
 
-From 2011, the Committee turned its attention to improvements in the calculation of capital requirements. The risk-based capital requirements set out in the Basel II framework were expanded to cover:
+From 2011, the Committee turned its attention to improvements in the calculation of capital requirements. The risk-based capital requirements set out in the [[basel_2|Basel II]] framework were expanded to cover:
 
 - in 2012, capital requirements for banks' exposures to central counterparties (initially an interim approach, subsequently revised in 2014)
 - in 2013, margin requirements for non-centrally cleared derivatives and capital requirements for banks' equity in funds
-- in 2014, a standardised approach for measuring counterparty credit risk exposures, improving the previous methodologies for assessing the counterparty credit risk associated with derivatives transactions
+- in 2014, a standardised approach for measuring [[02-counterparty_exposures|counterparty credit risk]] exposures, improving the previous methodologies for assessing the [[02-counterparty_exposures|counterparty credit risk]] associated with derivatives transactions
 - in 2014, a more robust framework for calculating capital requirements for securitisations, as well as the introduction of large exposure limits to constrain the maximum loss a bank could face in the event of a sudden failure of a counterparty
-- in 2016, a revised market risk framework that followed a fundamental review of trading book capital requirements
+- in 2016, a revised [[05-market_risk|market risk]] framework that followed a fundamental review of trading book capital requirements
 - a consolidated and enhanced framework for disclosure requirements to reflect the development of the Basel standards
 
-##### Revised approach for market risk
+##### Revised approach for [[05-market_risk|market risk]]
 
-Under the Basel III revisions, key enhancements have been made when calculating market risk:
+Under the [[basel_framework|Basel III]] revisions, key enhancements have been made when calculating [[05-market_risk|market risk]]:
 
 - A revised boundary between the banking and trading books
 - Revised Internal Model Approach: The revised IMA allows for two modellable and one non-modellable component(s).
@@ -400,7 +400,7 @@ Under the Basel III revisions, key enhancements have been made when calculating 
 
 #### 2017 Reforms
 
-The Committee completed its Basel III post-crisis reforms in 2017, with the publication of new standards for the calculation of capital requirements for credit risk, credit valuation adjustment risk and operational risk. The main revisions relate to the following areas:
+The Committee completed its [[basel_framework|Basel III]] post-crisis reforms in 2017, with the publication of new standards for the calculation of capital requirements for credit risk, credit valuation adjustment risk and operational risk. The main revisions relate to the following areas:
 
 - Standardised approach for credit risk
 - Internal ratings based (IRB) approach for credit risk
@@ -417,8 +417,8 @@ A key objective of the revisions was to reduce excessive variability of risk-wei
 
 - Enhancing the robustness and risk sensitivity of the standardised approaches for credit risk, credit valuation adjustment (CVA) risk, and operational risk
 - Constraining the use of the internal model approaches, by placing limits on certain inputs used to calculate capital requirements under the internal ratings-based (IRB) approach for credit risk and by removing the use of the internal model approaches for CVA risk and for operational risk
-- Introducing a leverage ratio buffer to further limit the leverage of global systemically important banks (G-SIBs)
-- Replacing the existing Basel II output floor with a more robust risk-sensitive floor based on the Committee’s revised Basel III standardised approaches.
+- Introducing a leverage ratio buffer to further limit the leverage of [[g_sibs|global systemically important banks (G-SIBs)]]
+- Replacing the existing [[basel_2|Basel II]] output floor with a more robust risk-sensitive floor based on the Committee’s revised [[basel_framework|Basel III]] standardised approaches.
 
 ##### Revised standardised approach for credit risk
 
@@ -441,7 +441,7 @@ The BCBS introduced the following revisions to address these shortcomings:
 
 ##### Revised CVA framework
 
-The internally modelled approach was removed and replaced with a standardised approach and a basic approach. As CVA is a market risk, these two approaches were calibrated to be in line with the revised market risk framework. The CVA framework was revised to achieve the following:
+The internally modelled approach was removed and replaced with a standardised approach and a basic approach. As CVA is a [[05-market_risk|market risk]], these two approaches were calibrated to be in line with the revised [[05-market_risk|market risk]] framework. The CVA framework was revised to achieve the following:
 
 - Enhance its risk sensitivity
 - Strengthen its robustness
@@ -449,7 +449,7 @@ The internally modelled approach was removed and replaced with a standardised ap
 
 ##### Revised approach for operational risk
 
-Under the final Basel III reforms, there is a single risk-sensitive standardised approach to be used by all banks. This ensures that banks have a consistent operational risk capital calculation methodology as well as reducing any capital benefit held by larger banks who utilise the AMA approach.
+Under the final [[basel_framework|Basel III]] reforms, there is a single risk-sensitive standardised approach to be used by all banks. This ensures that banks have a consistent operational risk capital calculation methodology as well as reducing any capital benefit held by larger banks who utilise the AMA approach.
 
 The new standardised approach for operational risk determines a bank’s operational risk capital requirements based on two components:
 
@@ -458,13 +458,13 @@ The new standardised approach for operational risk determines a bank’s operati
   - a. Operational risk increases at an increasing rate with a bank’s income
   - b. Banks which have experienced greater operational risk losses historically are assumed to be more likely to experience operational risk losses in the future.
 
-##### Leverage ratio buffer for G-SIBs
+##### Leverage ratio buffer for [[g_sibs|G-SIBs]]
 
-In addition to the minimum leverage ratio introduced by the initial Basel III capital requirements, the finalised requirements introduce a leverage ratio for globally systemically important banks (G-SIBs).
+In addition to the minimum leverage ratio introduced by the initial [[basel_framework|Basel III]] capital requirements, the finalised requirements introduce a leverage ratio for globally systemically important banks ([[g_sibs|G-SIBs]]).
 
-This leverage ratio requirement must be met with Tier 1 capital and is set at 50% of a G-SIB’s risk weighted higher-loss absorbency requirements.
+This leverage ratio requirement must be met with Tier 1 capital and is set at 50% of a [[g_sibs|G-SIB]]’s risk weighted higher-loss absorbency requirements.
 
-In addition to the introduction of the G-SIB buffer, the Committee has agreed to make various refinements to the definition of the leverage ratio exposure measure. These refinements include modifying the way in which derivatives are reflected in the exposure measure and updating the treatment of off-balance-sheet exposures to ensure consistency with their measurement in the standardised approach to credit risk. The Committee has also agreed that jurisdictions may exercise national discretion in periods of exceptional macro-economic circumstances to exempt central bank reserves from the leverage ratio exposure measure on a temporary basis. Jurisdictions that exercise this discretion would be required to recalibrate the minimum leverage ratio requirement commensurately to offset the impact of excluding central bank reserves and require their banks to disclose the impact of this exemption on their leverage ratios.
+In addition to the introduction of the [[g_sibs|G-SIB]] buffer, the Committee has agreed to make various refinements to the definition of the leverage ratio exposure measure. These refinements include modifying the way in which derivatives are reflected in the exposure measure and updating the treatment of off-balance-sheet exposures to ensure consistency with their measurement in the standardised approach to credit risk. The Committee has also agreed that jurisdictions may exercise national discretion in periods of exceptional macro-economic circumstances to exempt central bank reserves from the leverage ratio exposure measure on a temporary basis. Jurisdictions that exercise this discretion would be required to recalibrate the minimum leverage ratio requirement commensurately to offset the impact of excluding central bank reserves and require their banks to disclose the impact of this exemption on their leverage ratios.
 
 ##### Revised output floor
 

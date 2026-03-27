@@ -1,10 +1,10 @@
-# Risk Quantification for PD
+# [[07-risk_quantification|Risk Quantification]] for PD
 
 ### **1. Risk Grade Construction**
 
-In accordance with **CRR Article 172(2)** and to meet the requirements of **CRR Article 171(1)**, all exposures are **jointly calibrated** across the portfolio.
+In accordance with **[[crr|CRR]] Article 172(2)** and to meet the requirements of **[[crr|CRR]] Article 171(1)**, all exposures are **jointly calibrated** across the portfolio.
 
-* **No further calibration segmentation** is required.
+* **No further calibration [[06-segmentation|segmentation]]** is required.
 * Risk grade boundaries are **defined directly from the scores** of all PiT PD segment models.
 * This design allows **accounts to migrate** between grades to reflect **changes in PiT PD estimates** over time.
 
@@ -12,11 +12,11 @@ Here’s your **expanded Risk Grade Construction** section with the **iterative 
 
 ---
 
-## **Risk Quantification for PD**
+## **[[07-risk_quantification|Risk Quantification]] for PD**
 
 ### **1. Risk Grade Construction**
 
-In line with **CRR Article 172(2)** requirements, all exposures are **jointly calibrated** to meet **CRR Article 171(1)**.
+In line with **[[crr|CRR]] Article 172(2)** requirements, all exposures are **jointly calibrated** to meet **[[crr|CRR]] Article 171(1)**.
 
 * Risk grade boundaries are derived from **scores of all PiT PD segment models**.
 * This approach allows **accounts to migrate** between grades over time as PiT PD estimates change.
@@ -77,7 +77,7 @@ Four candidate grade schemes were considered and tested for performance against 
 
 **Table – Candidate Grade Structures & Test Results**
 
-| Candidate # | Number of Grades | Min Volume per Grade | Max Volume per Grade | Rank Order Breaks | % Breach in Heterogeneity | Migration Stability | Meets CRR 170(3) Tests? |
+| Candidate # | Number of Grades | Min Volume per Grade | Max Volume per Grade | Rank Order Breaks | % Breach in Heterogeneity | Migration Stability | Meets [[crr|CRR]] 170(3) Tests? |
 | ----------- | ---------------- | -------------------- | -------------------- | ----------------- | ------------------------- | ------------------- | ----------------------- |
 | 1           | 25               | X%                   | X%                   | X%                | X%                        | Yes/No              | Yes/No                  |
 | 2           | 30               | X%                   | X%                   | X%                | X%                        | Yes/No              | Yes/No                  |
@@ -90,7 +90,7 @@ Four candidate grade schemes were considered and tested for performance against 
 
 This structure clearly shows **methodology**, **iterative logic**, and **candidate selection**, while leaving room for your actual results table.
 
-If you’d like, I can also prepare a **flow diagram** for this grade construction process so it’s easy for a reader to follow visually alongside the text. That would make it match the earlier “variable reduction” and “transformation” sections visually.
+If you’d like, I can also prepare a **flow diagram** for this grade construction process so it’s easy for a reader to follow visually alongside the text. That would make it match the earlier “[[05-variable-reduction|variable reduction]]” and “transformation” sections visually.
 
 Here’s the table extracted from the image:
 
@@ -124,12 +124,12 @@ The risk grading framework is designed to ensure regulatory compliance, risk sen
 
 | Objective                                                                                       | Regulatory Reference | Test / Methodology                                             | Target Threshold                           |
 | ----------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------- | ------------------------------------------ |
-| Minimum volume per grade not lower than 1% of total population                                  | CRR 170(3)(b)        | Grade exposure %                                               | ≥ 1%                                       |
-| Maximum volume per grade not higher than 30%                                                    | CRR 170(3)(b)        | Grade exposure %                                               | ≤ 30%                                      |
-| Homogeneity – exposures in same grade have similar default rates                                | CRR 170(3)(c)        | Chi-square test: average proportion of failures across grades  | ≤ 5% difference                            |
-| Heterogeneity – default rates between different grades are distinct and monotonic               | CRR 170(3)(c)        | Z-test: average proportion of failures between adjacent grades | ≤ 5% difference; Rank order breaks < 5%    |
-| Granularity – number of risk grades provides meaningful discrimination                          | CRR 170(3)(c)        | Review of grade count vs portfolio distribution                | As per rating methodology                  |
-| Stability – account migrations and annual ODR changes align with selected PiT rating philosophy | CRR 170(3)(c)        | Migration matrix analysis; ODR trend analysis                  | Stable over time, consistent with PiT view |
+| Minimum volume per grade not lower than 1% of total population                                  | [[crr|CRR]] 170(3)(b)        | Grade exposure %                                               | ≥ 1%                                       |
+| Maximum volume per grade not higher than 30%                                                    | [[crr|CRR]] 170(3)(b)        | Grade exposure %                                               | ≤ 30%                                      |
+| Homogeneity – exposures in same grade have similar default rates                                | [[crr|CRR]] 170(3)(c)        | Chi-square test: average proportion of failures across grades  | ≤ 5% difference                            |
+| Heterogeneity – default rates between different grades are distinct and monotonic               | [[crr|CRR]] 170(3)(c)        | Z-test: average proportion of failures between adjacent grades | ≤ 5% difference; Rank order breaks < 5%    |
+| Granularity – number of risk grades provides meaningful discrimination                          | [[crr|CRR]] 170(3)(c)        | Review of grade count vs portfolio distribution                | As per rating methodology                  |
+| Stability – account migrations and annual ODR changes align with selected PiT rating philosophy | [[crr|CRR]] 170(3)(c)        | Migration matrix analysis; ODR trend analysis                  | Stable over time, consistent with PiT view |
 
 ---
 
@@ -141,4 +141,4 @@ The risk grading framework is designed to ensure regulatory compliance, risk sen
 
 ---
 
-If you like, I can now prepare the **LRA (Long-Run Average) section** next so the **Risk Quantification** chapter is complete before we move to the next major part of the framework. That way, you’ll have Risk Differentiation → Risk Quantification flowing without any gaps.
+If you like, I can now prepare the **LRA (Long-Run Average) section** next so the **[[07-risk_quantification|Risk Quantification]]** chapter is complete before we move to the next major part of the framework. That way, you’ll have [[03-risk-differentiation|Risk Differentiation]] → [[07-risk_quantification|Risk Quantification]] flowing without any gaps.

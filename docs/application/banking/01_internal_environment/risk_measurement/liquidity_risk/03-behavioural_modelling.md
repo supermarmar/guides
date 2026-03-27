@@ -40,7 +40,7 @@ Stable aggregate balances observed across a sufficiently long time period (inclu
 
 **Conservative cap:** Regardless of what historical statistics suggest, the behavioural tenor for demand deposits (current accounts, instant-access accounts) should not be set at longer than **3 years**, and certainly not longer than **5 years**, because the nature of future liquidity stress events may differ materially from historical observations.
 
-Multiple uses exist for this analysis, including FTP, calculation of an internal LCR view, determination of an appropriate LAB size, and informing customer pricing strategy.
+Multiple uses exist for this analysis, including FTP, calculation of an internal [[04-lcr|LCR]] view, determination of an appropriate LAB size, and informing customer pricing strategy.
 
 ## Modelling Prepayment Behaviour
 
@@ -56,7 +56,7 @@ Contingent, off-balance-sheet, and collateral obligations also generate term fun
 
 **Derivatives and CSA arrangements:** Interbank derivatives trading takes place under the Credit Support Annex (CSA) of the standard ISDA contract. Under a two-way CSA, the mark-to-market value of each derivative is exchanged as cash collateral. In theory, a perfectly hedged book has netted zero collateral flows because what a bank posts on the negative leg it receives from the hedge counterparty.
 
-However, many counterparties — corporates, sovereign authorities, debt management offices, central banks — do not sign CSA agreements. Under this **one-way CSA** arrangement, the bank must post cash collateral when mark-to-market negative but receives nothing when mark-to-market positive. This creates a structural funding requirement. The bank must apply the appropriate tenor liquidity premium to the net mark-to-market of all uncollateralised derivatives, based on the time-bucketed net cashflow profile of those positions.
+However, many counterparties — corporates, sovereign authorities, debt management offices, [[05-central_banks|central banks]] — do not sign CSA agreements. Under this **one-way CSA** arrangement, the bank must post cash collateral when mark-to-market negative but receives nothing when mark-to-market positive. This creates a structural funding requirement. The bank must apply the appropriate tenor liquidity premium to the net mark-to-market of all uncollateralised derivatives, based on the time-bucketed net cashflow profile of those positions.
 
 ## Behaviouralisation Exercise
 

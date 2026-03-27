@@ -69,7 +69,7 @@ If the implementation is easy to explain, it may be a good idea.
 Namespaces are one honking great idea -- let's do more of those!
 ```
 
-- **Simplicity and Clarity**: Aim for simple, readable code. Favor readability over complexity, especially in data transformations, feature engineering, and model training steps.
+- **Simplicity and Clarity**: Aim for simple, readable code. Favor readability over complexity, especially in data transformations, [[01-feature-engineering|feature engineering]], and model training steps.
 - **Explicitness**: Avoid implicit code structures that might confuse others. For example, when indexing data frames, prefer explicit column names over positions.
 
 ## **PEP 257 – Docstring Conventions**

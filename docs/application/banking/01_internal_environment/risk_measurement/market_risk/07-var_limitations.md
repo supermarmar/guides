@@ -22,7 +22,7 @@ VaR measures the maximum expected loss over a given time period that will not be
 
 **Advantages of VaR:**
 - Easily understood — expressed in simple, intelligible units (e.g. "the 99% VaR represents a one-in-a-hundred-year loss event").
-- Can be used across all market risk types and allows for interaction between risks.
+- Can be used across all [[05-market_risk|market risk]] types and allows for interaction between risks.
 - Comparable across different business units.
 - Easily translated into risk benchmarks and limits.
 

@@ -1,10 +1,10 @@
-# Capital Requirements Regulation (CRR) Near Final Requirements
+# [[crr|Capital Requirements Regulation (CRR)]] Near Final Requirements
 
 <https://www.bankofengland.co.uk/-/media/boe/files/prudential-regulation/policy-statement/2024/september/ps924app2.pdf>
 
-While SS4/24 is the most recent standalone issuance, it is part of a broader regime change the PRA is implementing — namely, the restatement and adaptation of CRR (Capital Requirements Regulation) into the PRA’s domestic rulebook, especially post-Brexit. This is sometimes informally referred to as the “CRR Near Final Requirements” exercise.
+While [[ss4-24|SS4/24]] is the most recent standalone issuance, it is part of a broader regime change the [[pra|PRA]] is implementing — namely, the restatement and adaptation of [[crr|CRR]] ([[crr|Capital Requirements Regulation]]) into the [[pra|PRA]]’s domestic rulebook, especially post-Brexit. This is sometimes informally referred to as the “[[crr|CRR]] Near Final Requirements” exercise.
 
-The PRA is consulting and implementing restated CRR provisions (own funds, definition of capital, credit quality steps, large exposures, etc.) into its UK Rulebook. PS12/25 is a policy statement on the restatement of CRR and Solvency II requirements into the PRA Rulebook, effective 1 January 2026. The “near-final rules” include how CRR’s capital, liquidity, large exposure, and credit risk regimes will be embedded in the PRA’s own rulebook (with modifications to suit the UK context).
+The [[pra|PRA]] is consulting and implementing restated [[crr|CRR]] provisions (own funds, definition of capital, credit quality steps, large exposures, etc.) into its UK Rulebook. PS12/25 is a policy statement on the restatement of [[crr|CRR]] and Solvency II requirements into the [[pra|PRA]] Rulebook, effective 1 January 2026. The “near-final rules” include how [[crr|CRR]]’s capital, liquidity, large exposure, and credit risk regimes will be embedded in the [[pra|PRA]]’s own rulebook (with modifications to suit the UK context).
 
 ## Glosarry (Annex A)
 
@@ -16,11 +16,11 @@ transactor exposure:
     - (b) the obligor has repaid the balance in full at each scheduled repayment date for the previous 12-month period; and
   - (2) an overdraft facility which the obligor has not drawn down over the previous 12 month period.  
 
-## Required Level of Own Funds (CRR) Part (Annex B)
+## Required Level of Own Funds ([[crr|CRR]]) Part (Annex B)
 
 ### Article 92  OWN FUNDS REQUIREMENTS
 
-1. Subject to Article 93 of CRR, an institution shall at all times satisfy the following own funds requirements:
+1. Subject to Article 93 of [[crr|CRR]], an institution shall at all times satisfy the following own funds requirements:
     - (a)  a Common Equity Tier 1 capital ratio of 4.5%;
     - (b) a Tier 1 capital ratio of 6%;
     - (c) a total capital ratio of 8%.
@@ -31,21 +31,21 @@ transactor exposure:
     - (b) the Tier 1 capital ratio is the Tier 1 capital of the institution expressed as a percentage of the total risk exposure amount;
     - (c) the total capital ratio is the own funds of the institution expressed as a percentage of the total risk exposure amount.
 
-## Credit Risk: General Provisions (CRR) Part (Annex C)
+## Credit Risk: General Provisions ([[crr|CRR]]) Part (Annex C)
 
 ### ARTICLE 107  APPROACHES TO CREDIT RISK ARTICLE
 
-1. Institutions shall apply either the Standardised Approach provided for in Credit Risk: Standardised Approach (CRR) Part and Chapter 2 of Title II of Part of CRR or, if permitted by the PRA in accordance with Credit Risk: Internal Ratings Based Approach (CRR) Part Article 143, the IRB Approach to calculate their risk-weighted exposure amounts for the purposes of points (a) and (f) of paragraph 3 of Required Level of Own Funds (CRR) Part Article 92.
+1. Institutions shall apply either the Standardised Approach provided for in Credit Risk: Standardised Approach ([[crr|CRR]]) Part and Chapter 2 of Title II of Part of [[crr|CRR]] or, if permitted by the [[pra|PRA]] in accordance with Credit Risk: Internal Ratings Based Approach ([[crr|CRR]]) Part Article 143, the IRB Approach to calculate their risk-weighted exposure amounts for the purposes of points (a) and (f) of paragraph 3 of Required Level of Own Funds ([[crr|CRR]]) Part Article 92.
 
-## Credit Risk: Standardised Approach (CRR) Part (Annex D)
+## Credit Risk: Standardised Approach ([[crr|CRR]]) Part (Annex D)
 
 ### Article 111 EXPOSURE VALUE
 
 1. The exposure value of:
 
-- (a) an asset item shall be its accounting value remaining after specific credit risk adjustments (in accordance with Credit Risk: General Provisions (CRR) Part Article 110 and Commission Delegated Regulation (EU) No 183/2014), additional value adjustments in accordance with Article 34 of CRR and Trading Book (CRR) Part Article 105 and own funds reductions related to the asset item have been applied;  
+- (a) an asset item shall be its accounting value remaining after specific credit risk adjustments (in accordance with Credit Risk: General Provisions ([[crr|CRR]]) Part Article 110 and Commission Delegated Regulation (EU) No 183/2014), additional value adjustments in accordance with Article 34 of [[crr|CRR]] and Trading Book ([[crr|CRR]]) Part Article 105 and own funds reductions related to the asset item have been applied;  
 - (b) subject to point (c), an off-balance sheet item listed in Column A of Table A1 shall be the product of:
-  - (i) its nominal value after reduction of specific credit risk adjustments (in accordance with Credit Risk: General Provisions (CRR) Part Article 110 and Commission Delegated Regulation (EU) No 183/2014); and
+  - (i) its nominal value after reduction of specific credit risk adjustments (in accordance with Credit Risk: General Provisions ([[crr|CRR]]) Part Article 110 and Commission Delegated Regulation (EU) No 183/2014); and
   - (ii) the applicable conversion factor (the percentage specified in the corresponding row of Column B)
 - (c) a commitment to issue an off-balance sheet item listed in Table A1 shall be calculated in accordance with point (b) of paragraph 1, but using the lower of:  
   - (i) the percentage specified in Column B that is applicable to the off-balance sheet item on which the commitment is made; and
@@ -59,17 +59,17 @@ transactor exposure:
 | The following issued off-balance sheet items: financial guarantees having the character of credit substitutes, (including guarantees for the good payment of credit facilities); credit derivatives; acceptances; endorsements on bills not bearing the name of another institution or investment firm; irrevocable standby letters of credit having the character of credit substitutes; and any other issued off-balance sheet items that have the character of credit substitutes. | 100% |
 | The following types of commitment: transactions with recourse (including factoring and invoice discount facilities); assets purchased under outright forward purchase agreements; asset sale and repurchase agreements: including agreements where the transferee is merely entitled to return the assets at the purchase price or for a different amount agreed in advance on a date specified or to be specified; and excluding agreements where the transferor is not entitled to show in their balance sheets the assets transferred; and forward deposits; the unpaid portion of partly-paid shares and securities; and  other commitments that have similar economic substance as the types of commitments in points (a) to (e), in particular with regard to having certain drawdowns. | 100% |
 |Other issued off-balance sheet items that do not have the character of credit substitutes. | 50% |
-|The following commitments: note issuance facilities and revolving underwriting facilities; and  UK residential mortgage commitments that are not subject to a conversion factor of 10% or 100%. | 50% |
+|The following commitments: note issuance facilities and revolving [[00_underwriting|underwriting]] facilities; and  UK residential mortgage commitments that are not subject to a conversion factor of 10% or 100%. | 50% |
 |Any other commitment that is not subject to a conversion factor of 10%, 50% or 100%. | 40% |
 |The following issued off-balance sheet items:  (a) documentary credits issued or confirmed and other selfliquidating transactions; (b) warranties, tender bonds, performance bonds, advance payment guarantees, retention guarantees, and guarantees not having the character of credit substitutes;  (c) irrevocable standby letters of credit not having the character of credit substitutes; and (d) shipping guarantees, customs and tax bonds.| 20% |
 |Undrawn commitments which may be cancelled unconditionally at any time without notice, or that effectively provide for automatic cancellation due to a deterioration in an obligor’s creditworthiness. Retail credit lines may be considered as unconditionally cancellable if the terms permit the institution to cancel them to the full extent allowable under the applicable consumer protection and related leg. | 10% |
 
-## Credit Risk: Internal Ratings Based Approach (CRR) Part (Annex E)
+## Credit Risk: Internal Ratings Based Approach ([[crr|CRR]]) Part (Annex E)
 
 ### Article 144 HIGH-LEVEL REQUIREMENTS FOR USING THE IRB APPROACH
 
 1. An institution shall meet the following requirements when using the IRB Approach:
-    - (b) internal ratings and default and loss estimates used in the calculation of own funds requirements and associated systems and processes shall play an essential role in the risk management and decision-making process, and in the credit approval, internal capital allocation and corporate governance functions of the institution;
+    - (b) internal ratings and default and loss estimates used in the calculation of own funds requirements and associated systems and processes shall play an essential role in the [[01-risk_management|risk management]] and decision-making process, and in the credit approval, internal capital allocation and corporate governance functions of the institution;
 
 ### Article 163 PROBABILITY OF DEFAULT (PD): RETAIL
 
@@ -86,18 +86,18 @@ transactor exposure:
 
 ### Article 166C EXPOSURE VALUE FOR CORPORATES AND INSTITUTIONS: THE FOUNDATION IRB APPROACH AND THE SLOTTING APPROACH
 
-1. An institution shall determine the exposure value for off-balance sheet items in respect of which it uses the Foundation IRB Approach or the Slotting Approach in accordance with Article 147A by multiplying the conversion factor that would be applicable to the off-balance sheet item under the Standardised Approach, as set out in Credit Risk: Standardised Approach (CRR) Part Article 111, by the item’s nominal value.
+1. An institution shall determine the exposure value for off-balance sheet items in respect of which it uses the Foundation IRB Approach or the Slotting Approach in accordance with Article 147A by multiplying the conversion factor that would be applicable to the off-balance sheet item under the Standardised Approach, as set out in Credit Risk: Standardised Approach ([[crr|CRR]]) Part Article 111, by the item’s nominal value.
 
-2. An institution shall, in order to reflect the effect of funded credit protection in respect of exposures for which it uses the Slotting Approach, apply the methods set out in the Credit Risk Mitigation (CRR) Part.  
+2. An institution shall, in order to reflect the effect of funded credit protection in respect of exposures for which it uses the Slotting Approach, apply the methods set out in the Credit [[05-risk_mitigation|Risk Mitigation]] ([[crr|CRR]]) Part.  
 
 ### Article 166D EXPOSURE VALUE FOR CORPORATES, INSTITUTIONS AND RETAIL: THE ADVANCED IRB APPROACH  
 
 1. An institution shall, subject to paragraph 3, determine the exposure value for off-balance sheet items in respect of which it uses the Advanced IRB Approach in accordance with Article 147A by multiplying the item’s nominal value by:
 
-- (a) for revolving loan commitments which would not be subject to a 100% conversion factor under Credit Risk: Standardised Approach (CRR) Part Article 111: an own estimate of conversion factor that the institution shall provide in accordance with Section 6;
-- (b) for all other off-balance sheet items: the conversion factor that would be applicable to the off-balance sheet item under the Standardised Approach, as set out in Credit Risk: Standardised Approach (CRR) Part Article 111.
+- (a) for revolving loan commitments which would not be subject to a 100% conversion factor under Credit Risk: Standardised Approach ([[crr|CRR]]) Part Article 111: an own estimate of conversion factor that the institution shall provide in accordance with Section 6;
+- (b) for all other off-balance sheet items: the conversion factor that would be applicable to the off-balance sheet item under the Standardised Approach, as set out in Credit Risk: Standardised Approach ([[crr|CRR]]) Part Article 111.
 
-### Article 178 RISK QUANTIFICATION DEFAULT OF AN OBLIGOR OR FACILITY
+### Article 178 [[07-risk_quantification|RISK QUANTIFICATION]] DEFAULT OF AN OBLIGOR OR FACILITY
 
 1. A default shall be considered to have occurred with regard to a particular obligor when either or both of the following have taken place:
     - (a) the institution considers that the obligor is unlikely to pay its credit obligations to the institution, the parent undertaking or any of its subsidiaries in full, without recourse by the institution to actions such as realising security;

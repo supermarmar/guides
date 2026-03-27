@@ -19,7 +19,7 @@ The purpose of studying banking products is not to make students experts in a si
 
 Retail banking activities include the distribution of a range of products to personal and small business customers.
 
-There are four tests for characterisation as retail exposure ("regulatory retail") according to Basel:
+There are four tests for characterisation as retail exposure ("regulatory retail") according to [[bis|Basel]]:
 
 - **Orientation** – individual or small business (SME) exposures
 - **Product type**:
@@ -28,7 +28,7 @@ There are four tests for characterisation as retail exposure ("regulatory retail
   - Small business facilities and commitments
   - Residential mortgage loans (subject to limits on the number of housing units per exposure)
 - **Granularity** – the segments should exhibit homogeneity but also be sufficiently diversified so that a view of credit risk is applicable to the entire portfolio equally (e.g. if a loan is substantially riskier and larger than the rest of the segment, it is not reasonable to weigh the risk equally)
-- **Maximum individual exposure** – the aggregate exposure to one client cannot surpass €1 million (mandated by Basel)
+- **Maximum individual exposure** – the aggregate exposure to one client cannot surpass €1 million (mandated by [[bis|Basel]])
 
 Retail banking products have become increasingly commoditised, leading competition to focus mainly on price. Banks differentiate through reward programmes, ratings, and innovation — though product innovation can be replicated quickly and may not provide sustainable competitive advantage.
 
@@ -77,7 +77,7 @@ Complexity and cash handling costs make current accounts expensive to operate. T
 
 The provision of current accounts creates various operational risks, in addition to the funding and credit risk associated with overdraft lending:
 
-- **KYC/AML failures**: Fines for failing to detect money laundering or payments to sanctioned individuals or countries can be very large (e.g., HSBC was fined $1.9 billion in 2017; NatWest was fined £265 million in 2021).
+- **[[05-aml_kyc|KYC]]/[[05-aml_kyc|AML]] failures**: Fines for failing to detect money laundering or payments to sanctioned individuals or countries can be very large (e.g., HSBC was fined $1.9 billion in 2017; NatWest was fined £265 million in 2021).
 - **Legacy systems and IT failures**: Banks relying on older IT programs face operational risk when new services are added to current accounts. New entrants using new technologies have an advantage over incumbents.
 - **Treating customers fairly**: Regulators may intervene if banks are deemed to have been unfair to vulnerable customers, such as charging disproportionately for unauthorised overdrafts.
 - **Fraud**:
@@ -105,8 +105,8 @@ Credit cards come with significant fraud risks (especially for online payments) 
 Banks separate customers into behavioural groups:
 
 - **Transactors**: Customers that pay off their balances in full every month. The card issuer receives interchange fees on transactions, but for transactors with only limited spending, interchange fees do not cover the operating costs of their credit cards.
-- **Revolvers**: Customers that carry credit balances forward from one month to the next. Revolvers can be high risk if they only pay the minimum amount required each month — credit card borrowings are unsecured, and credit losses are likely to be high in periods of pressure on household incomes. Banks often increase the interest rate if a customer misses a monthly minimum payment.
-- **Spend revolvers**: The most profitable customers — they spend on their cards each month and pay off their credit card borrowings over time. Banks earn both interchange fees on spending and interest on borrowing, but generally do not suffer credit losses.
+- **Revolvers**: Customers that carry credit balances forward from one month to the next. Revolvers can be high risk if they only pay the minimum amount required each month — credit card borrowings are unsecured, and [[02-credit_losses|credit losses]] are likely to be high in periods of pressure on household incomes. Banks often increase the interest rate if a customer misses a monthly minimum payment.
+- **Spend revolvers**: The most profitable customers — they spend on their cards each month and pay off their credit card borrowings over time. Banks earn both interchange fees on spending and interest on borrowing, but generally do not suffer [[02-credit_losses|credit losses]].
 
 ### Savings Accounts
 
@@ -146,7 +146,7 @@ Money market funds were seen as an alternative to savings accounts, and were tru
 
 Personal loans are unsecured loans, taken out by individuals and paid back over fixed periods, typically between one and seven years. Interest rates on personal loans are usually fixed for the duration of the loan. There may also be early repayment charges when loans are repaid early.
 
-The interest rate on a personal loan normally reflects the size of the loan and the creditworthiness of the borrower. Personal loans use **risk-based pricing** to reflect the expected credit risk of individual borrowers. This enables banks to offer loans to higher-risk customers (e.g., a bank might decide that a customer is too risky for a personal loan at 7%, but that a loan at 15% would be profitable, allowing for expected credit losses).
+The interest rate on a personal loan normally reflects the size of the loan and the creditworthiness of the borrower. Personal loans use **risk-based pricing** to reflect the expected credit risk of individual borrowers. This enables banks to offer loans to higher-risk customers (e.g., a bank might decide that a customer is too risky for a personal loan at 7%, but that a loan at 15% would be profitable, allowing for expected [[02-credit_losses|credit losses]]).
 
 Regulators may set rules to avoid higher-risk borrowers being misled by low headline rates. For example, in the UK, banks can only advertise a headline rate if over 50% of borrowers receive that rate or lower. In SA, the **National Credit Act** specifies the maximum lending rate that could be charged to retail customers.
 
@@ -177,7 +177,7 @@ A mortgage is a loan taken out to purchase a property and the loan is **secured 
 
 **US mortgage market**: Dominated by Government Sponsored Entities (GSEs) such as Freddie Mac and Fannie Mae. The design of US mortgages is influenced by requirements of the Federal Housing Administration. US banks arrange mortgages and then sell them to the GSEs, which may package mortgages as **mortgage-backed securities (MBS)** and sell them to investors. This was a fundamental driver of the Banking Crisis of 2007/08, where much of the bubble centred on sub-prime mortgages packaged as CDOs.
 
-**Mortgage-related systemic risks**: Mortgage lending can contribute to periodic booms and busts. The availability of larger mortgages at higher LTV ratios can push up house prices. A credit-fuelled housing bubble can start when house prices are rising, credit losses are low, and banks are willing to offer mortgages at higher LTV ratios and lower interest rates. This pattern also contributed to the "lost decade" in Japan after property and stock market bubbles burst in the late 1980s.
+**Mortgage-related systemic risks**: Mortgage lending can contribute to periodic booms and busts. The availability of larger mortgages at higher LTV ratios can push up house prices. A credit-fuelled housing bubble can start when house prices are rising, [[02-credit_losses|credit losses]] are low, and banks are willing to offer mortgages at higher LTV ratios and lower interest rates. This pattern also contributed to the "lost decade" in Japan after property and stock market bubbles burst in the late 1980s.
 
 ### Credit Insurance
 
@@ -191,7 +191,7 @@ Historically in the UK, PPI was offered and even bundled with mortgages, credit 
 
 Corporate banks offer banking products for companies, from large corporations down to medium-sized businesses. The boundary between large and medium-sized business (supported by corporate banking) and small businesses (supported by retail banking) varies from bank to bank. Corporate banking customers are normally supported by specialist relationship managers, often based in business centres, while small business customers typically use local branches and online banking.
 
-As for retail banking, corporate banking services include payments, deposits and loans, but corporate banks may also offer services such as foreign exchange and risk management.
+As for retail banking, corporate banking services include payments, deposits and loans, but corporate banks may also offer services such as foreign exchange and [[01-risk_management|risk management]].
 
 Corporate banking services within FirstRand are delivered jointly through FNB Business (serving SMEs and mid-sized corporates) and RMB (serving large corporates, multinationals, and public sector clients).
 
@@ -228,7 +228,7 @@ A corporate loan is a loan made to a corporate banking customer. Loans made to s
 Corporate loans are normally **variable rate** (floating rate), with the rate of interest being set relative to a defined benchmark:
 
 - Before the financial crisis of 2007-08, the commonly used benchmark was **LIBOR** (London Inter-Bank Offered Rate), calculated daily using estimates submitted by individual banks of their cost of borrowing. After the banking crisis, some banks were found to have submitted low estimates, to reassure markets about their financial position and ability to attract funding. LIBOR was discontinued at the end of 2021.
-- Variable rate loans are now priced relative to a risk-free interest rate such as **SONIA** (Sterling Overnight Interest Average, administered by the Bank of England). The equivalent benchmark for SA is **ZARONIA** (South African Rand Overnight Index Average, published by the SARB).
+- Variable rate loans are now priced relative to a risk-free interest rate such as **SONIA** (Sterling Overnight Interest Average, administered by the [[bank_of_england|Bank of England]]). The equivalent benchmark for SA is **ZARONIA** (South African Rand Overnight Index Average, published by the [[sarb|SARB]]).
 
 A corporate loan can be secured or unsecured, with lower interest rates on secured loans than on unsecured loans because of lower expected losses given default. In addition to seeking security, banks reduce credit risk by setting out **loan covenants**, which the borrower must satisfy at all times:
 
@@ -281,7 +281,7 @@ Trade finance is a collection of short-term financial products that help busines
 
 #### Letters of Credit
 
-A letter of credit is a document issued by a bank that guarantees a payment will be made for a given amount on a given date. It simplifies trade when buyers and sellers do not know each other well — the issuing bank is taking on the counterparty credit risk that the buyer will pay the seller.
+A letter of credit is a document issued by a bank that guarantees a payment will be made for a given amount on a given date. It simplifies trade when buyers and sellers do not know each other well — the issuing bank is taking on the [[02-counterparty_exposures|counterparty credit risk]] that the buyer will pay the seller.
 
 The typical four-step process:
 
@@ -315,7 +315,7 @@ A trade loan is a short-term revolving credit facility that funds the period bet
 
 Investment banks offer a range of products and services to corporate clients and other financial institutions, including other banks. Their activities fall into two main areas: **transactional services** (sales and trading of bonds, equities, and derivatives) and **advisory services** (M&A, capital raising).
 
-RMB, the group's investment banking arm, focuses on structured finance, capital markets, advisory, and risk management solutions for corporate, institutional, and government clients.
+RMB, the group's investment banking arm, focuses on structured finance, capital markets, advisory, and [[01-risk_management|risk management]] solutions for corporate, institutional, and government clients.
 
 | Product                                                          | Provided by | Status | Description                                                                                       |
 | ---------------------------------------------------------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------- |
@@ -336,13 +336,13 @@ Investment banks may trade on their own account, either to hedge their own marke
 
 #### Derivatives
 
-A derivative is a contract based on an underlying asset or index. Financial derivatives may be based on bonds, equities, interest rates, currencies, commodities or other types of assets. Investors, businesses and financial institutions can use derivatives to reduce risk, take financial positions and offer risk management services to their customers.
+A derivative is a contract based on an underlying asset or index. Financial derivatives may be based on bonds, equities, interest rates, currencies, commodities or other types of assets. Investors, businesses and financial institutions can use derivatives to reduce risk, take financial positions and offer [[01-risk_management|risk management]] services to their customers.
 
 ##### Swaps
 
 Swaps are a form of derivative contract under which two parties agree to swap payments for an agreed period. Swaps are OTC contracts agreed directly between two parties and are not traded on an exchange. A swap agreement defines a notional capital amount on which cashflows are exchanged at agreed dates for an agreed period of time.
 
-- **Interest rate swaps**: Most bank loans and deposits are variable rate. However, banks may offer fixed rate loans such as mortgages, not fully funded by fixed rate deposits. Banks may choose to manage the interest rate risk in their banking book (IRRBB) through interest rate swaps.
+- **Interest rate swaps**: Most bank loans and deposits are variable rate. However, banks may offer fixed rate loans such as mortgages, not fully funded by fixed rate deposits. Banks may choose to manage the interest rate risk in their banking book ([[04-irrbb_measurement|IRRBB]]) through interest rate swaps.
 - **Currency swaps**: The two parties agree to exchange interest and/or principal payments on a notional or actual amount in different currencies.
 - **Credit Default Swaps (CDS)**: A CDS provides a form of credit insurance. It is an OTC derivative agreed between two parties and is the most common form of credit derivative. The **buyer of a CDS** (protection buyer) pays the seller (protection seller) an agreed premium for an agreed period. If the reference entity defaults during this period, the buyer of the CDS is compensated. This allows credit risk to be transferred without the need to sell the underlying financial asset. The credit spread, stated in basis points, indicates how much the seller of a CDS needs to receive to justify taking on the credit risk. Banks use CDSs to allow them to offer large loans to key corporate clients while avoiding excessive credit concentration risk. CDSs can also be used for trading by speculative investors who think the creditworthiness of underlying assets is likely to decline.
 
@@ -350,7 +350,7 @@ Swaps are a form of derivative contract under which two parties agree to swap pa
 
 Futures and forwards are similar to options, the difference being that each counterparty is **obligated** to respectively buy or sell the underlying asset at the agreed price at or before the agreed date (rather than having the right to do so).
 
-- **Futures** are exchange-traded and therefore carry less counterparty credit risk than forwards, as the exchange acts as a central counterparty and margining is applied.
+- **Futures** are exchange-traded and therefore carry less [[02-counterparty_exposures|counterparty credit risk]] than forwards, as the exchange acts as a central counterparty and margining is applied.
 - **Forwards** are traded over the counter (OTC), meaning there is a bilateral risk of loss to both the buyer and the seller — either party could default before settlement.
 
 ##### Options
@@ -365,7 +365,7 @@ An option is a form of derivative contract that gives the buyer the right, but n
 
 #### Long Settlement Transactions
 
-Long settlement transactions are similar to derivatives but are longer term, and thus may present higher counterparty credit risk due to the extended period over which a counterparty could default before the transaction settles.
+Long settlement transactions are similar to derivatives but are longer term, and thus may present higher [[02-counterparty_exposures|counterparty credit risk]] due to the extended period over which a counterparty could default before the transaction settles.
 
 #### Securities Financing Transactions (Repo)
 
@@ -375,9 +375,9 @@ Repos are a key tool for:
 
 - **Liquidity management**: Banks use repo to access short-term funding against their securities holdings.
 - **Trading strategies**: Repo allows investment banks to finance long positions in securities.
-- **Central bank operations**: Central banks use repos as a primary monetary policy tool.
+- **Central bank operations**: [[05-central_banks|Central banks]] use repos as a primary monetary policy tool.
 
-OTC derivatives (swaps, forwards) and securities financing transactions (repo) carry **counterparty credit risk (CCR)** — the risk that the counterparty defaults before settlement, requiring the position to be replaced at a worse price. For the regulatory capital treatment of CCR and CVA arising from these instruments, see [Regulatory Capital (Trading Book)](credit_risk\05_counterparty_modelling\01_introduction\01-regulatory_capital.md).
+OTC derivatives (swaps, forwards) and securities financing transactions (repo) carry **[[02-counterparty_exposures|counterparty credit risk]] (CCR)** — the risk that the counterparty defaults before settlement, requiring the position to be replaced at a worse price. For the regulatory capital treatment of CCR and CVA arising from these instruments, see [Regulatory Capital (Trading Book)](credit_risk\05_counterparty_modelling\01_introduction\01-regulatory_capital.md).
 
 #### Asset-Backed Securities (ABS)
 
@@ -460,6 +460,6 @@ For an **IPO (Initial Public Offering)**, little or no pricing information exist
 
 In addition to price discovery, the investment bank will need to ensure that the company satisfies the requirements of the exchange through which it wishes to sell shares. This will involve corporate governance and public disclosures. The investment bank will prepare a **prospectus** for potential investors.
 
-The investment bank may **underwrite** the IPO, agreeing to buy any shares that are not sold to investors (with fees reflecting its underwriting risk as well as its advisory services). For a large IPO, it is likely that a syndicate of investment banks will spread the underwriting risk and ensure a wide distribution of shares.
+The investment bank may **underwrite** the IPO, agreeing to buy any shares that are not sold to investors (with fees reflecting its [[00_underwriting|underwriting]] risk as well as its advisory services). For a large IPO, it is likely that a syndicate of investment banks will spread the [[00_underwriting|underwriting]] risk and ensure a wide distribution of shares.
 
 The fees charged for an IPO are generally expressed as a percentage of the amount raised, and can vary from 3% for large IPOs to 7% for smaller IPOs. The price discovery role of investment banks has had the effect of limiting competition in equity issuance.

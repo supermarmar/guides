@@ -2,7 +2,7 @@
 
 ## Purpose and Formula
 
-The Basel III short-term liquidity metric is the **liquidity coverage ratio (LCR)**. Its purpose is to promote short-term resilience of a bank's liquidity risk profile by ensuring it holds sufficient high-quality liquid assets (HQLA) to survive a significant 30-day stress scenario.
+The [[basel_framework|Basel III]] short-term liquidity metric is the **liquidity coverage ratio (LCR)**. Its purpose is to promote short-term resilience of a bank's liquidity risk profile by ensuring it holds sufficient high-quality liquid assets (HQLA) to survive a significant 30-day stress scenario.
 
 ```math
 \text{LCR} = \frac{\text{Stock of HQLA}}{\text{Total net cash outflows over the next 30 calendar days}} \geq 100\%
@@ -28,12 +28,12 @@ The combined idiosyncratic and market-wide stress scenario entails:
 
 For LCR purposes, HQLA must be **unencumbered** and possess the following fundamental characteristics:
 
-- **Low risk** — high credit standing of the issuer, low sensitivity to interest rate and market risk, low legal and inflation risk, denomination in a convertible currency with low FX risk.
+- **Low risk** — high credit standing of the issuer, low sensitivity to interest rate and [[05-market_risk|market risk]], low legal and inflation risk, denomination in a convertible currency with low FX risk.
 - **Ease and certainty of valuation** — pricing must be straightforward, not dependent on strong assumptions, and based on publicly available inputs. Structured and exotic products are effectively excluded.
 - **Low correlation with risky assets** — the stock of HQLA must not be subject to wrong-way (highly correlated) risk.
 - **Listed on a developed and recognised exchange** — listing increases transparency and supports liquidity under stress.
 
-Level 2 assets may represent at most 40% of total HQLA; Level 2B assets may not exceed 15% of total HQLA. See [Liquidity Metrics](02-liquidity_metrics.md) for the SARB HQLA tier classifications (Level 1, 2A, 2B).
+Level 2 assets may represent at most 40% of total HQLA; Level 2B assets may not exceed 15% of total HQLA. See [Liquidity Metrics](02-liquidity_metrics.md) for the [[sarb|SARB]] HQLA tier classifications (Level 1, 2A, 2B).
 
 ## Outflow Assumptions by Deposit Type
 
@@ -54,7 +54,7 @@ Level 2 assets may represent at most 40% of total HQLA; Level 2B assets may not 
 
 An **effective deposit insurance scheme** must: guarantee prompt pay-outs with clearly defined and publicly known coverage; have the formal legal powers to fulfil its mandate; and operate with operational independence, transparency, and accountability.
 
-**South African context:** South Africa does not have a deposit insurance scheme. Consequently, all retail and small business deposits are classified as **"less stable"** (10% run-off factor), creating a structurally more demanding LCR environment for South African banks compared to many other jurisdictions. Industry discussions with the Prudential Authority (PA) on establishing deposit insurance were underway at the time of writing.
+**South African context:** South Africa does not have a deposit insurance scheme. Consequently, all retail and small business deposits are classified as **"less stable"** (10% run-off factor), creating a structurally more demanding LCR environment for South African banks compared to many other jurisdictions. Industry discussions with the [[pa|Prudential Authority]] (PA) on establishing deposit insurance were underway at the time of writing.
 
 ### Broader Outflow Rate Schedule
 
@@ -91,7 +91,7 @@ The liquidity value of a deposit (i.e. its LCR outflow rate) is driven by four c
 
 A bank can address the LCR from the numerator or denominator (or both):
 
-**Numerator (increase HQLA):** This is straightforward in principle — purchase more HQLA assets. The HQLA itself must be funded with long-term liabilities, so a deposit-raising strategy may be required simultaneously. In South Africa, government paper (Treasury bills and government bonds) is the only Level 1 HQLA available. Given limited issuance volumes by National Treasury, a structural HQLA shortage emerged for South African banks, prompting the SARB to provide a **committed liquidity facility (CLF)** (available for a fee against pledged collateral) as a substitute for Level 2 assets. A bank can also simply hold surplus funds as cash at the central bank, though this carries a P&L cost.
+**Numerator (increase HQLA):** This is straightforward in principle — purchase more HQLA assets. The HQLA itself must be funded with long-term liabilities, so a deposit-raising strategy may be required simultaneously. In South Africa, government paper (Treasury bills and government bonds) is the only Level 1 HQLA available. Given limited issuance volumes by National Treasury, a structural HQLA shortage emerged for South African banks, prompting the [[sarb|SARB]] to provide a **committed liquidity facility (CLF)** (available for a fee against pledged collateral) as a substitute for Level 2 assets. A bank can also simply hold surplus funds as cash at the central bank, though this carries a P&L cost.
 
 **Denominator (reduce net cash outflows):** A bank should target its optimal liabilities profile and implement a funding strategy that strengthens the LCR. Specific measures include:
 
@@ -108,4 +108,4 @@ A bank can address the LCR from the numerator or denominator (or both):
 
 Best practice is to maintain a regular (weekly or fortnightly) deposits analysis report for the products committee, covering: year-end and forecast deposits; articulation of the high-level deposits strategy; treasury's view on market rates and FTP implications; product emphasis (MTAs, instant access, or term); competitor rate analysis; and tracking of current funding levels versus plan.
 
-A competitor analysis is essential — banks typically aim to offer deposit rates in the middle of the competitive range to avoid both under-pricing (losing deposits) and over-paying (NIM compression). In South Africa, competitor information can be sourced from the monthly **BA900 Economic Returns** published by the SARB and from competitors' quarterly/annual Basel Pillar 3 reports.
+A competitor analysis is essential — banks typically aim to offer deposit rates in the middle of the competitive range to avoid both under-pricing (losing deposits) and over-paying ([[03-nii_nim|NIM]] compression). In South Africa, competitor information can be sourced from the monthly **BA900 Economic Returns** published by the [[sarb|SARB]] and from competitors' quarterly/annual [[bis|Basel]] Pillar 3 reports.

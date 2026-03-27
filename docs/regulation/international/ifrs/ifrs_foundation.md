@@ -30,9 +30,9 @@ The members of the Monitoring Board are representatives from:
 - the Comissão de Valores Mobiliários (CVM) of Brazil;
 - the Financial Services Commission (FSC) of Korea;
 - the Ministry of Finance of the People’s Republic of China; and
-- the Financial Conduct Authority (FCA) of the United Kingdom.
+- the [[fca|Financial Conduct Authority]] ([[fca|FCA]]) of the United Kingdom.
 
-The Basel Committee on Banking Supervision is an observer.
+The [[bis|Basel Committee on Banking Supervision]] is an observer.
 
 ## **Foundation Trustees**
 
@@ -93,31 +93,31 @@ After the financial crisis, it was noted that IAS 39 was flawed and contributed 
 - Many banks felt the use of different impairment models for different asset classes, and the classification of financial assets into these asset classes, under IAS 39 was overly complex.
 - Those affected by an entity’s performance (e.g. shareholders) generally use financial statements to assess this. However, under IAS 39 some entities postponed losses and so ECLs were not always adequately disclosed.
 
-#### IFRS 9 (Expected Forward Looking Losses)
+#### [[ifrs9_standard|IFRS 9]] (Expected Forward Looking Losses)
 
-IFRS 9 addresses these weaknesses (as well as other weaknesses not directly related to credit risk, such as changes to hedge accounting) and has significantly changed the treatment of impaired assets – with many banks having taken years to adjust their risk management processes accordingly. Some significant improvements made are:
+[[ifrs9_standard|IFRS 9]] addresses these weaknesses (as well as other weaknesses not directly related to credit risk, such as changes to hedge accounting) and has significantly changed the treatment of impaired assets – with many banks having taken years to adjust their [[01-risk_management|risk management]] processes accordingly. Some significant improvements made are:
 
 - ECLs will be recognised at all times, reducing “cliff effects”.
-- To incorporate forward looking information into the assessment of the expected credit losses of a loans.
+- To incorporate [[01-model_methodology|forward looking information]] into the assessment of the expected [[02-credit_losses|credit losses]] of a loans.
 - Only one impairment model is used and a simpler classification system for assets.
 - Improved disclosure, as banks are required to disclose the entire process to determine their ECLs in detail.
 
-The benefits of these changes are to ensure that banks increase the impairments held against loans where there is expected deterioration in the credit risk of a loan due to potential deterioration in the underlying behavioural risk of a loan (SICR component) or due to deteriorating economic circumstances (FLI component). This is intended to make sure that banks incorporate future information (as opposed to only past and current information in IAS 39) when calculating the expected credit losses on loans.
+The benefits of these changes are to ensure that banks increase the impairments held against loans where there is expected deterioration in the credit risk of a loan due to potential deterioration in the underlying behavioural risk of a loan (SICR component) or due to deteriorating economic circumstances (FLI component). This is intended to make sure that banks incorporate future information (as opposed to only past and current information in IAS 39) when calculating the expected [[02-credit_losses|credit losses]] on loans.
 
-IFRS 9 should not be viewed in isolation to other guidance, and the BIS has addressed IFRS 9 in many of its guidance documents on credit risk. It is important that the methodologies are aligned, subject to supervisory guidance, to ensure that risk management practices and processes are consistent. In practice, many banks have chosen to leverage their existing Basel compliant models to implement the IFRS 9 methodology.
+[[ifrs9_standard|IFRS 9]] should not be viewed in isolation to other guidance, and the [[bis|BIS]] has addressed [[ifrs9_standard|IFRS 9]] in many of its guidance documents on credit risk. It is important that the methodologies are aligned, subject to supervisory guidance, to ensure that [[01-risk_management|risk management]] practices and processes are consistent. In practice, many banks have chosen to leverage their existing [[bis|Basel]] compliant models to implement the [[ifrs9_standard|IFRS 9]] methodology.
 
 ##### Transition Impacts
 
-The impacts of IFRS 9 are varied. There are risk management benefits, owing to the weaknesses
+The impacts of [[ifrs9_standard|IFRS 9]] are varied. There are [[01-risk_management|risk management]] benefits, owing to the weaknesses
 of IAS 39 being addressed, but these come at a cost, including:
 
 - Direct costs: Costs directly related to the implementation of the new methodology, such as the redevelopment of systems and training or hiring of staff. Some of these costs will be once-off, others long-term.
-- Income volatility: Provisions directly affect profit and loss on the income statement, and IFRS 9 requires provisions to be changed at each reporting date if significant changes in credit risk occur. Those assets that use fair values to inform expected credit losses will experience volatility in these figures.
-- Increased recognition of ECLs: Under IAS 39, ECLs would only be calculated when losses were incurred on defaulting assets. Under IFRS 9, ECLs need to be calculated on all eligible assets and provisions held for these assets. This results in higher provisions being held earlier.
-- Increased disclosure: As discussed, banks will need to provide more detailed disclosures on the risk management processes followed under the new methodology.
-- Capital impact: There will be varied impacts on capital. For example, under Pillar 1, Core Equity Tier 1 (CET1) capital is made up largely of retained earnings and increased provisions under IFRS 9 will reduce these earnings, thus reducing capital resources. Other affected areas will include stress testing and capital buffers. These impacts will be more significant for banks relying on the standardised approach.
+- Income volatility: Provisions directly affect profit and loss on the income statement, and [[ifrs9_standard|IFRS 9]] requires provisions to be changed at each reporting date if significant changes in credit risk occur. Those assets that use fair values to inform expected [[02-credit_losses|credit losses]] will experience volatility in these figures.
+- Increased recognition of ECLs: Under IAS 39, ECLs would only be calculated when losses were incurred on defaulting assets. Under [[ifrs9_standard|IFRS 9]], ECLs need to be calculated on all eligible assets and provisions held for these assets. This results in higher provisions being held earlier.
+- Increased disclosure: As discussed, banks will need to provide more detailed disclosures on the [[01-risk_management|risk management]] processes followed under the new methodology.
+- Capital impact: There will be varied impacts on capital. For example, under Pillar 1, Core Equity Tier 1 (CET1) capital is made up largely of retained earnings and increased provisions under [[ifrs9_standard|IFRS 9]] will reduce these earnings, thus reducing capital resources. Other affected areas will include [[02-stress_testing|stress testing]] and capital buffers. These impacts will be more significant for banks relying on the standardised approach.
 
-The impacts of IFRS 9 can be significant, but they also present an opportunity for banks to re-examine their risk management systems and models, and to improve efficiencies and management in order to reduce the impact. The improved assessment of credit risk will also help reduce the impacts of defaults and improve financial stability.
+The impacts of [[ifrs9_standard|IFRS 9]] can be significant, but they also present an opportunity for banks to re-examine their [[01-risk_management|risk management]] systems and models, and to improve efficiencies and management in order to reduce the impact. The improved assessment of credit risk will also help reduce the impacts of defaults and improve financial stability.
 
 ## **Interpretations Committee**
 
@@ -129,7 +129,7 @@ The Committee comprises 14 voting members, appointed by the Trustees of the IFRS
 
 The Trustees of the IFRS Foundation announced the formation of the International Sustainability Standards Board (ISSB) on 3 November 2021 at COP26 in Glasgow, following strong market demand for its establishment. The ISSB is developing—in the public interest—standards that will result in a high-quality, comprehensive global baseline of sustainability disclosures focused on the needs of investors and the financial markets.
 
-The ISSB has international support with its work to develop sustainability disclosure standards backed by the G7, the G20, the International Organization of Securities Commissions (IOSCO), the Financial Stability Board, African Finance Ministers and Finance Ministers and Central Bank Governors from more than 40 jurisdictions.
+The ISSB has international support with its work to develop sustainability disclosure standards backed by the G7, the G20, the International Organization of Securities Commissions (IOSCO), the [[fsb|Financial Stability Board]], African Finance Ministers and Finance Ministers and Central Bank Governors from more than 40 jurisdictions.
 
 The ISSB builds on the work of market-led investor-focused reporting initiatives, including the Climate Disclosure Standards Board (CDSB), the Task Force for Climate-related Financial Disclosures (TCFD), the Value Reporting Foundation’s Integrated Reporting Framework and industry-based SASB Standards, as well as the World Economic Forum’s Stakeholder Capitalism Metrics.
 

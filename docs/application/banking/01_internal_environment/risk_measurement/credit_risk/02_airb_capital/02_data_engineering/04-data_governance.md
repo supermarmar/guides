@@ -6,4 +6,4 @@ Data governance for the CCD is overseen by the Risk, Finance and/or Treasury (RF
 - **Data Lineage and Traceability**: End-to-end lineage documentation is maintained to trace all data elements from original source systems through to model input tables, ensuring transparency of all transformations and aggregations.
 - **Metadata Management**: All key data elements are catalogued with defined business definitions, data quality thresholds, and control owners.
 - **Governance Oversight**: Data quality metrics and control outcomes are periodically reviewed in RFT Data Governance Forums, with escalations made to the Model Risk Committee if material issues are identified.
-- **Regulatory Compliance**: The governance process ensures that all data used in credit risk models remains compliant with PRA and ECB expectations regarding data lineage, accuracy, and use-test requirements.
+- **Regulatory Compliance**: The governance process ensures that all data used in credit risk models remains compliant with [[pra|PRA]] and [[ecb|ECB]] expectations regarding data lineage, accuracy, and use-test requirements.

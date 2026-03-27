@@ -1,12 +1,12 @@
-# Interest Rate Risk in the Banking Book (IRRBB): Sources
+# Interest Rate Risk in the Banking Book ([[04-irrbb_measurement|IRRBB]]): Sources
 
-A bank can be extremely effective at managing its credit portfolio but still perform poorly if it fails to manage its interest rate and market risk. While credit risk remains the main type of risk exposure for most retail banks, interest rate risk in the banking book (IRRBB) represents a significant and pervasive structural risk for all deposit-taking institutions.
+A bank can be extremely effective at managing its credit portfolio but still perform poorly if it fails to manage its interest rate and [[05-market_risk|market risk]]. While credit risk remains the main type of risk exposure for most retail banks, interest rate risk in the banking book ([[04-irrbb_measurement|IRRBB]]) represents a significant and pervasive structural risk for all deposit-taking institutions.
 
 ## Banking Book vs Trading Book
 
-**Interest rate risk in the banking book (IRRBB)** refers to the current or potential risk to the bank's capital and earnings arising from adverse movements in interest rates that affect the bank's banking book positions. Basel III defines IRRBB as "the current or prospective risk to the bank's capital and earnings arising from adverse movements in interest rates that affect the bank's banking book positions."
+**Interest rate risk in the banking book ([[04-irrbb_measurement|IRRBB]])** refers to the current or potential risk to the bank's capital and earnings arising from adverse movements in interest rates that affect the bank's banking book positions. [[basel_framework|Basel III]] defines [[04-irrbb_measurement|IRRBB]] as "the current or prospective risk to the bank's capital and earnings arising from adverse movements in interest rates that affect the bank's banking book positions."
 
-**Trading book** — a portfolio of financial instruments held by a bank that are actively traded to facilitate trading for the institution's customers, profit from trading spreads, or hedge risk. Trading books are marked to market daily and use value at risk (VaR) as a key risk metric.
+**Trading book** — a portfolio of financial instruments held by a bank that are actively traded to facilitate trading for the institution's customers, profit from trading spreads, or hedge risk. Trading books are marked to market daily and use [[07-var_limitations|value at risk]] (VaR) as a key risk metric.
 
 An instrument must be designated as a trading book instrument (at first recognition) if it is held for one or more of the following purposes: short-term resale; profiting from short-term price movements; locking in arbitrage profits; or hedging risks arising from the above. Any instrument not held for these purposes at inception must be assigned to the banking book.
 
@@ -14,14 +14,14 @@ An instrument must be designated as a trading book instrument (at first recognit
 
 When interest rates change, two key effects arise:
 
-1. **Earnings effect** — changes in interest rate-sensitive income and expenses alter the bank's net interest income (NII).
+1. **Earnings effect** — changes in interest rate-sensitive income and expenses alter the bank's [[03-nii_nim|net interest income]] ([[03-nii_nim|NII]]).
 2. **Economic value effect** — the present value of future cashflows changes, altering the underlying value of assets, liabilities, and off-balance sheet items, and hence the bank's economic value of equity (EVE).
 
 Mismatches between assets and liabilities mean these changes are not symmetrical, leaving banks exposed to adverse interest rate movements.
 
-## Four Sources of IRRBB Mismatch
+## Four Sources of [[04-irrbb_measurement|IRRBB]] Mismatch
 
-The sources of structural mismatch that give rise to IRRBB are:
+The sources of structural mismatch that give rise to [[04-irrbb_measurement|IRRBB]] are:
 
 - **Term** — short-term liabilities funding long-term assets (e.g. non-maturity deposits funding 20-year mortgages).
 - **Volume** — many smaller deposits funding large loans.
@@ -70,12 +70,12 @@ Interest rates may not change across the entire yield curve uniformly. In a borr
 Banks are often described by their relative responsiveness to short-term rate changes:
 
 - **Asset-sensitive** — interest-earning assets (loans and investments) tend to reprice more quickly than interest-bearing deposits and borrowed funds. These banks tend to benefit when rates rise but face margin compression when rates fall.
-- **Liability-sensitive** — liabilities reprice more quickly than assets (e.g. funded long-term fixed rate assets with short-term deposits). These banks face NII pressure when rates rise, and their EVE declines as the discount rate applied to long-duration assets increases.
+- **Liability-sensitive** — liabilities reprice more quickly than assets (e.g. funded long-term fixed rate assets with short-term deposits). These banks face [[03-nii_nim|NII]] pressure when rates rise, and their EVE declines as the discount rate applied to long-duration assets increases.
 
 South African banks tend to have floating rate assets (linked to the prime rate) and a mix of fixed-rate liabilities (cheque accounts, fixed deposits) and floating-rate wholesale funding (JIBAR-linked). If left unhedged, this structure leads to widening margins when rates increase and narrowing margins when rates decrease.
 
-## IRRBB Hedging (Behavioural)
+## [[04-irrbb_measurement|IRRBB]] Hedging (Behavioural)
 
-Interest rate risk in the banking book may be hedged to mitigate rate risk and lock in NII. However, hedging instruments come at a cost, reducing earnings. Furthermore, **behavioural risks** arise from hedging: early redemptions or prepayments can result in "naked" hedges that no longer have underlying offsetting exposures, incurring a cost to unwind.
+Interest rate risk in the banking book may be hedged to mitigate rate risk and lock in [[03-nii_nim|NII]]. However, hedging instruments come at a cost, reducing earnings. Furthermore, **behavioural risks** arise from hedging: early redemptions or prepayments can result in "naked" hedges that no longer have underlying offsetting exposures, incurring a cost to unwind.
 
-For market risk hedging instruments (FRAs, futures, swaps, options) see [Hedging Instruments](05-market_risk.md).
+For [[05-market_risk|market risk]] hedging instruments (FRAs, futures, swaps, options) see [Hedging Instruments](05-market_risk.md).

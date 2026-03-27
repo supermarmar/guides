@@ -4,12 +4,12 @@ Perfect — you’re now in the **Long-Run Average (LRA) section of PD quantific
 
 ### **LRA Period**
 
-Under **CRR Article 180(2)(a)**, probability of default (PD) estimates must be calibrated to the **long-run average (LRA)** default rate per grade. The selection of an appropriate LRA period is therefore critical.
+Under **[[crr|CRR]] Article 180(2)(a)**, probability of default (PD) estimates must be calibrated to the **long-run average (LRA)** default rate per grade. The selection of an appropriate LRA period is therefore critical.
 
 * **Minimum requirements:**
 
-  * **CRR Article 180(2)(e)** specifies that the observation period for PD estimation must cover **at least 5 years** and include both **good** and **bad** years of the credit cycle.
-  * **PRA SS4/24 paragraph 11.13** expands on this, stating that banks should consider:
+  * **[[crr|CRR]] Article 180(2)(e)** specifies that the observation period for PD estimation must cover **at least 5 years** and include both **good** and **bad** years of the credit cycle.
+  * **[[pra|PRA]] [[ss4-24|SS4/24]] paragraph 11.13** expands on this, stating that banks should consider:
 
     * The variability of all observed one-year default rates (ODRs),
     * The relative frequency of good and bad years in relation to the most relevant macroeconomic variables (MEVs) that drive default risk for the exposures, and
@@ -24,7 +24,7 @@ Together, these requirements ensure that the LRA period captures a representativ
 1. **Derive factors of the conjunction representation**
 
    * Identify the macroeconomic variables (MEVs) most strongly associated with default risk for the exposure class.
-   * Use these to build a representation of the economic environment over time.
+   * Use these to build a representation of the [[03-economic_envrionment|economic environment]] over time.
 
 2. **Determine good and bad periods**
 
@@ -47,7 +47,7 @@ The LRA period should be chosen to reflect a balanced view of credit risk across
 
 ---
 
-Would you like me to also write up the **“LRA Calibration” subsection** next, in the same structured style, so you can directly use both in your risk quantification section?
+Would you like me to also write up the **“LRA Calibration” subsection** next, in the same structured style, so you can directly use both in your [[07-risk_quantification|risk quantification]] section?
 
 Perfect — I’ve amended your **LRA Period subsection** to incorporate the detailed methodology you’ve just outlined. Here’s a clean, structured draft you can use directly:
 
@@ -55,12 +55,12 @@ Perfect — I’ve amended your **LRA Period subsection** to incorporate the det
 
 ### **LRA Period**
 
-Under **CRR Article 180(2)(a)**, probability of default (PD) estimates must be calibrated to the **long-run average (LRA)** default rate per grade. The selection of an appropriate LRA period is therefore critical.
+Under **[[crr|CRR]] Article 180(2)(a)**, probability of default (PD) estimates must be calibrated to the **long-run average (LRA)** default rate per grade. The selection of an appropriate LRA period is therefore critical.
 
 * **Minimum requirements:**
 
-  * **CRR Article 180(2)(e)** specifies that the observation period for PD estimation must cover **at least 5 years** and include both **good** and **bad** years of the credit cycle.
-  * **PRA SS4/24 paragraph 11.13** expands on this, requiring firms to consider:
+  * **[[crr|CRR]] Article 180(2)(e)** specifies that the observation period for PD estimation must cover **at least 5 years** and include both **good** and **bad** years of the credit cycle.
+  * **[[pra|PRA]] [[ss4-24|SS4/24]] paragraph 11.13** expands on this, requiring firms to consider:
 
     * The variability of all observed one-year default rates (ODRs),
     * The relative frequency of good and bad years reflected by relevant macroeconomic variables (MEVs), and
@@ -72,7 +72,7 @@ Under **CRR Article 180(2)(a)**, probability of default (PD) estimates must be c
 
 1. **Derivation of Economic Factor**
 
-   * **Macroeconomic variables (MEVs)** were selected based on their relevance to US credit card default risk, guided by business intuition and alignment with the key drivers in the IFRS 9 model.
+   * **Macroeconomic variables (MEVs)** were selected based on their relevance to US credit card default risk, guided by business intuition and alignment with the key drivers in the [[ifrs9_standard|IFRS 9]] model.
    * Variables included: **Unemployment rate, debt-to-income ratio, CPI, industry charge-off rate, consumer confidence index (CCI), disposable income, GDP, and house price index (HPI)**.
    * Transformations such as **quarter-on-quarter relative or absolute changes** and **6/12-month moving averages** were explored.
    * **Principal Component Analysis (PCA)** was then applied to consolidate the MEVs into a single factor, capturing the overall economic trend.
@@ -111,12 +111,12 @@ Great — thanks for sharing the additional context. I’ll extend and integrate
 
 ### **LRA Period**
 
-Under **CRR Article 180(2)(a)**, probability of default (PD) estimates must be calibrated to the **long-run average (LRA)** default rate per grade. The selection of an appropriate LRA period is therefore critical.
+Under **[[crr|CRR]] Article 180(2)(a)**, probability of default (PD) estimates must be calibrated to the **long-run average (LRA)** default rate per grade. The selection of an appropriate LRA period is therefore critical.
 
 * **Minimum requirements:**
 
-  * **CRR Article 180(2)(e)** specifies that the observation period for PD estimation must cover **at least 5 years** and include both **good** and **bad** years of the credit cycle.
-  * **PRA SS4/24 paragraph 11.13** requires firms to also consider:
+  * **[[crr|CRR]] Article 180(2)(e)** specifies that the observation period for PD estimation must cover **at least 5 years** and include both **good** and **bad** years of the credit cycle.
+  * **[[pra|PRA]] [[ss4-24|SS4/24]] paragraph 11.13** requires firms to also consider:
 
     * The variability of one-year observed default rates (ODRs),
     * The balance of good and bad years represented by relevant macroeconomic variables (MEVs), and
@@ -155,7 +155,7 @@ Under **CRR Article 180(2)(a)**, probability of default (PD) estimates must be c
 * Produced a balanced mix of **48/52 good vs bad quarters** in the chosen LRA period,
 * Mirrored the balance in the reference economic cycle,
 * Passed the **F-test** for ODR variability (p-value > 5%),
-* Aligned with the **IFRS 9 impairment model**, ensuring methodological consistency across accounting and regulatory credit risk models.
+* Aligned with the **[[ifrs9_standard|IFRS 9]] impairment model**, ensuring methodological consistency across accounting and regulatory credit risk models.
 
 ---
 
@@ -179,9 +179,9 @@ Perfect — thanks for laying out the detail. I’ll now turn that into a struct
 
 ### **Regulatory Requirements**
 
-* **CRR Article 169(3):** PD estimates must be assigned on a **discrete rating scale**. All accounts allocated to the same **risk grade** (based on their PiT PD) are assigned a single PD estimate, equal to the **long-run average default rate (LRA DR)** of that grade.
-* **PRA SS4/24 (11.10c):** Permits both **overlapping** and **non-overlapping** performance windows. However, if overlapping windows are used, firms must perform an analysis of **potential bias** due to overweighting observations in the overlap.
-* **PRA SS4/24 (11.31):** Requires that **PDs increase monotonically across grades**, ensuring consistency and interpretability of the risk scale.
+* **[[crr|CRR]] Article 169(3):** PD estimates must be assigned on a **discrete rating scale**. All accounts allocated to the same **risk grade** (based on their PiT PD) are assigned a single PD estimate, equal to the **long-run average default rate (LRA DR)** of that grade.
+* **[[pra|PRA]] [[ss4-24|SS4/24]] (11.10c):** Permits both **overlapping** and **non-overlapping** performance windows. However, if overlapping windows are used, firms must perform an analysis of **potential bias** due to overweighting observations in the overlap.
+* **[[pra|PRA]] [[ss4-24|SS4/24]] (11.31):** Requires that **PDs increase monotonically across grades**, ensuring consistency and interpretability of the risk scale.
 
 ---
 
@@ -198,7 +198,7 @@ Perfect — thanks for laying out the detail. I’ll now turn that into a struct
 
 3. **Bias Assessment – Overlap vs Non-Overlap:**
 
-   * In line with SS4/24 11.10c, an assessment of bias from overlapping windows was performed.
+   * In line with [[ss4-24|SS4/24]] 11.10c, an assessment of bias from overlapping windows was performed.
    * The LRA DR was recalculated using **non-overlapping windows** (i.e., selecting a non-overlapping set of performance periods).
    * The **overall LRA DR** for each grade was then **ranked against the distribution** of quarterly LRA DRs.
    * This analysis confirmed that overlapping did not materially bias the estimates, since the LRA DRs derived were stable relative to non-overlapping measures.
@@ -215,7 +215,7 @@ Perfect — thanks for laying out the detail. I’ll now turn that into a struct
   * Ratio of each grade’s LRA PD relative to the prior grade.
 * Results demonstrated that:
 
-  * **Monotonicity** was achieved (i.e., higher grades consistently mapped to higher PDs), meeting SS4/24 11.31.
+  * **Monotonicity** was achieved (i.e., higher grades consistently mapped to higher PDs), meeting [[ss4-24|SS4/24]] 11.31.
   * Ratios between grades provided evidence of meaningful separation and discrimination power.
 
 ---

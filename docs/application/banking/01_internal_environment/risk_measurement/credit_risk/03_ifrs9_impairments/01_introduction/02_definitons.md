@@ -2,7 +2,7 @@
 
 ## Gross Carrying Amount
 
-The gross carrying amount of a financial asset under IFRS 9 represents its original or amortized cost, before any adjustments for impairment losses (i.e., loss allowances). It reflects the contractual amounts due from the borrower and excludes any deductions for expected credit losses (IFRS9 §5.1.1).
+The gross carrying amount of a financial asset under [[ifrs9_standard|IFRS 9]] represents its original or amortized cost, before any adjustments for impairment losses (i.e., loss allowances). It reflects the contractual amounts due from the borrower and excludes any deductions for expected [[02-credit_losses|credit losses]] ([[ifrs9_standard|IFRS9]] §5.1.1).
 
 > *Example: A bank issues a loan of £100,000 with £500 in legal fees at 10% interest. If the loan is measured at amortised cost, the bank records an initial gross carrying amount of £100,500.*
 
@@ -15,7 +15,7 @@ The gross carrying amount includes:
 
 ## Net Carrying Amount
 
-The net carrying amount (often referred to simply as amortized cost) is the value of a financial asset after adjusting for repayments, amortization of premiums/discounts, and the Expected Credit Loss (ECL) allowance (IFRS9 §5.2.2).
+The net carrying amount (often referred to simply as amortized cost) is the value of a financial asset after adjusting for repayments, amortization of premiums/discounts, and the Expected Credit Loss (ECL) allowance ([[ifrs9_standard|IFRS9]] §5.2.2).
 
 $\text{Net Carrying Amount} = \text{Gross Carrying Amount} - \text{ECL}$
 
@@ -35,7 +35,7 @@ Impairments cannot be technically recognised as defaults yet, but should not be 
 
 The concept of a Significant Increase in Credit Risk (SICR) is a critical component of the impairment model. It requires financial institutions to assess whether the credit risk of a financial asset has significantly increased since its initial recognition. If there is a SICR, the asset transitions from Stage 1 to Stage 2 in the Expected Credit Loss (ECL) framework. This increases the ECL since we are now using a lifetime PD and EAD.
 
-> *At each reporting date, the bank is required to assess whether the credit risk of a loan has increased significantly compared to its risk at initial recognition. Let’s say a bank issued a 5-year loan to a mid-sized logistics company in 2022. At the time of origination, the borrower had a healthy balance sheet, steady cash flow, and an external credit rating equivalent to BBB, reflecting a low probability of default. Now, in 2025, during a new reporting cycle, the bank reassesses the risk of default over the remaining life of the loan. It notices that the borrower has experienced a significant drop in revenue, is taking longer to pay other creditors, and is on credit watch for a potential downgrade. Although the actual ECL amount hasn't changed drastically yet, the risk of default occurring over the life of the loan has materially increased when compared to 2022. Therefore, this loan would move from Stage 1 to Stage 2, and the bank would now recognise lifetime expected credit losses instead of just 12-month ECLs. This results in a higher loss allowance and an impairment loss on the income statement, even if actual cash shortfalls haven't occurred yet.*
+> *At each reporting date, the bank is required to assess whether the credit risk of a loan has increased significantly compared to its risk at initial recognition. Let’s say a bank issued a 5-year loan to a mid-sized logistics company in 2022. At the time of origination, the borrower had a healthy balance sheet, steady cash flow, and an external credit rating equivalent to BBB, reflecting a low probability of default. Now, in 2025, during a new reporting cycle, the bank reassesses the risk of default over the remaining life of the loan. It notices that the borrower has experienced a significant drop in revenue, is taking longer to pay other creditors, and is on credit watch for a potential downgrade. Although the actual ECL amount hasn't changed drastically yet, the risk of default occurring over the life of the loan has materially increased when compared to 2022. Therefore, this loan would move from Stage 1 to Stage 2, and the bank would now recognise lifetime expected [[02-credit_losses|credit losses]] instead of just 12-month ECLs. This results in a higher loss allowance and an impairment loss on the income statement, even if actual cash shortfalls haven't occurred yet.*
 
 ### SICR Triggers
 
@@ -73,13 +73,13 @@ Banks should disclose impairment triggers to supervisors. Banks can analyse seve
 
 ## Definition of Default (DoD)
 
-IFRS 9 statest that when definining default for the purposes of determining the risk of a defualt occuring, an entity shall apply a default defintion that is consistent with the definition used for internal credit risk management purposes. However there is a rebuttable presumption that default does not occur later than when a financial assete is 90 daas past due unless an entity has reasonable and supportable information to demonstrate that a more lagging default criterion is more appropriate.
+[[ifrs9_standard|IFRS 9]] statest that when definining default for the purposes of determining the risk of a defualt occuring, an entity shall apply a default defintion that is consistent with the definition used for internal credit [[01-risk_management|risk management]] purposes. However there is a rebuttable presumption that default does not occur later than when a financial assete is 90 daas past due unless an entity has reasonable and supportable information to demonstrate that a more lagging default criterion is more appropriate.
 
 The DoD for impairment models should therefore be aligned to the IRB model DoD where such models exist.
 
 ### Days Past Due (DPD)
 
-Banks commonly specified three payments (or 90 DPD) in arrears as a pragmatic point of ‘default’ [B5.5.37](a), long before the introduction of the Basel II Capital Accords. That said, this threshold can generally range between 30–180 days based on managerial discretion and some analysis.
+Banks commonly specified three payments (or 90 DPD) in arrears as a pragmatic point of ‘default’ [B5.5.37](a), long before the introduction of the [[basel_2|Basel II]] Capital Accords. That said, this threshold can generally range between 30–180 days based on managerial discretion and some analysis.
 
 ### Return to Default
 
@@ -102,7 +102,7 @@ When preparing the training dataset for PIT PD calibration:
 
 ## Cure
 
-IFRS 9 is not prescriptive in terms of defining when an account has cured [5.5.7](a). Hence, a default flag can be created under the following alternatives of cure.
+[[ifrs9_standard|IFRS 9]] is not prescriptive in terms of defining when an account has cured [5.5.7](a). Hence, a default flag can be created under the following alternatives of cure.
 
 - Instant Cure: An account returns to performing immediately after the cause of default is removed.
 - Probabtion Period: This is used when an account needs to wait for a certain amount of time (e.g. 6m) before returning to performing. It reduces the risk of multiple defaults.
@@ -153,7 +153,7 @@ The distinction between gross and net carrying amounts is critical for calculati
 
 ### Coverage Ratio
 
-A coverage ratio is a financial metric used to assess an entity's ability to meet its financial obligations, such as debt repayments, interest expenses, or other liabilities. In an IFRS 9 context it is the ECL over the total outstanding loan amounts.
+A coverage ratio is a financial metric used to assess an entity's ability to meet its financial obligations, such as debt repayments, interest expenses, or other liabilities. In an [[ifrs9_standard|IFRS 9]] context it is the ECL over the total outstanding loan amounts.
 
 $\Large\frac{\text{ECL}_{i,t,t'}}{\text{Balance}_{i,t}}$ where $\text{ECL}_{i,t,t'} = \displaystyle\sum_{s=1}^{3}\text{ECL Stage } s_{i,t,t'}$
 

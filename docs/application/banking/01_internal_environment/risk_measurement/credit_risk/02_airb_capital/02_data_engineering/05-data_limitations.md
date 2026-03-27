@@ -8,7 +8,7 @@ A register of known data limitations is maintained and shared with model validat
 
 3. Segment-specific data gap (e.g., a new portfolio acquired in 2025) lacks sufficient historical performance data. This segment is excluded from model development and may rely on benchmarking or conservative assumptions.
 
-4. Inconsistent default definition or implementation of default status (e.g., write-off logic, forbearance flagging) may have changed operationally over time, leading to inconsistencies in the target variable.
+4. Inconsistent default definition or implementation of default status (e.g., write-off logic, forbearance flagging) may have changed operationally over time, leading to inconsistencies in the [[01-target_variable|target variable]].
 
 5. Data migrations and system changes may result in gaps in bureau data or truncated behavioural histories. These inconsistencies require exclusion of affected periods or imputation of missing fields.
 

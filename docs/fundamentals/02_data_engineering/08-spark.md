@@ -251,7 +251,7 @@ The driver program is the core of the Spark application, but there are also modu
 
 - Spark SQL: an API that converts SQL queries and actions into Spark tasks to be distributed by the cluster manager. This allows for the integration of existing SQL pipelines without redevelopment of code and subsequent testing required for quality control.
 - Spark Streaming: a solution for processing live data streams that creates a discretized stream (Dstream) of RDD batches.
-- MLlib and ML: machine learning modules for designing pipelines used for feature engineering and algorithm training. ML is the DataFrame-based improvement on the original MLlib module.
+- MLlib and ML: machine learning modules for designing pipelines used for [[01-feature-engineering|feature engineering]] and algorithm training. ML is the DataFrame-based improvement on the original MLlib module.
 - GraphX: a robust graphing solution for Spark. More than just visualizing data, this API converts RDDs to resilient distributed property graphs (RDPGs) which utilize vertex and edge properties for relational data analysis.
 
 While we can directly analyze data using Spark’s Resilient Distributed Datasets (RDDs), we may not always want to perform complicated analysis directly on RDDs. Luckily, Spark offers a module called Spark SQL that can make common data analysis tasks simpler and faster. The name Spark SQL is an umbrella term, as there are several ways to interact with data when using this module. We’ll cover two of these methods using the PySpark API:

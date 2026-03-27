@@ -4,7 +4,7 @@ The most common LGD measure is “gross” (where the LGD is represented as a pe
 
 LGD can be difficult to calculate as bank recovery rates vary and workouts take different lengths of time, so peer data is not always useful. Formulas have been developed to best achieve comparability. Models should “time weight” LGD, meaning historical data is not analysed simply by averaging losses corresponding to each default, but also by considering the time periods in the economic cycle when they are likely to occur. For example, more and larger losses would be expected in an economic downturn for some asset classes, while other asset classes will not experience the same variation.
 
-In terms of data, Basel (and regulators) details requirements that should be met, such as the minimum historical time period covered (7 years or minimum 5 years depending on the asset class). In line with the above, data used for modelling period should cover at least one economic cycle.
+In terms of data, [[bis|Basel]] (and regulators) details requirements that should be met, such as the minimum historical time period covered (7 years or minimum 5 years depending on the asset class). In line with the above, data used for modelling period should cover at least one economic cycle.
 
 LGD is modelled using a **component-based approach** to capture the complex nature of post-default outcomes. The target is not a single value but built from two or more sub-models:
 
@@ -22,8 +22,8 @@ LGD is modelled using a **component-based approach** to capture the complex natu
 
 #### 3.3.2 Considerations
 
-* Losses and recoveries are tracked over a **maximum resolution period**, typically **5 years**, in accordance with **Basel and PRA** expectations.
-* LGD estimates should reflect **long-run average (LRA)** and **downturn (DT)** conditions, with proper segmentation by:
+* Losses and recoveries are tracked over a **maximum resolution period**, typically **5 years**, in accordance with **[[bis|Basel]] and [[pra|PRA]]** expectations.
+* LGD estimates should reflect **long-run average (LRA)** and **downturn (DT)** conditions, with proper [[06-segmentation|segmentation]] by:
 
   * Security type (secured vs. unsecured),
   * Product type,
@@ -32,7 +32,7 @@ LGD is modelled using a **component-based approach** to capture the complex natu
 
 The LCD1 (non-default book) and LGD2 (default book) models were designed to predict the economic loss realised on an exposure following default, expressed as a percentage of exposure at default.
 
-The LGD model was developed based on a component-based design, where the overall LGD prediction has been decomposed into a sequence of probability and recovery components. The composite LGD model was then calibrated and back-tested based on realised LGD. Details of the LCD model design are provided in Model Methodology.
+The LGD model was developed based on a component-based design, where the overall LGD prediction has been decomposed into a sequence of probability and recovery components. The composite LGD model was then calibrated and back-tested based on realised LGD. Details of the LCD [[02-model-design|model design]] are provided in Model Methodology.
 
 The table below summarises the target variable and outcome periods for each model component:
 
@@ -46,19 +46,19 @@ It is important to note that while PDs are generally associated with the borrowe
 
 ### Probability of Zero Payer and Full Repayment
 
-The target variables for probability model components are binary indicators:
+The [[01-target-variables|target variables]] for probability model components are binary indicators:
 
 - For the probability of Zero Payer model component, the target variable is the zero-payer flag ("segment_24m_zp" in the MRD) which is an indicator that an account has made no payments during a 24-month outcome period after the point of default.
 - For the probability of Full Payer model component, the target variable is the fuil payer flag ("segment_24m_fp" in the MRD) which is an indicator that an account has repaid all outstanding debt during e 24-month outcome period after the point of default.
 
 The same outcome period is used for the probability component models to ensure consistency. To determine an appropriate outcome performance window, three different time horizons were assessed: 12-months, 24- months and 36-months.
 
-Given the model design, the probabilities of whether an account is a Zero Payer or full payer are not necessarily independent. The probability of full repayment may be conditional on certain factors that also influence the probability of zero repayment. For example, higher balances may increase the probability of zero repayment while also decrease the probability of full repayment. Therefore, the hierarchy of which of these probabilities are predicted first is important and may impact the accuracy of the overall estimated LGD. The hierarchy of predictions was also assessed using the same performance windows for the following architectures:
+Given the [[02-model-design|model design]], the probabilities of whether an account is a Zero Payer or full payer are not necessarily independent. The probability of full repayment may be conditional on certain factors that also influence the probability of zero repayment. For example, higher balances may increase the probability of zero repayment while also decrease the probability of full repayment. Therefore, the hierarchy of which of these probabilities are predicted first is important and may impact the accuracy of the overall estimated LGD. The hierarchy of predictions was also assessed using the same performance windows for the following architectures:
 
 - Full Payer (FP) first: This approach models the full payer population first and subsequent population is conditional on full payment.
 - Zero Payer (ZP) first: This approach models the zero-payer population first and subsequent population is conditional on zero payment.
 
-Toy models for the probability components were built using the development sample (detailed in Section 7.4) to compare their results with different outcome periods. The first step in building the toy models was running the variable reduction analysis (details in Section 9.4) and identifying the strongest 35 variables for each model. Thereafter, the model was fit using these variables to better understand the implications of the model hierarchy. Figure 7.3-1 presents the accuracy (error rates) and discriminatory power (Gini) of each probability component calculated based on different outcome periods and hierarchies.
+Toy models for the probability components were built using the development sample (detailed in Section 7.4) to compare their results with different outcome periods. The first step in building the toy models was running the [[05-variable-reduction|variable reduction]] analysis (details in Section 9.4) and identifying the strongest 35 variables for each model. Thereafter, the model was fit using these variables to better understand the implications of the model hierarchy. Figure 7.3-1 presents the accuracy (error rates) and discriminatory power (Gini) of each probability component calculated based on different outcome periods and hierarchies.
 
 ### Recovery Rate
 
@@ -68,7 +68,7 @@ The outcome period was determined by assessing the incremental cumulative recove
 
 <!--  
 
-An “economic” loss (unlike an accounting loss) considers all relevant factors including material discount effects, and material direct and indirect costs associated with holding and collecting the defaulted facilities, i.e. direct and indirect costs discounted back to the point of default. Indirect costs are only considered when calculating the LGD used for capital calculations, but not included within the LGD used in the IFRS9 impairment calculations (discussed in a later section).
+An “economic” loss (unlike an accounting loss) considers all relevant factors including material discount effects, and material direct and indirect costs associated with holding and collecting the defaulted facilities, i.e. direct and indirect costs discounted back to the point of default. Indirect costs are only considered when calculating the LGD used for capital calculations, but not included within the LGD used in the [[ifrs9_standard|IFRS9]] impairment calculations (discussed in a later section).
 
 It is important to note that while PDs are generally associated with the borrower, or client, LGDs are associated with the facility, and the asset being financed, as the loss depends on the characteristics of the product in question.
 
@@ -79,16 +79,16 @@ Methods used to estimate the LGD for credit facilities fall into one of two cate
   - Explicit methods, i.e. the market LGD approach and workout LGD approach
   - Implicit methods, i.e. the implied market LGD approach.
 
-Unlike PD estimates, where Basel has provided more detailed guidelines, LGD estimates follow a principles-based approach where Basel describes what the resulting LGD should include and account for but does not necessarily provide guidelines on how it should be estimated. For example, Basel requires banks to “reflect economic downturn conditions where necessary to capture the relevant risks” in their LGD estimates; i.e. “downturn” (DT) LGDs. Regulatory bodies, however, may provide further guidance. -->
+Unlike PD estimates, where [[bis|Basel]] has provided more detailed guidelines, LGD estimates follow a principles-based approach where [[bis|Basel]] describes what the resulting LGD should include and account for but does not necessarily provide guidelines on how it should be estimated. For example, [[bis|Basel]] requires banks to “reflect economic downturn conditions where necessary to capture the relevant risks” in their LGD estimates; i.e. “downturn” (DT) LGDs. Regulatory bodies, however, may provide further guidance. -->
 
-### Downturn LGD
+### [[07-risk_quantification|Downturn LGD]]
 
 <!-- DT LGD estimates are based on historical recoveries (including collateral) in economic downturn conditions and used in calculating regulatory capital. Interpretations of key parameters differ by bank and are not always comparable, given the less specific guidelines provided by international bodies. Definitions of downturn vary, with some banks using two consecutive quarters of negative GDP growth, while others emphasise product downturn rather than overall economic conditions. While PD is largely the same across all types of exposures to a borrower, LGD is likely to vary significantly by product. Banks are expected to be conservative, and auditors and external supervisors must be able to validate the model. -->
 
 ### LGD Reference Value
 
-SS4/24 Paragraph 15.7 requires that firms calculate a "reference value" as the simple average of the realised LGDs in the two years with the highest total economic loss divided by total outstanding amount (i.e. the average of the two years with highest balance-weighted LCD). The reference value should be compared against the downturn LGD at least at the level of calibration segments.
+[[ss4-24|SS4/24]] Paragraph 15.7 requires that firms calculate a "reference value" as the simple average of the realised LGDs in the two years with the highest total economic loss divided by total outstanding amount (i.e. the average of the two years with highest balance-weighted LCD). The reference value should be compared against the [[07-risk_quantification|downturn LGD]] at least at the level of calibration segments.
 
 ### Observed Average LGD
 
-In line with SS4/24 Paragraph 14.6, the observed average LGD represents the arithmetic (default-weighted) average realised LGD, on resolved facilities.
+In line with [[ss4-24|SS4/24]] Paragraph 14.6, the observed average LGD represents the arithmetic (default-weighted) average realised LGD, on resolved facilities.

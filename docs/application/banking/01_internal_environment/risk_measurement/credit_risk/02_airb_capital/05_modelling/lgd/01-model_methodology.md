@@ -12,11 +12,11 @@ To calculate estimates of LGDs, first “realised” LGDs must be calculated. Th
 - Market LGD – The LGD is observed from market prices of defaulted bonds and marketable loans soon after default events, i.e. their residual values which indicate the value lost. The main benefit is that actual prices can be used and reflect market views, though data can be scarce. This is the methodology used most by the rating agencies.
 - Workout LGD – The LGD is estimated cashflows from the workout process, based on estimated exposure and a discount rate. Users must monitor the timing of payments received and consider the riskiness of any restructured debt, i.e. expected losses and recoveries are discounted to calculate the estimated LGD. This method requires extensive data.
 - Implied market LGD – The LGD is derived from prices of bonds deemed to be high risk (but not defaulted), where the credit spreads are used in the estimation process. A credit spread between a risk-free and a risky bond will indicate the risk premium, which can be used to determine an implied LGD if the PD is already known (or can be estimated). This is the least developed of the methods but has the benefit of a large pool of market data and is often used within the derivative space.
-- Implied historical LGDs – The LGD is estimated using long-term historical average losses for similar asset types. Basel requires current information to be used where available to supplement this method, and only allows for this method to be used in a retail context.
+- Implied historical LGDs – The LGD is estimated using long-term historical average losses for similar asset types. [[bis|Basel]] requires current information to be used where available to supplement this method, and only allows for this method to be used in a retail context.
 
 The above estimation methods may be subject to various assumptions and approximations, depending on the individual bank and regulators. For example, the Workout LGD method may involve using aggregate portfolio losses and recoveries, or even assuming all recoveries and losses are incurred at the write-off date. The discount rate that should be used is a subject of debate, and if regulators do not prescribe this, most banks follow best practice in the industry or set this rate internally. Once the realised LGDs have been calculated, or estimated, various methodologies can be used to estimate LGDs on current exposures. These methods would be in line with those used for PD.
 
-Consideration must be given to collateral treatment when modelling LGDs. Basel outlines steps banks should take to incorporate collateral, and a conservative view is recommended. Collateral providers can also default, or collateral can take a long time to access, so collateral does not mean losses can be offset entirely.
+Consideration must be given to collateral treatment when modelling LGDs. [[bis|Basel]] outlines steps banks should take to incorporate collateral, and a conservative view is recommended. Collateral providers can also default, or collateral can take a long time to access, so collateral does not mean losses can be offset entirely.
 
 ## Implied Market LGD Approach
 
@@ -25,7 +25,7 @@ Two separate LGD models were developed:
 - LGD1: applicable to the non-defaulted (performing) book; and
 - LGD2: applicable to the defaulted (non-performing) book.
 
-The overall model methodology decomposes LGD into probability and severity components. Risk differentiation is achieved via a segmented set of logistic regression and generalised linear model (CLM) components. Internally this step is referred to as risk differentiation, and the outputs referred te as Point in Time (PiT) LGDs.
+The overall model methodology decomposes LGD into probability and severity components. [[03-risk-differentiation|Risk differentiation]] is achieved via a segmented set of logistic regression and generalised linear model (CLM) components. Internally this step is referred to as [[03-risk-differentiation|risk differentiation]], and the outputs referred te as Point in Time (PiT) LGDs.
 
 The modelled components comprise:
 
@@ -60,4 +60,4 @@ R_{\text{Partial}} = (1-P(\text{Zero})) \times (1-P(\text{Full}))) \times E[r(\t
 - $E[r({\text{Debt Sale})}]$ The expected recovery rate from debt sale proceeds.
 - $\text{CoR}$ The total estimated direct and indirect cost of recoveries.
 
-PiT LCDs are grouped into risk grades. In line with regulatory requirements, each risk grade was calibrated to the empirically observed Long Run Average (LRA) and Downturn (DT) loss given default. Appropriate Adjustments (AA) and where applicable. Margin of Conservatism (MoC) were added to account for residual uncertainties in estimates, to return a final regulatory LGD. Internaily the calibration step is referred to as risk quantification.
+PiT LCDs are grouped into risk grades. In line with regulatory requirements, each risk grade was calibrated to the empirically observed Long Run Average (LRA) and Downturn (DT) loss given default. Appropriate Adjustments (AA) and where applicable. Margin of Conservatism (MoC) were added to account for residual uncertainties in estimates, to return a final regulatory LGD. Internaily the calibration step is referred to as [[07-risk_quantification|risk quantification]].

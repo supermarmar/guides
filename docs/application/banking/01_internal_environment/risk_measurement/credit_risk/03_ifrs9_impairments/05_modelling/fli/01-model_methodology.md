@@ -1,6 +1,6 @@
 # Forward Looking Information
 
-In IFRS 9, Forward-Looking Information (FLI) ensures that Expected Credit Losses (ECLs) are not solely based on historical data but also incorporate anticipated macroeconomic conditions (e.g., GDP growth, unemployment rates). The process involves calibrating Point-in-Time (PIT) Probability of Default (PD) values to reflect the influence of future economic scenarios.
+In [[ifrs9_standard|IFRS 9]], Forward-Looking Information (FLI) ensures that Expected [[02-credit_losses|Credit Losses]] (ECLs) are not solely based on historical data but also incorporate anticipated macroeconomic conditions (e.g., GDP growth, unemployment rates). The process involves calibrating Point-in-Time (PIT) Probability of Default (PD) values to reflect the influence of future economic scenarios.
 
 ## Credit Cycle Forecasts
 

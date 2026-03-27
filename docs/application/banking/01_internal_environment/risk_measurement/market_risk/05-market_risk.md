@@ -4,7 +4,7 @@
 
 Market risk is defined as the **risk of loss from movements in prices in the financial markets**. It can arise from any position — on- or off-balance sheet — in cash, securities, derivatives, or from customer lending, market making, or trading. Market risks tend to arise from movements in interest rates, foreign exchange rates, and market prices (commodities and equities). Interest rate risk is therefore a form of market risk. Banks also have market risk from FX, commodity, and equity positions depending on the scale of their global operations and trading businesses.
 
-## Value at Risk (VaR)
+## [[07-var_limitations|Value at Risk]] (VaR)
 
 VaR is the maximum possible loss that a portfolio can suffer with a specific level of confidence over a certain time frame. Expressed formally:
 
@@ -18,11 +18,11 @@ For example, if 1-day VaR is $25 million at 95% confidence, there is an estimate
 
 A **"VaR break"** is when actual losses exceed the VaR threshold. In a perfectly accurate model, the number of VaR breaks would equal $(1 - \alpha)$ of trading days. Banks must back-test their models daily; regulators penalise banks with capital add-ons when poor back-testing highlights deficient models.
 
-South African banks commonly use 1-day and 10-day holding period assumptions for risk management.
+South African banks commonly use 1-day and 10-day holding period assumptions for [[01-risk_management|risk management]].
 
 ### Stressed VaR (sVaR)
 
-sVaR considers the worst losses of a portfolio observed from historical data — most commonly the 2008 financial crisis. Banks run simulations to identify the most stressful 1-year period from 2007 to the current date, and use that time series to calculate sVaR. sVaR is used alongside current VaR to set regulatory capital levels, while point-in-time VaR is the primary metric for limit monitoring. Both VaR and sVaR are used to set economic capital levels.
+sVaR considers the worst losses of a portfolio observed from historical data — most commonly the 2008 financial crisis. Banks run simulations to identify the most stressful 1-year period from 2007 to the current date, and use that time series to calculate sVaR. sVaR is used alongside current VaR to set regulatory capital levels, while point-in-time VaR is the primary metric for limit monitoring. Both VaR and sVaR are used to set [[01-economic_capital|economic capital]] levels.
 
 For limitations of VaR and alternative coherent measures (Expected Shortfall, TVaR) see [VaR Limitations](07-var_limitations.md).
 
@@ -65,7 +65,7 @@ Options provide protection against adverse market movements without the firm com
 
 The "basis" is a key challenge in hedging: there is no certainty that rates on the bank's exposure will move in tandem with the instrument used to hedge. If a bank earns prime on its assets but pays JIBAR 3-months on liabilities, entering a pay-fixed-receive-JIBAR swap eliminates the JIBAR liability exposure, leaving only the fixed leg and the prime-JIBAR basis as residual risks.
 
-Risk management reports must identify hedging so that basis risk can be analysed separately. Aggregating long and short positions could show little net risk while basis risk is substantial.
+[[01-risk_management|Risk management]] reports must identify hedging so that basis risk can be analysed separately. Aggregating long and short positions could show little net risk while basis risk is substantial.
 
 ### JSE Interest Rate Derivatives
 

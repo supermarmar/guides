@@ -62,4 +62,4 @@ Lifecycle segmentation focuses on where customers are in their personal or busin
 - Families / Established earners – wealth accumulation, insurance, and investment planning.
 - Pre-retirement and retirees – capital preservation, estate planning, and income-generating investments.
 - Start-ups and SMEs – working capital finance, merchant services, and business accounts.
-- Large corporates / institutions – complex lending, risk management, and investment banking.
+- Large corporates / institutions – complex lending, [[01-risk_management|risk management]], and investment banking.

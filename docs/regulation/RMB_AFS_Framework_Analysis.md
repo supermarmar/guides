@@ -1,4 +1,4 @@
-# RMB Annual Financial Statements — Framework Analysis
+# RMB [[02-financial_management|Annual Financial Statements]] — Framework Analysis
 
 *Mapping Rand Merchant Bank's AFS (FY2024, year ended 30 June 2024) to the standard bank AFS framework. RMB is the corporate and investment banking division of FirstRand Bank Limited, reported as a distinct segment within FirstRand's consolidated accounts. All figures are normalised (management basis) and in South African rand millions (Rm) unless otherwise stated.*
 
@@ -16,12 +16,12 @@ RMB's banking book is composed almost entirely of **wholesale corporate credit**
 
 - **Loans and Advances (Corporate/Wholesale):** The primary earning asset. RMB lends to large corporates, institutions, and project vehicles via leveraged finance, project finance, acquisition finance, and structured lending. Core advances grew **11% in FY2024** and **9% in H1 FY2025**. There are no retail loans — no mortgages, credit cards, or personal loans. This is a significant structural departure from the typical banking book described in the framework.
 - **Off-balance sheet commitments (Undrawn facilities):** RMB carries undrawn facilities as off-balance sheet exposures, consistent with the framework — commitment fees are earned on these lines.
-- **HQLAs:** RMB holds high-quality liquid assets (cash, South African sovereign bonds/RSA government securities) to meet LCR requirements, consistent with the framework. However, because RMB has no retail deposit base, the absolute volume of HQLAs relative to total assets is lower than at a retail bank like FNB.
+- **HQLAs:** RMB holds high-quality liquid assets (cash, South African sovereign bonds/RSA government securities) to meet [[04-lcr|LCR]] requirements, consistent with the framework. However, because RMB has no retail deposit base, the absolute volume of HQLAs relative to total assets is lower than at a retail bank like FNB.
 - **Securities and bonds:** RMB holds bonds and structured instruments as part of its investment banking activity and in support of its Global Markets trading operations.
 
 ##### Book Value (Amortised Cost)
 
-Corporate loans in the banking book are held at amortised cost, consistent with the framework. IFRS 9 ECL provisions are applied across three stages. RMB deliberately tilts its origination towards higher-quality credits, and its **watchlist counters fell 60% in FY2024** as clients either cured into Stage 1 or moved to NPL status.
+Corporate loans in the banking book are held at amortised cost, consistent with the framework. [[ifrs9_standard|IFRS 9]] ECL provisions are applied across three stages. RMB deliberately tilts its origination towards higher-quality credits, and its **watchlist counters fell 60% in FY2024** as clients either cured into Stage 1 or moved to NPL status.
 
 #### Trading Book
 
@@ -30,7 +30,7 @@ RMB has a **significantly larger trading book relative to its balance sheet** th
 - **Fixed income, currencies and commodities (FICC):** RSA government bonds, credit instruments, FX forwards and options, interest rate derivatives (JIBAR/SOFR swaps), commodity derivatives.
 - **Equity derivatives:** Structured equity products, single-stock and index derivatives.
 
-All of these satisfy Basel's trading book criteria — held for short-term gain, actively managed, and hedgeable. This is qualitatively consistent with the framework's description of trading book exposures but represents a **much larger proportion of RMB's balance sheet** than would be typical for a retail bank.
+All of these satisfy [[bis|Basel]]'s trading book criteria — held for short-term gain, actively managed, and hedgeable. This is qualitatively consistent with the framework's description of trading book exposures but represents a **much larger proportion of RMB's balance sheet** than would be typical for a retail bank.
 
 ##### Fair Value (M2M)
 
@@ -62,11 +62,11 @@ RMB is **not a separately listed entity** — it is a segment of FirstRand Bank 
 
 ## Income Statement (IS)
 
-### Net Interest Income (NII)
+### [[03-nii_nim|Net Interest Income]] ([[03-nii_nim|NII]])
 
-RMB earns NII from the spread between corporate loan rates (above JIBAR/repo) and its cost of corporate deposits and wholesale funding. In FY2024, **NII grew 15%**, driven by growth in both SA and broader African deposits and corporate lending volumes.
+RMB earns [[03-nii_nim|NII]] from the spread between corporate loan rates (above JIBAR/repo) and its cost of corporate deposits and wholesale funding. In FY2024, **[[03-nii_nim|NII]] grew 15%**, driven by growth in both SA and broader African deposits and corporate lending volumes.
 
-However, NII represents a **lower share of total income** at RMB than at a typical retail bank. Where a retail bank might derive 60–70% of total income from NII, RMB's NII/total income ratio is materially lower (estimated in the range of 40–50%) because of the large contribution from trading and fees. This makes RMB's income **less stable** in aggregate than a retail bank like FNB, but potentially higher-returning.
+However, [[03-nii_nim|NII]] represents a **lower share of total income** at RMB than at a typical retail bank. Where a retail bank might derive 60–70% of total income from [[03-nii_nim|NII]], RMB's [[03-nii_nim|NII]]/total income ratio is materially lower (estimated in the range of 40–50%) because of the large contribution from trading and fees. This makes RMB's income **less stable** in aggregate than a retail bank like FNB, but potentially higher-returning.
 
 - **Interest earned on loans:** Based on corporate JIBAR-linked pricing plus credit margin; higher-quality origination means margins are tighter than in retail but loss rates are lower.
 - **Interest earned on HQLAs and deposits:** Consistent with the framework.
@@ -91,7 +91,7 @@ Trading income from Global Markets (FICC and equity derivatives) is marked to ma
 
 - RSA sovereign bond trading generates Level 1/Level 2 income.
 - Derivative structuring for corporate clients generates Level 2/Level 3 income.
-- Currency and commodity risk management for corporates generates FX/commodity trading income.
+- Currency and commodity [[01-risk_management|risk management]] for corporates generates FX/commodity trading income.
 
 > **Consistency with framework:** RMB's trading book operates exactly as described — marked to market, exposed to daily P&L volatility, with Level 1/2/3 hierarchy applied. Where it diverges is the **significant Level 3 component** from private equity and structured credit, which relies on model-derived values not available in active markets.
 
@@ -101,7 +101,7 @@ RMB's cost structure differs from a retail bank in composition, even if the fram
 
 - **Staff costs (dominant):** Banker salaries and performance bonuses are the largest cost item. Unlike a retail bank, there are no branch teller costs or retail service staff. Compensation is high per head but headcount is lower. Variable (bonus) costs tied to deal flow and trading performance make the cost base more **flexible and linked to revenue cycles** than at a retail bank. This is a key difference.
 - **Property costs:** Minimal relative to total costs — no branch network. RMB operates primarily from head offices in Sandton (SA) and key international cities.
-- **IT and processing costs:** Systems for trading (risk management, pricing, Bloomberg/Reuters), deal management, and regulatory reporting.
+- **IT and processing costs:** Systems for trading ([[01-risk_management|risk management]], pricing, Bloomberg/Reuters), deal management, and regulatory reporting.
 - **Third-party and professional advisor costs:** Consistent with the framework — legal, accounting, and advisory costs on transactions.
 
 The **cost-to-income ratio** for RMB is broadly comparable to international investment banks (mid-to-high 40s range), somewhat higher than the most efficient retail banks, reflecting the high compensation model. This is consistent with the framework's acknowledgement that cost-to-income ratios reflect "different business mixes."
@@ -112,12 +112,12 @@ Fixed, semi-fixed, and variable cost categories apply, but the **variable compon
 
 RMB's credit loss profile is **lower than a retail bank** but not absent. Key characteristics:
 
-- IFRS 9 ECL applies across Stages 1, 2, and 3 — consistent with the framework.
+- [[ifrs9_standard|IFRS 9]] ECL applies across Stages 1, 2, and 3 — consistent with the framework.
 - **Credit impairment charges are modest** relative to total income, reflecting the wholesale/institutional client base and deliberate better-quality origination strategy.
 - Watchlist counters decreased materially in FY2024 (down 60%), indicating improving credit quality.
 - There is no consumer credit (no mortgage arrears, credit card charge-offs, or personal loan defaults) — a fundamental difference from a retail bank where cost of credit is a major income statement item through the cycle.
 
-> **Key difference from framework:** The framework notes that credit losses are "considerably higher in periods of recession than in periods of economic growth" and references consumer products. For RMB, credit losses are lower in absolute terms and are more driven by individual large corporate credit events or sovereign/country risk (especially in broader Africa) than by systemic consumer stress.
+> **Key difference from framework:** The framework notes that [[02-credit_losses|credit losses]] are "considerably higher in periods of recession than in periods of economic growth" and references consumer products. For RMB, [[02-credit_losses|credit losses]] are lower in absolute terms and are more driven by individual large corporate credit events or sovereign/country risk (especially in broader Africa) than by systemic consumer stress.
 
 ### Tax
 
@@ -129,7 +129,7 @@ Following the framework's formula:
 
 | Line Item | RMB FY2024 Commentary |
 |---|---|
-| **Total Income** (NII + NIR) | NII grew 15%, NIR grew 12%; total income growth solid |
+| **Total Income** ([[03-nii_nim|NII]] + NIR) | [[03-nii_nim|NII]] grew 15%, NIR grew 12%; total income growth solid |
 | **Less: Operational Expenses** | Mid-to-high 40s cost-to-income ratio; staff costs dominant |
 | **Less: Cost of Credit** | Low credit loss ratio; watchlist improved materially |
 | **= EBIT** | Strong profitability |
@@ -145,13 +145,13 @@ Following the framework's formula:
 
 ### Stability of Income (IS)
 
-The framework notes that a **high NII-to-total income ratio** signals more stable income. RMB scores **lower** on this measure than a retail bank. Its income mix is more heavily weighted towards NIR — trading income and deal fees — making total income more volatile. This is an inherent feature of investment banking and is reflected in year-on-year variability in results (e.g. Global Markets weakness in one year, recovery the next).
+The framework notes that a **high [[03-nii_nim|NII]]-to-total income ratio** signals more stable income. RMB scores **lower** on this measure than a retail bank. Its income mix is more heavily weighted towards NIR — trading income and deal fees — making total income more volatile. This is an inherent feature of investment banking and is reflected in year-on-year variability in results (e.g. Global Markets weakness in one year, recovery the next).
 
 > RMB is not optimised for income stability; it is optimised for return.
 
 ### Efficiency (IS)
 
-RMB's **cost-to-income ratio** sits in the mid-to-high 40s range (broadly in line with international investment bank peers). This is higher than the most efficient retail banks (e.g. FNB's ratio is lower) but reflects the high-compensation, fee-driven business model. The framework correctly notes that different ratios may reflect different business mixes rather than inefficiency.
+RMB's **cost-to-income ratio** sits in the mid-to-high 40s range (broadly in line with international investment bank peers). This is higher than the most efficient retail banks (e.g. FNB's ratio is lower) but reflects the high-compensation, fee-driven [[01-business_model|business model]]. The framework correctly notes that different ratios may reflect different business mixes rather than inefficiency.
 
 ### Growth (IS)
 
@@ -161,15 +161,15 @@ RMB's **cost-to-income ratio** sits in the mid-to-high 40s range (broadly in lin
 
 #### Net Interest Spread (NIS)
 
-RMB's NIS reflects the spread between corporate lending rates (JIBAR + corporate credit spread) and the cost of corporate deposits and wholesale funding. This spread is **tighter per loan** than in retail banking (where personal loan and credit card margins are high) but is offset by the absence of large retail credit losses.
+RMB's NIS reflects the spread between corporate lending rates (JIBAR + corporate credit spread) and the cost of corporate deposits and wholesale funding. This spread is **tighter per loan** than in retail banking (where personal loan and credit card margins are high) but is offset by the absence of large retail [[02-credit_losses|credit losses]].
 
-#### Net Interest Margin (NIM)
+#### [[03-nii_nim|Net Interest Margin]] ([[03-nii_nim|NIM]])
 
-RMB's **NIM is lower** than a retail bank's because:
+RMB's **[[03-nii_nim|NIM]] is lower** than a retail bank's because:
 1. Corporate loans carry tighter margins than consumer products.
 2. The balance sheet includes a large trading book (which earns mark-to-market gains rather than a traditional interest spread).
 
-NII grew 15% in FY2024, driven by volume growth and deposit mix improvements in CTB, rather than margin expansion.
+[[03-nii_nim|NII]] grew 15% in FY2024, driven by volume growth and deposit mix improvements in CTB, rather than margin expansion.
 
 #### Return on Assets (ROA) and Return on Equity (ROE)
 
@@ -179,7 +179,7 @@ This ROE is **higher than a typical retail bank** and reflects the fee-intensive
 
 ### Quality of Loan Portfolio (BS)
 
-Stage 3 loans as a proportion of total loans at RMB are **lower than at a retail bank**, reflecting the wholesale lending strategy. Watchlist counters decreased 60% in FY2024. The credit quality framework (IFRS 9 Stages 1–3) applies identically to the framework's description.
+Stage 3 loans as a proportion of total loans at RMB are **lower than at a retail bank**, reflecting the wholesale lending strategy. Watchlist counters decreased 60% in FY2024. The credit quality framework ([[ifrs9_standard|IFRS 9]] Stages 1–3) applies identically to the framework's description.
 
 ### Stability of Funding (BS)
 
@@ -196,7 +196,7 @@ RMB does not report standalone capital ratios (CET1/RWA) — this is managed at 
 
 ### Liquidity Strength (BS)
 
-LCR and NSFR are managed at the FirstRand Bank level, not at the RMB segment level. RMB holds HQLAs consistent with its liquidity requirements. The absence of a retail deposit base means RMB is inherently more exposed to wholesale funding market conditions — a liquidity consideration not as prominent in the framework's retail-bank framing.
+[[04-lcr|LCR]] and [[05-nsfr|NSFR]] are managed at the FirstRand Bank level, not at the RMB segment level. RMB holds HQLAs consistent with its liquidity requirements. The absence of a retail deposit base means RMB is inherently more exposed to wholesale funding market conditions — a liquidity consideration not as prominent in the framework's retail-bank framing.
 
 ---
 
@@ -209,11 +209,11 @@ LCR and NSFR are managed at the FirstRand Bank level, not at the RMB segment lev
 | Trading book | ✅ Present and significant | Larger share of balance sheet than typical; includes PE (Level 3) |
 | Fair value hierarchy (L1/L2/L3) | ✅ Applies | Large Level 3 book (PE, structured credit) |
 | Retail deposits as liabilities | ❌ Absent | Corporate deposits and wholesale funding only |
-| NII as primary income | ⚠️ Partial | NII present but NIR is proportionally larger; income less stable |
+| [[03-nii_nim|NII]] as primary income | ⚠️ Partial | [[03-nii_nim|NII]] present but NIR is proportionally larger; income less stable |
 | Non-interest income (fees) | ✅ Present | Deal fees, advisory, PE income — not account or insurance fees |
 | Trading income | ✅ Present and material | Global Markets is a core business line |
 | Operational expenses | ✅ Consistent | Dominated by variable staff/bonus costs; no branch network |
-| Cost of credit (IFRS 9 ECL) | ✅ Applies | Lower credit loss ratio; no consumer credit losses |
+| Cost of credit ([[ifrs9_standard|IFRS 9]] ECL) | ✅ Applies | Lower credit loss ratio; no consumer [[02-credit_losses|credit losses]] |
 | Tax at 28% | ✅ Consistent | Standard SA rate applies |
 | Standalone EPS / listed entity | ❌ Not applicable | Segment of FirstRand; EPS reported at group level |
 | Loan-to-deposit ratio | ⚠️ Limited use | Corporate deposits less stable; wholesale funding reliant |

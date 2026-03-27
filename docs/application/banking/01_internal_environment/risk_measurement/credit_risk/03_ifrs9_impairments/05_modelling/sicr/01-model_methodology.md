@@ -2,16 +2,16 @@
 
 
 
-The IFRS 9 standard does not prescribe a single method for determining a SICR but provides principles and guidelines. IFRS 9 allows institutions to design their SICR framework, which introduces variability across entities.
+The [[ifrs9_standard|IFRS 9]] standard does not prescribe a single method for determining a SICR but provides principles and guidelines. [[ifrs9_standard|IFRS 9]] allows institutions to design their SICR framework, which introduces variability across entities.
 
 Factors to consider the occurence of SICR includes, but is not limited to:
 
 - Quantitative indicators: PD comparison where a residual lifetime PD should used. It implies that the same remaining period is considered for PD at origination and reporting date. As a proxy, a 12m PD can be used if changes in a 12m PD are a reasonable approximation to changes in a lifetime PD.
-- Qualitative indicators: IFRS 9 provides some examples such as credit spread, CDS price etc. These factors should considered separately as they are not included in the quantitative assessment.
+- Qualitative indicators: [[ifrs9_standard|IFRS 9]] provides some examples such as credit spread, CDS price etc. These factors should considered separately as they are not included in the quantitative assessment.
 
 ## PD Comparison Approach
 
-Let this $t$-month PD be denoted by $p_{t}(x_i,t')$ given risk information $x$ observed at time $t'$ for a specific loan account. A SICR-event can then be defined by comparing $p_1(x,t'_r)$ with $p_1(x,t'_i)$ between reporting time $t'_r$ and initial recognition time $t'_i$ , which reflects §5.5.9 in IFRS 9. An accounted is SICR if there is a significant increase in the current FLI-adjsuted PD compared to the initial application PD (regardless of how it changed in between).
+Let this $t$-month PD be denoted by $p_{t}(x_i,t')$ given risk information $x$ observed at time $t'$ for a specific loan account. A SICR-event can then be defined by comparing $p_1(x,t'_r)$ with $p_1(x,t'_i)$ between reporting time $t'_r$ and initial recognition time $t'_i$ , which reflects §5.5.9 in [[ifrs9_standard|IFRS 9]]. An accounted is SICR if there is a significant increase in the current FLI-adjsuted PD compared to the initial application PD (regardless of how it changed in between).
 
 Should this change in risk estimates, or the magnitude $m(x,t'_r)$, exceed some arbitrarily chosen threshold $u$, then a SICR-event is said to have occurred. Note that $m(x,t'_r)$ can refer either to the difference $p_1(x,t'_r) -p_1(x,t'_i)$, or to the ratio $p_1(x,t'_r)/p_1(x,t'_i)$; though both definitions signify the change in lifetime PD. $m(x,t'_r) > u$, then the loan is migrated to Stage 2, otherwise it remains in Stage 1. Given any 𝑢-value, we subsequently formulate this approach into the binary-valued decision model $H(𝑚, 𝑢) ∈ {0, 1}$
 
@@ -23,7 +23,7 @@ The converse is presumably true as well: a Stage 2 loan is migrated back to Stag
 
 This approach immediately highlights at least two challenges in establishing whether credit quality has deteriorated significantly.
 
-1. Selecting an appropriate threshold for the magnitude is non-trivial and highly subjective, which is exacerbated by IFRS 9 being principled instead of overly prescriptive. Neither IFRS 9 nor most regulators offer any firm guidance on the choice of $u$. While the European Banking Authority defines $u = 200\%$, it provides no explanation for this seemingly arbitrary value. In fact, the PRA observed multiple threshold-values that were in use across UK banks and even across different portfolios; all of which attests to further arbitrariness.
+1. Selecting an appropriate threshold for the magnitude is non-trivial and highly subjective, which is exacerbated by [[ifrs9_standard|IFRS 9]] being principled instead of overly prescriptive. Neither [[ifrs9_standard|IFRS 9]] nor most regulators offer any firm guidance on the choice of $u$. While the [[eba|European Banking Authority]] defines $u = 200\%$, it provides no explanation for this seemingly arbitrary value. In fact, the [[pra|PRA]] observed multiple threshold-values that were in use across UK banks and even across different portfolios; all of which attests to further arbitrariness.
 2. Secondly, any reliance on the point estimate PD tacitly requires a certain degree of accuracy. Examples: inappropriate
 modelling technique, failing to capture the time-dynamic nature of lifetime PD, selecting good predictive variables, data quality, paucity of data for low default portofolios.
 
@@ -71,7 +71,7 @@ renders the eventual $u$ value as highly subjective and possibly divorced from r
 
 The basis of ‘SICR-modelling’ is then finding a statistical relationship between future SICR-events and a broad set of present-day inputs that predict those SICR-events. Such a binary classification task can render SICR-predictions more accurately, which includes the change in risk since initial recognition; i.e., the magnitude $m(x, t_r)$.
 
-In fact, IFRS 9 already requires the use of "all reasonable and supportable information" to identify a SICR-event (cf. §5.5.4, §5.5.9, §5.5.11, §5.5.17), which further supports statistical modelling.
+In fact, [[ifrs9_standard|IFRS 9]] already requires the use of "all reasonable and supportable information" to identify a SICR-event (cf. §5.5.4, §5.5.9, §5.5.11, §5.5.17), which further supports statistical modelling.
 
 It is not strictly necessary to compare explicit PD-estimates at two points, provided that the evolution of default risk over time is incorporated in some other way. In principle, and when viewed retrospectively, a SICR-event should reasonably preempt a default event such that the **timings of both events do not coincide**, lest we contravene §B5.5.21. This principle suggests using loan delinquency (and its pre-default evolution) directly in defining a SICR-event, at least retrospectively.
 
@@ -117,10 +117,10 @@ In predicting the SICR-outcomes $𝑦_{𝑖𝑡}$ for each outcome period, consi
 
 Here we are trying to model the **conditional SICR probability**.
 
-The probabilistic SICR-predictions from logit-models will need to be dichotomised towards rendering impairment staging decisions under IFRS 9, i.e., Stage 1 or 2, which are respectively called a ‘negative’ or
+The probabilistic SICR-predictions from logit-models will need to be dichotomised towards rendering impairment staging decisions under [[ifrs9_standard|IFRS 9]], i.e., Stage 1 or 2, which are respectively called a ‘negative’ or
 ‘positive’ event. An appropriate cut-off c ∈ [0, 1] is therefore required for dichotomising each probability score 𝑝 ∈ [0, 1] from each SICR-model 𝑗.
 
-Moreover, SICR-outcomes are relatively rare and the consequences of misclassifying positives vs. negatives are intuitively unequal. Under IFRS 9, false negatives 𝐹− should be costlier than false positives 𝐹+ in that the former implies the bank has failed to increase its loss provision for those accounts with increasing credit risk, i.e., those accounts with an actual future SICR-outcome. Misclassification costs are accordingly assigned as $𝑐_{𝐹-}$ = 6 for false negatives and $𝑐_{𝐹+}$ = 1 for false positives, which implies an intuitively high cost ratio of 𝑎 = 6/1 across all SICR-models.
+Moreover, SICR-outcomes are relatively rare and the consequences of misclassifying positives vs. negatives are intuitively unequal. Under [[ifrs9_standard|IFRS 9]], false negatives 𝐹− should be costlier than false positives 𝐹+ in that the former implies the bank has failed to increase its loss provision for those accounts with increasing credit risk, i.e., those accounts with an actual future SICR-outcome. Misclassification costs are accordingly assigned as $𝑐_{𝐹-}$ = 6 for false negatives and $𝑐_{𝐹+}$ = 1 for false positives, which implies an intuitively high cost ratio of 𝑎 = 6/1 across all SICR-models.
 
 These costs are deduced using expert judgement and experimentation, though can certainly be refined in future work. Given this 𝑎-value, each 𝑐-value is then found using the Generalised Youden Index.
 
@@ -134,11 +134,11 @@ accuracy. Note that in this work, we are ultimately examining the effect of a pa
 Therefore, and as a last step, the selected features are ‘standardised’ within each definition class in the table such that all SICR-models have the same input space per (𝑑, 𝑠)-tuple across all 𝑘-values. This ‘standardisation’ should not be confused with rescaling some quantity towards achieving zero mean and unit variance. By standardising the input space, one can therefore ascribe observable patterns in model performance
 only to variations in the SICR-definition itself, without contending too much with changes in the input space.
 
->"Furthermore, the variable `pd_ratio` signifies the change in the lifetime PD since initial recognition, which ensures compliance with §5.5.9 of IFRS 9. Our results, however, show that this variable is statistically insignificant across all SICR-definitions, which implies that the broader input space already captures whatever intrinsic information this variable might have in predicting future SICR-events. This profound result clearly rebuts the underlying intuition of §5.5.9 on incorporating the lifetime PD when rendering SICR-flagging decisions. However, this result is also unsurprising since the associated PD-model  has an input space that is similar (but smaller) to those of the various SICR-models. Therefore, not only do these SICR-models predict future SICR-events more accurately, but they also do so more parsimoniously than the PD-comparison approach."
+>"Furthermore, the variable `pd_ratio` signifies the change in the lifetime PD since initial recognition, which ensures compliance with §5.5.9 of [[ifrs9_standard|IFRS 9]]. Our results, however, show that this variable is statistically insignificant across all SICR-definitions, which implies that the broader input space already captures whatever intrinsic information this variable might have in predicting future SICR-events. This profound result clearly rebuts the underlying intuition of §5.5.9 on incorporating the lifetime PD when rendering SICR-flagging decisions. However, this result is also unsurprising since the associated PD-model  has an input space that is similar (but smaller) to those of the various SICR-models. Therefore, not only do these SICR-models predict future SICR-events more accurately, but they also do so more parsimoniously than the PD-comparison approach."
 
 ### Outcome Period 𝑘
 
-In general, SICR-classification should react dynamically to changes in credit risk and its pre-default evolution over time. This dynamicity is even implicit in §B5.5.2 of IFRS 9, which postulates that a SICR-event should ideally predate an increase in loan delinquency, i.e., the $𝑔_0$-measure. In predicting such events, shorter outcome periods 𝑘
+In general, SICR-classification should react dynamically to changes in credit risk and its pre-default evolution over time. This dynamicity is even implicit in §B5.5.2 of [[ifrs9_standard|IFRS 9]], which postulates that a SICR-event should ideally predate an increase in loan delinquency, i.e., the $𝑔_0$-measure. In predicting such events, shorter outcome periods 𝑘
 can demonstrably achieve this dynamicity more readily than longer periods, since the latter is at greater risk of missing short-term fluctuations in $𝑔_0(𝑡)$ between times 𝑡 and 𝑡 + 𝑘.
 
 However, the ‘optimal’ choice of this outcome period is yet unclear, as is the very idea of optimality within this SICR-modelling context. To help fill this gap, we deliberately vary 𝑘 from 3 months up to an extreme of 36 months when training our cross-sectional SICR-models,
@@ -153,7 +153,7 @@ In exploring the portfolio-level effect of a given SICR-definition, one may star
 
 Each SICR-rate has a different but increasing mean-level as 𝑘 increases, especially when examined after the anomalous 2008 Global Financial Crisis (GFC). Since $𝑔_0(𝑡 + 𝑘) ≥ 3 > 𝑑$ will hold for both default and SICR-outcomes, larger 𝑘-values will increasingly capture a greater proportion of defaulting accounts, thereby explaining the phenomenon.
 
-Moreover, the figure reveals a plateauing effect in the mean, which suggests that choosing $𝑘 ≥ 18$ has a negligible contribution to the overall SICR-mean. At worst, choosing $𝑘 ≥ 18$ will increasingly select default-instances into the sample, thereby ‘contaminating’ the SICR-mean. Doing so can detract from the very idea of SICR-staging, which should ideally act as a pro-cyclical early warning system for impending credit risk; see §B.5.5.21 in IFRS 9 from IASB (2014). The SICR-rate of each 𝑘-value also exhibits a unique volatility pattern, which is seemingly more stable at the extremes, i.e., $𝑘 ≤ 3$ and $𝑘 > 24$. However, stable SICR-rates may not necessarily be a useful pursuit, especially not during an unfolding macroeconomic crisis and its subsequent effect on default rates. In particular, the most stable SICR-rates also failed to track the increasing default rates during 2007-2008.
+Moreover, the figure reveals a plateauing effect in the mean, which suggests that choosing $𝑘 ≥ 18$ has a negligible contribution to the overall SICR-mean. At worst, choosing $𝑘 ≥ 18$ will increasingly select default-instances into the sample, thereby ‘contaminating’ the SICR-mean. Doing so can detract from the very idea of SICR-staging, which should ideally act as a pro-cyclical early warning system for impending credit risk; see §B.5.5.21 in [[ifrs9_standard|IFRS 9]] from IASB (2014). The SICR-rate of each 𝑘-value also exhibits a unique volatility pattern, which is seemingly more stable at the extremes, i.e., $𝑘 ≤ 3$ and $𝑘 > 24$. However, stable SICR-rates may not necessarily be a useful pursuit, especially not during an unfolding macroeconomic crisis and its subsequent effect on default rates. In particular, the most stable SICR-rates also failed to track the increasing default rates during 2007-2008.
 
 As a working principle for defining the SICR-event, SICR-rates should reasonably exceed default rates since SICR-staging should ideally preempt default. This principle avails a useful heuristic in disqualifying both $𝑘 ≤ 3$ and $𝑘 > 24$, given their failure in tracking the 12-month default rate.
 

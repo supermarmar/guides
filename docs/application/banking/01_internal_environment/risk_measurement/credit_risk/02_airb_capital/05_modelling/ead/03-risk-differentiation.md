@@ -1,13 +1,13 @@
 ## **Risk Differentiation – EAD**
 
-### **Model Design**
+### **[[02-model-design|Model Design]]**
 
 * The EAD model is developed at an **account level** using a **Generalised Linear Model (GLM)** framework.
 * GLMs are chosen because they **relax the restrictive assumptions of linear regression**, in particular:
 
   * They allow for **non-normality** in the dependent variable distribution.
   * They permit flexible link functions between predictors and the response variable.
-* The target variable is the **Exposure at Default Factor (EADF)**.
+* The [[01-target_variable|target variable]] is the **Exposure at Default Factor (EADF)**.
 * The general GLM form is:
 
 [
@@ -42,25 +42,25 @@ Where:
 
 ---
 
-### **Segmentation**
+### **[[06-segmentation|Segmentation]]**
 
-Segmentation follows a similar process to PD:
+[[06-segmentation|Segmentation]] follows a similar process to PD:
 
 * **Data construction**: 12 monthly cohorts of Core and Gap data from 2023.
 * **Metrics for risk differentiation**: (R^2), Gini, and Lift ratio were used to assess discriminatory power across candidate segments.
-* **Key segmentation drivers**:
+* **Key [[06-segmentation|segmentation]] drivers**:
 
   * **Utilisation** and **Limits** were the most significant factors.
   * **Decision trees** were applied to determine optimal cut-offs for key splits.
 
-**Final segmentation structure:**
+**Final [[06-segmentation|segmentation]] structure:**
 
 1. **Delinquency status** (current vs delinquent)
 2. **Seasoning** (Early MOB vs Seasoned, cut-off determined via decision tree)
 3. **Limit banding** (low limit < 1,000 vs higher limits)
 4. **Activity** (active vs inactive accounts)
 5. **Internal utilisation bands**: 10%, 20%, 50%, 60%, 90% (decision tree splits using EADF as target)
-6. **External utilisation segmentation**
+6. **External utilisation [[06-segmentation|segmentation]]**
 
 * For each final segment, a summary table is constructed showing:
 
@@ -69,10 +69,10 @@ Segmentation follows a similar process to PD:
   * Default count
   * Good book limit, balance, and volume
 
-This segmentation ensures that the EAD model is **granular, interpretable, and capable of capturing key drivers of exposure behaviour**.
+This [[06-segmentation|segmentation]] ensures that the EAD model is **granular, interpretable, and capable of capturing key drivers of exposure behaviour**.
 
 ---
 
-✅ Next natural piece would be **Differentiation Testing Results for EAD** (parallel to PD: Accuracy, Discrimination, Stability, Robustness, Stress Testing, Benchmarking).
+✅ Next natural piece would be **Differentiation Testing Results for EAD** (parallel to PD: Accuracy, Discrimination, Stability, Robustness, [[02-stress_testing|Stress Testing]], Benchmarking).
 
 Do you want me to draft the **Differentiation Testing Results for EAD** section now, reusing the PD test framework but adapting the test definitions (e.g., error metrics for continuous EAD instead of PDs, Gini on EADF prediction, PSI/CSI for stability, sensitivity to utilisation shocks for stress)?

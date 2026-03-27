@@ -19,7 +19,7 @@ The yield curve plots interest rates for the same type of debt contracts or inst
 - **Market expectation** — the yield curve is influenced by market participants' views on future interest rate levels.
 - **Liquidity preference** — it is riskier for lenders to commit funds for longer periods, creating a liquidity premium.
 - **Money substitute** — most investors see holdings as only a substitute for cash, so there is less inclination to extend out the curve.
-- **Segmentation** — borrowers, lenders, and investors have differing financial needs and time frames, leading to different supply and demand along the curve (e.g. pension funds and infrastructure drive the long end; trade finance and cash surpluses influence the short end).
+- **[[06-segmentation|Segmentation]]** — borrowers, lenders, and investors have differing financial needs and time frames, leading to different supply and demand along the curve (e.g. pension funds and infrastructure drive the long end; trade finance and cash surpluses influence the short end).
 
 In practice, market participants consider a combination of these factors. One cannot assume a "parallel shift" in the yield curve. Trading book managers tend to focus on VaR limits, while banking book managers focus on annual earnings at risk (EAR) and economic value of equity (EVE).
 
@@ -57,8 +57,8 @@ JIBAR is the key benchmark money market interest rate in South Africa. Key featu
 - Published daily at 11 a.m. on the JSE website for 1, 3, 6, and 12-month tenors.
 - The **3-month JIBAR** is the most widely used benchmark for floating rate transactions and interest rate swaps.
 - Unlike LIBOR, JIBAR is based on interest rates at which South African banks buy and sell their own **negotiable certificates of deposit (NCDs)**. Bid and offer rates are submitted to determine mid-rates, with the two highest and two lowest removed before averaging.
-- SARB-regulated banks (five local, four foreign) contribute rates.
+- [[sarb|SARB]]-regulated banks (five local, four foreign) contribute rates.
 - The JSE distributes contributor rates to ensure submissions are as close to market trading rates as possible.
-- A JIBAR Code of Conduct was published in March 2014 following a SARB-initiated review.
+- A JIBAR Code of Conduct was published in March 2014 following a [[sarb|SARB]]-initiated review.
 
 **Basis risk note:** since derivatives such as interest rate swaps tend to reprice with reference to 3-month JIBAR, while most banking book assets are linked to the prime interest rate, hedged portfolios tend to retain prime-JIBAR basis risk.

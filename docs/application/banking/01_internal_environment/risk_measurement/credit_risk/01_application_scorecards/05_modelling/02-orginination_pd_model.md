@@ -4,7 +4,7 @@
 
 Logistic regression is a commonly used statistical technique in credit risk modeling due to its simplicity, interpretability, and effectiveness in binary classification problems, such as determining whether a borrower will default (1) or not default (0) on a loan. The model estimates a score (between 0 and 1) that represents the likelihood of default based on borrower characteristics and financial behavior.
 
-Logistic regression models the relationship between a set of independent variables (e.g., income, credit history length) and a binary target variable (default or no default) by applying a **logistic (sigmoid) function** to a linear equation. Provides a continuous risk score rather than a binary result, enabling nuanced decisions (e.g., risk-based pricing). Easy to implement and explain to stakeholders. You can decide to build different models for different segmentations.
+Logistic regression models the relationship between a set of independent variables (e.g., income, credit history length) and a binary [[01-target_variable|target variable]] (default or no default) by applying a **logistic (sigmoid) function** to a linear equation. Provides a continuous risk score rather than a binary result, enabling nuanced decisions (e.g., risk-based pricing). Easy to implement and explain to stakeholders. You can decide to build different models for different segmentations.
 
 The model creates a linear equation: 
 

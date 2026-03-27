@@ -18,7 +18,7 @@ A mortgage is secured on real property, allowing the bank to repossess and sell 
 
 The loss given default on a mortgage is directly proportional to LTV: at 95% LTV, a property price fall of more than 5% (net of repossession costs) produces a loss. At 70% LTV, prices would have to fall by over 30% to produce a loss. LTV is therefore the primary variable in mortgage pricing models. Higher LTV bands attract both higher pricing and higher capital requirements.
 
-**Fixed vs variable rate mortgages — the margin management problem:** When banks fund long-term fixed-rate mortgages with short-term variable-rate deposits, rising interest rates compress NIM. Additionally, fixed-rate mortgages embed an asymmetric option: if rates fall, borrowers prepay (reducing the bank's fixed-rate asset duration); if rates rise, borrowers stay (extending duration at a below-market rate). UK banks resolve this through **deal periods** (fixed rates applying for 2 or 5 years) that revert to the bank's **standard variable rate (SVR)**. SVR is a bank-controlled rate that can be reset with adequate notice, creating a repricing point that restores margin management capability. See the S&L crisis example below.
+**Fixed vs variable rate mortgages — the margin management problem:** When banks fund long-term fixed-rate mortgages with short-term variable-rate deposits, rising interest rates compress [[03-nii_nim|NIM]]. Additionally, fixed-rate mortgages embed an asymmetric option: if rates fall, borrowers prepay (reducing the bank's fixed-rate asset duration); if rates rise, borrowers stay (extending duration at a below-market rate). UK banks resolve this through **deal periods** (fixed rates applying for 2 or 5 years) that revert to the bank's **standard variable rate (SVR)**. SVR is a bank-controlled rate that can be reset with adequate notice, creating a repricing point that restores margin management capability. See the S&L crisis example below.
 
 **US S&L crisis:** US regulations historically required banks to offer 15-year fixed-rate mortgages. During the 1970s–1980s, rising inflation and short-term rates caused savings and loan (S&L) institutions to pay escalating deposit rates while earning fixed low rates on their mortgage books — creating negative margins. Approximately one-third of US S&Ls failed. US banks now securitise mortgages (selling to Freddie Mac, Fannie Mae, or ABS investors) to transfer this duration and margin risk off-balance-sheet.
 
@@ -51,15 +51,15 @@ Loans above certain thresholds require credit committee and board approval. Bank
 
 ## Investment Bank Loans
 
-Investment banks generally prefer not to lend from their own balance sheet, instead intermediating between issuers and capital markets. However, investment banks **underwrite bond and equity issues** — committing to purchase any unsold portion — which creates temporary credit risk if an issue is not successfully placed with investors. This underwriting risk is priced into the fees and underwriting spread.
+Investment banks generally prefer not to lend from their own balance sheet, instead intermediating between issuers and capital markets. However, investment banks **underwrite bond and equity issues** — committing to purchase any unsold portion — which creates temporary credit risk if an issue is not successfully placed with investors. This [[00_underwriting|underwriting]] risk is priced into the fees and [[00_underwriting|underwriting]] spread.
 
-## Managing NIM Over the Rate Cycle
+## Managing [[03-nii_nim|NIM]] Over the Rate Cycle
 
 The ability to reprice products as interest rates change is a critical design feature. Key considerations:
 
-- **Variable-rate lending** (overdrafts, credit cards, corporate floating-rate loans linked to repo/LIBOR/JIBAR) can be repriced rapidly when base rates change, protecting NIM.
-- **Fixed-rate personal loans** — shorter behavioural lives and higher spreads mean NIM exposure to rate changes is limited.
-- **Fixed-rate mortgages** — the most problematic: the asymmetric prepayment option combined with long maturities creates substantial NIM and duration risk if not managed through deal periods and SVR reversion.
-- **Negative rate environments** — in some EU countries, Switzerland, and Japan, policy rates turned negative. Banks compressed lending rates (as intended by policy) but were reluctant to impose negative rates on retail deposits, squeezing NIM from both sides.
+- **Variable-rate lending** (overdrafts, credit cards, corporate floating-rate loans linked to repo/LIBOR/JIBAR) can be repriced rapidly when base rates change, protecting [[03-nii_nim|NIM]].
+- **Fixed-rate personal loans** — shorter behavioural lives and higher spreads mean [[03-nii_nim|NIM]] exposure to rate changes is limited.
+- **Fixed-rate mortgages** — the most problematic: the asymmetric prepayment option combined with long maturities creates substantial [[03-nii_nim|NIM]] and duration risk if not managed through deal periods and SVR reversion.
+- **Negative rate environments** — in some EU countries, Switzerland, and Japan, policy rates turned negative. Banks compressed lending rates (as intended by policy) but were reluctant to impose negative rates on retail deposits, squeezing [[03-nii_nim|NIM]] from both sides.
 
-Banks must price and design loan products with the full repricing cycle in mind, not just at origination — a lesson emphasised by the S&L crisis and more recently by the post-2020 rate normalisation cycle.
+Banks must price and design loan products with the full repricing cycle in mind, not just at origination — a lesson emphasised by the S&L crisis and more recently by the post-2020 rate [[07-normalisation|normalisation]] cycle.

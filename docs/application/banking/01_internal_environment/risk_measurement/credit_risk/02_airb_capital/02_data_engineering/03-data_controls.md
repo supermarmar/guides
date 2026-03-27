@@ -1,6 +1,6 @@
 # Data Controls
 
-The bank maintains a comprehensive data control framework designed to ensure the accuracy, completeness, and integrity of all data used for credit risk modelling, reporting, and decision-making. The data controls framework is aligned with regulatory expectations under BCBS 239 (Principles for Effective Risk Data Aggregation and Risk Reporting), PRA Supervisory Statement SS11/13 (Internal Ratings-Based Approaches), and PA Directive D5/2017 (Framework for Data Management in Banks). Collectively, these frameworks require firms to establish robust governance processes and control mechanisms to ensure that data used for risk measurement and regulatory reporting is accurate, complete, timely, and appropriate for its intended use.
+The bank maintains a comprehensive data control framework designed to ensure the accuracy, completeness, and integrity of all data used for credit risk modelling, reporting, and decision-making. The data controls framework is aligned with regulatory expectations under [[bcbs_239|BCBS 239]] (Principles for Effective Risk Data Aggregation and Risk Reporting), [[pra|PRA]] Supervisory Statement SS11/13 (Internal Ratings-Based Approaches), and PA Directive D5/2017 (Framework for Data Management in Banks). Collectively, these frameworks require firms to establish robust governance processes and control mechanisms to ensure that data used for [[04-risk_measurement|risk measurement]] and regulatory reporting is accurate, complete, timely, and appropriate for its intended use.
 
 In practice, this control environment operates through a series of automated and manual checks embedded throughout the MDS creation process. Each step—from data ingestion to transformation and model input generation—is governed by specific validation and reconciliation controls.
 
@@ -8,7 +8,7 @@ In practice, this control environment operates through a series of automated and
 - **Error Handling**: Data load processes include embedded error-handling routines that identify, log, and escalate data anomalies or processing errors for resolution prior to model input or reporting.
 - **Data Accuracy Checks**: On a quarterly basis, a sample of approximately 200 customer accounts is manually validated against the original data source to confirm the ongoing accuracy and consistency of key fields.
 - **Business Logic Validation**: All transformation rules, business filters, and derivations (e.g. delinquency flags, transactor indicators) undergo periodic validation to ensure they remain aligned with approved definitions and regulatory expectations.
-- **Change Control**: Any change to data mappings, business rules, or source systems is subject to formal approval and testing before deployment, following the model risk and data governance framework.
+- **Change Control**: Any change to data mappings, business rules, or source systems is subject to formal approval and testing before deployment, following the model risk and [[04-data_governance|data governance]] framework.
 
 These controls collectively provide assurance that data used for model development and monitoring remains reliable, traceable, and compliant with internal and regulatory standards.
 

@@ -9,7 +9,7 @@ As PDs are estimates of likelihoods, statistical methods are used to estimate PD
 - Cox proportional hazards model
 - Neural networks
 
-### Model Design
+### [[02-model-design|Model Design]]
 
 A **binary logistic regression** model was selected for risk differentiation. This approach is widely adopted in the banking industry for default prediction due to its interpretability, regulatory acceptance, and ability to rank-order accounts effectively.
 
@@ -39,9 +39,9 @@ The model parameters were estimated using **Maximum Likelihood Estimation (MLE)*
 
 ---
 
-### Segmentation Strategy
+### [[06-segmentation|Segmentation]] Strategy
 
-Segmentation was undertaken prior to model estimation to maximise risk differentiation. The aim was to identify **homogeneous risk groups** that:
+[[06-segmentation|Segmentation]] was undertaken prior to model estimation to maximise risk differentiation. The aim was to identify **homogeneous risk groups** that:
 
 1. Share underlying risk drivers with a similar relationship to default
 2. Have sufficient volume
@@ -91,9 +91,9 @@ Initial splits were identified using **decision tree analysis** with historical 
 
 ---
 
-### Final Segmentation Schema
+### Final [[06-segmentation|Segmentation]] Schema
 
-This multi-step approach resulted in segments that are internally homogeneous, stable over time, and exhibit clear differences in observed default rates. This segmentation underpinned the subsequent variable selection and model estimation, ensuring strong discriminatory power while maintaining business interpretability and regulatory compliance.
+This multi-step approach resulted in segments that are internally homogeneous, stable over time, and exhibit clear differences in observed default rates. This [[06-segmentation|segmentation]] underpinned the subsequent variable selection and model estimation, ensuring strong discriminatory power while maintaining business interpretability and regulatory compliance.
 
 ---
 
@@ -121,6 +121,6 @@ caas_jupyter_tools.display_dataframe_to_user(name="Segmentation Volume and Defau
 
 ```
 
-Perfect — you’re now at the **Risk Differentiation** section for EAD, which should echo the PD structure (Model Design → Literature Review → Segmentation → Risk Differentiation Tests), but tailored to the peculiarities of **EAD modelling**. Based on what you wrote, here’s a clean draft:
+Perfect — you’re now at the **Risk Differentiation** section for EAD, which should echo the PD structure ([[02-model-design|Model Design]] → Literature Review → [[06-segmentation|Segmentation]] → Risk Differentiation Tests), but tailored to the peculiarities of **EAD modelling**. Based on what you wrote, here’s a clean draft:
 
 ---

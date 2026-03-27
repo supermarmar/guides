@@ -32,7 +32,7 @@ Structured data is data that adheres to a fixed schema, so all of the data has t
 
 Semi-structured data is information that has some structure, but which allows for some variation between entity instances. For example, while most customers may have an email address, some might have multiple email addresses, and some might have none at all.
 
-One common format for semi-structured data is JavaScript Object Notation (JSON). The example below shows a pair of JSON documents that represent customer information. Each customer document includes address and contact information, but the specific fields vary between customers.
+One common format for semi-structured data is JavaScript Object [[notation|Notation]] (JSON). The example below shows a pair of JSON documents that represent customer information. Each customer document includes address and contact information, but the specific fields vary between customers.
 
 ```json
 # Customer 1
@@ -103,7 +103,7 @@ Joe,Jones,joe@litware.com
 Samir,Nadoy,samir@northwind.com
 ```
 
-### JavaScript Object Notation (JSON)
+### JavaScript Object [[notation|Notation]] (JSON)
 
 JSON is a ubiquitous format in which a hierarchical document schema is used to define data entities (objects) that have multiple attributes. Each attribute might be an object (or a collection of objects); making JSON a flexible format that's good for both structured and semi-structured data.
 

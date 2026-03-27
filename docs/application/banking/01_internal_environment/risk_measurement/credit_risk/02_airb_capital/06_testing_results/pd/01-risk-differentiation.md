@@ -20,7 +20,7 @@ Differentiation testing assesses whether the PiT PD model provides reliable, sta
 | **Benchmarking**           | Gini based on FICO score                                          | OOS, OOT              |
 | **Alternative Approaches** | Accuracy and discrimination of PiT model with dynamic calibration | Development, OOS, OOT |
 
-*Table 11-1: Summary of Tests Performed on Risk Differentiation*
+*Table 11-1: Summary of Tests Performed on [[03-risk-differentiation|Risk Differentiation]]*
 
 ---
 

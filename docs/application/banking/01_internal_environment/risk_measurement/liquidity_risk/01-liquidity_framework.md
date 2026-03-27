@@ -1,8 +1,8 @@
 # Liquidity Framework
 
-This file covers the **conceptual foundations of liquidity risk management** used in bank treasury and ALCO functions, including the definition of liquidity risk, its structural link to maturity transformation, the sources of bank funding, and the behavioural characteristics of different liability types.
+This file covers the **conceptual foundations of liquidity [[01-risk_management|risk management]]** used in bank treasury and ALCO functions, including the definition of liquidity risk, its structural link to maturity transformation, the sources of bank funding, and the behavioural characteristics of different liability types.
 
-For the quantitative liquidity metrics (LDR, CLM, LRF, HQLA) used to measure and monitor these risks, see [Liquidity Metrics](02-liquidity_metrics.md). For the balance sheet treatment of liquidity (HQLA on the asset side, deposit types on the liability side), see [Annual Financial Statements](../../02-afs.md). For the broader business model context of maturity transformation, see [Business Model](../../01-business_model.md). For the regulatory minimum liquidity standards (LCR, NSFR) introduced under Basel III, see [Basel / BIS](../../../../../regulation/international/bis/bis.md).
+For the quantitative [[02-liquidity_metrics|liquidity metrics]] (LDR, CLM, LRF, HQLA) used to measure and monitor these risks, see [Liquidity Metrics](02-liquidity_metrics.md). For the balance sheet treatment of liquidity (HQLA on the asset side, deposit types on the liability side), see [Annual Financial Statements](../../02-afs.md). For the broader [[01-business_model|business model]] context of maturity transformation, see [Business Model](../../01-business_model.md). For the regulatory minimum liquidity standards ([[04-lcr|LCR]], [[05-nsfr|NSFR]]) introduced under [[basel_framework|Basel III]], see [Basel / BIS](../../../../../regulation/international/bis/bis.md).
 
 ## Defining Liquidity
 
@@ -10,7 +10,7 @@ For the quantitative liquidity metrics (LDR, CLM, LRF, HQLA) used to measure and
 
 Three distinct types of liquidity are commonly distinguished:
 
-- **Funding liquidity**: The ability of a bank to fund assets throughout their life and to meet demands for withdrawal of liabilities as and when they arise. This is the primary concern of liquidity risk management.
+- **Funding liquidity**: The ability of a bank to fund assets throughout their life and to meet demands for withdrawal of liabilities as and when they arise. This is the primary concern of liquidity [[01-risk_management|risk management]].
 - **Trading liquidity**: The ease with which an asset may be bought or sold in the market, in size and with no material impact on the asset price. A liquid asset trades at a narrow bid-offer spread; an illiquid asset cannot.
 - **Redemption liquidity**: Similar to trading liquidity but relevant only as an asset approaches maturity.
 
@@ -31,7 +31,7 @@ Banks also need to understand the **behavioural nature of their deposits** in or
 
 In every jurisdiction, the central bank operates as a **lender of last resort**, providing emergency liquidity to a bank that cannot generate liquidity through the liquidation of assets. However, recourse to central bank funding is the last option for the bank — it signals a compromised standalone viability and should not be considered a BAU source of liquidity.
 
-Post-2009, banks in the Eurozone accessed the ECB's 3-year repo facility as a quasi-BAU source; this reflected structural funding instability after the financial crisis rather than sound practice, and the facility was designed as a temporary measure. Under normal conditions, central bank funding (other than daily open market operations) lies outside the scope of ordinary liquidity management.
+Post-2009, banks in the Eurozone accessed the [[ecb|ECB]]'s 3-year repo facility as a quasi-BAU source; this reflected structural funding instability after the financial crisis rather than sound practice, and the facility was designed as a temporary measure. Under normal conditions, central bank funding (other than daily open market operations) lies outside the scope of ordinary liquidity management.
 
 ## Sources of Liquidity
 
@@ -71,13 +71,13 @@ Retail current accounts are the best example of the distinction between contract
 
 At the other end of the spectrum, short-term wholesale liabilities sourced in interbank markets exhibit the most volatile characteristics under stress: professional depositors are market-aware and multi-banked and have historically shown aggressive outflow behaviour during stress events. Non-bank financial institutions (NBFIs) are similarly classified as behaviourally non-stable depositors, as they are sensitive to market conditions and can withdraw at no notice.
 
-A bank's medium-term liability strategy should seek to maximise funding based on higher-stability liabilities and minimise reliance on wholesale funding, while also considering the trade-off with NII / NIM and customer franchise considerations.
+A bank's medium-term liability strategy should seek to maximise funding based on higher-stability liabilities and minimise reliance on wholesale funding, while also considering the trade-off with [[03-nii_nim|NII]] / [[03-nii_nim|NIM]] and customer franchise considerations.
 
 ## Behavioural Assumptions
 
-Pure liquidity stress events are rare, and many senior managers have never experienced one. This makes it difficult to calibrate deposit behaviour under stress purely from historical observation. **Conservatism and prudence** are therefore the appropriate approach for both liability strategy and liquidity risk management.
+Pure liquidity stress events are rare, and many senior managers have never experienced one. This makes it difficult to calibrate deposit behaviour under stress purely from historical observation. **Conservatism and prudence** are therefore the appropriate approach for both liability strategy and liquidity [[01-risk_management|risk management]].
 
-Key nuances in behavioural modelling include:
+Key nuances in [[03-behavioural_modelling|behavioural modelling]] include:
 
 - Digital/mobile-based accounts may behave differently from branch or postal accounts, varying by customer demographic.
 - In markets such as South Africa, very low-income customers may withdraw entire salary payments in cash on pay day, creating predictable but concentrated outflow events.

@@ -1,6 +1,6 @@
 # Derivative Pricing
 
-This file covers investment banking pricing — the pricing of transactional and advisory services, and the mathematical foundations of derivative pricing including risk-neutral pricing, Black-Scholes, dynamic hedging, swaps, and the breakdown of these models under stress. For interest rate and FX derivatives used in asset-liability management see [Market Risk](../market_risk/05-market_risk.md) and [IRRBB Measurement](../market_risk/04-irrbb_measurement.md). For xVA adjustments to derivative fair values see [Proprietary Trading and xVA](../market_risk/08-proprietary_trading_xva_pension.md).
+This file covers investment banking pricing — the pricing of transactional and advisory services, and the mathematical foundations of derivative pricing including risk-neutral pricing, Black-Scholes, dynamic hedging, swaps, and the breakdown of these models under stress. For interest rate and FX derivatives used in asset-liability management see [Market Risk](../market_risk/05-market_risk.md) and [IRRBB Measurement](../market_risk/04-irrbb_measurement.md). For [[08-proprietary_trading_xva_pension|xVA]] adjustments to derivative fair values see [Proprietary Trading and xVA](../market_risk/08-proprietary_trading_xva_pension.md).
 
 ## Investment Banking Services and Pricing Regimes
 
@@ -94,13 +94,13 @@ A vega-hedged portfolio offsets exposure to changes in implied volatility by hol
 
 An IRS is a contract exchanging interest payments on a notional principal for an agreed period. Example: Party A pays 3m LIBOR + 0.25% and receives 2% fixed for 2 years on a notional of £1m.
 
-This allows a bank to safely fund a fixed-rate loan (earning 4%) with variable-rate deposits (paying 3m LIBOR). Without the swap, rising LIBOR compresses NIM; with the swap, the bank locks in a fixed net margin regardless of LIBOR:
+This allows a bank to safely fund a fixed-rate loan (earning 4%) with variable-rate deposits (paying 3m LIBOR). Without the swap, rising LIBOR compresses [[03-nii_nim|NIM]]; with the swap, the bank locks in a fixed net margin regardless of LIBOR:
 
 ```
 Net margin = 4% (fixed rate on loan) − 2% (fixed paid on swap) = 2% fixed
 ```
 
-Most LIBOR rates were phased out from end-2021 following the 2012–13 manipulation scandal. Replacements include **SONIA** (Sterling Overnight Index Average, Bank of England) and **SOFR** (Secured Overnight Financing Rate, Federal Reserve). See [Yield Curves and Benchmarks](../market_risk/02-yield_curves_benchmarks.md) for further detail.
+Most LIBOR rates were phased out from end-2021 following the 2012–13 manipulation scandal. Replacements include **SONIA** (Sterling Overnight Index Average, [[bank_of_england|Bank of England]]) and **SOFR** (Secured Overnight Financing Rate, Federal Reserve). See [Yield Curves and Benchmarks](../market_risk/02-yield_curves_benchmarks.md) for further detail.
 
 ### Currency Swaps
 
@@ -117,7 +117,7 @@ The total price of a derivative includes the theoretical Black-Scholes price plu
 - **Delta and vega hedging rebalancing costs** — dealing costs and locked-in losses from convex-vs-linear hedging
 - **Infrastructure and trading desk costs** — computational power and personnel
 
-Post-2008, Basel III encouraged moving OTC derivatives onto exchanges or central counterparties (CCPs) to reduce systemic risk from open bilateral positions — highlighted by the 2008 Lehman Brothers failure.
+Post-2008, [[basel_framework|Basel III]] encouraged moving OTC derivatives onto exchanges or central counterparties (CCPs) to reduce systemic risk from open bilateral positions — highlighted by the 2008 Lehman Brothers failure.
 
 ## When Black-Scholes Assumptions Break Down
 
@@ -139,6 +139,6 @@ Volatility that clusters (periods of high vol followed by high vol; low vol by l
 
 Hedge funds amplify Black-Scholes-based strategies through leverage: they identify mispriced assets, set up delta-hedged portfolios, and earn small risk-adjusted returns — then leverage these positions to make them meaningful. This works while markets are rational. When a highly-leveraged fund suffers losses, it may face margin calls that force it to unwind positions at losses:
 
-**Long-Term Capital Management (LTCM), August 1998:** Founded by Black-Scholes Nobel laureates, LTCM bet that spreads between safe assets (US Treasuries) and riskier assets (corporate bonds, emerging market debt) would narrow. Russia's government default triggered a massive flight to safety — the opposite of LTCM's position. LTCM was forced to unwind at massive losses. As one forced seller became multiple forced sellers, spreads widened further, triggering more losses in a self-reinforcing cycle.
+**Long-Term [[04-capital_management|Capital Management]] (LTCM), August 1998:** Founded by Black-Scholes Nobel laureates, LTCM bet that spreads between safe assets (US Treasuries) and riskier assets (corporate bonds, emerging market debt) would narrow. Russia's government default triggered a massive flight to safety — the opposite of LTCM's position. LTCM was forced to unwind at massive losses. As one forced seller became multiple forced sellers, spreads widened further, triggering more losses in a self-reinforcing cycle.
 
 The key insight: **Keynes's dictum applies directly** — "The market can remain irrational longer than you can remain solvent." Derivatives-based strategies that appear risk-free under lognormal assumptions can produce catastrophic losses when markets behave irrationally and when too many funds have made similar leveraged bets. The 2007–2008 crisis repeated this dynamic at scale: when one fund became a forced seller, the strategy that had attracted many imitators simultaneously unwound, creating the "deleveraging of historical proportions" described by hedge fund manager Cliff Asness.

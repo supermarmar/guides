@@ -1,17 +1,17 @@
-Here is the structured write-up for the **Data Representativeness** section, incorporating all your detailed notes in a professional, regulatory-aligned format:
+Here is the structured write-up for the **[[04-data-representativeness|Data Representativeness]]** section, incorporating all your detailed notes in a professional, regulatory-aligned format:
 
 ---
 
-## 5. Data Representativeness
+## 5. [[04-data-representativeness|Data Representativeness]]
 
 ### 5.1 Objective and Regulatory Context
 
 The objective of this section is to demonstrate that the modelling data is **sufficiently representative** of the portfolio to which the IRB models will be applied, in accordance with:
 
-* **CRR Article 174(c)** – requiring that development and application populations be comparable,
-* **PRA SS4/24 Paragraphs 8.2–8.15**, which set out expectations for assessing representativeness, including statistical comparisons of key characteristics and structural portfolio features.
+* **[[crr|CRR]] Article 174(c)** – requiring that development and application populations be comparable,
+* **[[pra|PRA]] [[ss4-24|SS4/24]] Paragraphs 8.2–8.15**, which set out expectations for assessing representativeness, including statistical comparisons of key characteristics and structural portfolio features.
 
-Where data representativeness limitations exist, **appropriate adjustments must be made**, and these are further addressed in the **Model of Conservatism (MoC)** section.
+Where [[04-data-representativeness|data representativeness]] limitations exist, **appropriate adjustments must be made**, and these are further addressed in the **Model of Conservatism (MoC)** section.
 
 ---
 
@@ -19,7 +19,7 @@ Where data representativeness limitations exist, **appropriate adjustments must 
 
 Multiple tests were carried out to assess representativeness:
 
-* **Population Stability Index (PSI)** and **Chi-Square tests** were used to compare the development (risk differentiation) and calibration (risk quantification) samples against the **application portfolio**.
+* **Population Stability Index (PSI)** and **Chi-Square tests** were used to compare the development ([[03-risk-differentiation|risk differentiation]]) and calibration ([[07-risk_quantification|risk quantification]]) samples against the **application portfolio**.
 * These tests were performed at both **portfolio level** and **segmented level**, across multiple time points.
 
 ---
@@ -38,12 +38,12 @@ Comparisons were made across the following key risk drivers:
 * **Revolver vs. Transactor status**
 * **Months on Book (MoB)**
 * **FICO score bands**
-* **PiT segmentation**
+* **PiT [[06-segmentation|segmentation]]**
 
 A notable structural shift was identified during the analysis:
 
 * A **change in product mix** occurred following the **acquisition of a new business line**.
-* In response, a **product flag** was incorporated into the segmentation logic to ensure representativeness across new and legacy products.
+* In response, a **product flag** was incorporated into the [[06-segmentation|segmentation]] logic to ensure representativeness across new and legacy products.
 * All other characteristics showed:
 
   * **PSI values close to 0**, indicating stable distributions,
@@ -60,17 +60,17 @@ A notable structural shift was identified during the analysis:
 * For **continuous variables**, comparisons were made using **decile distributions**.
 * Analysis covered:
 
-  * **Key risk drivers within each PiT segment** used for risk differentiation,
-  * **Final model variables** used for risk quantification.
+  * **Key risk drivers within each PiT segment** used for [[03-risk-differentiation|risk differentiation]],
+  * **Final model variables** used for [[07-risk_quantification|risk quantification]].
 * Outliers and missing data were also profiled and found to be consistent across samples.
 
 ---
 
 ### 5.4 Lending Standards and Recovery Policies
 
-* A key qualitative and quantitative check involved assessing changes in **underwriting or collections strategies**.
+* A key qualitative and quantitative check involved assessing changes in **[[00_underwriting|underwriting]] or collections strategies**.
 * Example: For **March 2009**, the 12-month average PiT segment distribution before and after a known **strategy change in April 2009** was compared.
-* No material shift in the key PiT segmentation or risk profile was identified.
+* No material shift in the key PiT [[06-segmentation|segmentation]] or risk profile was identified.
 * Discussions with **model owners** and **collections teams** confirmed:
 
   * No foreseeable **policy or strategy changes** in the near term,
@@ -81,7 +81,7 @@ A notable structural shift was identified during the analysis:
 
 ### 5.5 Macroeconomic Environment (Calibration Only)
 
-* This analysis applies only to the **risk quantification (calibration)** samples.
+* This analysis applies only to the **[[07-risk_quantification|risk quantification]] (calibration)** samples.
 * Representativeness was assessed by comparing:
 
   * **Observed Default Rates (ODRs)** over time,
@@ -91,4 +91,4 @@ A notable structural shift was identified during the analysis:
 
 ---
 
-Let me know if you want to go straight into the **Model Segmentation** section next or wrap this into a compiled draft.
+Let me know if you want to go straight into the **Model [[06-segmentation|Segmentation]]** section next or wrap this into a compiled draft.

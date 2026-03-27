@@ -36,14 +36,14 @@ That’s CodeWiki’s “agentic” system. Each agent manages a section of the 
 
 ## 3. Multi-Modal Synthesis (text + diagrams)
 
-CodeWiki doesn’t just generate Markdown. It provides diagrams like:
+CodeWiki doesn’t just generate [[02-markdown|Markdown]]. It provides diagrams like:
 
 - Architecture overview
 - Data flow
 - Per-module dependency graphs
 - Sequence diagrams
 
-All created with Mermaid, so you can edit them later.
+All created with [[07-mermaid|Mermaid]], so you can edit them later.
 
 ## Installation
 
@@ -51,7 +51,7 @@ You’ll need:
 
 - Python 3.12+
 - Node.js (for diagram validation)
-- An LLM API key (Claude, OpenAI, etc.)
+- An LLM API key ([[CLAUDE|Claude]], OpenAI, etc.)
 
 `pip install git+https://github.com/FSoft-AI4Code/CodeWiki.git`
 

@@ -2,7 +2,7 @@
 
 Exposure at default (EAD) is the gross total of extended credit plus estimated additional drawings for 1 year or until maturity. EAD modelling is relatively simpler than PD and LGD modelling, as for many products the EAD may simply be estimated as the exposure to the obligor, or client.
 
-Where EAD modelling becomes more complex is where this exposure is not fixed and can fluctuate over time. Off-balance-sheet exposures, for example, that incur counterparty credit risk (derivatives, etc.) are required to be treated separately from other exposures, as detailed by Basel.
+Where EAD modelling becomes more complex is where this exposure is not fixed and can fluctuate over time. Off-balance-sheet exposures, for example, that incur [[02-counterparty_exposures|counterparty credit risk]] (derivatives, etc.) are required to be treated separately from other exposures, as detailed by [[bis|Basel]].
 
 The greatest analytical challenge is setting credit conversion factors (CCFs) (or loan equivalents). This involves estimating additional drawings. Globally, unused commitments are huge, and it is logical that a corporation would seek to draw down in stress scenarios. Products where CCF modelling is needed include committed loan, liquidity facilities, and credit cards. Once the CCF is calculated as a percentage of the undrawn exposure, an EAD estimate can be calculated as follows:
 
@@ -12,42 +12,42 @@ The greatest analytical challenge is setting credit conversion factors (CCFs) (o
 
 Strong information management systems are vital in assessing EAD, as the bank must ensure that troubled entities draw only under the terms permitted by the facility and up to the limit. Collateral must be monitored, priced, and margined. The bank must act efficiently and quickly in default situations to reduce losses and limit additional drawings where possible.
 
-Whilst EAD is commonly positioned or understood as account balance at the point of default, there exists a number of nuances that can lead to a misalignment between account balance, IFRS accounting value, accounting value gross of specific credit risk adjustments and the adjustments required by SS4/24 to derive a compliant "outstanding amount" that serves as both the LGD denominator and EAD untransformed dependent variable. Additionally, there are motivations to model a transformation of EAD. The sections below cover:
+Whilst EAD is commonly positioned or understood as account balance at the point of default, there exists a number of nuances that can lead to a misalignment between account balance, IFRS accounting value, accounting value gross of specific credit risk adjustments and the adjustments required by [[ss4-24|SS4/24]] to derive a compliant "outstanding amount" that serves as both the LGD denominator and EAD untransformed dependent variable. Additionally, there are motivations to model a transformation of EAD. The sections below cover:
 
 - Deriving a compliant outstanding amount and demonstrating equivalence to account balance and IFRS accouniting value; and
 - Applying a transformation to help improve overall holdout goodness-of-fit as well as consistency of goodness-of-fit across key strata of the live portfolio.
 
 ### Outstanding Amount
 
-The definition of EAD for AIRB model estimation must comply with rules set out in the CRR and SS4/24. This section discusses the EAD definition and introduces the concept of "outstanding amount" per SS4/24 Paragraph 13.1, which reflects the accounting value gross of impairment, plus some specific adjustments menitioned in regulation.
+The definition of EAD for AIRB model estimation must comply with rules set out in the [[crr|CRR]] and [[ss4-24|SS4/24]]. This section discusses the EAD definition and introduces the concept of "outstanding amount" per [[ss4-24|SS4/24]] Paragraph 13.1, which reflects the accounting value gross of impairment, plus some specific adjustments menitioned in regulation.
 
 #### Accounting Value Equivalence to Customer Balance
 
-In its purest form, CRR Article 166A(2) defines exposure value as the accounting value without considering Specific Credit Risk Adjustments (SCRA). SRCA are IFRS 9 impairments on assets measured at Amortised Cost (AC), or the credit component of Fair Value (FV) discounted to par value for assets measured at Fair Value. At present there are no credit card exposures measured at FV and none are anticipated.
+In its purest form, [[crr|CRR]] Article 166A(2) defines exposure value as the accounting value without considering Specific Credit Risk Adjustments (SCRA). SRCA are [[ifrs9_standard|IFRS 9]] impairments on assets measured at Amortised Cost (AC), or the credit component of Fair Value (FV) discounted to par value for assets measured at Fair Value. At present there are no credit card exposures measured at FV and none are anticipated.
 
 - For exposures measured at AC in the IFRS accounts: Although interest accrues daily. it is allocated to accounts as a monthly debit. Thus, month-end balance snapshots are equivalent to the AC Cost accounting value at month-end. Impairment liabilities are held separately and do not need to be removed from balances that are already gross of SCRA. Therefore, a customer account with a $100 balance has an outstanding amount for EAD purposes of $100.
 - A special case with features of both AC and FV assets is acquired portfolios. These are typically measured at FV (i.e. the transaction price) at day zero, with a day-one transfer to AC.
   - In this scenario the AC gross accounting value would in theory be set to $95 and unwound via a credit-adjusted Effective Interest Rate (EIR), up to $100 at the facility's behavioural life.
-  - The IFRS 9 impairment liability is measured with respect to the $95 and set to $0 at initial recognition. (If the credit risk increases to $6 from an initial estimate of $4 factored into the FV, then an impairment liability of $2 is recognised and the gross accounting value remains $95). Being a gross amount, in line with AC as described above, no further adjustment for SCRA is needed
-  - Technically, the outstanding amount is $95. The operational challenges associated with allocating the FV adjustment to individual facilities would result in exposure values that float because of accounting policy and not due to credit-related action or behaviour. As a general principle, Basel seeks estimates that are agnostic to accounting policy (e.g. the economic loss calculation can include cash flows that occur after the point of accounting derecognition and looks through restructures onto new accounts). To maintain RWA consistency with exposures originated within USCB and to develop an intuitive model that is agnostic to accounting treatment, the outstanding amount has been set to the customer balance (in this example $100) in line with CRR Article 3.
+  - The [[ifrs9_standard|IFRS 9]] impairment liability is measured with respect to the $95 and set to $0 at initial recognition. (If the credit risk increases to $6 from an initial estimate of $4 factored into the FV, then an impairment liability of $2 is recognised and the gross accounting value remains $95). Being a gross amount, in line with AC as described above, no further adjustment for SCRA is needed
+  - Technically, the outstanding amount is $95. The operational challenges associated with allocating the FV adjustment to individual facilities would result in exposure values that float because of accounting policy and not due to credit-related action or behaviour. As a general principle, Basel seeks estimates that are agnostic to accounting policy (e.g. the economic loss calculation can include cash flows that occur after the point of accounting derecognition and looks through restructures onto new accounts). To maintain RWA consistency with exposures originated within USCB and to develop an intuitive model that is agnostic to accounting treatment, the outstanding amount has been set to the customer balance (in this example $100) in line with [[crr|CRR]] Article 3.
 
 #### Outstanding Amount for Performing Facilities
 
-CRR Article 182(1)(ca)(i) and SS4/24 Paragraph 13.11 require that additional drawings between observation and default are reflected in Conversion Factors (CFs). Such drawings are reflected in both the customer balance and accounting value, therefore, no adjustments are required to incorporate this requirement. Thus, the outstanding amount for performing facilities is the customer balance at default, which includes all principal, interest and fees.
+[[crr|CRR]] Article 182(1)(ca)(i) and [[ss4-24|SS4/24]] Paragraph 13.11 require that additional drawings between observation and default are reflected in Conversion Factors (CFs). Such drawings are reflected in both the customer balance and accounting value, therefore, no adjustments are required to incorporate this requirement. Thus, the outstanding amount for performing facilities is the customer balance at default, which includes all principal, interest and fees.
 
 #### Outstanding Amount for Defaulted Facilities
 
-For facilities in default, the LGD rules within SS4/24 also require the following of the outstanding amount:
+For facilities in default, the LGD rules within [[ss4-24|SS4/24]] also require the following of the outstanding amount:
 
-- Adding back previous partial write-offs (SS4/24 Paragraph 13.5).
-- Late fees not capitalised per CRR Article 181(1)(i) and SS4/24 Paragraph 13.9
-- Interest not capitalised (SS4/24 Paragraph 13.10)
+- Adding back previous partial write-offs ([[ss4-24|SS4/24]] Paragraph 13.5).
+- Late fees not capitalised per [[crr|CRR]] Article 181(1)(i) and [[ss4-24|SS4/24]] Paragraph 13.9
+- Interest not capitalised ([[ss4-24|SS4/24]] Paragraph 13.10)
 
 Thus, the outstanding amount for defaulted facilities is the customer balance (which includes all principal, interest and fees), with no further adjustments.
 
 #### Treatment of Related Facilities
 
-The concept of a "related facility" is not explicitly defined in the CRR. However, for the purposes of unbiased estimation, firms are required to look through restructures and account number changes to connect post-default drawings and cash flows with facilities at-observation (SS4/24 Paragraph 13.8). As an example, a related facility may arise if an account is restricted to a new facility number or transferred to a fixed term loan to clear the debt.
+The concept of a "related facility" is not explicitly defined in the [[crr|CRR]]. However, for the purposes of unbiased estimation, firms are required to look through restructures and account number changes to connect post-default drawings and cash flows with facilities at-observation ([[ss4-24|SS4/24]] Paragraph 13.8). As an example, a related facility may arise if an account is restricted to a new facility number or transferred to a fixed term loan to clear the debt.
 
 The EAD target is more complex due to the variety of ways in which utilisation and credit availability can change over time, especially for revolving products like credit cards or overdrafts.
 
@@ -68,21 +68,21 @@ The EAD target is more complex due to the variety of ways in which utilisation a
 
 #### 3.2.2 Transformed EAD Targets
 
-This section describes the choice of target variable for EAD modelling, It discusses the merlts of
+This section describes the choice of [[01-target_variable|target variable]] for EAD modelling, It discusses the merlts of
 direct EAD estimation and transformations of EAD. The concept of a transformation is attractive,
 because it allows the application of a broader set of standard modelling techniques to find and
 select modelled assumptions with an appropriate goodness-of-fit, holdout performance/stability,
 and alignment to business requirements such as intuitiveness.
-SS4/24 Paragraph 17.1 states, in part, "Firms may choose to provide own estimates of EAD in
+[[ss4-24|SS4/24]] Paragraph 17.1 states, in part, "Firms may choose to provide own estimates of EAD in
 place of the own estimates of CF in accordance with Article 166D(3) of the Credit Rlsk: Internal
-Ratings Based Approach (CRR) Part." Paragraph 17.2 reads, "The PRA considers that there are a
+Ratings Based Approach ([[crr|CRR]]) Part." Paragraph 17.2 reads, "The [[pra|PRA]] considers that there are a
 number of potentially complant approaches to estimate EAD and that an acceptable approach is
 to estimate EAD as a percentage of total limit (Limit Factor estimation)."
 
 Table 7.2-1 lists the candidate target variables considered for EAD modelling with their
 associated strengths, weaknesses, ranges, and limits.
 
-Different target variable transformations are applied to better align with model performance, business use, and interpretability. Each has distinct pros and cons:
+Different [[01-target_variable|target variable]] transformations are applied to better align with model performance, business use, and interpretability. Each has distinct pros and cons:
 
 | Target   | Formula                                                                   | Description                         | Strengths                                                                           | Weaknesses                                                                                               | Typical Range               |
 | -------- | ------------------------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------- |
@@ -113,13 +113,13 @@ Different target variable transformations are applied to better align with model
   * **Predictor interpretability**, and
   * **Business and regulatory alignment**.
 
-Here is a write-up for **Section 3.2: EAD Target Variable Analysis**, based on your notes:
+Here is a write-up for **Section 3.2: EAD [[01-target_variable|Target Variable]] Analysis**, based on your notes:
 
 ---
 
-## 3.2 Selection of EAD Target Variable
+## 3.2 Selection of EAD [[01-target_variable|Target Variable]]
 
-To determine the most appropriate target variable for **Exposure at Default (EAD)** modelling, we undertook a structured comparative analysis between two candidate target transformations: **EADF** (EAD as a proportion of credit limit) and **CCF** (Credit Conversion Factor).
+To determine the most appropriate [[01-target_variable|target variable]] for **Exposure at Default (EAD)** modelling, we undertook a structured comparative analysis between two candidate target transformations: **EADF** (EAD as a proportion of credit limit) and **CCF** (Credit Conversion Factor).
 
 ### 3.2.1 Candidate Target Definitions
 
@@ -139,7 +139,7 @@ A toy model was developed using four intuitive portfolio segments to test perfor
 * **Utilisation <10%**
 * **Utilisation between 10–95%**
 
-This segmentation allowed early identification of structural biases or volatility in target variables across key behavioural clusters.
+This [[06-segmentation|segmentation]] allowed early identification of structural biases or volatility in target variables across key behavioural clusters.
 
 ---
 
@@ -168,7 +168,7 @@ This was conducted:
 * On **Good Book** vs **Bad Book** (accounts that defaulted vs didn’t)
 * By **FICO band**, **credit limit band**, and **utilisation band**
 
-**EADF consistently showed lower error volatility**, better central tendency alignment, and smoother trends across segmentation variables.
+**EADF consistently showed lower error volatility**, better central tendency alignment, and smoother trends across [[06-segmentation|segmentation]] variables.
 
 ---
 

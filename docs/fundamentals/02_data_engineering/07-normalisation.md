@@ -2,7 +2,7 @@
 
 Normalization is a process in database design that organizes data to reduce redundancy and improve data integrity. The goal is to divide large tables into smaller ones and establish relationships between them using primary and foreign keys. This process follows a series of "normal forms" (rules), each building on the previous one.
 
-The goal of normalization is efficiency in transactional databases (OLTP systems). A *Star Schema* is a denormalized data model primarily used in data warehousing and analytics tools like Power BI to optimize query performance for reporting and analysis.
+The goal of normalization is efficiency in transactional databases (OLTP systems). A *Star Schema* is a denormalized data model primarily used in data warehousing and analytics tools like [[01-power-bi|Power BI]] to optimize query performance for reporting and analysis.
 
 ## Unnormalized Table (UNF)
 

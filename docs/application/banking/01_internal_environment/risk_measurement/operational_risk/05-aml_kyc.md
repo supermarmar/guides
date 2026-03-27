@@ -1,12 +1,12 @@
 # Anti-Money Laundering (AML) and Know Your Customer (KYC)
 
-AML and KYC represent a critical subset of operational risk management. While the legal definition of money laundering differs across jurisdictions, the Basel Committee on Banking Supervision (BCBS) defines it as "acts that acquire, transfer, or conceal proceeds of a certain criminal act." The underlying criminal act is known as the **predicate crime** (e.g. tax evasion, human and drug trafficking, bribery).
+AML and KYC represent a critical subset of operational [[01-risk_management|risk management]]. While the legal definition of money laundering differs across jurisdictions, the [[bis|Basel Committee on Banking Supervision]] ([[bis|BCBS]]) defines it as "acts that acquire, transfer, or conceal proceeds of a certain criminal act." The underlying criminal act is known as the **predicate crime** (e.g. tax evasion, human and drug trafficking, bribery).
 
 ## Anti-Money Laundering (AML)
 
 ### The Three Phases of Money Laundering
 
-According to the BIS framework, money laundering typically consists of three phases:
+According to the [[bis|BIS]] framework, money laundering typically consists of three phases:
 
 1. **Placement** — illegally obtained funds are brought into the financial system (e.g. depositing cash received from drug trafficking into a bank account).
 2. **Layering** — the true origin of funds is concealed (e.g. moving bank account balances, often across national borders).
@@ -16,7 +16,7 @@ According to the BIS framework, money laundering typically consists of three pha
 
 Two key international bodies set standards and guidance:
 
-**BCBS** — issues AML/CFT guidance and incorporates recommendations from the FATF.
+**[[bis|BCBS]]** — issues AML/CFT guidance and incorporates recommendations from the FATF.
 
 **Financial Action Task Force (FATF)** — an independent inter-governmental body set up to combat money laundering, terrorist financing, and the financing of weapons of mass destruction proliferation. FATF focuses on three main areas:
 
@@ -49,7 +49,7 @@ The board of directors bears principal responsibility for managing money launder
 
 ### Role of Supervisors
 
-Supervisors interpret, tailor, and implement international AML/CFT standards at the national level. In South Africa, the Prudential Authority (PA) has issued local regulations under the **Financial Intelligence Centre Act, 2001 (FICA)**. Financial institutions including banks are regularly supervised for FICA compliance. The National Treasury performs periodic evaluations of South Africa's compliance with the FATF 40 recommendations and assesses the effectiveness of AML/CFT controls.
+Supervisors interpret, tailor, and implement international AML/CFT standards at the national level. In South Africa, the [[pa|Prudential Authority]] (PA) has issued local regulations under the **Financial Intelligence Centre Act, 2001 (FICA)**. Financial institutions including banks are regularly supervised for FICA compliance. The National Treasury performs periodic evaluations of South Africa's compliance with the FATF 40 recommendations and assesses the effectiveness of AML/CFT controls.
 
 ## Know Your Customer (KYC)
 
@@ -81,7 +81,7 @@ Jurisdictions consider the following patterns to identify suspicious transaction
 
 ### 4. Management of Information
 
-For a proper audit trail and to fulfil information requests from supervisors, a bank should keep accurate records of customer information and documents collected during CDD, as well as transaction history. IT systems must be able to cater to the types of information and documents required. According to BCBS guidelines and **FATF Recommendation 11**, banks should retain customer records, account files, and business correspondence for at least **five years** after the relationship is ended or after the latest transaction.
+For a proper audit trail and to fulfil information requests from supervisors, a bank should keep accurate records of customer information and documents collected during CDD, as well as transaction history. IT systems must be able to cater to the types of information and documents required. According to [[bis|BCBS]] guidelines and **FATF Recommendation 11**, banks should retain customer records, account files, and business correspondence for at least **five years** after the relationship is ended or after the latest transaction.
 
 ### 5. Reporting of Suspicious Transactions
 

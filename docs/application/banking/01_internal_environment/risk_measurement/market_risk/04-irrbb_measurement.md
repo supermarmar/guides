@@ -52,17 +52,17 @@ where $V_t$ is the discount factor at time $t$.
 **Treatment of equity capital:** the bank's equity (ordinary shares, preference shares, retained earnings) represents interest-free, perpetual funding. Including it as-is can distort the EVE calculation. It can be split into maturity buckets that roll off with assets, with a fixed rate cost assigned to each bucket.
 
 **Liability-sensitive bank example** (assets have longer duration than liabilities — funding long-term fixed/long-repricing-period assets with short-term liabilities): when interest rates increase:
-1. NII is squeezed as the cost of liabilities increases while asset yields stay fixed for an extended period.
+1. [[03-nii_nim|NII]] is squeezed as the cost of liabilities increases while asset yields stay fixed for an extended period.
 2. From a behavioural perspective, customers have reduced incentive to prepay loans (as alternatives have higher yields), further increasing asset duration.
 3. Higher discount rates reduce the PV of forecasted cashflows.
 
 All three effects reduce the EVE as rates increase.
 
-**Key trade-off:** stabilising NII (earnings) vs stabilising EVE involves opposing structural positions. A bank needs to consider both perspectives when managing IRRBB. Basel III requires banks to measure the impact of interest rate shocks on EVE (six prescribed shock scenarios) and NII (two shock scenarios) as part of Pillar 2 supervisory review.
+**Key trade-off:** stabilising [[03-nii_nim|NII]] (earnings) vs stabilising EVE involves opposing structural positions. A bank needs to consider both perspectives when managing IRRBB. [[basel_framework|Basel III]] requires banks to measure the impact of interest rate shocks on EVE (six prescribed shock scenarios) and [[03-nii_nim|NII]] (two shock scenarios) as part of [[02-stress_testing|Pillar 2]] supervisory review.
 
 ## Earnings at Risk (EaR)
 
-The earnings perspective focuses on how rate changes affect the bank's NII and earnings over a given time horizon (typically short to medium term, not more than 2 years). Accuracy of the forecast decreases as the time horizon increases.
+The earnings perspective focuses on how rate changes affect the bank's [[03-nii_nim|NII]] and earnings over a given time horizon (typically short to medium term, not more than 2 years). Accuracy of the forecast decreases as the time horizon increases.
 
 ### Step 1: Re-pricing Gap Analysis
 
@@ -76,11 +76,11 @@ The re-pricing gap analysis allocates assets and liabilities into pre-defined ti
 | Liabilities (Rm) | 100 | 60 | 25 | 5 | 10 |
 | Re-pricing gap (Rm) | −10 | −20 | −15 | +10 | +15 |
 
-The bank has R10m more liabilities repricing over the next 12 months than assets. An interest rate increase will therefore reduce NII over this period, as more liabilities reprice to higher rates than assets.
+The bank has R10m more liabilities repricing over the next 12 months than assets. An interest rate increase will therefore reduce [[03-nii_nim|NII]] over this period, as more liabilities reprice to higher rates than assets.
 
-### Step 2: NII Sensitivity
+### Step 2: [[03-nii_nim|NII]] Sensitivity
 
-Given a change in rates, the NII sensitivity in each time band is:
+Given a change in rates, the [[03-nii_nim|NII]] sensitivity in each time band is:
 
 ```math
 \text{NII Sensitivity} = \frac{\text{Re-pricing gap} \times \text{Remaining term (months)} \times \Delta r}{12}
@@ -88,7 +88,7 @@ Given a change in rates, the NII sensitivity in each time band is:
 
 **Example — 100bp rate increase:**
 
-| Time band | Gap (Rm) | Remaining term (months) | Rate change (bps) | NII Sensitivity (R) |
+| Time band | Gap (Rm) | Remaining term (months) | Rate change (bps) | [[03-nii_nim|NII]] Sensitivity (R) |
 |---|---|---|---|---|
 | 0–3m | −20 | 12 | 100 | −200,000 |
 | 3–6m | −15 | 9 | 100 | −112,500 |
@@ -96,16 +96,16 @@ Given a change in rates, the NII sensitivity in each time band is:
 | 9–12m | +15 | 3 | 100 | +37,500 |
 | **Total** | **−10** | | | **−225,000** |
 
-A 100bp increase in rates reduces NII by R225,000 over the following year.
+A 100bp increase in rates reduces [[03-nii_nim|NII]] by R225,000 over the following year.
 
 The analysis can be enhanced by allowing for: a dynamic balance sheet (new business volumes, new products, funding plan changes); gradual rate increases; pricing time lags; and behavioural assumptions (prepayments, withdrawal behaviour as rates change).
 
 ### Step 3: Earnings at Risk (EaR)
 
-The final step introduces a stochastic element. An appropriately calibrated stochastic interest rate process (e.g. the Vasicek model) is used to generate a distribution of potential interest rate scenarios at a given confidence level. Monte Carlo simulations then produce a distribution of NII changes over the time horizon.
+The final step introduces a stochastic element. An appropriately calibrated stochastic interest rate process (e.g. the Vasicek model) is used to generate a distribution of potential interest rate scenarios at a given confidence level. Monte Carlo simulations then produce a distribution of [[03-nii_nim|NII]] changes over the time horizon.
 
 ```math
 \text{EaR}_{1-\alpha} = \text{VaR}_{1-\alpha}(\Delta\text{NII})
 ```
 
-EaR is effectively the VaR with respect to the bank's NII for a given confidence level over the time horizon of interest. For example, the 95% EaR is the level such that only 5% of simulations produce a worse NII outcome.
+EaR is effectively the VaR with respect to the bank's [[03-nii_nim|NII]] for a given confidence level over the time horizon of interest. For example, the 95% EaR is the level such that only 5% of simulations produce a worse [[03-nii_nim|NII]] outcome.

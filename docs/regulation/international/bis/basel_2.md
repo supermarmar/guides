@@ -1,4 +1,4 @@
-# Basel II
+# [[bis|Basel]] II
 
 <https://www.bis.org/publ/bcbs128.pdf>
 
@@ -6,7 +6,7 @@
 
 1. The fundamental objective of the Committee’s work to revise the 1988 Accord2 has been to develop a framework that would further strengthen the soundness and stability of the international banking system while maintaining sufficient consistency that capital adequacy regulation will not be a significant source of competitive inequality among internationally active banks. The Committee notes that, in their comments on the proposals, banks and other interested parties have welcomed the concept and rationale of the three pillars (minimum capital requirements, supervisory review, and market discipline) approach on which the revised Framework is based.
 
-2. In developing the revised Framework, the Committee has sought to arrive at significantly more risk-sensitive capital requirements that are conceptually sound and at the same time pay due regard to particular features of the present supervisory and accounting systems in individual member countries. It believes that this objective has been achieved. The Committee is also retaining key elements of the 1988 capital adequacy framework, including the general requirement for banks to hold total capital equivalent to at least 8% of their risk-weighted assets; the basic structure of the 1996 Market Risk Amendment regarding the treatment of market risk; and the definition of eligible capital.
+2. In developing the revised Framework, the Committee has sought to arrive at significantly more risk-sensitive capital requirements that are conceptually sound and at the same time pay due regard to particular features of the present supervisory and accounting systems in individual member countries. It believes that this objective has been achieved. The Committee is also retaining key elements of the 1988 capital adequacy framework, including the general requirement for banks to hold total capital equivalent to at least 8% of their risk-weighted assets; the basic structure of the 1996 [[05-market_risk|Market Risk]] Amendment regarding the treatment of [[05-market_risk|market risk]]; and the definition of eligible capital.
 
 3. The revised Framework provides a range of options for determining the capital requirements for credit risk and operational risk to allow banks and supervisors to select approaches that are most appropriate for their operations and their financial market infrastructure.
 
@@ -63,7 +63,7 @@ block
 
 #### B. Risk-weighted assets
 
-1. Total risk-weighted assets are determined by multiplying the capital requirements for market risk and operational risk by 12.5 (i.e. the reciprocal of the minimum capital ratio of 8%) and adding the resulting figures to the sum of risk-weighted assets for credit risk.
+1. Total risk-weighted assets are determined by multiplying the capital requirements for [[05-market_risk|market risk]] and operational risk by 12.5 (i.e. the reciprocal of the minimum capital ratio of 8%) and adding the resulting figures to the sum of risk-weighted assets for credit risk.
 The Committee applies a scaling factor in order to broadly maintain the aggregate level of minimum capital requirements, while also providing incentives to adopt the more advanced risk-sensitive approaches of the Framework. The current best estimate of the scaling factor is 1.06. National authorities will continue to monitor capital requirements during the implementation period of this Framework. Moreover, the Committee will monitor national experiences with this Framework. The scaling factor is applied to the riskweighted asset amounts for credit risk assessed under the IRB approach.
 
 ### Ia. The constituents of capital
@@ -87,7 +87,7 @@ The Committee applies a scaling factor in order to broadly maintain the aggregat
 
 49(xii). The Committee is agreed that subordinated term debt instruments have significant deficiencies as constituents of capital in view of their fixed maturity and inability to absorb losses except in a liquidation. These deficiencies justify an additional restriction on the amount of such debt capital which is eligible for inclusion within the capital base. Consequently, it has been concluded that subordinated term debt instruments with a minimum original term to maturity of over five years may be included within the supplementary elements of capital, but only to a maximum of 50% of the core capital element and subject to adequate amortisation arrangements.
 
-#### C. Short-term subordinated debt covering market risk (Tier 3)
+#### C. Short-term subordinated debt covering [[05-market_risk|market risk]] (Tier 3)
 
 49(xiii). The principal form of eligible capital to cover market risks consists of shareholders’ equity and retained earnings (Tier 1 capital) and supplementary capital (Tier 2 capital) as defined in paragraphs 49(i) to 49(xii). But banks may also, at the discretion of their national authority, employ a third tier of capital (“Tier 3”), consisting of short-term subordinated debt as defined in paragraph 49(xiv) below for the sole purpose of meeting a proportion of the capital requirements for market risks, subject to the following conditions:
 
@@ -122,7 +122,7 @@ The Committee applies a scaling factor in order to broadly maintain the aggregat
 
 ##### 1. Claims on sovereigns
 
-53. Claims on sovereigns and their central banks will be risk weighted as follows:
+53. Claims on sovereigns and their [[05-central_banks|central banks]] will be risk weighted as follows:
 
 | Credit Assessment | AAA to AA- | A+ to A- | BBB+ to BBB- | BB+ to B- | Below B- | Unrated |
 | - | - | - | - | - | - |
@@ -132,7 +132,7 @@ The Committee applies a scaling factor in order to broadly maintain the aggregat
 
 ##### 2. Claims on non-central government public sector entities (PSEs)
 
-56. Claims on the Bank for International Settlements, the International Monetary Fund, the European Central Bank and the European Community may receive a 0% risk weight.
+56. Claims on the [[bis|Bank for International Settlements]], the International Monetary Fund, the [[ecb|European Central Bank]] and the European Community may receive a 0% risk weight.
 57. Claims on domestic PSEs will be risk-weighted at national discretion, according to either option 1 or option 2 for claims on banks.
 58. Subject to national discretion, claims on certain domestic PSEs may also be treated as claims on the sovereigns in whose jurisdictions the PSEs are established.
 
@@ -213,7 +213,7 @@ Option 2
 - (i). Direct credit substitutes, e.g. general guarantees of indebtedness (including standby letters of credit serving as financial guarantees for loans and securities) and acceptances (including endorsements with the character of acceptances) will receive a CCF of 100%.
 - (ii). Sale and repurchase agreements and asset sales with recourse,34 where the credit risk remains with the bank will receive a CCF of 100%.
 
-#### D. Standardised approach ─ credit risk mitigation
+#### D. Standardised approach ─ credit [[05-risk_mitigation|risk mitigation]]
 
 109.   Banks use a number of techniques to mitigate the credit risks to which they are exposed. For example, exposures may be collateralised by first priority claims, in whole or in part with cash or securities, a loan exposure may be guaranteed by a third party, or a bank may buy a credit derivative to offset various forms of credit risk. Additionally banks may agree to net loans owed to them against deposits from the same counterparty.
 110.   Where these techniques meet the requirements for legal certainty as described in paragraph 117 and 118 below, the revised approach to CRM allows a wider range of credit risk mitigants to be recognised for regulatory capital purposes than is permitted under the 1988 Accord.
@@ -249,8 +249,8 @@ Option 2
 
 131. Additionally where the exposure and collateral are held in different currencies an additional downwards adjustment must be made to the volatility adjusted collateral amount to take account of possible future fluctuations in exchange rates.
 
-147. For a collateralised transaction, the exposure amount after risk mitigation is calculated as follows: $E* = E - C$ where $E*$ is the exposure value after risk mitigation, $E$ is the exposure value after risk mitigation and $C$ is the the exposure value after risk mitigation.
-148. The exposure amount after risk mitigation will be multiplied by the risk weight of the counterparty to obtain the risk-weighted asset amount for the collateralised transaction.
+147. For a collateralised transaction, the exposure amount after [[05-risk_mitigation|risk mitigation]] is calculated as follows: $E* = E - C$ where $E*$ is the exposure value after [[05-risk_mitigation|risk mitigation]], $E$ is the exposure value after [[05-risk_mitigation|risk mitigation]] and $C$ is the the exposure value after [[05-risk_mitigation|risk mitigation]].
+148. The exposure amount after [[05-risk_mitigation|risk mitigation]] will be multiplied by the risk weight of the counterparty to obtain the risk-weighted asset amount for the collateralised transaction.
 
 > Consider the comprehensive approach next. Assume that the adjustment to exposure to allow for possible future increases in the exposure is +10% and the adjustment to the collateral to allow for possible future decreases in its value is -15%. The new exposure is: (1,1 × 800) – (0,85 × 700) = 285, or R285 million and a risk weight of 150% is applied to this exposure to give risk-adjusted assets equal to R427,5 million.
 
@@ -267,7 +267,7 @@ Option 2
 ##### 1. Categorisation of exposures
 
 215. Under the IRB approach, banks must categorise banking-book exposures into broad classes of assets with different underlying risk characteristics, subject to the definitions set out below. The classes of assets are (a) corporate, (b) sovereign, (c) bank, (d) retail, and (e) equity. Within the corporate asset class, five sub-classes of specialised lending are separately identified. Within the retail asset class, three sub-classes are separately identified. Within the corporate and retail asset classes, a distinct treatment for purchased receivables may also apply provided certain conditions are met.
-216. The classification of exposures in this way is broadly consistent with established bank practice. However, some banks may use different definitions in their internal risk management and measurement systems.
+216. The classification of exposures in this way is broadly consistent with established bank practice. However, some banks may use different definitions in their internal [[01-risk_management|risk management]] and measurement systems.
 
 ###### Corporate Exposure Defintion
 
@@ -290,7 +290,7 @@ commercial real estate that exhibits higher loss rate volatility (i.e. higher as
 
 ###### Sovereign Exposure Definition
 
-229. This asset class covers all exposures to counterparties treated as sovereigns under the standardised approach. This includes sovereigns (and their central banks), certain PSEs identified as sovereigns in the standardised approach, MDBs that meet the criteria for a 0% risk weight under the standardised approach, and the entities referred to in paragraph 56.
+229. This asset class covers all exposures to counterparties treated as sovereigns under the standardised approach. This includes sovereigns (and their [[05-central_banks|central banks]]), certain PSEs identified as sovereigns in the standardised approach, MDBs that meet the criteria for a 0% risk weight under the standardised approach, and the entities referred to in paragraph 56.
 
 ###### Bank Exposure Definition
 
@@ -307,11 +307,11 @@ commercial real estate that exhibits higher loss rate volatility (i.e. higher as
 232. An exposure is categorised as a retail exposure if it meets all of the following criteria: Large number of exposures
 
 - The exposure must be one of a large pool of exposures, which are managed by the bank on a pooled basis. Supervisors may choose to set a minimum number of exposures within a pool for exposures in that pool to be treated as retail.
-- Small business exposures below €1 million may be treated as retail exposures if the bank treats such exposures in its internal risk management systems consistently over time and in the same manner as other retail exposures. This requires that such an exposure be originated in a similar manner to other retail exposures. Furthermore, it must not be managed individually in a way comparable to corporate exposures, but rather as part of a portfolio segment or pool of exposures with similar risk characteristics for purposes of risk assessment and quantification. However, this does not preclude retail exposures from being treated individually at some stages of the risk management process. The fact that an exposure is rated individually does not by itself deny the eligibility as a retail exposure.
+- Small business exposures below €1 million may be treated as retail exposures if the bank treats such exposures in its internal [[01-risk_management|risk management]] systems consistently over time and in the same manner as other retail exposures. This requires that such an exposure be originated in a similar manner to other retail exposures. Furthermore, it must not be managed individually in a way comparable to corporate exposures, but rather as part of a portfolio segment or pool of exposures with similar risk characteristics for purposes of risk assessment and quantification. However, this does not preclude retail exposures from being treated individually at some stages of the [[01-risk_management|risk management]] process. The fact that an exposure is rated individually does not by itself deny the eligibility as a retail exposure.
 
 233.   Within the retail asset class category, banks are required to identify separately three sub-classes of exposures: (a) exposures secured by residential properties as defined above, (b) qualifying revolving retail exposures, as defined in the following paragraph, and (c) all other retail exposures.
 
-234.   All of the following criteria must be satisfied for a sub-portfolio to be treated as a qualifying revolving retail exposure (QRRE). These criteria must be applied at a sub-portfolio level consistent with the bank’s segmentation of its retail activities generally. Segmentation at the national or country level (or below) should be the general rule.
+234.   All of the following criteria must be satisfied for a sub-portfolio to be treated as a qualifying revolving retail exposure (QRRE). These criteria must be applied at a sub-portfolio level consistent with the bank’s [[06-segmentation|segmentation]] of its retail activities generally. [[06-segmentation|Segmentation]] at the national or country level (or below) should be the general rule.
 
 - (a) The exposures are revolving, unsecured, and uncommitted (both contractually and in practice). In this context, revolving exposures are defined as those where customers’ outstanding balances are permitted to fluctuate based on their decisions to borrow and repay, up to a limit established by the bank.
 - (b) The exposures are to individuals.
@@ -335,10 +335,10 @@ commercial real estate that exhibits higher loss rate volatility (i.e. higher as
 
 ###### 3. Adoption of the IRB approach across asset classes
 
-256. Once a bank adopts an IRB approach for part of its holdings, it is expected to extend it across the entire banking group. The Committee recognises however, that, for many banks, it may not be practicable for various reasons to implement the IRB approach acrossall material asset classes and business units at the same time. Furthermore, once on IRB, data limitations may mean that banks can meet the standards for the use of own estimates of LGD and EAD for some but not all of their asset classes/business units at the same time.
+256. Once a bank adopts an IRB approach for part of its holdings, it is expected to extend it across the entire banking group. The Committee recognises however, that, for many banks, it may not be practicable for various reasons to implement the IRB approach acrossall material asset classes and business units at the same time. Furthermore, once on IRB, [[05-data_limitations|data limitations]] may mean that banks can meet the standards for the use of own estimates of LGD and EAD for some but not all of their asset classes/business units at the same time.
 257. As such, supervisors may allow banks to adopt a phased rollout of the IRB approach across the banking group. The phased rollout includes (i) adoption of IRB across asset classes within the same business unit (or in the case of retail exposures across individual sub-classes); (ii) adoption of IRB across business units in the same banking group; and (iii) move from the foundation approach to the advanced approach for certain risk components. However, when a bank adopts an IRB approach for an asset class within a particular business unit (or in the case of retail exposures for an individual sub-class), it must apply the IRB approach to all exposures within that asset class (or sub-class) in that unit.
 258. A bank must produce an implementation plan, specifying to what extent and when it intends to roll out IRB approaches across significant asset classes (or sub-classes in the case of retail) and business units over time. The plan should be exacting, yet realistic, and must be agreed with the supervisor. It should be driven by the practicality and feasibility of moving to the more advanced approaches, and not motivated by a desire to adopt a Pillar 1 approach that minimises its capital charge. During the roll-out period, supervisors will ensure that no capital relief is granted for intra-group transactions which are designed to reduce a banking group’s aggregate capital charge by transferring credit risk among entities on the standardised approach, foundation and advanced IRB approaches. This includes, but is not limited to, asset sales or cross guarantees.
-259. Some exposures in non-significant business units as well as asset classes (or subclasses in the case of retail) that are immaterial in terms of size and perceived risk profile may be exempt from the requirements in the previous two paragraphs, subject to supervisory approval. Capital requirements for such operations will be determined according to the standardised approach, with the national supervisor determining whether a bank should hold more capital under Pillar 2 for such positions.
+259. Some exposures in non-significant business units as well as asset classes (or subclasses in the case of retail) that are immaterial in terms of size and perceived risk profile may be exempt from the requirements in the previous two paragraphs, subject to supervisory approval. Capital requirements for such operations will be determined according to the standardised approach, with the national supervisor determining whether a bank should hold more capital under [[02-stress_testing|Pillar 2]] for such positions.
 261. Banks adopting an IRB approach are expected to continue to employ an IRB approach. A voluntary return to the standardised or foundation approach is permitted only in extraordinary circumstances, such as divestiture of a large fraction of the bank’s credit related business, and must be approved by the supervisor.
 
 #### C. UL for corporate, sovereign, and bank exposures
@@ -407,15 +407,15 @@ The capital requirement (K) for a defaulted exposure is equal to the greater of 
 
 ## Part 3: The Second Pillar – Supervisory Review Process
 
-719. This section discusses the key principles of supervisory review, risk management guidance and supervisory transparency and accountability produced by the Committee with respect to banking risks, including guidance relating to, among other things, the treatment of interest rate risk in the banking book, credit risk (stress testing, definition of default, residual risk, and credit concentration risk), operational risk, enhanced cross-border communication and cooperation, and securitisation.
+719. This section discusses the key principles of supervisory review, [[01-risk_management|risk management]] guidance and supervisory transparency and accountability produced by the Committee with respect to banking risks, including guidance relating to, among other things, the treatment of [[01-irrbb_sources|interest rate risk in the banking book]], credit risk ([[02-stress_testing|stress testing]], definition of default, residual risk, and credit concentration risk), operational risk, enhanced cross-border communication and cooperation, and securitisation.
 
 ### I. Importance of supervisory review
 
-720. The supervisory review process of the Framework is intended not only to ensure that banks have adequate capital to support all the risks in their business, but also to encourage banks to develop and use better risk management techniques in monitoring and managing their risks.
+720. The supervisory review process of the Framework is intended not only to ensure that banks have adequate capital to support all the risks in their business, but also to encourage banks to develop and use better [[01-risk_management|risk management]] techniques in monitoring and managing their risks.
 721. The supervisory review process recognises the responsibility of bank management in developing an internal capital assessment process and setting capital targets that are commensurate with the bank’s risk profile and control environment. In the Framework, bank management continues to bear responsibility for ensuring that the bank has adequate capital to support its risks beyond the core minimum requirements.
 722. Supervisors are expected to evaluate how well banks are assessing their capital needs relative to their risks and to intervene, where appropriate. This interaction is intended to foster an active dialogue between banks and supervisors such that when deficiencies are identified, prompt and decisive action can be taken to reduce risk or restore capital. Accordingly, supervisors may wish to adopt an approach to focus more intensely on those banks with risk profiles or operational experience that warrants such attention.
-723. The Committee recognises the relationship that exists between the amount of capital held by the bank against its risks and the strength and effectiveness of the bank’s risk management and internal control processes. However, increased capital should not be viewed as the only option for addressing increased risks confronting the bank. Other means for addressing risk, such as strengthening risk management, applying internal limits, strengthening the level of provisions and reserves, and improving internal controls, must also be considered. Furthermore, capital should not be regarded as a substitute for addressing fundamentally inadequate control or risk management processes.
-724. There are three main areas that might be particularly suited to treatment under Pillar 2: risks considered under Pillar 1 that are not fully captured by the Pillar 1 process (e.g. credit concentration risk); those factors not taken into account by the Pillar 1 process (e.g. interest rate risk in the banking book, business and strategic risk); and factors external to the bank (e.g. business cycle effects). A further important aspect of Pillar 2 is the assessment of compliance with the minimum standards and disclosure requirements of the more advanced methods in Pillar 1, in particular the IRB framework for credit risk and the Advanced Measurement Approaches for operational risk. Supervisors must ensure that these requirements are being met, both as qualifying criteria and on a continuing basis.
+723. The Committee recognises the relationship that exists between the amount of capital held by the bank against its risks and the strength and effectiveness of the bank’s [[01-risk_management|risk management]] and internal control processes. However, increased capital should not be viewed as the only option for addressing increased risks confronting the bank. Other means for addressing risk, such as strengthening [[01-risk_management|risk management]], applying internal limits, strengthening the level of provisions and reserves, and improving internal controls, must also be considered. Furthermore, capital should not be regarded as a substitute for addressing fundamentally inadequate control or [[01-risk_management|risk management]] processes.
+724. There are three main areas that might be particularly suited to treatment under [[02-stress_testing|Pillar 2]]: risks considered under Pillar 1 that are not fully captured by the Pillar 1 process (e.g. credit concentration risk); those factors not taken into account by the Pillar 1 process (e.g. [[01-irrbb_sources|interest rate risk in the banking book]], business and strategic risk); and factors external to the bank (e.g. business cycle effects). A further important aspect of [[02-stress_testing|Pillar 2]] is the assessment of compliance with the minimum standards and disclosure requirements of the more advanced methods in Pillar 1, in particular the IRB framework for credit risk and the Advanced Measurement Approaches for operational risk. Supervisors must ensure that these requirements are being met, both as qualifying criteria and on a continuing basis.
 
 ### II. Four key principles of supervisory review
 
@@ -432,8 +432,8 @@ Banks should have a process for assessing their overall capital adequacy in rela
 - Comprehensive assessment of risks;
   - Credit risk
   - Op risk
-  - Market risk
-  - Interest rate risk in the banking book
+  - [[05-market_risk|Market risk]]
+  - [[01-irrbb_sources|Interest rate risk in the banking book]]
   - Liquidity risk
   - Other risks
 - Monitoring and reporting; and
@@ -455,9 +455,9 @@ Supervisors should seek to intervene at an early stage to prevent capital from f
 
 761. The Committee has identified a number of important issues that banks and supervisors should particularly focus on when carrying out the supervisory review process. These issues include some key risks which are not directly addressed under Pillar 1 and important assessments that supervisors should make to ensure the proper functioning of certain aspects of Pillar 1.
 
-#### A. Interest rate risk in the banking book
+#### A. [[01-irrbb_sources|Interest rate risk in the banking book]]
 
-762. The Committee remains convinced that interest rate risk in the banking book is a potentially significant risk which merits support from capital. However, comments received from the industry and additional work conducted by the Committee have made it clear that there is considerable heterogeneity across internationally active banks in terms of the nature of the underlying risk and the processes for monitoring and managing it. In light of this, the Committee has concluded that it is at this time most appropriate to treat interest rate risk in the banking book under Pillar 2 of the Framework. Nevertheless, supervisors who consider that there is sufficient homogeneity within their banking populations regarding the nature and methods for monitoring and measuring this risk could establish a mandatory minimum capital requirement.
+762. The Committee remains convinced that [[01-irrbb_sources|interest rate risk in the banking book]] is a potentially significant risk which merits support from capital. However, comments received from the industry and additional work conducted by the Committee have made it clear that there is considerable heterogeneity across internationally active banks in terms of the nature of the underlying risk and the processes for monitoring and managing it. In light of this, the Committee has concluded that it is at this time most appropriate to treat [[01-irrbb_sources|interest rate risk in the banking book]] under [[02-stress_testing|Pillar 2]] of the Framework. Nevertheless, supervisors who consider that there is sufficient homogeneity within their banking populations regarding the nature and methods for monitoring and measuring this risk could establish a mandatory minimum capital requirement.
 
 #### B. Credit risk
 
@@ -468,17 +468,17 @@ Supervisors should seek to intervene at an early stage to prevent capital from f
 2. Definition of default
 3. Residual risk
 4. Credit concentration risk
-5. Counterparty credit risk
+5. [[02-counterparty_exposures|Counterparty credit risk]]
 
 #### C. Operational risk
 
 Gross income, used in the Basic Indicator and Standardised Approaches for operational risk, is only a proxy for the scale of operational risk exposure of a bank and can in some cases (e.g. for banks with low margins or profitability) underestimate the need for capital for operational risk. With reference to the Committee document on Sound Practices for the Management and Supervision of Operational Risk (February 2003), the supervisor should consider whether the capital requirement generated by the Pillar 1 calculation gives a consistent picture of the individual bank’s operational risk exposure, for example in comparison with other banks of similar size and with similar operations.
 
-#### D. Market risk
+#### D. [[05-market_risk|Market risk]]
 
-##### 3. Stress testing under the internal models approach
+##### 3. [[02-stress_testing|Stress testing]] under the internal models approach
 
-778(iii). A bank must ensure that it has sufficient capital to meet the minimum capital requirements set out in paragraphs 718(Lxx) to 718(xciv) and to cover the results of its stress testing required by paragraph 718(Lxxiv) (g), taking into account the principles set forth in paragraphs 738(ii) and 738(iv). Supervisors will consider whether a bank has sufficient capital for these purposes, taking into account the nature and scale of the bank’s trading activities and any other relevant factors such as valuation adjustments made by the bank. To the extent that there is a shortfall, or if supervisors are not satisfied with the premise upon which the bank’s assessment of internal market risk capital adequacy is based, supervisors will take the appropriate measures. This will usually involve requiring the bank to reduce its risk exposures and/or to hold an additional amount of capital, so that its overall capital resources at least cover the Pillar 1 requirements plus the result of a stress test acceptable to the supervisor.
+778(iii). A bank must ensure that it has sufficient capital to meet the minimum capital requirements set out in paragraphs 718(Lxx) to 718(xciv) and to cover the results of its [[02-stress_testing|stress testing]] required by paragraph 718(Lxxiv) (g), taking into account the principles set forth in paragraphs 738(ii) and 738(iv). Supervisors will consider whether a bank has sufficient capital for these purposes, taking into account the nature and scale of the bank’s trading activities and any other relevant factors such as valuation adjustments made by the bank. To the extent that there is a shortfall, or if supervisors are not satisfied with the premise upon which the bank’s assessment of internal [[06-market_risk_capital|market risk capital]] adequacy is based, supervisors will take the appropriate measures. This will usually involve requiring the bank to reduce its risk exposures and/or to hold an additional amount of capital, so that its overall capital resources at least cover the Pillar 1 requirements plus the result of a stress test acceptable to the supervisor.
 
 ## Part 4: The Third Pillar – Market Discipline
 
@@ -486,7 +486,7 @@ Gross income, used in the Basic Indicator and Standardised Approaches for operat
 
 #### B. Guiding principles
 
-809.   The purpose of Pillar 3 ─ market discipline is to complement the minimum capital requirements (Pillar 1) and the supervisory review process (Pillar 2). The Committee aims to encourage market discipline by developing a set of disclosure requirements which will allow market participants to assess key pieces of information on the scope of application, capital, risk exposures, risk assessment processes, and hence the capital adequacy of the institution. The Committee believes that such disclosures have particular relevance under the Framework, where reliance on internal methodologies gives banks more discretion in assessing capital requirements.
+809.   The purpose of Pillar 3 ─ market discipline is to complement the minimum capital requirements (Pillar 1) and the supervisory review process ([[02-stress_testing|Pillar 2]]). The Committee aims to encourage market discipline by developing a set of disclosure requirements which will allow market participants to assess key pieces of information on the scope of application, capital, risk exposures, risk assessment processes, and hence the capital adequacy of the institution. The Committee believes that such disclosures have particular relevance under the Framework, where reliance on internal methodologies gives banks more discretion in assessing capital requirements.
 
 810. In principle, banks’ disclosures should be consistent with how senior management and the board of directors assess and manage the risks of the bank. Under Pillar 1, banks use specified approaches/methodologies for measuring the various risks they face and the resulting capital requirements. The Committee believes that providing disclosures that are based on this common framework is an effective means of informing the market about a bank’s exposure to those risks and provides a consistent and understandable disclosure framework that enhances comparability.
 
@@ -502,7 +502,7 @@ Gross income, used in the Basic Indicator and Standardised Approaches for operat
 
 #### Frequency
 
-818. The disclosures set out in Pillar 3 should be made on a semi-annual basis, subject to the following exceptions. Qualitative disclosures that provide a general summary of a bank’s risk management objectives and policies, reporting system and definitions may be published on an annual basis. In recognition of the increased risk sensitivity of the Framework and the general trend towards more frequent reporting in capital markets, large internationally active banks and other significant banks (and their significant bank subsidiaries) must disclose their Tier 1 and total capital adequacy ratios, and their components,174 on a quarterly basis. Furthermore, if information on risk exposure or other items is prone to rapid change, then banks should also disclose information on a quarterly basis.
+818. The disclosures set out in Pillar 3 should be made on a semi-annual basis, subject to the following exceptions. Qualitative disclosures that provide a general summary of a bank’s [[01-risk_management|risk management]] objectives and policies, reporting system and definitions may be published on an annual basis. In recognition of the increased risk sensitivity of the Framework and the general trend towards more frequent reporting in capital markets, large internationally active banks and other significant banks (and their significant bank subsidiaries) must disclose their Tier 1 and total capital adequacy ratios, and their components,174 on a quarterly basis. Furthermore, if information on risk exposure or other items is prone to rapid change, then banks should also disclose information on a quarterly basis.
 
 ### II. The disclosure requirements
 

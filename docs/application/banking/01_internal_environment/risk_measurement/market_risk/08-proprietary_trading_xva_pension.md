@@ -30,17 +30,17 @@ New valuation adjustments were introduced after the crisis to measure the "true 
 | **DVA** — Debit Value Adjustment | The benefit a bank will receive in the case of its own default |
 | **FVA** — Funding Value Adjustment | The cost of funding a derivative in the event the bank has to post more collateral on a trade |
 | **MVA** — Margin Value Adjustment | The funding costs of initial margin specific to centrally cleared transactions |
-| **KVA** — Capital Value Adjustment | The cost for regulatory capital that must be held by the bank against the trade throughout its life (to be replaced by SA-CCR — standardised approach for counterparty credit risk) |
+| **KVA** — Capital Value Adjustment | The cost for regulatory capital that must be held by the bank against the trade throughout its life (to be replaced by SA-CCR — standardised approach for [[02-counterparty_exposures|counterparty credit risk]]) |
 
-Significant changes to derivative valuation and risk measurement in the trading book have occurred since 2008, and further changes are expected.
+Significant changes to derivative valuation and [[04-risk_measurement|risk measurement]] in the trading book have occurred since 2008, and further changes are expected.
 
-## Pension Fund Market Risk
+## Pension Fund [[05-market_risk|Market Risk]]
 
-A bank's pension fund only poses a market risk to the bank where the bank operates a **defined benefit (DB)** pension scheme or any scheme where benefits are not directly aligned to the performance of the pension fund's assets (e.g. providing minimum guaranteed benefits). In South Africa, most pension funds (allowing for legacy books) are **defined contribution (DC)** and therefore do not pose a direct risk to the bank.
+A bank's pension fund only poses a [[05-market_risk|market risk]] to the bank where the bank operates a **defined benefit (DB)** pension scheme or any scheme where benefits are not directly aligned to the performance of the pension fund's assets (e.g. providing minimum guaranteed benefits). In South Africa, most pension funds (allowing for legacy books) are **defined contribution (DC)** and therefore do not pose a direct risk to the bank.
 
 ### Risk Issue
 
-The Bank of England (BOE) defines pension obligation risk as: the risk to a firm caused by its contractual or other liabilities to or with respect to a pension scheme; or that a firm will make payments or contributions to a pension scheme because of a moral obligation or because the firm considers it needs to do so for some other reason.
+The [[bank_of_england|Bank of England]] (BOE) defines pension obligation risk as: the risk to a firm caused by its contractual or other liabilities to or with respect to a pension scheme; or that a firm will make payments or contributions to a pension scheme because of a moral obligation or because the firm considers it needs to do so for some other reason.
 
 To the extent that a pension fund is in deficit, the bank must cover that deficit using its **CET1 capital**. Adverse conditions in the pension fund therefore directly impair the bank's regulatory capital position. Note that surpluses in the pension fund are **not** included in the bank's capital supply.
 
@@ -52,8 +52,8 @@ The bank must quantify pension obligation risk as part of its **ICAAP process**.
 
 Regulators review the bank's pension obligation risk assessment in the ICAAP and may adjust the implied capital requirement. Regulators may apply a standard set of stress scenarios across banks for comparability; results are then compared to the banks' internal ICAAP assessments to identify deviations requiring justification.
 
-Risk mitigation in the form of offsets and management actions is only permitted if it meets the following criteria:
+[[05-risk_mitigation|Risk mitigation]] in the form of offsets and management actions is only permitted if it meets the following criteria:
 
 - **Financial performance** — the efficacy of offsets and management actions must not depend on assumptions about the future financial performance of the firm, either before or after a stress.
 - **Independence from third parties** — the efficacy must not depend on the future agreement or behaviour of third parties, before or after a stress.
-- **Immediacy** — recognised offsets should reflect a risk mitigation benefit already effective when the offset is taken. Management actions must be capable of taking effect quickly enough to mitigate the relevant stress.
+- **Immediacy** — recognised offsets should reflect a [[05-risk_mitigation|risk mitigation]] benefit already effective when the offset is taken. Management actions must be capable of taking effect quickly enough to mitigate the relevant stress.

@@ -1,13 +1,13 @@
 # Model Methodology
 
-Basel also provides specific conditions when calculating the EADs for off-balance-sheet assets (e.g. securitisations, letters of credit, and guarantees), and a separate methodology for derivatives (these are viewed as incurring counterparty credit risk rather than pure credit risk).
+[[bis|Basel]] also provides specific conditions when calculating the EADs for off-balance-sheet assets (e.g. securitisations, letters of credit, and guarantees), and a separate methodology for derivatives (these are viewed as incurring [[02-counterparty_exposures|counterparty credit risk]] rather than pure credit risk).
 
 ## **Rating Philosophy**
 
 * The model follows a **Point-in-Time (PiT)** rating philosophy.
 * PiT EAD estimates are designed to be **sensitive to the economic cycle** and provide an accurate forecast of exposure usage over a **12-month horizon**.
-* This approach is consistent with IFRS9, where **PiT EADs** are required to calculate expected credit losses (ECL).
-* In addition, in accordance with **CRR Articles 182.1(a) and 182.1(b)**, the following measures are calculated and maintained:
+* This approach is consistent with [[ifrs9_standard|IFRS9]], where **PiT EADs** are required to calculate expected [[02-credit_losses|credit losses]] (ECL).
+* In addition, in accordance with **[[crr|CRR]] Articles 182.1(a) and 182.1(b)**, the following measures are calculated and maintained:
 
   * **PiT EADF** (Exposure at Default Factor)
   * **Long-Run Average (LRA) EADF**

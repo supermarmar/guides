@@ -1,6 +1,6 @@
-# Market Risk Capital in the Trading Book
+# [[05-market_risk|Market Risk]] Capital in the Trading Book
 
-To comply with the minimum capital requirements for market risk set by the BCBS, a bank may choose between two methodologies: the **standardised approach** and the **internal models approach (IMA)**. The methodology chosen must be approved by national authorities (in South Africa, the SARB).
+To comply with the minimum capital requirements for [[05-market_risk|market risk]] set by the [[bis|BCBS]], a bank may choose between two methodologies: the **standardised approach** and the **internal models approach (IMA)**. The methodology chosen must be approved by national authorities (in South Africa, the [[sarb|SARB]]).
 
 ## Standardised Approach
 
@@ -37,11 +37,11 @@ The RRAO is calculated for all instruments bearing residual risk, in addition to
 
 ## Internal Models Approach (IMA)
 
-The use of internal models to determine market risk capital is conditional on explicit supervisory approval. This approval requires at minimum:
+The use of internal models to determine [[05-market_risk|market risk]] capital is conditional on explicit supervisory approval. This approval requires at minimum:
 
-1. The supervisory authority is satisfied that the bank's risk management system is conceptually sound and implemented with integrity.
+1. The supervisory authority is satisfied that the bank's [[01-risk_management|risk management]] system is conceptually sound and implemented with integrity.
 2. The bank has a sufficient number of staff skilled in sophisticated models — not only in trading but also in risk control, product control (finance), audit, and back office.
-3. The bank's trading desk risk management model has a proven track record of reasonable accuracy in measuring risk.
+3. The bank's trading desk [[01-risk_management|risk management]] model has a proven track record of reasonable accuracy in measuring risk.
 4. The bank regularly conducts stress tests.
 5. Positions included in the bank's internal models are held in trading desks approved for the use of those models.
 
@@ -49,11 +49,11 @@ The bank must maintain a documented set of internal manuals, policies, controls,
 
 A bank intending to use the IMA must conduct and successfully pass **back-testing** at the bank-wide level and both **back-testing** and **P&L attribution** at the trading desk level.
 
-Expected shortfall (see [VaR Limitations](07-var_limitations.md)) plays a key role in setting market risk capital under the IMA.
+Expected shortfall (see [VaR Limitations](07-var_limitations.md)) plays a key role in setting [[05-market_risk|market risk]] capital under the IMA.
 
-## Revised Market Risk Framework (FRTB — effective 1 January 2023)
+## Revised [[05-market_risk|Market Risk]] Framework (FRTB — effective 1 January 2023)
 
-The **Fundamental Review of the Trading Book (FRTB)** is a set of BCBS proposals transforming market risk capital requirements.
+The **Fundamental Review of the Trading Book (FRTB)** is a set of [[bis|BCBS]] proposals transforming [[05-market_risk|market risk]] capital requirements.
 
 ### Three Key Areas of the Revised Framework
 
@@ -69,5 +69,5 @@ The **Fundamental Review of the Trading Book (FRTB)** is a set of BCBS proposals
 - **Credit treatment** — securitised and non-securitised products are treated differently.
 - **Risk measure** — the move from VaR to **expected shortfall**, so that tail risk is better captured.
 - **IMA vs SA alignment** — large differences in capital calculations between IMA and SA users are to be reduced; FRTB seeks to align them.
-- **Revised SA** — provides a method for banks with business models not requiring sophisticated market risk measures.
+- **Revised SA** — provides a method for banks with business models not requiring sophisticated [[05-market_risk|market risk]] measures.
 - **FRTB goes live** from 1 January 2023, replacing VaR with expected shortfall, which will most likely increase bank capital charges.

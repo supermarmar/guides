@@ -3,7 +3,7 @@
 In credit risk modeling, banks often create training, testing, and holdout datasets instead of just the typical train-test split because of the high-stakes nature of credit decisions, regulatory requirements, and the need to ensure robust and unbiased model performance over time. 
 
 1. **Training Dataset (50%)**: Used to train the model by finding the optimal parameters that minimize prediction errors.
-2. **Testing Dataset (30%)**: Used to evaluate the model's performance during development. It is used to tune hyperparameters and evaluate intermediate iterations of the model.
+2. **Testing Dataset (30%)**: Used to evaluate the model's performance during development. It is used to tune [[01-hyperparamter-tuning|hyperparameters]] and evaluate intermediate iterations of the model.
 3. **Holdout Dataset (20%)**: A completely independent dataset reserved until the final stages of model development. Acts as a proxy for future data to validate how the model will perform in real-world scenarios. It provides a final unbiased assessment of model performance.
 
 Regulatory bodies often require banks to demonstrate that the model has been tested on independent data that was not used in any way during training or tuning. The holdout dataset is a key part of this evidence. The holdout dataset simulates this scenario, providing insight into how well the model will perform on new customers.

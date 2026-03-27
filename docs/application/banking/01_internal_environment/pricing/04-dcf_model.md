@@ -1,4 +1,4 @@
-# DCF Loan Pricing Model
+# DCF [[03-loan_pricing|Loan Pricing]] Model
 
 This file covers the mechanics of discounted cashflow (DCF) models used to assess the pricing and profitability of loan products — model structure, assumptions, and uses. For the loan products themselves see [Loan Pricing](03-loan_pricing.md). For credit risk parameters (PD, LGD, EAD) see the credit risk modelling files.
 
@@ -37,7 +37,7 @@ The **contractual balance ratio** is generally preferred. The default loss at ea
 \text{Default Loss}_t = d_t \times \text{Balance at default}_t \times \text{LGD}_t
 ```
 
-LGD parameters are sourced from the IFRS 9 or IRB rating system (see credit risk modelling). Default losses are calculated across all model durations.
+LGD parameters are sourced from the [[ifrs9_standard|IFRS 9]] or IRB rating system (see credit risk modelling). Default losses are calculated across all model durations.
 
 ### Balance Run-Down
 
@@ -53,11 +53,11 @@ Income has two components: **interest income** and **non-interest (fee) income**
 - Introductory rate periods (e.g. 0% credit cards) require hedging only to the re-pricing date.
 - Fee income may be initial (e.g. mortgage arrangement fee), ongoing (transaction fees), or final (early repayment charges). Some fees must be spread over the product life under **EIR (Effective Interest Rate) accounting**. Regulatory caps on fees and early repayment charges may apply.
 
-### Expected Credit Losses (ECL)
+### Expected [[02-credit_losses|Credit Losses]] (ECL)
 
-ECL is typically low at origination, rises over the loan life, then levels off or declines. Banks use through-the-cycle expected loss assumptions for fundamental pricing; point-in-time losses are too volatile (too low in booms, too high in recessions). Stress scenarios consistent with ICAAP stress testing may be evaluated alongside the base case.
+ECL is typically low at origination, rises over the loan life, then levels off or declines. Banks use through-the-cycle expected loss assumptions for fundamental pricing; point-in-time losses are too volatile (too low in booms, too high in recessions). Stress scenarios consistent with ICAAP [[02-stress_testing|stress testing]] may be evaluated alongside the base case.
 
-Under **IFRS 9**, provisions reduce profits and capital immediately. The DCF model must account for both the amount and timing of ECL impacts on capital. Note that **IFRS 9 ECL ≠ Basel expected loss** — the Basel expected loss definition differs methodologically and a capital gap adjustment may be necessary (see figure below: Basel methodology creates a gap between provisions held and the capital required to cover losses at the 0.1% confidence level).
+Under **[[ifrs9_standard|IFRS 9]]**, provisions reduce profits and capital immediately. The DCF model must account for both the amount and timing of ECL impacts on capital. Note that **[[ifrs9_standard|IFRS 9]] ECL ≠ [[bis|Basel]] expected loss** — the [[bis|Basel]] expected loss definition differs methodologically and a capital gap adjustment may be necessary (see figure below: [[bis|Basel]] methodology creates a gap between provisions held and the capital required to cover losses at the 0.1% confidence level).
 
 ### Operational Costs
 
@@ -69,7 +69,7 @@ For the credit cut-off decision and marginal pricing, only **marginal costs** (v
 
 CET1 capital is the primary loss-absorbing capital and the denominator for ROE/RORAC calculations. The capital profile (amount of capital required at each loan duration) must be explicitly modelled, using either:
 
-- The **Basel Standardised Approach** (prescribed risk weights — generally higher, putting standardised banks at a disadvantage vs IRB banks, particularly for mortgages)
+- The **[[bis|Basel]] Standardised Approach** (prescribed risk weights — generally higher, putting standardised banks at a disadvantage vs IRB banks, particularly for mortgages)
 - **Internal models (IRB)** — subject to regulatory approval, generally produce lower capital requirements
 
 Capital buffers (CCB, countercyclical, etc.) should be allocated to loan categories in proportion to the stress losses identified in the ICAAP.
@@ -122,4 +122,4 @@ A simpler, widely used summary metric for loan profitability. The **lifetime (un
 \text{Lifetime ROE} = \frac{\text{Lifetime profit (undiscounted)}}{\text{Lifetime average capital}}
 ```
 
-where lifetime average capital = (sum of capital required at each month) ÷ number of months. This represents the ROE the bank would earn if the loan reaches steady state (i.e. held to maturity). **RORAC** uses risk-adjusted capital (CET1 per Basel) in the denominator — equivalent to ROE when CET1 is the relevant capital measure. This metric is useful for rapid profitability comparison across products and banks using Basel-standardised capital requirements.
+where lifetime average capital = (sum of capital required at each month) ÷ number of months. This represents the ROE the bank would earn if the loan reaches steady state (i.e. held to maturity). **RORAC** uses risk-adjusted capital (CET1 per [[bis|Basel]]) in the denominator — equivalent to ROE when CET1 is the relevant capital measure. This metric is useful for rapid profitability comparison across products and banks using [[bis|Basel]]-standardised capital requirements.

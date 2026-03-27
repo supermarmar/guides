@@ -12,7 +12,7 @@ We use **Azure Boards** to manage work and collaboration.
 
 | Level   | Description                              |
 |---------|------------------------------------------|
-| **Epic**     | Large thematic areas (e.g. "IFRS9 Modelling")     |
+| **Epic**     | Large thematic areas (e.g. "[[ifrs9_standard|IFRS9]] Modelling")     |
 | **Feature**  | Major work items or deliverables     |
 | **Task**     | Smallest actionable units of work    |
 | **Bug**      | Defects or things that need fixing   |
@@ -61,7 +61,7 @@ Help reviewers and contributors remember key checks before pushing:
 
 - Focus on one subtask or issue at a time.
 - Run the code regularly to check for errors.
-- Follow existing coding standards (see docs\markdown\modelling\coding_standards.md).
+- Follow existing [[01-coding-standards|coding standards]] (see docs\[[02-markdown|markdown]]\modelling\coding_standards.md).
 - Avoid committing large files or credentials
 - Delete unused code and print statements
 

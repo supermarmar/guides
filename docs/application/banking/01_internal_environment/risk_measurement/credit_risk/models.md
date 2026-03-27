@@ -8,7 +8,7 @@ Risk parameter estimates (PDs, EADs, and LGDs) for capital purposes may not be t
 - The level of complexity – additional complexity, and therefore improved performance, must be weighed against the costs of this complexity and the difficulty of interpreting results
 - Models and methodologies approved by the regulator
 - The risk type being modelled – different risk types require different modelling techniques
-- Suitability of the model, and any assumptions made within the model, to the bank’s business model and the specific asset class or portfolio
+- Suitability of the model, and any assumptions made within the model, to the bank’s [[01-business_model|business model]] and the specific asset class or portfolio
 - Inclusion of both quantitative and qualitative factors.
 
 ## Single Exposure Models
@@ -111,10 +111,10 @@ Panel models introduce the additional dimension of time (other dimensions can be
 
 However, the model is not without its flaws:
 
-- Data collection can be challenging, though in terms of the Basel requirements this should not be too concerning.
+- Data collection can be challenging, though in terms of the [[bis|Basel]] requirements this should not be too concerning.
 - Though the model is relatively simple, resources such as modellers familiar with time series analysis will be required.
 
-Panel models are not commonly used within the credit risk space currently, though there are instances of its use. Basel itself has used panel models in various studies.
+Panel models are not commonly used within the credit risk space currently, though there are instances of its use. [[bis|Basel]] itself has used panel models in various studies.
 
 #### Cox Proportional Hazards Model
 
@@ -128,7 +128,7 @@ The covariates are denoted by x and their coefficients by $\beta$. $h(t)$ repres
 
 The Cox model can be used to model PDs, where survival would be defined as a non-default and a hazard as a default. The covariates would then be factors that are used to predict possible defaults. In the case of PD modelling, a probability would be required as the dependent variable.
 
-The structure of a Cox model is similar to and uses similar modelling techniques as regression models and can be transformed into a regression function similar to linear regression. The Cox model presents many advantages for use in modelling risk parameters, many of which are shared by traditional regression models. It can perform more efficiently than a simple logistic regression, as it does not need a full historical time period for entities (i.e. from the inception of an entity to its default or closure). Basel itself has used this model to assess default risks in studies.
+The structure of a Cox model is similar to and uses similar modelling techniques as regression models and can be transformed into a regression function similar to linear regression. The Cox model presents many advantages for use in modelling risk parameters, many of which are shared by traditional regression models. It can perform more efficiently than a simple logistic regression, as it does not need a full historical time period for entities (i.e. from the inception of an entity to its default or closure). [[bis|Basel]] itself has used this model to assess default risks in studies.
 
 However, the model is also subject to disadvantages. The time element of the model is limited, as since this is a proportional model, risks are considered to be proportional and so the model does not inform the user as to how risks can change over time – this is a vital aspect for modelling PDs over a credit cycle, or during a downturn.
 
@@ -155,7 +155,7 @@ On the other hand, neural networks do present challenges as well, such as:
 - These models tend to require a large amount of data, which means that its not as generally applicable as simpler models.
 - There is no guarantee that neural networks will outperform or sufficiently outperform simpler models.
 
-Neural networks are currently not a primary modelling technique amongst banks, at least not for credit risk. There is arguably more activity in the market risk, trading, pricing, and derivative space, more so around research and development.
+Neural networks are currently not a primary modelling technique amongst banks, at least not for credit risk. There is arguably more activity in the [[05-market_risk|market risk]], trading, pricing, and derivative space, more so around research and development.
 
 ### Structural Models
 
@@ -201,7 +201,7 @@ Where:
 
 This model is a vendor model, so the particular details of the model construction are not known – especially in terms of refinements made over the years – but many banks globally use the model.
 
-The asymptotic risk factor model is based on the Merton model and measures credit risk at a portfolio level. It has been used by Basel to inform their formulae for the calculation of capital requirements. Other notable structural models include the Black-Cox model and Brownian Motion-based models.
+The asymptotic risk factor model is based on the Merton model and measures credit risk at a portfolio level. It has been used by [[bis|Basel]] to inform their formulae for the calculation of capital requirements. Other notable structural models include the Black-Cox model and Brownian Motion-based models.
 
 ### Reduced Form Models
 
@@ -221,7 +221,7 @@ There are also models that allow banks to assess credit risk within an entire po
 
 It is vital that a bank understands the interactions between its portfolios and asset classes, as most portfolios would have some level of correlation. Positively correlated portfolios can create large risks in times of downturn, where higher losses are experienced and losses in one portfolio may increase the risk of losses in another. Negatively correlated portfolios, on the other hand, can result in diversification where losses in one portfolio are offset by gains in another. For example, individual clients may pose little risk and low losses if they default, but if these clients are positively correlated, these smaller losses can add up quite quickly to a large loss.
 
-Credit portfolio models are designed to address and measure portfolio risk, which is the risk that a portfolio(s) does not perform adequately and so does not meet its financial objectives – this is related to credit risk as explained by the prior examples. The bank is concerned about the overall risk, and therefore performance, of portfolios. This is a vital part of risk management, as monitoring the overall risk in a portfolio frequently allows for more informed and timely decision-making (e.g. noticing a reduction in overall credit quality before defaults begin occurring). This approach allows banks to identify diversification opportunities as well as concentration risks.
+Credit portfolio models are designed to address and measure portfolio risk, which is the risk that a portfolio(s) does not perform adequately and so does not meet its financial objectives – this is related to credit risk as explained by the prior examples. The bank is concerned about the overall risk, and therefore performance, of portfolios. This is a vital part of [[01-risk_management|risk management]], as monitoring the overall risk in a portfolio frequently allows for more informed and timely decision-making (e.g. noticing a reduction in overall credit quality before defaults begin occurring). This approach allows banks to identify diversification opportunities as well as concentration risks.
 
 There are some common modelling approaches used by banks to assess this risk:
 
@@ -243,7 +243,7 @@ CreditMetrics is a credit migration model that involves modelling both default e
 CreditMetrics utilises rating migration matrices and transition probabilities, i.e. the probability of an entity moving from one rating to another over a specific time period (where at least one migration can result in a default). These transition probabilities can, at a bank’s discretion, be sourced directly from credit rating agencies or developed internally. This approach utilises four main components in its methodology:
 
 - Individual credit exposures
-- Value at risk (VaR) of individual credit exposures (including ratings and changes in individual ratings)
+- [[07-var_limitations|Value at risk]] (VaR) of individual credit exposures (including ratings and changes in individual ratings)
 - Correlations between exposures
 - VaR of the overall portfolio.
 
@@ -275,4 +275,4 @@ In the context of credit risk and portfolio risk, copulas can be used to model d
 
 This is especially useful for PDs and LGDs – where the CDFs are available, but the marginal distributions are generally not. Copulas use the relationships between these risk parameters and their CDFs to assess the dependencies between exposures in a portfolio, or even between portfolios.
 
-Copulas can be very useful in assessing portfolio credit risk and can provide useful insights when stress testing, and do not require the use of marginal distributions which can cause complexity. It should be noted that the direct use of copulas is not widespread, owing to their complexity and the correspondingly higher costs of implementation (e.g. required expertise). As discussed, the commonly used CreditMetrics model uses copulas as a part of its methodology, but this is indirect.
+Copulas can be very useful in assessing portfolio credit risk and can provide useful insights when [[02-stress_testing|stress testing]], and do not require the use of marginal distributions which can cause complexity. It should be noted that the direct use of copulas is not widespread, owing to their complexity and the correspondingly higher costs of implementation (e.g. required expertise). As discussed, the commonly used CreditMetrics model uses copulas as a part of its methodology, but this is indirect.

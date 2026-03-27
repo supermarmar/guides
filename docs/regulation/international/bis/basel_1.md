@@ -1,4 +1,4 @@
-# Basel I
+# [[bis|Basel]] I
 
 <https://www.bis.org/publ/bcbs04a.htm>
 
@@ -114,7 +114,7 @@ The sum of tier 1 and tier 2 elements will be eligible for inclusion in the capi
 |Risk Weights| On-balance Sheet Asset|
 |-|-|
 |0%|Cash |
-||Claims on central governments and central banks denominated in national currency and funded in that currency |
+||Claims on central governments and [[05-central_banks|central banks]] denominated in national currency and funded in that currency |
 |0, 10, 20 or 50% (at national discretion)|Claims on domestic public-sector entities, excluding central government, and loans guaranteed4 by such entities|
 |20%|Claims on multilateral development banks and claims guaranteed by, or collateralised by securities issued by such banks|
 ||Claims on banks incorporated in the OECD and loans guaranteed4 by OECD incorporated banks|

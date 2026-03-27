@@ -45,7 +45,7 @@ The resulting final logistic regression model:
 
 * Retains the strongest predictors from both pre- and post-COVID datasets.
 * Balances discriminatory power with interpretability.
-* Meets the Internal Ratings-Based (IRB) framework requirements for **risk differentiation** and **regulatory approval**.
+* Meets the Internal Ratings-Based (IRB) framework requirements for **[[03-risk-differentiation|risk differentiation]]** and **regulatory approval**.
 
 ---
 
@@ -142,7 +142,7 @@ Here’s a clean, structured version of your **Segment 1: Late Delinquency** wri
 
 ---
 
-### **Variable Transformation**
+### **[[06-variable-transformation|Variable Transformation]]**
 
 **Table 3 – Variable Treatment Summary**
 
@@ -177,7 +177,7 @@ Here’s a clean, structured version of your **Segment 1: Late Delinquency** wri
 
 If you want, I can also **fill in placeholders** for tables like predictors, treatments, and performance so it’s already formatted for your documentation, ready for when you have the actual numbers. That way it’s fully plug-and-play.
 
-Here’s a polished draft for the **Overall PiT PD Model** section to align with the style we’ve been using for your risk differentiation documentation.
+Here’s a polished draft for the **Overall PiT PD Model** section to align with the style we’ve been using for your [[03-risk-differentiation|risk differentiation]] documentation.
 
 ---
 
@@ -255,4 +255,4 @@ Performance is also assessed at key business sub-population levels to ensure con
 
 ---
 
-If you want, I can now **merge this with your earlier segment write-up** so your documentation flows cleanly from **Variable Reduction → Transformation → Segment Modelling → Overall Model**, with consistent tables and formatting. That would make this whole risk differentiation section feel like one seamless narrative.
+If you want, I can now **merge this with your earlier segment write-up** so your documentation flows cleanly from **[[05-variable-reduction|Variable Reduction]] → Transformation → Segment Modelling → Overall Model**, with consistent tables and formatting. That would make this whole [[03-risk-differentiation|risk differentiation]] section feel like one seamless narrative.

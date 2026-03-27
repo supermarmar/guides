@@ -1,4 +1,4 @@
-# BCBS 239: Principles for effective risk data aggregation and risk reporting
+# [[bis|BCBS]] 239: Principles for effective risk data aggregation and risk reporting
 
 <https://www.bis.org/publ/bcbs239.pdf>
 
@@ -6,9 +6,9 @@
 
 (1)) One of the most significant lessons learned from the global financial crisis that began in 2007 was that banks’ information technology (IT) and data architectures were inadequate to support the broad management of financial risks. Many banks lacked the ability to aggregate risk exposures and identify concentrations quickly and accurately at the bank group level, across business lines and between legal entities. Some banks were unable to manage their risks properly because of weak risk data aggregation capabilities and risk reporting practices. This had severe consequences to the banks themselves and to the stability of the financial system as a whole.
 
-(2) In response, the Basel Committee issued supplemental Pillar 2 (supervisory review process) guidance to enhance banks’ ability to identify and manage bank-wide risks. In particular, the Committee emphasised that a sound risk management system should have appropriate management information systems (MIS) at the business and bank-wide level. The Basel Committee also included references to data aggregation as part of its guidance on corporate governance.
+(2) In response, the [[bis|Basel]] Committee issued supplemental [[02-stress_testing|Pillar 2]] (supervisory review process) guidance to enhance banks’ ability to identify and manage bank-wide risks. In particular, the Committee emphasised that a sound [[01-risk_management|risk management]] system should have appropriate management information systems (MIS) at the business and bank-wide level. The [[bis|Basel]] Committee also included references to data aggregation as part of its guidance on corporate governance.
 
-(3) Improving banks’ ability to aggregate risk data will improve their resolvability. For global systemically important banks (G-SIBs) in particular, it is essential that resolution authorities have access to aggregate risk data that complies with the FSB’s Key Attributes of Effective Resolution Regimes for Financial Institutions as well as the principles set out below. For recovery, a robust data framework will help banks and supervisors anticipate problems ahead. It will also improve the prospects of finding alternative options to restore financial strength and viability when the firm comes under severe stress. For example, it could improve the prospects of finding a suitable merger partner.
+(3) Improving banks’ ability to aggregate risk data will improve their resolvability. For [[g_sibs|global systemically important banks (G-SIBs)]] in particular, it is essential that resolution authorities have access to aggregate risk data that complies with the [[fsb|FSB]]’s Key Attributes of Effective Resolution Regimes for Financial Institutions as well as the principles set out below. For recovery, a robust data framework will help banks and supervisors anticipate problems ahead. It will also improve the prospects of finding alternative options to restore financial strength and viability when the firm comes under severe stress. For example, it could improve the prospects of finding a suitable merger partner.
 
 ## Definition
 
@@ -16,7 +16,7 @@
 
 ## Objectives
 
-(9) This paper presents a set of principles to strengthen banks’ risk data aggregation capabilities and internal risk reporting practices (the Principles). In turn, effective implementation of the Principles is expected to enhance risk management and decisionmaking processes at banks.
+(9) This paper presents a set of principles to strengthen banks’ risk data aggregation capabilities and internal risk reporting practices (the Principles). In turn, effective implementation of the Principles is expected to enhance [[01-risk_management|risk management]] and decisionmaking processes at banks.
 
 ## Overarching governance and infrastructure
 
@@ -24,9 +24,9 @@
 
 ### Principle 1 Governance
 
-A bank’s risk data aggregation capabilities and risk reporting practices should be subject to strong governance arrangements consistent with other principles and guidance established by the Basel Committee.
+A bank’s risk data aggregation capabilities and risk reporting practices should be subject to strong governance arrangements consistent with other principles and guidance established by the [[bis|Basel]] Committee.
 
-(27) A bank’s board and senior management should promote the identification, assessment and management of data quality risks as part of its **overall risk management framework**.
+(27) A bank’s board and senior management should promote the identification, assessment and management of data quality risks as part of its **overall [[01-risk_management|risk management]] framework**.
 
 (28) A bank’s board and senior management should **review and approve** the bank’s group risk data aggregation and risk reporting framework.
 
@@ -44,7 +44,7 @@ A bank should design, build and maintain data architecture and IT infrastructure
 
 ## Risk data aggregation capabilities
 
-Banks should develop and maintain strong risk data aggregation capabilities to ensure that risk management reports reflect the risks in a reliable way (ie meeting data aggregation expectations is necessary to meet reporting expectations). Compliance with these Principles should not be at the expense of each other. These risk data aggregation capabilities should meet all Principles below simultaneously in accordance with paragraph 22 of this document.
+Banks should develop and maintain strong risk data aggregation capabilities to ensure that [[01-risk_management|risk management]] reports reflect the risks in a reliable way (ie meeting data aggregation expectations is necessary to meet reporting expectations). Compliance with these Principles should not be at the expense of each other. These risk data aggregation capabilities should meet all Principles below simultaneously in accordance with paragraph 22 of this document.
 
 ### Principle 3 Accuracy and Integrity
 
@@ -67,12 +67,12 @@ A bank should be able to capture and aggregate all material risk data across the
 
 ### Principle 5 Timeliness
 
-A bank should be able to generate aggregate and up-to-date risk data in a timely manner while also meeting the principles relating to accuracy and integrity, completeness and adaptability. The precise timing will depend upon the nature and potential volatility of the risk being measured as well as its criticality to the overall risk profile of the bank. The precise timing will also depend on the bank-specific frequency requirements for risk management reporting, under both normal and stress/crisis situations, set based on the characteristics and overall risk profile of the bank.
+A bank should be able to generate aggregate and up-to-date risk data in a timely manner while also meeting the principles relating to accuracy and integrity, completeness and adaptability. The precise timing will depend upon the nature and potential volatility of the risk being measured as well as its criticality to the overall risk profile of the bank. The precise timing will also depend on the bank-specific frequency requirements for [[01-risk_management|risk management]] reporting, under both normal and stress/crisis situations, set based on the characteristics and overall risk profile of the bank.
 
-(44) A bank’s risk data aggregation capabilities should ensure that it is able to produce aggregate risk information on a timely basis to meet all risk management reporting requirements.
+(44) A bank’s risk data aggregation capabilities should ensure that it is able to produce aggregate risk information on a timely basis to meet all [[01-risk_management|risk management]] reporting requirements.
 
 ### Principle 6 Adaptability
 
-A bank should be able to generate aggregate risk data to meet a broad range of on-demand, ad hoc risk management reporting requests, including requests during stress/crisis situations, requests due to changing internal needs and requests to meet supervisory queries.
+A bank should be able to generate aggregate risk data to meet a broad range of on-demand, ad hoc [[01-risk_management|risk management]] reporting requests, including requests during stress/crisis situations, requests due to changing internal needs and requests to meet supervisory queries.
 
-(48) A bank’s risk data aggregation capabilities should be flexible and adaptable to meet ad hoc data requests, as needed, and to assess emerging risks. Adaptability will enable banks to conduct better risk management, including forecasting information, as well as to support stress testing and scenario analyses.
+(48) A bank’s risk data aggregation capabilities should be flexible and adaptable to meet ad hoc data requests, as needed, and to assess emerging risks. Adaptability will enable banks to conduct better [[01-risk_management|risk management]], including forecasting information, as well as to support [[02-stress_testing|stress testing]] and scenario analyses.

@@ -4,7 +4,7 @@ Perfect — thanks for laying out the details. I’ll draft a full **Quantificat
 
 ## **Quantification Testing Results**
 
-Quantification testing was performed on the final **risk grades** and **calibrated LRA PDs** across development, OOS and OOT samples. The objective of this testing is to ensure that the assigned risk grades are meaningful, statistically reliable, and consistent with the requirements of **CRR Article 170**, while also demonstrating accuracy and stability over time.
+Quantification testing was performed on the final **risk grades** and **calibrated LRA PDs** across development, OOS and OOT samples. The objective of this testing is to ensure that the assigned risk grades are meaningful, statistically reliable, and consistent with the requirements of **[[crr|CRR]] Article 170**, while also demonstrating accuracy and stability over time.
 
 The following test dimensions were considered:
 
@@ -18,7 +18,7 @@ The following test dimensions were considered:
 
 ### **1. Concentration**
 
-* In line with **CRR Article 170.3(b)**, the assigned risk grades were tested to ensure that:
+* In line with **[[crr|CRR]] Article 170.3(b)**, the assigned risk grades were tested to ensure that:
 
   * No excessive concentration exists in a single grade, and
   * Each grade has a sufficient level of exposure to support reliable calibration.
@@ -115,6 +115,6 @@ The following test dimensions were considered:
 
 ---
 
-✅ This section now flows like a regulatory-style model documentation. It links **CRR requirements**, **methodology**, **formulas**, **decision criteria**, and **results presentation (tables/plots)**.
+✅ This section now flows like a regulatory-style model documentation. It links **[[crr|CRR]] requirements**, **methodology**, **formulas**, **decision criteria**, and **results presentation (tables/plots)**.
 
 Would you like me to also **prepare illustrative visuals** (e.g., example migration matrix, HHI line chart, chi-square results table) that you could drop directly into the document, similar to how you structured the differentiation section?

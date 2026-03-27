@@ -1,4 +1,4 @@
-# FNB Annual Financial Statements — Framework Analysis
+# FNB [[02-financial_management|Annual Financial Statements]] — Framework Analysis
 
 *Mapping First National Bank's AFS (FY2024, year ended 30 June 2024) to the standard bank AFS framework. FNB is the retail and commercial banking division of FirstRand Bank Limited, and South Africa's largest bank by customer numbers (~12 million customers). All figures are normalised (management basis) and in South African rand millions (Rm) unless otherwise stated. Where relevant, figures are contrasted with the RMB analysis.*
 
@@ -14,25 +14,25 @@ FNB is the closest of the FirstRand segments to the **textbook bank** described 
 
 FNB's banking book is its core business and maps directly and fully onto the framework's description. Unlike RMB (which has no retail credit), FNB's entire lending franchise is built on the full spectrum of retail and commercial products.
 
-- **Home Loans (Mortgages):** The largest single asset class. Residential mortgage lending is held at amortised cost. Loan-to-value ratios and credit approval processes govern origination quality. Mortgage arrears and Stage 3 migration are key credit risk management metrics. Advances grew **5% in FY2024**, with improving household affordability in SA supporting momentum.
+- **Home Loans (Mortgages):** The largest single asset class. Residential mortgage lending is held at amortised cost. Loan-to-value ratios and credit approval processes govern origination quality. Mortgage arrears and Stage 3 migration are key credit [[01-risk_management|risk management]] metrics. Advances grew **5% in FY2024**, with improving household affordability in SA supporting momentum.
 - **Personal Loans:** Higher-yield, shorter-duration unsecured lending to individuals. Higher credit loss rates than mortgages, but significantly higher interest margins to compensate. FNB focuses on lending to its existing transactional account base, where it has income verification and behavioural data — a core competitive advantage.
 - **Credit Cards:** Revolving credit facilities. Highest margins of any retail credit product but also highest credit loss rates. FNB's eBucks loyalty programme (eBucks rewards on card spend) is a competitive differentiator that drives transactional volumes.
 - **Vehicle Finance:** Primarily handled by WesBank (a separate FirstRand segment) but FNB also originates vehicle finance for its retail customers, particularly through its Private Clients and business banking channels.
 - **Commercial and Business Banking Loans:** Loans to SMEs and commercial clients. These include working capital facilities, term loans, trade finance, and property finance for commercial real estate. FNB's commercial banking franchise contributes meaningfully to the banking book alongside retail credit.
 - **Undrawn commitments:** Off-balance sheet credit commitments to retail and commercial clients (overdraft facilities, credit card limits), consistent with the framework.
-- **HQLAs:** FNB holds substantial high-quality liquid assets — cash, RSA government bonds — to support the LCR and fund potential withdrawals of its large retail deposit base. As the **largest deposit-taking franchise in South Africa**, FNB holds a proportionally significant HQLA buffer.
+- **HQLAs:** FNB holds substantial high-quality liquid assets — cash, RSA government bonds — to support the [[04-lcr|LCR]] and fund potential withdrawals of its large retail deposit base. As the **largest deposit-taking franchise in South Africa**, FNB holds a proportionally significant HQLA buffer.
 
 ##### Book Value (Amortised Cost)
 
-All loans and advances are held at amortised cost, with IFRS 9 ECL provisions applied. FNB's credit loss ratio was **86 basis points in FY2024** — below the mid-point of its through-the-cycle range — reflecting improving household affordability as interest rates declined, and disciplined origination. This maps exactly to the framework's description of loans held at amortised cost, reduced by provisions when impaired.
+All loans and advances are held at amortised cost, with [[ifrs9_standard|IFRS 9]] ECL provisions applied. FNB's credit loss ratio was **86 basis points in FY2024** — below the mid-point of its through-the-cycle range — reflecting improving household affordability as interest rates declined, and disciplined origination. This maps exactly to the framework's description of loans held at amortised cost, reduced by provisions when impaired.
 
-> **Consistency with framework:** FNB's banking book is the archetypal version described in the framework — residential mortgages, personal loans, credit cards, and commercial lending, all held at amortised cost with IFRS 9 ECL provisioning applied.
+> **Consistency with framework:** FNB's banking book is the archetypal version described in the framework — residential mortgages, personal loans, credit cards, and commercial lending, all held at amortised cost with [[ifrs9_standard|IFRS 9]] ECL provisioning applied.
 
 #### Trading Book
 
 FNB does **not** have a significant proprietary trading book. This is the most important structural difference from RMB and a significant departure from what the framework implies when it discusses the trading book alongside the banking book in a single institution.
 
-- FNB enters into derivative contracts primarily for **client hedging purposes** (e.g. interest rate swaps for commercial clients, FX forwards for importers/exporters) and for **balance sheet risk management** (interest rate risk hedging on the fixed-rate mortgage book).
+- FNB enters into derivative contracts primarily for **client hedging purposes** (e.g. interest rate swaps for commercial clients, FX forwards for importers/exporters) and for **balance sheet [[01-risk_management|risk management]]** (interest rate risk hedging on the fixed-rate mortgage book).
 - These derivatives are fair-valued and appear in the balance sheet, but the portfolio is hedging-oriented, not trading-oriented.
 - There is no Global Markets business, no FICC trading desk, and no proprietary equity derivatives book within FNB.
 
@@ -67,18 +67,18 @@ FNB, like RMB, is **not a separately listed entity** — it is a segment of Firs
 
 ## Income Statement (IS)
 
-### Net Interest Income (NII)
+### [[03-nii_nim|Net Interest Income]] ([[03-nii_nim|NII]])
 
-NII is **FNB's primary income line**, consistent with and closely matching the framework's description. NII grew **7% in FY2024**, supported by volume growth in both advances and deposits.
+[[03-nii_nim|NII]] is **FNB's primary income line**, consistent with and closely matching the framework's description. [[03-nii_nim|NII]] grew **7% in FY2024**, supported by volume growth in both advances and deposits.
 
 - **Interest earned on loans:** FNB earns margin on the spread between its lending rates (JIBAR + product margin) and its cost of funding. Different products carry different margins — mortgages are tightest (secured, long duration), personal loans and credit cards are widest (unsecured, short duration), commercial loans sit in between.
 - **Interest earned on HQLAs and central bank deposits:** Consistent with the framework — FNB earns a return on its liquid asset buffer.
 - **Cost of funding (COF):** The interest paid on deposits. FNB's structural advantage is that its large transactional deposit base costs close to nothing (current account balances earn minimal interest), making its effective COF substantially below JIBAR. Fixed and savings deposits cost more, but the blended COF is very competitive versus banks without a large transactional franchise.
-- **NII stability:** As the framework predicts, NII is the more stable income component. FNB's NII is relatively predictable across the cycle — volumes grow steadily and margin compression is gradual, though rate cuts (as seen as the SA rate cycle turned in H2 FY2024) create short-term NII headwinds on variable-rate deposits repricing faster than assets.
+- **[[03-nii_nim|NII]] stability:** As the framework predicts, [[03-nii_nim|NII]] is the more stable income component. FNB's [[03-nii_nim|NII]] is relatively predictable across the cycle — volumes grow steadily and margin compression is gradual, though rate cuts (as seen as the SA rate cycle turned in H2 FY2024) create short-term [[03-nii_nim|NII]] headwinds on variable-rate deposits repricing faster than assets.
 
 ### Non-Interest Revenue (NIR)
 
-NIR is important at FNB but plays a **supporting role to NII**, unlike at RMB where NIR is the dominant income driver. FNB's NIR grew **8% in FY2024**, driven by transactional volumes and customer acquisition.
+NIR is important at FNB but plays a **supporting role to [[03-nii_nim|NII]]**, unlike at RMB where NIR is the dominant income driver. FNB's NIR grew **8% in FY2024**, driven by transactional volumes and customer acquisition.
 
 #### Non-interest Income (Banking Book)
 
@@ -87,7 +87,7 @@ This is where FNB is most directly aligned with the framework's description:
 - **Transactional account fees:** Monthly account fees charged across FNB's tiered account structure (Easy, Gold, Platinum, Private Clients, Private Wealth). These are recurring, stable, and grow with customer acquisition (+5% in FY2024) and fee increases.
 - **Card interchange and payment fees:** FNB earns interchange on debit and credit card transactions. Strong growth in digital payments and card-linked eBucks transactions drives volume growth here.
 - **Commitment fees:** On undrawn overdraft and credit card limits.
-- **Insurance income:** FNB Insurance is a substantial business embedded within FNB — credit life insurance (compulsory on personal loans), home contents and building insurance, and vehicle insurance. These premiums and underwriting profits form a meaningful NIR line.
+- **Insurance income:** FNB Insurance is a substantial business embedded within FNB — credit life insurance (compulsory on personal loans), home contents and building insurance, and vehicle insurance. These premiums and [[00_underwriting|underwriting]] profits form a meaningful NIR line.
 - **Wealth and investment fees:** FNB Wealth (linked to FNB Private Clients and FNB Private Wealth) earns asset management and advisory fees.
 - **eBucks revenue-sharing:** The eBucks loyalty programme is a distinctive feature of FNB with no direct equivalent in the framework. Revenue is generated through eBucks partner commissions (retail, fuel, travel) and the programme acts as a powerful retention and cross-sell tool.
 - **Asset management fees:** Consistent with the framework.
@@ -114,10 +114,10 @@ FNB's **cost-to-income ratio** is among the lowest in the South African banking 
 
 #### Cost of Credit
 
-This is where FNB most clearly **diverges from RMB and resembles the framework's description most closely**. Retail credit losses are a central cost of FNB's business model, with the full cycle of IFRS 9 provisioning applying across a multi-product consumer portfolio:
+This is where FNB most clearly **diverges from RMB and resembles the framework's description most closely**. Retail [[02-credit_losses|credit losses]] are a central cost of FNB's [[01-business_model|business model]], with the full cycle of [[ifrs9_standard|IFRS 9]] provisioning applying across a multi-product consumer portfolio:
 
-- **IFRS 9 ECL across Stages 1, 2, and 3:** FNB holds ECL provisions for all retail and commercial loan products. Mortgage provisions are lower (LTV-secured), while personal loan and credit card provisions are higher (unsecured, shorter-duration, higher PD).
-- **Credit loss ratio of 86 bps in FY2024:** Below the mid-cycle range, reflecting improving household affordability as the South African interest rate cycle turned and the impact of deliberate credit quality initiatives. The framework correctly notes that credit losses are "considerably higher in periods of recession" — FNB's credit loss ratio was meaningfully higher during peak COVID-19 stress (FY2020-FY2021) and the high interest rate environment.
+- **[[ifrs9_standard|IFRS 9]] ECL across Stages 1, 2, and 3:** FNB holds ECL provisions for all retail and commercial loan products. Mortgage provisions are lower (LTV-secured), while personal loan and credit card provisions are higher (unsecured, shorter-duration, higher PD).
+- **Credit loss ratio of 86 bps in FY2024:** Below the mid-cycle range, reflecting improving household affordability as the South African interest rate cycle turned and the impact of deliberate credit quality initiatives. The framework correctly notes that [[02-credit_losses|credit losses]] are "considerably higher in periods of recession" — FNB's credit loss ratio was meaningfully higher during peak COVID-19 stress (FY2020-FY2021) and the high interest rate environment.
 - **Collections and write-offs:** FNB has a large collections operation for delinquent retail accounts. Write-offs follow the collections process, reducing gross loan balances. This is entirely consistent with the framework.
 - **Sensitivity to interest rate cycle:** Because FNB lends to individuals on variable-rate products, rising interest rates increase debt service burden and elevate Stage 2 and Stage 3 migrations — a direct transmission mechanism from monetary policy to credit quality that is highly visible in FNB's results.
 
@@ -131,11 +131,11 @@ FNB's income is subject to South African corporation tax at **28%**, consistent 
 
 | Line Item | FNB FY2024 Commentary |
 |---|---|
-| **NII** | Primary income driver; grew 7%; high NII/total income ratio (estimated 60–65%) |
+| **[[03-nii_nim|NII]]** | Primary income driver; grew 7%; high [[03-nii_nim|NII]]/total income ratio (estimated 60–65%) |
 | **+ NIR** | Fee-driven; grew 8%; transactional, insurance, wealth fees |
-| **= Total Income** | NII dominant; stable income profile |
+| **= Total Income** | [[03-nii_nim|NII]] dominant; stable income profile |
 | **Less: Operational Expenses** | Branch network + staff + IT; low cost-to-income ratio by SA standards |
-| **Less: Cost of Credit** | Credit loss ratio ~86 bps FY2024; IFRS 9 ECL across full retail book |
+| **Less: Cost of Credit** | Credit loss ratio ~86 bps FY2024; [[ifrs9_standard|IFRS 9]] ECL across full retail book |
 | **= EBIT** | Strong; growing |
 | **Less: Tax (28% SA)** | Standard corporate rate |
 | **= Normalised Earnings** | Contributed ~50–55% of FirstRand group's R23.2bn total FY2024 earnings |
@@ -147,7 +147,7 @@ FNB's income is subject to South African corporation tax at **28%**, consistent 
 
 ### Stability of Income (IS)
 
-FNB has a **high NII-to-total income ratio** (estimated 60–65%), making it a textbook example of the framework's statement that "NII is a significant part of retail and commercial banks' total income." This contrasts sharply with RMB, where NIR plays an outsized role. FNB's income is genuinely more stable across the cycle — fee income is predictable, NII grows with the deposit/lending franchise, and there is no episodic trading income.
+FNB has a **high [[03-nii_nim|NII]]-to-total income ratio** (estimated 60–65%), making it a textbook example of the framework's statement that "[[03-nii_nim|NII]] is a significant part of retail and commercial banks' total income." This contrasts sharply with RMB, where NIR plays an outsized role. FNB's income is genuinely more stable across the cycle — fee income is predictable, [[03-nii_nim|NII]] grows with the deposit/lending franchise, and there is no episodic trading income.
 
 ### Efficiency (IS)
 
@@ -163,14 +163,14 @@ FNB delivered **7% normalised PBT growth in FY2024**, with the broader Africa fr
 
 FNB's NIS is driven by two key dynamics: the cost advantage of its transactional deposit base (near-zero cost current accounts) on the liability side, and the product mix of its lending book on the asset side. The blended lending yield is pulled down by the large mortgage book (tight margin) and pulled up by unsecured lending (wide margin). FNB's NIS is stronger than most SA retail peers because of the deposit cost advantage.
 
-#### Net Interest Margin (NIM)
+#### [[03-nii_nim|Net Interest Margin]] ([[03-nii_nim|NIM]])
 
-FNB's **NIM is higher** than RMB's because:
+FNB's **[[03-nii_nim|NIM]] is higher** than RMB's because:
 1. Retail lending carries wider margins than wholesale corporate lending.
 2. The low-cost deposit base reduces COF materially.
 3. The scale of the franchise means FNB benefits from pricing power across the rate cycle.
 
-NII grew 7% in FY2024 on advances growth of 5% — the difference reflects some margin improvement, partly from deposit repricing dynamics in the rate cut environment.
+[[03-nii_nim|NII]] grew 7% in FY2024 on advances growth of 5% — the difference reflects some margin improvement, partly from deposit repricing dynamics in the rate cut environment.
 
 #### Return on Assets (ROA) and Return on Equity (ROE)
 
@@ -197,11 +197,11 @@ This is the clearest example in the framework's terms of a bank with strong fund
 
 ### Capital Strength (BS)
 
-Capital ratios are managed at FirstRand Bank level. FNB's retail credit book is predominantly RWA Category 1 (residential mortgages at lower risk weights) and Category 2/3 (personal loans and credit cards at higher risk weights under Basel). The retail credit composition of FNB's RWAs makes its capital consumption profile very different from RMB's trading-book RWAs.
+Capital ratios are managed at FirstRand Bank level. FNB's retail credit book is predominantly RWA Category 1 (residential mortgages at lower risk weights) and Category 2/3 (personal loans and credit cards at higher risk weights under [[bis|Basel]]). The retail credit composition of FNB's RWAs makes its capital consumption profile very different from RMB's trading-book RWAs.
 
 ### Liquidity Strength (BS)
 
-FNB's large retail deposit base naturally supports a healthy **LCR and NSFR**, as retail deposits are assigned high stability weights under Basel III liquidity rules. The large HQLA buffer held against this deposit base further supports liquidity metrics. This is the opposite of RMB's position, where the absence of a retail deposit base means reliance on more volatile corporate and wholesale funding.
+FNB's large retail deposit base naturally supports a healthy **[[04-lcr|LCR]] and [[05-nsfr|NSFR]]**, as retail deposits are assigned high stability weights under [[basel_framework|Basel III]] liquidity rules. The large HQLA buffer held against this deposit base further supports [[02-liquidity_metrics|liquidity metrics]]. This is the opposite of RMB's position, where the absence of a retail deposit base means reliance on more volatile corporate and wholesale funding.
 
 ---
 
@@ -214,11 +214,11 @@ FNB's large retail deposit base naturally supports a healthy **LCR and NSFR**, a
 | Trading book | ❌ Largely absent | No proprietary trading; hedging derivatives only |
 | Fair value hierarchy (L1/L2/L3) | ⚠️ Limited | Applies only to HQLA portfolio and hedging derivatives |
 | Retail deposits as liabilities | ✅ Dominant | Largest retail deposit franchise in SA; core competitive advantage |
-| NII as primary income | ✅ Dominant (~60–65% of total income) | Closest to the framework's retail bank description |
+| [[03-nii_nim|NII]] as primary income | ✅ Dominant (~60–65% of total income) | Closest to the framework's retail bank description |
 | Non-interest income (fees) | ✅ Exactly as described | Account fees, card fees, commitment fees, insurance, wealth — all present |
 | Trading income | ❌ Absent | Not a meaningful income line |
 | Operational expenses | ✅ Full fit | Branch network, staff, IT, marketing — all as framework describes |
-| Cost of credit (IFRS 9 ECL) | ✅ Central to the model | 86 bps CLR in FY2024; full retail ECL provisioning; rate-cycle sensitivity |
+| Cost of credit ([[ifrs9_standard|IFRS 9]] ECL) | ✅ Central to the model | 86 bps CLR in FY2024; full retail ECL provisioning; rate-cycle sensitivity |
 | Tax at 28% | ✅ Consistent | Standard SA rate applies |
 | Standalone EPS / listed entity | ❌ Not applicable | Segment of FirstRand; group EPS reported at parent level |
 | Loan-to-deposit ratio | ✅ Meaningful and strong | Deposits > loan growth; retail deposits highly stable |
@@ -232,15 +232,15 @@ FNB's large retail deposit base naturally supports a healthy **LCR and NSFR**, a
 | Dimension | FNB | RMB |
 |---|---|---|
 | **Framework fit** | Near-complete | Partial |
-| **Primary income driver** | NII (~60–65%) | NIR (trading + fees) |
+| **Primary income driver** | [[03-nii_nim|NII]] (~60–65%) | NIR (trading + fees) |
 | **Balance sheet** | Retail/commercial credit + deposits | Wholesale credit + trading book |
 | **Trading book** | Absent | Central and significant |
 | **Deposit base** | Large, retail, sticky, low-cost | Corporate only; rate-sensitive |
-| **Credit losses** | Meaningful; rate-sensitive; IFRS 9 fully applicable | Low; wholesale quality; less cycle-sensitive |
+| **[[02-credit_losses|Credit losses]]** | Meaningful; rate-sensitive; [[ifrs9_standard|IFRS 9]] fully applicable | Low; wholesale quality; less cycle-sensitive |
 | **ROE** | ~41% — high via deposit cost advantage | ~20% — high via fee/trading model |
 | **Cost structure** | Branch + staff + digital IT | Banker bonuses; no branch network |
-| **Income stability** | High (NII dominant) | Low (trading + deal fees) |
+| **Income stability** | High ([[03-nii_nim|NII]] dominant) | Low (trading + deal fees) |
 
 ---
 
-*Sources: FirstRand Analysis of Financial Results FY2024 (year ended 30 June 2024); FirstRand H1 FY2025 Results (six months ended 31 December 2024); FirstRand FY2024 Annual Financial Statements.*
+*Sources: FirstRand Analysis of Financial Results FY2024 (year ended 30 June 2024); FirstRand H1 FY2025 Results (six months ended 31 December 2024); FirstRand FY2024 [[02-financial_management|Annual Financial Statements]].*
