@@ -1,3 +1,17 @@
+---
+tags:
+  - application/banking/external-environment/regulatory
+  - jurisdiction/south-africa
+  - jurisdiction/uk
+  - jurisdiction/eu
+  - regulator/sarb
+  - regulator/bcbs
+  - regulator/fsb
+  - flashcards/regulatory-environment
+  - study-status/new
+  - difficulty/easy
+aliases:
+---
 # Regulatory Environment
 
 Banks operate within a highly regulated environment shaped by multiple layers of oversight, spanning supranational, national, and sector-specific regulators. These authorities establish rules to maintain financial stability, protect consumers, ensure fair competition, and prevent financial crime.

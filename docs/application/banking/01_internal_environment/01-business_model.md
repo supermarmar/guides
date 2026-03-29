@@ -1,3 +1,6 @@
+---
+aliases:
+---
 # Business Model
 
 Banks enable surplus funds held by some customers to be used to provide loans to other customers, who use those loans to fund activities like developing new products or services. Banks take responsibility for the credit vetting process, pooling risks to the benefit of the depositor.
