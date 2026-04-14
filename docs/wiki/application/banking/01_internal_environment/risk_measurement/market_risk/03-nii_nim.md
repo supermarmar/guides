@@ -56,9 +56,9 @@ These risk-adjusted views demonstrate the actual value added or destroyed by the
 
 The NIM calculates the margin earned on interest-bearing assets, expressed as a percentage (usually annualised):
 
-```math
+$$
 \text{NIM} = \frac{\text{NII}}{\text{Average interest-earning assets}}
-```
+$$
 
 The asset rate can be decomposed as:
 

@@ -186,7 +186,7 @@ The document consists of two main sections, which cover (a) the definition of ca
 
 The Basel Accord is not a law.
 
-#### Capital Classification
+#### <mark style="background: #FFB86CA6;">Capital Classification</mark>
 
  When determining what tier is applicable for capital, the following items are considered:
 

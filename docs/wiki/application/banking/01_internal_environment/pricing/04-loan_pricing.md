@@ -15,20 +15,45 @@ This file covers the pricing of bank loan products by product type (retail, corp
 
 Personal loans are offered without any security; recoverability depends entirely on the borrower's income. In the event of default (e.g. due to unemployment), the **loss given default (LGD) is typically 70% or higher**. Typical product characteristics: small principal (c. £1,000–£15,000 in the UK), terms of 3–7 years, with risk-based pricing applied to reflect individual borrower risk. In South Africa, maximum interest rates are regulated by the NCA (e.g. repo rate + 21% for unsecured credit). In the UK, at least 51% of loans issued must be at the marketed headline rate even if risk-based pricing is used.
 
-### Mortgages (Residential and Buy-to-Let)
+### <mark style="background: #FFB86CA6;">Mortgages (Residential and Buy-to-Let)</mark>
 
 A mortgage is secured on real property, allowing the bank to repossess and sell the property on default. The key risk driver is the **loan-to-value (LTV) ratio**:
-
-```math
+$$
 \text{LTV} = \frac{\text{Loan outstanding}}{\text{Market value of property}}
-```
+$$
+The LGD on a mortgage is directly proportional to LTV: at 95% LTV, a property price fall of more than 5% (net of repossession costs) produces a loss. At 70% LTV, prices would have to fall by over 30% to produce a loss. LTV is therefore the primary variable in mortgage pricing models. Higher LTV bands attract both higher pricing and higher capital requirements.
 
-The loss given default on a mortgage is directly proportional to LTV: at 95% LTV, a property price fall of more than 5% (net of repossession costs) produces a loss. At 70% LTV, prices would have to fall by over 30% to produce a loss. LTV is therefore the primary variable in mortgage pricing models. Higher LTV bands attract both higher pricing and higher capital requirements.
+#### Fixed-rate Mortgages & Margin Risk
 
-**Fixed vs variable rate mortgages — the margin management problem:** When banks fund long-term fixed-rate mortgages with short-term variable-rate deposits, rising interest rates compress [[03-nii_nim|NIM]]. Additionally, fixed-rate mortgages embed an asymmetric option: if rates fall, borrowers prepay (reducing the bank's fixed-rate asset duration); if rates rise, borrowers stay (extending duration at a below-market rate). UK banks resolve this through **deal periods** (fixed rates applying for 2 or 5 years) that revert to the bank's **standard variable rate (SVR)**. SVR is a bank-controlled rate that can be reset with adequate notice, creating a repricing point that restores margin management capability. See the S&L crisis example below.
+When banks fund long-term fixed-rate mortgages with short-term variable-rate deposits, rising interest rates compress [[03-nii_nim|NIM]]. Additionally, fixed-rate mortgages embed an asymmetric option: if rates fall, borrowers prepay (reducing the bank's fixed-rate asset duration); if rates rise, borrowers stay (extending duration at a below-market rate). 
+##### Deal Periods
 
-**US S&L crisis:** US regulations historically required banks to offer 15-year fixed-rate mortgages. During the 1970s–1980s, rising inflation and short-term rates caused savings and loan (S&L) institutions to pay escalating deposit rates while earning fixed low rates on their mortgage books — creating negative margins. Approximately one-third of US S&Ls failed. US banks now securitise mortgages (selling to Freddie Mac, Fannie Mae, or ABS investors) to transfer this duration and margin risk off-balance-sheet.
+UK banks resolve this through **deal periods** (fixed rates applying for 2 or 5 years) that revert to the bank's **standard variable rate (SVR)**. SVR is a bank-controlled rate that can be reset with adequate notice, creating a repricing point that restores margin management capability. See the S&L crisis example below.
+##### Interest Rate Swaps
 
+This is the most common solution. The bank enters a contract with a third party (often a larger investment bank) to "swap" their risks.
+
+- **The Bank pays:** A fixed rate to the swap provider.
+- **The Bank receives:** A floating rate (linked to SONIA—the Sterling Over Night Index Average).
+
+By doing this, the bank effectively turns your fixed-rate mortgage into a floating-rate one on their books, which perfectly matches their floating-rate costs.
+
+##### Structural Hedging
+
+Banks have massive pools of "sticky" money—cash sitting in current accounts that doesn't earn much interest. Banks "invest" this pool into a rolling series of medium-term swaps. This creates a stable "base" of income that protects the margin even if the Base Rate fluctuates wildly.
+
+##### The "Swap Rate" Pricing Model
+
+UK banks don't actually price mortgages based on the BoE Base Rate; they price them based on **Swap Rates**.
+
+> **The Math:** If a 5-year swap rate is 3.8% and the bank wants a 1.2% profit margin, they will offer you a mortgage at 5.0%.
+> 
+> $$\text{Mortgage Rate} = \text{Swap Rate} + \text{Bank Margin (Spread)}$$
+
+This is why, as of April 2026, you might see mortgage rates rising even if the BoE hasn't moved the Base Rate yet—the "market" expects future inflation (often dubbed "Trumpflation" in current headlines) and has pushed the swap rates up already.
+##### Early Repayment Charges (ERCs)
+
+If you have a 5% fixed rate and market rates drop to 3%, you’ll want to leave. But the bank has already paid for a 5-year swap to hedge your loan. If you leave early, the bank is stuck paying for a hedge they no longer need. **ERCs** are designed to compensate the bank for the cost of breaking those financial hedges.
 ### Vehicle and Asset Finance
 
 Secured on the underlying asset (vehicle, machinery, boat, etc.). On default, the bank repossesses and sells the asset. Loan risk depends on the age and marketability of the asset, the loan tenor, the initial deposit paid, and the residual value (if applicable). Factors specific to the contract type (hire purchase vs PCP) affect risk profile. **Personal contract purchase (PCP)** loans are structured as leases with balloon payments: the residual value of the car at end of term settles the remaining loan balance, exposing the lender to **residual value risk** if the car is worth less than expected.

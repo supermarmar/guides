@@ -110,7 +110,7 @@ One of the most important lessons from the banking crisis of 2007–2008 has bee
 Margin risk is the risk of a significant fall in a bank's [[03-nii_nim|net interest margin]]. Margin compression may occur as a result of three reasons:
 
 - **Competitive pressure** — leading to lower interest rates on loans without corresponding reductions in deposit rates. Loan prices are not unusual to be reduced in periods of economic growth (with higher lending volumes and low [[02-credit_losses|credit losses]]) and to be increased in periods of recession (with lower lending volumes and high [[02-credit_losses|credit losses]]).
-- **Interest rate changes on mismatched assets and liabilities** — for example, the negative impact of higher interest rates on a bank with deposits of shorter maturities than its loans, or with fixed-rate loans financed by variable-rate deposits.
+- **Interest rate changes on mismatched assets and liabilities** — for example, the negative impact of higher interest rates on a bank with deposits of shorter maturities than its loans, or with fixed-rate loans financed by variable-rate deposits. See the [[04-loan_pricing|Fixed-rate Mortgages & Margin Risk]] section.
 - **Sustained low interest rates** — banks offering loans at historically low rates but being understandably reluctant to impose negative interest rates on retail deposits. Some European banks have charged negative interest rates on large deposits.
 
 ### Cyber Risk

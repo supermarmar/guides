@@ -61,17 +61,17 @@ An important disadvantage of wholesale funding is that the owners of the funds a
 
 Banks may get funding, at least on a temporary basis, through their money market operations with their central bank. It is believed that [[05-central_banks|central banks]] in various countries extended such facilities to help banks through the "liquidity crunch" of 2007, but information about such activities was not made public.
 
-### Shareholder Equity (Tier 1)
+### <mark style="background: #FFF3A3A6;">Shareholder Equity (Tier 1)</mark>
 
 Equity capital must be in the form of CET1 capital, meeting the criteria set out in [[basel_framework|Basel III]]. Given [[basel_framework|Basel III]]'s higher requirements for CET1 capital, and its introduction of capital buffers which must be in the form of CET1 capital, the percentage of funding by equity capital is much higher than it was before the banking crisis of 2007–2008.
 
 Banks may also hold AT1 capital — contingent convertible securities with mandatory conversion to CET1 capital if the issuing bank's CET1 capital ratios fall below a stated trigger level. New entrant banks may find it not practical to issue AT1 capital, at least during their early years.
 
-### Capital Obliged to Be Repaid (Tier 2)
+### <mark style="background: #FFF3A3A6;">Capital Obliged to Be Repaid (Tier 2)</mark>
 
 Tier 2 capital includes debt securities that have a maturity of at least 5 years and that are subordinated to depositors and other creditors of the bank. As long as the bank is a going concern, debt capital cannot be used to absorb losses. However, in the event that a bank fails, its debt capital can be used to absorb losses. Tier 2 capital may therefore be referred to as "gone-concern" capital.
 
-### Preference Shares
+### <mark style="background: #FFF3A3A6;">Preference Shares</mark>
 
 Banks issued preference shares historically prior to the introduction of [[bis|Basel]]. These instruments are preferred to equity on a going concern basis and were historically pari passu to equity on a liquidation basis. Preference shares are generally not recognised under the qualifying regulatory capital under [[basel_framework|Basel III]]. Many banks are phasing out these instruments.
 
@@ -79,7 +79,7 @@ Banks issued preference shares historically prior to the introduction of [[bis|B
 
 The capital structure will consist of three types of capital and the composition will be determined by the factors discussed in this section.
 
-### CET1
+### <mark style="background: #FFF3A3A6;">CET1</mark>
 
 Common Equity Tier 1 (CET1) capital consists in principle of share capital, share premium, and retained earnings attributed as regulatory capital. Certain deductions apply.
 
@@ -91,20 +91,20 @@ The features that make a long-dated liability eligible as Additional Tier 1 (AT1
 - Stock surplus (share premium) resulting from the issue of instruments included in Additional Tier 1 capital
 - Instruments issued by consolidated subsidiaries of the bank and held by third parties that meet the criteria for inclusion in Additional Tier 1 capital and are not included in Common Equity Tier 1. Note criteria being applied
 - Regulatory adjustments applied in the calculation of Additional Tier 1 Capital
-- Perpetual
+- <mark style="background: #FFB86CA6;">Perpetual</mark>
 - Coupons are discretionary and non-cumulative
-- Are subject to write-off or conversion into equity at the Point of Non-Viability which is determined by the regulator
+- Are subject to write-off or <mark style="background: #FFB86CA6;">conversion into equity</mark> at the Point of Non-Viability which is determined by the regulator
 
 ### T2
 
 - Instruments issued by the bank that meet the criteria for inclusion in Tier 2 capital (and are not included in Tier 1 capital)
 - Stock surplus (share premium) resulting from the issue of instruments included in Tier 2 capital
 - Instruments issued by consolidated subsidiaries of the bank and held by third parties that meet the criteria for inclusion in Tier 2 capital and are not included in Tier 1 capital
-- Certain loan loss provisions
-- Regulatory adjustments applied in the calculation of Tier 2 capital.
-- Are for a minimum term of 5 years
+- Certain <mark style="background: #FFB86CA6;">loan loss provisions</mark>
+- Regulatory adjustments applied in the calculation of Tier 2 capital. Crucially, they are subject to a **20% per annum amortisation haircut** in the final 5 years before maturity, reducing their recognised capital value as they approach redemption.
+- Are for a <mark style="background: #FFB86CA6;">minimum term of 5 years</mark>
 - Coupons are compulsory
-- Are subject to write-off or conversion into equity at the point of non-viability which is determined by the regulator.
+- Are subject to write-off or <mark style="background: #FFB86CA6;">conversion into equity</mark> at the point of non-viability which is determined by the regulator.
 
 | | Additional Tier I | Tier II |
 |---|---|---|
@@ -144,14 +144,14 @@ Regulators and society in general require banks to be well capitalised and profi
 
 The total required capital of the bank will be the Pillar 1 requirement as well as any additions from the [[02-stress_testing|Pillar 2]] requirements. The table below shows the capital requirements of a bank as per the [[basel_framework|Basel III]] guidelines.
 
-| Capital tiers | Total capital requirement (% of RWAs) | CET1 Capital requirement | Tier 1 (CET1 + AT1) Capital requirement | Tier 2 Capital requirement |
-|---|---|---|---|---|
-| [[basel_framework|Basel III]] minimum Regulatory Requirement | 8% | 4.5% | 6% | 2% |
-| Capital Conservation Buffer – CCoB | 0%–2.5% | 100% of CCoB | 100% of CCoB | N/A |
-| Countercyclical Capital Buffer – CCyB | 0%–2.5% | 100% of CCyB | 100% of CCyB | N/A |
-| Systemically Important Banks Add-on | 0%–2.5% | 100% of add-on | 100% of add-on | N/A |
-| Pillar 2A Add-on – P2A | 0%–2% | 50%+ of P2A | 75%+ of P2A | Max 25% of P2A |
-| [[02-stress_testing|Pillar 2B]] Add-on – P2B | Determined via Supervisory Review | 50% of P2B | 75% of P2B | Max 25% of P2B |
+| Capital tiers                                             | Total capital requirement (% of RWAs) | CET1 Capital requirement | Tier 1 (CET1 + AT1) Capital requirement | Tier 2 Capital requirement |
+| --------------------------------------------------------- | ------------------------------------- | ------------------------ | --------------------------------------- | -------------------------- |
+| [[basel_framework\|Basel minimum Regulatory Requirement]] | 8%                                    | 4.5%                     | 6%                                      | 2%                         |
+| Capital Conservation Buffer – CCoB                        | 0%–2.5%                               | 100% of CCoB             | 100% of CCoB                            | N/A                        |
+| Countercyclical Capital Buffer – CCyB                     | 0%–2.5%                               | 100% of CCyB             | 100% of CCyB                            | N/A                        |
+| Systemically Important Banks Add-on                       | 0%–2.5%                               | 100% of add-on           | 100% of add-on                          | N/A                        |
+| Pillar 2A Add-on – P2A                                    | 0%–2%                                 | 50%+ of P2A              | 75%+ of P2A                             | Max 25% of P2A             |
+| [[02-stress_testing\|Pillar 2B]]                          | Determined via Supervisory Review     | 50% of P2B               | 75% of P2B                              | Max 25% of P2B             |
 
 The composition of the capital base for the bank is very important. The base requirement is that a minimum of 4,5% of the capital requirement needs to be held in Common Equity Tier 1 (CET1) capital. In essence, CET1/RWAs must be greater than 4,5%. An additional 1,5% of the requirement can be held in Additional Tier 1 capital (AT1). The last 2% is allowed to be held in Tier 2 capital. Combined, this is a total of 8% of RWAs and is the minimum amount of capital a bank has to hold. [[basel_framework|Basel III]] also has three capital buffers that are discussed below.
 
