@@ -72,7 +72,7 @@ In the early years of credit derivatives, there were controversies in agreeing e
 
 Hedging of various other risks via financial derivatives can be used to protect against interest rate and exchange rate risk.
 
-### Loan [[01_underwriting|Underwriting]] Criteria
+### Loan [[01-underwriting|Underwriting]] Criteria
 
 New loans must be sanctioned only within the context of the [[02-risk_appetite|risk appetite]] statement and risk-weighted capital criteria:
 

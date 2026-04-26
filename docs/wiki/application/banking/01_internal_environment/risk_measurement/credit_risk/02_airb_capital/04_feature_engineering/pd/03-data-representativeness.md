@@ -45,12 +45,12 @@ Comparisons were made across the following key risk drivers:
 * **Revolver vs. Transactor status**
 * **Months on Book (MoB)**
 * **FICO score bands**
-* **PiT [[07-segmentation|segmentation]]**
+* **PiT [[08-segmentation|segmentation]]**
 
 A notable structural shift was identified during the analysis:
 
 * A **change in product mix** occurred following the **acquisition of a new business line**.
-* In response, a **product flag** was incorporated into the [[07-segmentation|segmentation]] logic to ensure representativeness across new and legacy products.
+* In response, a **product flag** was incorporated into the [[08-segmentation|segmentation]] logic to ensure representativeness across new and legacy products.
 * All other characteristics showed:
 
   * **PSI values close to 0**, indicating stable distributions,
@@ -75,9 +75,9 @@ A notable structural shift was identified during the analysis:
 
 ### 5.4 Lending Standards and Recovery Policies
 
-* A key qualitative and quantitative check involved assessing changes in **[[01_underwriting|underwriting]] or collections strategies**.
+* A key qualitative and quantitative check involved assessing changes in **[[01-underwriting|underwriting]] or collections strategies**.
 * Example: For **March 2009**, the 12-month average PiT segment distribution before and after a known **strategy change in April 2009** was compared.
-* No material shift in the key PiT [[07-segmentation|segmentation]] or risk profile was identified.
+* No material shift in the key PiT [[08-segmentation|segmentation]] or risk profile was identified.
 * Discussions with **model owners** and **collections teams** confirmed:
 
   * No foreseeable **policy or strategy changes** in the near term,
@@ -98,4 +98,4 @@ A notable structural shift was identified during the analysis:
 
 ---
 
-Let me know if you want to go straight into the **Model [[07-segmentation|Segmentation]]** section next or wrap this into a compiled draft.
+Let me know if you want to go straight into the **Model [[08-segmentation|Segmentation]]** section next or wrap this into a compiled draft.

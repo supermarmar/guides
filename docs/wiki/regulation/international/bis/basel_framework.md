@@ -668,7 +668,7 @@ planning consent.
 20.91 ADC exposures to residential real estate may be risk weighted at 100%, provided
 that the following criteria are met:
 20.91
-(1) prudential [[01_underwriting|underwriting]] standards meet the requirements in CRE20.71 (ie the
+(1) prudential [[01-underwriting|underwriting]] standards meet the requirements in CRE20.71 (ie the
 requirements that are used to classify regulatory real estate exposures)
 where applicable;
 (2) pre-sale or pre-lease contracts amount to a significant portion of total
@@ -858,8 +858,8 @@ and
 
 30.24 All of the following criteria must be satisfied for a sub-portfolio to be treated as a
 qualifying revolving retail exposure (QRRE). These criteria must be applied at a
-sub-portfolio level consistent with the bank’s [[07-segmentation|segmentation]] of its retail activities
-generally. [[07-segmentation|Segmentation]] at the national or country level (or below) should be the
+sub-portfolio level consistent with the bank’s [[08-segmentation|segmentation]] of its retail activities
+generally. [[08-segmentation|Segmentation]] at the national or country level (or below) should be the
 general rule.
 
 1. The exposures are revolving, unsecured, and uncommitted (both
@@ -1625,9 +1625,9 @@ EAD weighting, are not permitted.
 
 1. A bank may use data on internal default experience for the estimation of PD.
 A bank must demonstrate in its analysis that the estimates are reflective of
-[[01_underwriting|underwriting]] standards and of any differences in the rating system that
+[[01-underwriting|underwriting]] standards and of any differences in the rating system that
 generated the data and the current rating system. Where only limited data
-are available, or where [[01_underwriting|underwriting]] standards or rating systems have
+are available, or where [[01-underwriting|underwriting]] standards or rating systems have
 changed, the bank must add a greater margin of conservatism in its estimate
 of PD. The use of pooled data across institutions may also be recognised. A
 bank must demonstrate that the internal rating systems and criteria of other

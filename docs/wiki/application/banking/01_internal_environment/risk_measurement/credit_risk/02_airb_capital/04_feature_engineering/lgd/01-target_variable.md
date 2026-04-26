@@ -30,7 +30,7 @@ LGD is modelled using a **component-based approach** to capture the complex natu
 #### 3.3.2 Considerations
 
 * Losses and recoveries are tracked over a **maximum resolution period**, typically **5 years**, in accordance with **[[bis|Basel]] and [[pra|PRA]]** expectations.
-* LGD estimates should reflect **long-run average (LRA)** and **downturn (DT)** conditions, with proper [[07-segmentation|segmentation]] by:
+* LGD estimates should reflect **long-run average (LRA)** and **downturn (DT)** conditions, with proper [[08-segmentation|segmentation]] by:
 
   * Security type (secured vs. unsecured),
   * Product type,

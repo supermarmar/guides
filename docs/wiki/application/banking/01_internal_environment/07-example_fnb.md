@@ -94,7 +94,7 @@ This is where FNB is most directly aligned with the framework's description:
 - **Transactional account fees:** Monthly account fees charged across FNB's tiered account structure (Easy, Gold, Platinum, Private Clients, Private Wealth). These are recurring, stable, and grow with customer acquisition (+5% in FY2024) and fee increases.
 - **Card interchange and payment fees:** FNB earns interchange on debit and credit card transactions. Strong growth in digital payments and card-linked eBucks transactions drives volume growth here.
 - **Commitment fees:** On undrawn overdraft and credit card limits.
-- **Insurance income:** FNB Insurance is a substantial business embedded within FNB — credit life insurance (compulsory on personal loans), home contents and building insurance, and vehicle insurance. These premiums and [[01_underwriting|underwriting]] profits form a meaningful NIR line.
+- **Insurance income:** FNB Insurance is a substantial business embedded within FNB — credit life insurance (compulsory on personal loans), home contents and building insurance, and vehicle insurance. These premiums and [[01-underwriting|underwriting]] profits form a meaningful NIR line.
 - **Wealth and investment fees:** FNB Wealth (linked to FNB Private Clients and FNB Private Wealth) earns asset management and advisory fees.
 - **eBucks revenue-sharing:** The eBucks loyalty programme is a distinctive feature of FNB with no direct equivalent in the framework. Revenue is generated through eBucks partner commissions (retail, fuel, travel) and the programme acts as a powerful retention and cross-sell tool.
 - **Asset management fees:** Consistent with the framework.

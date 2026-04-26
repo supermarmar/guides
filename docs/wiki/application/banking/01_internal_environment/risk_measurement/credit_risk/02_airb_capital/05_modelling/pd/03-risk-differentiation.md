@@ -46,9 +46,9 @@ The model parameters were estimated using **Maximum Likelihood Estimation (MLE)*
 
 ---
 
-### [[07-segmentation|Segmentation]] Strategy
+### [[08-segmentation|Segmentation]] Strategy
 
-[[07-segmentation|Segmentation]] was undertaken prior to model estimation to maximise risk differentiation. The aim was to identify **homogeneous risk groups** that:
+[[08-segmentation|Segmentation]] was undertaken prior to model estimation to maximise risk differentiation. The aim was to identify **homogeneous risk groups** that:
 
 1. Share underlying risk drivers with a similar relationship to default
 2. Have sufficient volume
@@ -98,9 +98,9 @@ Initial splits were identified using **decision tree analysis** with historical 
 
 ---
 
-### Final [[07-segmentation|Segmentation]] Schema
+### Final [[08-segmentation|Segmentation]] Schema
 
-This multi-step approach resulted in segments that are internally homogeneous, stable over time, and exhibit clear differences in observed default rates. This [[07-segmentation|segmentation]] underpinned the subsequent variable selection and model estimation, ensuring strong discriminatory power while maintaining business interpretability and regulatory compliance.
+This multi-step approach resulted in segments that are internally homogeneous, stable over time, and exhibit clear differences in observed default rates. This [[08-segmentation|segmentation]] underpinned the subsequent variable selection and model estimation, ensuring strong discriminatory power while maintaining business interpretability and regulatory compliance.
 
 ---
 
@@ -128,6 +128,6 @@ caas_jupyter_tools.display_dataframe_to_user(name="Segmentation Volume and Defau
 
 ```
 
-Perfect — you’re now at the **Risk Differentiation** section for EAD, which should echo the PD structure ([[02-model-design|Model Design]] → Literature Review → [[07-segmentation|Segmentation]] → Risk Differentiation Tests), but tailored to the peculiarities of **EAD modelling**. Based on what you wrote, here’s a clean draft:
+Perfect — you’re now at the **Risk Differentiation** section for EAD, which should echo the PD structure ([[02-model-design|Model Design]] → Literature Review → [[08-segmentation|Segmentation]] → Risk Differentiation Tests), but tailored to the peculiarities of **EAD modelling**. Based on what you wrote, here’s a clean draft:
 
 ---

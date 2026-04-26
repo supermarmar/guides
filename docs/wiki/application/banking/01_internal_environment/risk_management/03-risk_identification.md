@@ -61,31 +61,9 @@ Callable bonds are an example of an embedded option that presents option risk. I
 
 If a bank has a portfolio of long-term fixed-rate mortgages in ZAR but relies on short-term variable-rate deposits in EUR to fund those mortgages, it faces mismatch risk. A rise in short-term rates could increase the cost of funds while the income from fixed-rate mortgages remains unchanged.
 
-## Operational Risk
+## <mark style="background: #FFF3A3A6;">Operational Risk</mark>
 
-Operational risk is the risk of potential losses that arise from failures in systems and processes; people; and external events.
-
-### People
-
-Risk of losses due to arising due to customer facing activities or failure to meet a professional obligation e.g. TCF risk, [[05-aml_kyc|KYC]] and [[05-aml_kyc|AML]] failures
-
-### Systems
-
-System failures and business disruption: Losses from disruption of business or system failures e.g. load shedding, software downtime, legacy IT systems
-
-### Internal Processes
-
-- Internal fraud: Losses due to acts of unauthorised activity, theft or fraud involving at least one internal party e.g. not reporting suspicious transactions, insider trading or bribing
-- Employee practices: Losses from inconsistent acts with employment, health or safety laws e.g. discrimination, worker’s compensation, employee benefits
-- Process management, execution and delivery: Losses from failed transaction processing with customers, counterparties and vendors e.g. miscommunication, missed deadline
-
-### External Events
-
-- External fraud: Losses due to acts of unauthorised activity, theft or fraud by a third party e.g. hacking, theft, fraud.
-  - 1st party fraud: Fake accounts for benefits e.g. ill willed student overdraft
-  - 2nd party fraud: aiding fraud e.g. money laundering with “clean” account
-  - 3rd party fraud: unauthorised account use
-- Damage to physical assets: Losses due to damage to physical assets from natural disasters or other events e.g. terrorism, earthquakes
+The [[basel_2|Basel II]] definition of operational risk is **"the risk of direct or indirect loss resulting from inadequate or failed internal processes, people and systems or from external events"**. For regulatory capital purposes this includes legal risk but excludes reputational and strategic risks.
 
 ## Capital Risk
 
@@ -110,7 +88,7 @@ One of the most important lessons from the banking crisis of 2007–2008 has bee
 Margin risk is the risk of a significant fall in a bank's [[03-nii_nim|net interest margin]]. Margin compression may occur as a result of three reasons:
 
 - **Competitive pressure** — leading to lower interest rates on loans without corresponding reductions in deposit rates. Loan prices are not unusual to be reduced in periods of economic growth (with higher lending volumes and low [[02-credit_losses|credit losses]]) and to be increased in periods of recession (with lower lending volumes and high [[02-credit_losses|credit losses]]).
-- **Interest rate changes on mismatched assets and liabilities** — for example, the negative impact of higher interest rates on a bank with deposits of shorter maturities than its loans, or with fixed-rate loans financed by variable-rate deposits. See the [[04-loan_pricing|Fixed-rate Mortgages & Margin Risk]] section.
+- **Interest rate changes on mismatched assets and liabilities** — for example, the negative impact of higher interest rates on a bank with deposits of shorter maturities than its loans, or with fixed-rate loans financed by variable-rate deposits. See the [[05-loan_pricing|Fixed-rate Mortgages & Margin Risk]] section.
 - **Sustained low interest rates** — banks offering loans at historically low rates but being understandably reluctant to impose negative interest rates on retail deposits. Some European banks have charged negative interest rates on large deposits.
 
 ### Cyber Risk

@@ -146,7 +146,7 @@ A toy model was developed using four intuitive portfolio segments to test perfor
 * **Utilisation <10%**
 * **Utilisation between 10–95%**
 
-This [[07-segmentation|segmentation]] allowed early identification of structural biases or volatility in target variables across key behavioural clusters.
+This [[08-segmentation|segmentation]] allowed early identification of structural biases or volatility in target variables across key behavioural clusters.
 
 ---
 
@@ -175,7 +175,7 @@ This was conducted:
 * On **Good Book** vs **Bad Book** (accounts that defaulted vs didn’t)
 * By **FICO band**, **credit limit band**, and **utilisation band**
 
-**EADF consistently showed lower error volatility**, better central tendency alignment, and smoother trends across [[07-segmentation|segmentation]] variables.
+**EADF consistently showed lower error volatility**, better central tendency alignment, and smoother trends across [[08-segmentation|segmentation]] variables.
 
 ---
 

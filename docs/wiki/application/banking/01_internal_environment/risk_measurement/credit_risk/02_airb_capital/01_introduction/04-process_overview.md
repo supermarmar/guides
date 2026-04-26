@@ -32,7 +32,7 @@ Several key design decisions are made to ensure data accuracy, completeness, and
 
 ## Portfolio Description
 
-High level descriptive statistics such as current total portoflio balance, product [[07-segmentation|segmentation]], target customers and strategy.
+High level descriptive statistics such as current total portoflio balance, product [[08-segmentation|segmentation]], target customers and strategy.
 
 ## Modelling
 

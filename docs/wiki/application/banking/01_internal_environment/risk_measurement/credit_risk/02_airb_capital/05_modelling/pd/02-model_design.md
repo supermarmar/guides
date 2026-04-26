@@ -35,7 +35,7 @@ This process was executed in two distinct phases:
 
 **Objective:** Develop a rating model with strong discriminatory power, enabling robust rank ordering of accounts.
 
-* **[[07-segmentation|Segmentation]] Analysis:** The portfolio was segmented into groups of accounts sharing common risk drivers and similar default relationships. This [[07-segmentation|segmentation]] allows for more accurate PiT PD estimation and maximises the model’s overall risk separation.
+* **[[08-segmentation|Segmentation]] Analysis:** The portfolio was segmented into groups of accounts sharing common risk drivers and similar default relationships. This [[08-segmentation|segmentation]] allows for more accurate PiT PD estimation and maximises the model’s overall risk separation.
 * **Variable Analysis:**
 
   * **Univariate analysis** to assess individual predictive power.
@@ -60,7 +60,7 @@ This process was executed in two distinct phases:
 
 **Regulatory Alignment:**
 
-* **[[crr|CRR]] Articles 174, 179, and 180** – [[07-segmentation|Segmentation]], [[04-data-representativeness|data representativeness]], and calibration in line with long-run average default rates.
+* **[[crr|CRR]] Articles 174, 179, and 180** – [[08-segmentation|Segmentation]], [[04-data-representativeness|data representativeness]], and calibration in line with long-run average default rates.
 * **[[pra|PRA]] [[ss4-24|SS4/24]] Paragraph 11.20** – Quantitative and qualitative validation tests performed during [[07-risk_quantification|risk quantification]].
 * **[[bis|Basel]] Requirements** – Incorporation of both rank-ordering capability and appropriate PD level setting.
 

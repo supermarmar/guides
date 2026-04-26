@@ -49,25 +49,25 @@ Where:
 
 ---
 
-### **[[07-segmentation|Segmentation]]**
+### **[[08-segmentation|Segmentation]]**
 
-[[07-segmentation|Segmentation]] follows a similar process to PD:
+[[08-segmentation|Segmentation]] follows a similar process to PD:
 
 * **Data construction**: 12 monthly cohorts of Core and Gap data from 2023.
 * **Metrics for risk differentiation**: (R^2), Gini, and Lift ratio were used to assess discriminatory power across candidate segments.
-* **Key [[07-segmentation|segmentation]] drivers**:
+* **Key [[08-segmentation|segmentation]] drivers**:
 
   * **Utilisation** and **Limits** were the most significant factors.
   * **Decision trees** were applied to determine optimal cut-offs for key splits.
 
-**Final [[07-segmentation|segmentation]] structure:**
+**Final [[08-segmentation|segmentation]] structure:**
 
 1. **Delinquency status** (current vs delinquent)
 2. **Seasoning** (Early MOB vs Seasoned, cut-off determined via decision tree)
 3. **Limit banding** (low limit < 1,000 vs higher limits)
 4. **Activity** (active vs inactive accounts)
 5. **Internal utilisation bands**: 10%, 20%, 50%, 60%, 90% (decision tree splits using EADF as target)
-6. **External utilisation [[07-segmentation|segmentation]]**
+6. **External utilisation [[08-segmentation|segmentation]]**
 
 * For each final segment, a summary table is constructed showing:
 
@@ -76,7 +76,7 @@ Where:
   * Default count
   * Good book limit, balance, and volume
 
-This [[07-segmentation|segmentation]] ensures that the EAD model is **granular, interpretable, and capable of capturing key drivers of exposure behaviour**.
+This [[08-segmentation|segmentation]] ensures that the EAD model is **granular, interpretable, and capable of capturing key drivers of exposure behaviour**.
 
 ---
 

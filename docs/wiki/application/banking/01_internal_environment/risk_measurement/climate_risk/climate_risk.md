@@ -141,7 +141,7 @@ Climate change is expected to impact banks' ability to raise and maintain fundin
 
 Several banks have strong ties to insurance firms, either through group ownership or direct collaboration. The insurance-specific climate risk considerations are:
 
-- **[[01_underwriting|Underwriting]] risk**: The increasing impact of climate change introduces material [[01_underwriting|underwriting]] risk in a similar way to how climate change impacts credit risk — driven primarily by physical risk events that historically would not have been seen at current frequency or severity.
+- **[[01-underwriting|Underwriting]] risk**: The increasing impact of climate change introduces material [[01-underwriting|underwriting]] risk in a similar way to how climate change impacts credit risk — driven primarily by physical risk events that historically would not have been seen at current frequency or severity.
 - **Bank exposure through mortgage insurance**: Mortgage products typically require insurance cover. If insurance becomes more expensive as insurers price in physical risk, this impacts the ability of banks to write loans.
 
 ## Climate Risk Modelling

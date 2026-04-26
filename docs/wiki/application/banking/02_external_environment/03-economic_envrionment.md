@@ -15,7 +15,7 @@ Economic growth encourages bank lending. When an economy grows, more people are 
 
 ## Falling Credit and Economic Contraction
 
-Economic decline leads to lower bank lending. When an economy declines, unemployment rises and production declines. Personal and corporate customers find it more difficult to repay their loans. The value of assets such as property, against which loans are secured, tends to fall during a recession. This causes [[02-credit_losses|credit losses]] to rise, possibly by large percentages. Banks seek to increase [[04-loan_pricing|loan pricing]], and individuals and companies become more cautious about taking on new credit.
+Economic decline leads to lower bank lending. When an economy declines, unemployment rises and production declines. Personal and corporate customers find it more difficult to repay their loans. The value of assets such as property, against which loans are secured, tends to fall during a recession. This causes [[02-credit_losses|credit losses]] to rise, possibly by large percentages. Banks seek to increase [[05-loan_pricing|loan pricing]], and individuals and companies become more cautious about taking on new credit.
 
 Lower bank lending leads to economic contraction — companies invest less, consumers buy fewer goods on credit, unemployment rises further, and banks' [[02-credit_losses|credit losses]] increase. As banks become more cautious about lending, they contribute to economic contraction.
 

@@ -117,11 +117,46 @@ When preparing the training dataset for PIT PD calibration:
 ## Write Offs
 
 
+A financial asset (or portion thereof) is written off when the entity has **no reasonable expectation of recovery**. This is a derecognition event — the gross carrying amount is removed from the balance sheet. The Critical Misconception:
+
+> ❌ **Wrong:** The write-off hits the income statement as an expense.
+>
+> ✅ **Correct:** The P&L impact occurs **when the ECL provision is raised**, not at the point of write-off.
+
+By the time a write-off occurs, a Stage 3 loss allowance (ECL provision) should already be sitting on the balance sheet, having been expensed through P&L when it was booked. The write-off simply collapses both the gross asset and the provision simultaneously.
+
+```
+Dr  Loss Allowance (contra-asset)     X
+Cr  Gross Loan Asset                  X
+```
+
+No P&L entry. No new equity impact. The balance sheet shrinks on both sides but net carrying amount — which was already zero — remains zero.
+
+|  | Before Write-Off | After Write-Off |
+|---|---|---|
+| Gross Loan | 1,000 | 0 |
+| Loss Allowance | (1,000) | 0 |
+| **Net Carrying Amount** | **0** | **0** |
+| Equity | Unchanged | Unchanged |
+
+> Equity was reduced **earlier** when the impairment expense was recognised. The write-off is balance sheet neutral at execution.
+
+If the write-off **exceeds** the existing provision (i.e. the bank under-provisioned), the excess does hit P&L as an additional impairment charge at the point of write-off.
+
 ### PWOR
 
 Post Write-Off Recoveries refer to the collections or repayments a bank manages to recover from borrowers after their loans have been written off as bad debts. In accounting terms, a write-off occurs when the bank deems that a loan is unlikely to be repaid and removes it from the active accounts receivable or loan book. However, even after a write-off, the bank can continue pursuing recovery actions through legal means, collection agencies, or other strategies.
 
 A loan is written off when the bank believes there is minimal likelihood of full repayment based on its internal policies and regulations (e.g., after a certain period of nonpayment or legal default). The loan balance is removed from the bank's financial statements as an asset. Any recoveries after the write-off are recorded as recovery income in the bank’s income statement, not as a reversal of the write-off.
+
+Any cash subsequently recovered is recognised as income through P&L:
+
+```
+Dr  Cash
+Cr  Impairment Reversal (P&L income)
+```
+
+The gross carrying amount is **not reinstated**. The recovery flows directly to P&L, increasing retained earnings and rebuilding equity.
 
 ### Write Off Rule
 

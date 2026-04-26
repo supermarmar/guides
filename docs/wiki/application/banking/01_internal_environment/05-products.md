@@ -467,6 +467,6 @@ For an **IPO (Initial Public Offering)**, little or no pricing information exist
 
 In addition to price discovery, the investment bank will need to ensure that the company satisfies the requirements of the exchange through which it wishes to sell shares. This will involve corporate governance and public disclosures. The investment bank will prepare a **prospectus** for potential investors.
 
-The investment bank may **underwrite** the IPO, agreeing to buy any shares that are not sold to investors (with fees reflecting its [[01_underwriting|underwriting]] risk as well as its advisory services). For a large IPO, it is likely that a syndicate of investment banks will spread the [[01_underwriting|underwriting]] risk and ensure a wide distribution of shares.
+The investment bank may **underwrite** the IPO, agreeing to buy any shares that are not sold to investors (with fees reflecting its [[01-underwriting|underwriting]] risk as well as its advisory services). For a large IPO, it is likely that a syndicate of investment banks will spread the [[01-underwriting|underwriting]] risk and ensure a wide distribution of shares.
 
 The fees charged for an IPO are generally expressed as a percentage of the amount raised, and can vary from 3% for large IPOs to 7% for smaller IPOs. The price discovery role of investment banks has had the effect of limiting competition in equity issuance.

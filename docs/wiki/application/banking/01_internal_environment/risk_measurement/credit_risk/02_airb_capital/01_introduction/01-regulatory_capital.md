@@ -116,14 +116,11 @@ The [[bis|Basel]] Committee reserves the right to apply a scaling factor (less t
 
 A scaling factor of 1,06 has been applied by the [[sarb|SARB]] consistent with international practice.
 
-##### Defaulted Assets
+##### <mark style="background: #FFB86CA6;">Defaulted Assets</mark>
 
 The capital requirement (as a percentage of the outstanding balance) for defaulted assets is calculated as:
 
-```math
-K = \max(0,\text{LGD}_\text{Reg}\times \text{BEEL}
-```
-
+$$ K = \max(0,\text{LGD}_\text{Reg} - \text{BEEL})$$
 LGDs for defaulted assets should reflect the need for potential additional losses over the recovery period. The best estimate of expected loss (BEEL) is the estimate of loss set by the bank taking into account the current economic climate and the status of the facility. The BEEL is usually the specific provision loss estimate of that facility.
 
 ##### Maturity Adjustment

@@ -7,7 +7,7 @@ aliases:
 ---
 # Loan Pricing
 
-This file covers the pricing of bank loan products by product type (retail, corporate, investment bank), including key credit risk drivers, structural risks, and the challenge of managing fixed-rate loan margins through interest rate cycles. For the DCF modelling framework used to derive loan prices see [DCF Model](05-dcf_model.md). For general pricing principles see [Pricing Framework](02-pricing_framework.md).
+This file covers the pricing of bank loan products by product type (retail, corporate, investment bank), including key credit risk drivers, structural risks, and the challenge of managing fixed-rate loan margins through interest rate cycles. For the DCF modelling framework used to derive loan prices see [DCF Model](06-dcf_model.md). For general pricing principles see [Pricing Framework](02-pricing_framework.md).
 
 ## Retail Loan Products
 
@@ -83,7 +83,7 @@ Loans above certain thresholds require credit committee and board approval. Bank
 
 ## Investment Bank Loans
 
-Investment banks generally prefer not to lend from their own balance sheet, instead intermediating between issuers and capital markets. However, investment banks **underwrite bond and equity issues** — committing to purchase any unsold portion — which creates temporary credit risk if an issue is not successfully placed with investors. This [[01_underwriting|underwriting]] risk is priced into the fees and [[01_underwriting|underwriting]] spread.
+Investment banks generally prefer not to lend from their own balance sheet, instead intermediating between issuers and capital markets. However, investment banks **underwrite bond and equity issues** — committing to purchase any unsold portion — which creates temporary credit risk if an issue is not successfully placed with investors. This [[01-underwriting|underwriting]] risk is priced into the fees and [[01-underwriting|underwriting]] spread.
 
 ## Managing [[03-nii_nim|NIM]] Over the Rate Cycle
 

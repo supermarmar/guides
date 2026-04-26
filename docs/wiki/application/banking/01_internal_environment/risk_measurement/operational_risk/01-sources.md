@@ -5,26 +5,40 @@ tags:
   - study-status/new
 aliases:
 ---
-# Operational Risk: Definition and Sources
+# <mark style="background: #FFF3A3A6;">Sources</mark>
 
-Operational risk is as old as banking, but its measurement and management has only recently been given the focus afforded to credit, interest rate, market, and liquidity risks. In the past it was often placed in the same category as credit risk, despite being markedly different. Measurement, modelling, and capital allocation for operational risks remain challenging and the subject of much debate, but continue to grow as a discipline in the face of an increasingly complex banking environment driven by globalisation, evolving regulations, and technological developments.
-
-## [[basel_2|Basel II]] Definition
-
-The [[basel_2|Basel II]] definition of operational risk is **"the risk of direct or indirect loss resulting from inadequate or failed internal processes, people and systems or from external events"**. For regulatory capital purposes this includes legal risk but excludes reputational and strategic risks.
-
-## Sources of Operational Risk
+Operational risk is as old as banking, but its measurement and management has only recently been given the focus afforded to credit, interest rate, market, and liquidity risks. In the past it was often placed in the same category as credit risk, despite being markedly different. Measurement, modelling, and capital allocation for operational risks remain challenging and the subject of much debate, but continue to grow as a discipline in the face of an increasingly complex banking environment driven by globalization, evolving regulations, and technological developments.
 
 Operational risk stems from four sources:
 
-- **Internal processes** — banks must have clear, orderly, and complete processes to meet responsibilities to customers, manage risk, control payments, protect against fraud, and comply with regulation.
 - **People** — banks must communicate and enforce rules, minimise conflicts of interest, and set proper incentives to maintain an ethical culture.
 - **Systems** — banks must have adequate technology resources that are backed up and protected from security breaches.
+- **Internal processes** — banks must have clear, orderly, and complete processes to meet responsibilities to customers, manage risk, control payments, protect against fraud, and comply with regulation.
 - **External events** — banks must know and monitor customers to guard against fraud and protect people and facilities from any external event.
 
 Operational [[01-risk_management|risk management]] encompasses quality change and business continuity management, and crisis management in adverse situations. While not included in the regulatory definition or capital allocation, operational risk failings affect reputation, customer satisfaction, business and earnings volatility, and shareholder value.
 
 Unlike lending or trading, new operational risks are not acquired to build revenue and profits. Operational risks can be more difficult to foresee and cannot be diversified, sold off, or hedged in the banking market. A key mitigation and pricing tool is insurance, depending on availability. While operational risk cannot be eliminated, the goal is to keep it within acceptable limits and prevent it from eroding business gains.
+
+### People
+
+- _Internal fraud_ — rogue employees, unauthorised trading, embezzlement e.g. [[05-aml_kyc|AML]] failures
+- _Employment practices & workplace safety_ — discrimination claims, wrongful dismissal, health and safety failures
+- _Clients, products & business practices_ — misselling, fiduciary breaches, market manipulation (primarily a people/judgment failure) e.g. TCF risk and [[05-aml_kyc|KYC]]
+### Systems
+
+- _Business disruption & system failures_ — IT outages, hardware failures, software bugs, network disruptions
+### Internal Processes
+
+- _Execution, delivery & process management_ — settlement errors, failed transaction processing, miscommunication with counterparties
+- _Clients, products & business practices_ also has a process dimension — poor product design or inadequate disclosure can be a process failure as much as a people one
+### External Events
+
+- _External fraud_ — theft, hacking, forgery, cyber attacks by outsiders
+  - 1st party fraud: Fake accounts for benefits e.g. ill willed student overdraft
+  - 2nd party fraud: aiding fraud e.g. money laundering with “clean” account
+  - 3rd party fraud: unauthorised account use
+- _Damage to physical assets_ — natural disasters, terrorism, vandalism
 
 ## Conduct Risk
 

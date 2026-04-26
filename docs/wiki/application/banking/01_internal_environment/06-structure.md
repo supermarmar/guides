@@ -62,7 +62,7 @@ Each of these divisions operates semi-autonomously under the banking licence of 
 Within Barclays Bank PLC operate several business lines:
 
 - Barclays Corporate Banking – serving large corporates, financial institutions, and public sector clients through lending, trade finance, and treasury solutions.
-- Barclays Investment Bank – providing investment banking, advisory, and capital markets services globally, including debt and equity [[01_underwriting|underwriting]], M&A advisory, and derivatives trading.
+- Barclays Investment Bank – providing investment banking, advisory, and capital markets services globally, including debt and equity [[01-underwriting|underwriting]], M&A advisory, and derivatives trading.
 - Barclays International – covering non-UK retail, business banking, and wealth management activities, particularly in Europe, the Americas, Asia, and Africa.
 
 Barclays Bank PLC also houses several international branches and subsidiaries, including Barclays Bank Ireland PLC, which serves as the EU hub following Brexit to maintain passporting rights and continuity of service within the European Economic Area (EEA).

@@ -318,7 +318,7 @@ commercial real estate that exhibits higher loss rate volatility (i.e. higher as
 
 233.   Within the retail asset class category, banks are required to identify separately three sub-classes of exposures: (a) exposures secured by residential properties as defined above, (b) qualifying revolving retail exposures, as defined in the following paragraph, and (c) all other retail exposures.
 
-234.   All of the following criteria must be satisfied for a sub-portfolio to be treated as a qualifying revolving retail exposure (QRRE). These criteria must be applied at a sub-portfolio level consistent with the bank’s [[07-segmentation|segmentation]] of its retail activities generally. [[07-segmentation|Segmentation]] at the national or country level (or below) should be the general rule.
+234.   All of the following criteria must be satisfied for a sub-portfolio to be treated as a qualifying revolving retail exposure (QRRE). These criteria must be applied at a sub-portfolio level consistent with the bank’s [[08-segmentation|segmentation]] of its retail activities generally. [[08-segmentation|Segmentation]] at the national or country level (or below) should be the general rule.
 
 - (a) The exposures are revolving, unsecured, and uncommitted (both contractually and in practice). In this context, revolving exposures are defined as those where customers’ outstanding balances are permitted to fluctuate based on their decisions to borrow and repay, up to a limit established by the bank.
 - (b) The exposures are to individuals.

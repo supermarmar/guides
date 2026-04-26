@@ -11,7 +11,7 @@ aliases:
 
 In accordance with **[[crr|CRR]] Article 172(2)** and to meet the requirements of **[[crr|CRR]] Article 171(1)**, all exposures are **jointly calibrated** across the portfolio.
 
-* **No further calibration [[07-segmentation|segmentation]]** is required.
+* **No further calibration [[08-segmentation|segmentation]]** is required.
 * Risk grade boundaries are **defined directly from the scores** of all PiT PD segment models.
 * This design allows **accounts to migrate** between grades to reflect **changes in PiT PD estimates** over time.
 

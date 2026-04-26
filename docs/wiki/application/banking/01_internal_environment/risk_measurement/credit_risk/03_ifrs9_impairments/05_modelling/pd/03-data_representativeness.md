@@ -17,7 +17,7 @@ $r(k,x_{i},x_{i,t},t')=\frac{1}{n_0(x_{i},x_{i,t},t')}\displaystyle \sum_{i\subs
 
 where $𝑛_𝑡'$ denotes the size of the at-risk population within each subset $D'(t')$. Finally, and in verifying sampling representativeness using the equation above, we graph and compare the $v$-month default rate over time and across the various datasets. We furthermore calculate the mean absolute error (MAE) between $D$ and each respective sample, $D_𝑇$ and $D_𝑉$. If these values are low then the sample is representative of the population.
 
-The method above calculates default rates by considering the number of accounts, treating all defaults equally, regardless of exposure size. This is used when the focus is on account-level performance, customer [[07-segmentation|segmentation]], or building behavioral scorecards. Useful for corporate business banking when there is low number of accounts.
+The method above calculates default rates by considering the number of accounts, treating all defaults equally, regardless of exposure size. This is used when the focus is on account-level performance, customer [[08-segmentation|segmentation]], or building behavioral scorecards. Useful for corporate business banking when there is low number of accounts.
 
 ### Exposure Weighted
 

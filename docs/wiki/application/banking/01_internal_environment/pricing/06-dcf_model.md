@@ -5,9 +5,9 @@ tags:
   - study-status/new
 aliases:
 ---
-# DCF [[04-loan_pricing|Loan Pricing]] Model
+# DCF [[05-loan_pricing|Loan Pricing]] Model
 
-This file covers the mechanics of discounted cashflow (DCF) models used to assess the pricing and profitability of loan products — model structure, assumptions, and uses. For the loan products themselves see [Loan Pricing](04-loan_pricing.md). For credit risk parameters (PD, LGD, EAD) see the credit risk modelling files.
+This file covers the mechanics of discounted cashflow (DCF) models used to assess the pricing and profitability of loan products — model structure, assumptions, and uses. For the loan products themselves see [Loan Pricing](05-loan_pricing.md). For credit risk parameters (PD, LGD, EAD) see the credit risk modelling files.
 
 ## Model Overview and Purpose
 
@@ -89,7 +89,7 @@ Recognise capital required at each duration; charge the **opportunity cost of ca
 
 ### Funding Costs (FTP)
 
-Loans are funded by a mix of CET1 capital, debt capital, and deposits. The FTP rate (from treasury's term liquidity premium yield curve) is applied to the balance run-down and in-force volumes at each duration. Interest on debt capital is charged at actual rates paid. See [Deposit Pricing](03-deposit_pricing.md) for FTP and TLP mechanics.
+Loans are funded by a mix of CET1 capital, debt capital, and deposits. The FTP rate (from treasury's term liquidity premium yield curve) is applied to the balance run-down and in-force volumes at each duration. Interest on debt capital is charged at actual rates paid. See [Deposit Pricing](04-deposit_pricing.md) for FTP and TLP mechanics.
 
 ## Profit Calculation and NPV
 

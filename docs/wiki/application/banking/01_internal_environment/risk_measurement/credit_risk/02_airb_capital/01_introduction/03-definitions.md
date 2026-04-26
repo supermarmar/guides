@@ -438,7 +438,7 @@ basis may often be unreasonable.
 
 Owing to this, retail exposures are not generally managed using ratings on an individual borrower basis. Exposures will often be grouped into segments with similar risk characteristics. This often results in the distinction between borrower and product becoming limited or eliminated. In these cases, borrower characteristics (e.g. population segment, income, credit history) and those of the facility (e.g. product type, credit limit, collateral) would be blended in formulating segments.
 
-To demonstrate homogeneity of risk, genuine [[07-segmentation|segmentation]] requires all borrowers within a segment to be treated the same. Ratings reflective of the entire segment can then be applied.
+To demonstrate homogeneity of risk, genuine [[08-segmentation|segmentation]] requires all borrowers within a segment to be treated the same. Ratings reflective of the entire segment can then be applied.
 
 ### Ratings Philosophy
 
