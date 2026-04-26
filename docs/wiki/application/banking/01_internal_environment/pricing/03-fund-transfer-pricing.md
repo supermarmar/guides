@@ -1,4 +1,4 @@
-# Fund Transfer Pricing
+# <mark style="background: #FFF3A3A6;">Fund Transfer Pricing</mark>
 
 Fund Transfer Pricing (FTP) is the internal market through which a bank's treasury function acts as a central counterparty to every business line, buying deposits at an internal bid and selling funding at an internal offer along a tenor-specific curve. Its purpose is not accounting but economic: to strip interest-rate and liquidity risk out of commercial P&L, concentrate those risks in a function that can hedge them, and leave business units accountable only for what they actually control — origination, credit, service and operations. Without FTP, deposit franchises look unprofitable, long-dated lenders look like geniuses, and treasury is a residual P&L of whatever the macro environment delivered. The 2007–08 crisis demonstrated that this is not a harmless book-keeping choice: banks which priced funding but not liquidity systematically over-accumulated illiquid assets, under-rewarded stable deposit gatherers, and wrote off-balance-sheet commitments whose true cost only appeared when wholesale markets closed. Every post-crisis supervisory framework — BCBS 144 (2008), CEBS/EBA (2010 and 2022), US SR 16-3 (2016), PRA SS24/15 — has since rested on the same principle: that **liquidity costs, benefits and risks must be incorporated into internal pricing, performance measurement, and new-product approval for all significant on- and off-balance-sheet activities**. The March 2023 failures of Silicon Valley Bank, Signature and First Republic added a new chapter: that the behavioural assumptions embedded in FTP — especially for non-maturing deposits — must hold up in a digital, socially networked, rising-rate world, not only the world of 2010–2021 regression samples.
 
@@ -73,6 +73,12 @@ The curve choice determines what FTP actually measures. Four families have domin
 **Blended / synthetic curves** — tenor-by-tenor weighted averages of the bank's actual funding mix (retail deposits, secured wholesale, senior unsecured, covered bonds, FHLB advances) — are conceptually optimal because they reflect how the bank *actually* raises a marginal unit. The PRA's cross-firm review documents a trend toward these blended curves. The challenges are endogeneity (the marginal cost of deposits is partly a function of the FTP output itself), ambiguity in the weighting scheme (flow, target-mix, or stock?), and opacity to business lines.
 
 ## Components
+
+The FTP curve is built as:
+
+$$r_{\text{FTP}}(T) = r_{\text{swap}}(T) + \text{LP}(T) + \text{CC}(T) + \text{Optionality}(T)$$
+
+The **base rate** is the risk-free rate at the matching tenor — typically the SOFR swap curve (US) or SONIA swap curve (UK) post-LIBOR transition. Since SOFR is a secured rate, a compensating **credit/liquidity spread** must be added to approximate the bank's actual unsecured funding cost. The **liquidity premium (LP)** — also called the term liquidity premium (TLP) — represents the spread above the risk-free rate that the bank pays for term wholesale funding, derived by stripping the bank's own senior unsecured issuances into their floating-rate equivalent and observing the spread over the reference rate. Pre-2007, bank 5-year unsecured spreads were negligible; post-crisis they widened to **100+ bps** and have remained structurally elevated. The **contingency cost (CC)** allocates the carry cost of LCR/NSFR-compliant HQLA buffers to the instruments creating the liquidity requirement.
 
 ### Base rate
 

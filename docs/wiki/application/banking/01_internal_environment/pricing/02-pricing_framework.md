@@ -34,7 +34,7 @@ This file covers the overarching principles governing how banks price their prod
 - **Competition** — the primary driver of headline prices for most banking products. Competition is strongest in secured lending (mortgages) and fixed deposits; weakest in unsecured lending and investment banking advisory. Large banks typically price headline rates close to competitors. Online banks intensify competition further.
 - **Regulation** — South Africa's **National Credit Act (NCA)** imposes maximum pricing on consumer credit facilities, covering both interest rates and fees (e.g. unsecured personal loans capped at repo rate + 21%). **Treating Customers Fairly (TCF)** regulation limits discriminatory or opaque pricing. In retail banking, at least 51% of loans issued in the UK must be at the advertised headline rate (restricting risk-based pricing breadth).
 
-## <mark style="background: #FFF3A3A6;">Components</mark>
+## <mark style="background: #FFF3A3A6;"> Loan Pricing Components</mark>
 
 The key income and cost components that [[05-loan_pricing|loan pricing]] must cover are: 
 - funds transfer pricing (FTP) — the internal cost assigned by treasury for term-matched funding;
@@ -63,7 +63,19 @@ The gap between the pricing floor (~17%) and the charged APR (~21%) reflects com
 
 For this to be adequate, the bank measures **return on capital (ROC)** and sets **hurdle rates** by product risk category. The more precise measure of economic profit is **Net Income After Cost of Capital (NIACC)** — the bank aims for NIACC-positive pricing.
 
-A critical distinction: the **expected loss component in pricing uses through-the-cycle (TTC) parameters**, while IFRS 9 provisioning uses point-in-time (PIT) estimates. The pricing EL is a long-run cost that must be recovered over the cycle; the accounting provision reflects current forward-looking conditions. During benign periods, the pricing EL exceeds the IFRS 9 provision (building an implicit buffer), while in stress the relationship inverts.
+### Credit Losses
+
+A critical distinction: the **expected loss component in pricing uses through-the-cycle (TTC) parameters**, while IFRS 9 provisioning uses point-in-time (PIT) estimates. The pricing EL is a long-run cost that must be recovered over the cycle; the accounting provision reflects current forward-looking conditions. During benign periods, the pricing EL exceeds the IFRS 9 provision (building an implicit buffer), while in stress the relationship inverts. 
+
+The ECL loading embedded in the interest rate is:
+
+$$\text{EL\%} = \text{PD}_{\text{TTC}} \times \text{LGD}_{\text{downturn}} \times \text{EAD factor}$$
+
+Banks use **TTC PDs** for pricing because the interest rate on a credit card must remain economically viable across the full credit cycle. A TTC PD reflects the long-run average default frequency — if observed annual default rates ranged from 1.5% in expansion to 5% in recession, the TTC central tendency would be approximately **2.8%**. This prevents pro-cyclical pricing that would underprice risk in booms and overprice in recessions. Calibration methods include long-run averaging of observed default rates, mapping to external rating agency TTC default tables, or using the Vasicek single-factor model to condition out the systematic factor from PIT estimates.
+
+**Downturn LGD** (rather than best-estimate LGD) is used in pricing to provide conservatism — reflecting the empirical reality that recovery rates decline during recessions. For unsecured credit cards, downturn LGD typically falls in the **75–90%** range, compared to **10–25%** for first-lien residential mortgages.
+
+## Deposit Pricing Components
 
 [[04-deposit_pricing|Deposit pricing]] objectives include managing inflow volumes, minimising the marginal cost of new deposits, and supporting the bank's [[03-nii_nim|NIM]] targets. Deposit rates must also factor in the liquidity value of each product type (see [Deposit Pricing](04-deposit_pricing.md)).
 
