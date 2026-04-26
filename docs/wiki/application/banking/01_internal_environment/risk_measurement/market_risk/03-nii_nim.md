@@ -85,6 +85,14 @@ The base rate plus liquidity risk premium represents the bank's cost of funding;
 
 **Margin analysis** — a more granular view leveraging the bank's Funds Transfer Pricing (FTP) process, showing the contribution to NII from each business unit as the difference between the customer rate and the transfer pricing rate.
 
+### NIM Management
+
+Banks track [[03-nii_nim|NIM]] by "front book" (new business) and "back book" (existing book) to identify trends, since margins may erode on the front book during competitive growth phases.
+
+Several forces compress [[03-nii_nim|NIM]] over time: competitive pressure reduces loan spreads during economic expansions; [[02-credit_losses|credit losses]] increase during recessions; and rate mismatches between fixed-rate loans and variable-rate deposits create margin exposure when interest rates move. [[03-nii_nim|NIM]] management therefore requires active product design and repricing capability.
+
+Banks must also match the [[03-nii_nim|NIM]] concept to the funding structure. For corporate and investment banking, the **term liquidity premium (TLP)** methodology is essential — treasury charges lending products the true cost of term-matched funding, discouraging cheap short-term funding of long-term assets. For retail banking, the same concept applies but TLP rates must reflect the actual retail deposit mix, not just the wholesale curve, to avoid mispricing loans relative to competitors.
+
 ## Net Interest Spread (NIS)
 
 The net interest spread is the difference between the average interest rate on all of the bank's interest-earning assets and the average interest rate on all of its sources of funds. Unlike NIM, NIS does **not** consider the size of the interest-earning asset base. NIM can change when the asset base expands or contracts even if the spread is unchanged.

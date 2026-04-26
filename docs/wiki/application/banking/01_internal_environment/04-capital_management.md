@@ -188,9 +188,13 @@ There are two components to [[02-stress_testing|Pillar 2]] which have different 
 
 The Pillar 2A requirement will determine what risks have not been identified or fully captured by Pillar 1 and what amount of capital needs to be held to cover these risks. In South Africa, this requirement is specifically set for local market concentration. The capital in Pillar 2A is expected to be met at all times and is usually disclosed publicly – similar to Pillar 1 requirements.
 
-##### [[02-stress_testing|Pillar 2B]]
+##### [[02-stress_testing|Pillar 2B]] ([[02-stress_testing|Stress Testing]] Buffer)
 
-The [[02-stress_testing|Pillar 2B]] requirement (also known as the bank-specific individual capital requirement (ICR) in South Africa), looks at stressed scenarios for the bank and determines what amount of capital the bank needs to hold to absorb any losses from such scenarios. This requirement can also contain capital to cover any specific risks that might have been raised by the supervisor or other ad-hoc risks. In South Africa, the [[02-stress_testing|Pillar 2B]] contains both elements of the total [[02-stress_testing|Pillar 2]] requirements of the UK. [[02-stress_testing|Pillar 2B]] capital is generally not disclosed publicly. [[02-stress_testing|Pillar 2B]] does not include requirements for systemically important banks which are set separately.
+The [[02-stress_testing|Pillar 2B]] requirement (also known as the bank-specific individual capital requirement (ICR) in South Africa), looks at stressed scenarios for the bank and determines what amount of capital the bank needs to hold to absorb any losses from such scenarios. This requirement can also contain capital to cover any specific risks that might have been raised by the supervisor or other ad-hoc risks. 
+
+Banks conduct their own [[02-stress_testing|stress testing]] to determine their additional capital requirements above and beyond the minimum. Both CCoB and CCyB serve to protect the capital base in such stressed scenarios. The CCoB and CCyB numbers are, however, only minimum requirements. If a bank’s own [[02-stress_testing|stress testing]] leads them to determine that they need to hold an amount above the sum of CCoB and CCyB, they should do so, as this would be the most prudent approach. Some banks are so prudent they simply add the stress test buffer to the CCoB and the CCyB.
+
+In South Africa, the [[02-stress_testing|Pillar 2B]] contains both elements of the total [[02-stress_testing|Pillar 2]] requirements of the UK. [[02-stress_testing|Pillar 2B]] capital is generally not disclosed publicly. [[02-stress_testing|Pillar 2B]] does not include requirements for systemically important banks which are set separately.
 
 #### Pillar 3: Disclosures
 
@@ -216,21 +220,32 @@ Under [[basel_framework|Basel III]], banks also now need to hold an additional 2
 
 The countercyclical buffer requires a bank to hold between 0% and 2,5% of additional CET1. This number will be set by the national regulator and works to counteract any cyclical changes expected in the economy. It is generally set at 0% and increased as the economy is perceived to “overheat” when household and corporate debt to GDP increases to levels considered to be unsustainable.
 
-#### Systemically Risk Buffer
+#### Systemically Important Risk Buffer
 
 The last type of capital buffer is the systemically important banks’ buffer ([[g_sibs|G-SIBs]] and D-SIBs). This requirement only applies to large banks which pose a systemic risk as determined by the regulator. The regulator can require a bank to hold up to an additional 3% of RWAs in CET1 if it is determined to be a systemically important bank. For [[g_sibs|G-SIBs]], amounts are set by the [[fsb|FSB]] in consultation with the [[bis|BCBS]] — currently at 2%, 1.5%, and 1% of total RWAs of selected banks. In the UK, amounts are set by the [[pra|PRA]] — currently at 2%, 1.5%, and 1% for ring-fenced banks within the largest UK banks.
 
-#### [[02-stress_testing|Stress Testing]] Buffer
+In South Africa, a D-SIB buffer of up to 2,5% is set by the [[pa|Prudential Authority]]. The first 1% of the specified D-SIB capital requirement, up to a maximum of 1% of a bank’s risk-weighted exposures, must be fully met by CET 1 capital and reserve funds.
 
-Banks conduct their own [[02-stress_testing|stress testing]] to determine their additional capital requirements above and beyond the minimum. Both CCoB and CCyB serve to protect the capital base in such stressed scenarios. The CCoB and CCyB numbers are, however, only minimum requirements. If a bank’s own [[02-stress_testing|stress testing]] leads them to determine that they need to hold an amount above the sum of CCoB and CCyB, they should do so, as this would be the most prudent approach. Some banks are so prudent they simply add the stress test buffer to the CCoB and the CCyB.
+Any additional requirement, up to the first 1,5% of risk-weighted exposures may be met by Tier 1 capital and reserve funds. Any additional requirement to the aforementioned requirement, up to 2,5% of risk-weighted exposures, may be met with total capital and reserve funds.
 
 #### [[tlac|TLAC]]
 
-For the full regulatory detail on [[tlac|TLAC]], see [TLAC Principles and Term Sheet](..\..\regulation\international\fsb\tlac.md).
+Over and above the capital requirements outlined in the [[basel_framework|Basel framework]], the [[fsb|Financial Stability Board]] has also introduced a term sheet containing a separate capital structure over and above [[bis|Basel]] prescribed minimums. The [[fsb|Financial Stability Board]] is an international body that makes recommendations about, and monitors, the global financial system. This structure is applicable to [[g_sibs|G-SIBS]] ([[g_sibs|Global Systemically Important Banks]]) only, but some authorities are considering its application potentially for D-SIBS (Domestic Systemically Important Banks) as well. The framework is referred to as [[tlac|TLAC]] or total loss absorbing capacity. For the full regulatory detail on [[tlac|TLAC]], see [TLAC Principles and Term Sheet](..\..\regulation\international\fsb\tlac.md).
 
-Over and above the capital requirements outlined in the [[basel_framework|Basel framework]], the [[fsb|Financial Stability Board]] has also introduced a term sheet containing a separate capital structure over and above [[bis|Basel]] prescribed minimums. The [[fsb|Financial Stability Board]] is an international body that makes recommendations about, and monitors, the global financial system. This structure is applicable to [[g_sibs|G-SIBS]] ([[g_sibs|Global Systemically Important Banks]]) only, but some authorities are considering its application potentially for D-SIBS (Domestic Systemically Important Banks) as well. The framework is referred to as [[tlac|TLAC]] or total loss absorbing capacity. The primary aim is to ensure sufficient liabilities are available to bail in in the event of a resolution and, if deemed appropriate, recapitalise the bank without the need for a taxpayer bail-out. Other resolution techniques are also available. In South Africa, a D-SIB buffer of up to 2,5% is set by the [[pa|Prudential Authority]]. The first 1% of the specified D-SIB capital requirement, up to a maximum of 1% of a bank’s risk-weighted exposures, must be fully met by CET 1 capital and reserve funds.
+**Purpose — the "too big to fail" problem.** The GFC exposed a brutal dilemma: when a G-SIB (Global Systemically Important Bank) neared failure, regulators faced two bad options — let it collapse in a disorderly way (systemic contagion) or bail it out with taxpayer money (moral hazard). They almost always chose the bailout. TLAC was designed to make a _third option_ viable: **orderly resolution without public funds**. The mechanism is bail-in — creditors absorb losses and are converted into equity, the bank is recapitalized, and it emerges from resolution still able to perform its critical economic functions.
 
-Any additional requirement, up to the first 1,5% of risk-weighted exposures may be met by Tier 1 capital and reserve funds. Any additional requirement to the aforementioned requirement, up to 2,5% of risk-weighted exposures, may be met with total capital and reserve funds.
+**It's not just capital.** This is the key distinction. Basel III capital (CET1, AT1, Tier 2) covers loss absorption on a going-concern and gone-concern basis. TLAC goes further: it must also cover _recapitalization_ needs post-resolution. To achieve that scale, eligible instruments include not only regulatory capital but also qualifying **bail-in-able senior unsecured debt** — instruments that can be written down or converted in resolution. Calling it purely a "capital requirement" misses this debt component.
+
+The minimum TLAC requirement is set as the _higher_ of:
+
+- **16% of Risk-Weighted Assets** (rising to 18% from 2022), and
+- **6% of the leverage ratio exposure/denominator**  (rising to 6.75% from 2022)
+
+These sit _below_ the combined buffer requirements (capital conservation buffer + G-SIB surcharge), which must be held on top. So a G-SIB's total loss-absorbing stack is: TLAC minimum + capital buffers.
+
+Eligible liabilities must be subordinated to operational liabilities, have a minimum remaining maturity of one year, and must not be insured or subject to netting — conditions designed to ensure they are genuinely bail-in-able without touching depositors or counterparties.
+
+The EU parallel is **MREL** (Minimum Requirement for own funds and Eligible Liabilities) under the BRRD, which applies to all EU banks, not just G-SIBs, but with institution-specific calibration.
 
 #### [[mrel|MREL]]
 

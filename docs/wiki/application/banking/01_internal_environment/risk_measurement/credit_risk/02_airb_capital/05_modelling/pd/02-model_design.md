@@ -64,8 +64,3 @@ This process was executed in two distinct phases:
 * **[[pra|PRA]] [[ss4-24|SS4/24]] Paragraph 11.20** – Quantitative and qualitative validation tests performed during [[07-risk_quantification|risk quantification]].
 * **[[bis|Basel]] Requirements** – Incorporation of both rank-ordering capability and appropriate PD level setting.
 
----
-
-If you’d like, I can also prepare a **visual process flow diagram** for this, which could help in explaining the two-phase approach clearly to both stakeholders and regulators. This will make the flow from PiT estimation to final regulatory PD more intuitive.
-
-Do you want me to prepare that next?

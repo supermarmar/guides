@@ -108,7 +108,7 @@ Since the `?` is a metacharacter, you need to use the escape character in your r
 
 ### **0 or More, 1 or More**
 
-In 1951, mathematician Stephen Cole Kleene developed a system to match patterns in written language with mathematical [[notation]]. This [[notation]] is now known as regular expressions!
+In 1951, mathematician Stephen Cole Kleene developed a system to match patterns in written language with mathematical [[01_notation]]. This [[01_notation]] is now known as regular expressions!
 
 In his honor, the next piece of regular expressions syntax we will learn is known as the Kleene star. The Kleene star, denoted with the asterisk `*`, is also a quantifier, and matches the preceding character 0 or more times. This means that the character doesn’t need to appear, can appear once, or can appear many many times.
 

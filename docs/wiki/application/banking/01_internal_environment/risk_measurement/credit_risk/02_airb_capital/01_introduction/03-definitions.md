@@ -433,8 +433,7 @@ Ratings have two dimensions:
 
 Ratings remain relatively constant and are often linked to a schedule of average default probabilities.
 
-Ratings, if they are to be truly indicative of the credit risk presented by a client, require an extensive amount of accurate information. For larger clients, many of whom will maintain financial statements, this information is more easily accessed and verified. For smaller clients in retail, such as SMEs and individuals, this is not the case and so calculating ratings on a one-onone
-basis may often be unreasonable.
+Ratings, if they are to be truly indicative of the credit risk presented by a client, require an extensive amount of accurate information. For larger clients, many of whom will maintain financial statements, this information is more easily accessed and verified. For smaller clients in retail, such as SMEs and individuals, this is not the case and so calculating ratings on a one-onone basis may often be unreasonable.
 
 Owing to this, retail exposures are not generally managed using ratings on an individual borrower basis. Exposures will often be grouped into segments with similar risk characteristics. This often results in the distinction between borrower and product becoming limited or eliminated. In these cases, borrower characteristics (e.g. population segment, income, credit history) and those of the facility (e.g. product type, credit limit, collateral) would be blended in formulating segments.
 

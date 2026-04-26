@@ -9,7 +9,7 @@ aliases:
 
 Extending credit is one of the core business activities of a bank. This activity incurs credit risk, which should be measured and managed appropriately. There are many considerations when measuring credit risk, such as the factors to assess, prevailing regulation and guidance, modelling techniques, and product characteristics.
 
-## Front Book vs Back Book
+## Books
 
 ### Front Book
 

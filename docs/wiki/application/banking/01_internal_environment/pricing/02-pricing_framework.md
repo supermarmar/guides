@@ -75,19 +75,51 @@ Banks use **TTC PDs** for pricing because the interest rate on a credit card mus
 
 **Downturn LGD** (rather than best-estimate LGD) is used in pricing to provide conservatism — reflecting the empirical reality that recovery rates decline during recessions. For unsecured credit cards, downturn LGD typically falls in the **75–90%** range, compared to **10–25%** for first-lien residential mortgages.
 
-## Deposit Pricing Components
+| Dimension | Pricing (TTC) | IFRS 9 Provisioning (PIT) |
+|---|---|---|
+| PD basis | Through-the-cycle (long-run average) | Point-in-time (forward-looking, macro-adjusted) |
+| LGD basis | Downturn LGD (conservative) | Best-estimate PIT LGD |
+| Time horizon | 1-year annualised (for revolving products) | 12-month (Stage 1) or lifetime (Stages 2–3) |
+| Stability | Stable across the cycle | Volatile — tracks macro scenarios |
+| Purpose | Recover average losses over time through the rate | Reflect current expected losses on the balance sheet |
+| Conservatism | Includes margin of conservatism | Must be unbiased — best estimate |
 
-[[04-deposit_pricing|Deposit pricing]] objectives include managing inflow volumes, minimising the marginal cost of new deposits, and supporting the bank's [[03-nii_nim|NIM]] targets. Deposit rates must also factor in the liquidity value of each product type (see [Deposit Pricing](04-deposit_pricing.md)).
+During a benign credit environment, IFRS 9 PIT PDs will be **lower** than TTC pricing PDs, meaning the bank is implicitly accumulating a buffer through the interest rate. During a recession, the relationship inverts: IFRS 9 provisions spike above the pricing EL, and the buffer built in good years absorbs the difference. This asymmetry is a feature, not a bug — it is why TTC pricing creates economic stability in the lending model.
 
-## [[03-nii_nim|Net Interest Margin]] Management
+### Cost of Capital
 
-**[[03-nii_nim|Net interest income]] ([[03-nii_nim|NII]])** = interest earned on assets − interest paid on liabilities. **[[03-nii_nim|Net interest margin]] ([[03-nii_nim|NIM]])** = [[03-nii_nim|NII]] ÷ average interest-earning assets. Banks track [[03-nii_nim|NIM]] by "front book" (new business) and "back book" (existing book) to identify trends, since margins may erode on the front book during competitive growth phases.
+**Worked example** (PD = 3%, downturn LGD = 80%, R = 0.04):
 
-Several forces compress [[03-nii_nim|NIM]] over time: competitive pressure reduces loan spreads during economic expansions; [[02-credit_losses|credit losses]] increase during recessions; and rate mismatches between fixed-rate loans and variable-rate deposits create margin exposure when interest rates move. [[03-nii_nim|NIM]] management therefore requires active product design and repricing capability.
+- $\Phi^{-1}(0.03) = -1.8808$; $\Phi^{-1}(0.999) = 3.0902$
+- $\sqrt{1/(1-0.04)} = 1.02062$; $\sqrt{0.04/(1-0.04)} = 0.20412$
+- Conditional PD = $\Phi(1.02062 \times (-1.8808) + 0.20412 \times 3.0902) = \Phi(-1.2885) \approx 0.0988$
+- **K = 0.80 × (0.0988 − 0.03) = 5.50%**
+- Risk weight = 5.50% × 12.5 = **68.75%**
 
-Banks must also match the [[03-nii_nim|NIM]] concept to the funding structure. For corporate and investment banking, the **term liquidity premium (TLP)** methodology is essential — treasury charges lending products the true cost of term-matched funding, discouraging cheap short-term funding of long-term assets. For retail banking, the same concept applies but TLP rates must reflect the actual retail deposit mix, not just the wholesale curve, to avoid mispricing loans relative to competitors.
+This is consistent with the reported US advanced-approaches average risk weight for credit cards of approximately **73%** (FFIEC 101 data, 2014–2022).
 
-## Price vs Volume Trade-Off
+The capital charge embedded in the price is then:
+
+$$\text{Capital charge (\% of EAD, p.a.)} = \text{RW} \times \text{CET1 requirement} \times r_{\text{ROE}}$$
+
+For our example: 68.75% × 10.5% CET1 (4.5% minimum + 2.5% CCB + 3.5% illustrative Pillar 2/G-SIB buffers) × 12% target ROE = **0.87%**, or **87 basis points** per annum. This is the minimum annual return on the credit card EAD that must be earned purely to compensate shareholders for the equity capital consumed.
+
+### Scorecards → Ratecards
+
+The pricing pipeline flows from **score → rating grade → PD → EL% and RWA → pricing tier**. At origination, the **application scorecard** evaluates the applicant using demographics, income, employment, requested amount, and bureau data, producing a numerical score that predicts 12–24 month default probability. Post-origination, the **behavioural scorecard** continuously updates the risk assessment using payment history, usage patterns, delinquency, and balance trends. This behavioural score feeds IFRS 9 staging decisions (SICR assessment) and, in jurisdictions permitting it, repricing decisions.
+
+Each score maps to an internal risk grade, and each grade carries a calibrated TTC PD. The EL% for that grade is then computed and added to the common cost base (FTP + OpEx + capital charge) to determine the minimum required rate for that risk band:
+
+| Risk grade | TTC PD | LGD | EL% | FTP | OpEx | Capital charge | Profit | **APR** |
+|---|---|---|---|---|---|---|---|---|
+| A (Super-prime) | 0.5% | 80% | 0.4% | 5.0% | 4.0% | 0.6% | 2.0% | **12.0%** |
+| B (Prime) | 2.0% | 80% | 1.6% | 5.0% | 4.0% | 0.8% | 2.0% | **13.4%** |
+| C (Near-prime) | 5.0% | 85% | 4.3% | 5.0% | 5.0% | 1.2% | 2.0% | **17.5%** |
+| D (Subprime) | 10.0% | 90% | 9.0% | 5.0% | 5.0% | 1.8% | 2.0% | **22.8%** |
+
+Note that the capital charge also increases with PD because the IRB risk-weight function produces higher K (and thus higher RWA) at higher PDs, requiring more CET1 per unit of exposure.
+
+### Price vs Volume Trade-Off
 
 Because banks have large fixed and semi-fixed cost bases (head office, IT, branch networks, central functions), [[05-loan_pricing|loan pricing]] cannot be set purely by DCF fundamentals. A bank pricing above market rates risks sub-scale volumes that fail to cover fixed costs; a bank pricing below DCF fundamentals generates volume but destroys value.
 
@@ -98,3 +130,26 @@ The practical approach is:
 - Price new business at marginal (not fully-loaded) cost for the cut-off decision, but monitor fully-loaded profitability across the portfolio to ensure fixed costs are covered.
 
 This is analogous to the pricing discipline in general insurance and in industrial businesses: volume below the break-even point produces losses, but volume above marginal cost provides contribution to fixed costs even if it does not cover fully-loaded costs.
+
+### Floors & Ceilings
+
+Banks set **floor APRs** (e.g., "Prime + 12.99%, minimum 14.99%") to ensure minimum profitability when benchmark rates decline. On the ceiling side, **no general federal usury cap** exists for credit cards in the US — most major issuers are chartered in Delaware or South Dakota, which impose no caps. The Military Lending Act caps rates at **36% APR** for active-duty personnel. Federal credit unions face a statutory cap of **18%**. In the UK, there is no statutory interest rate cap for credit cards, though the FCA's persistent debt rules require issuers to intervene when customers pay more in interest and fees than principal repayment over 18 months. Proposed US legislation in the 119th Congress includes bills for 10% and 36% caps, though none has been enacted. Bank Policy Institute analysis suggests a 10% cap would deny credit access to approximately **14 million US households**, concentrated among subprime borrowers.
+
+### RAROC Decision Framework
+
+RAROC (Risk-Adjusted Return on Risk-Adjusted Capital, often just called "RAROC" in practice) is:
+
+$$\text{RAROC} = \frac{\text{Interest income} + \text{Fee income} - \text{FTP cost} - \text{OpEx} - \text{Expected Loss} - \text{Tax}}{\max(\text{Economic Capital}, \text{Regulatory Capital})}$$
+
+The **hurdle rate** is the minimum RAROC a transaction, product, or business unit must achieve. It is typically derived from the **cost of equity via CAPM** — not the WACC — because the cost of debt (deposits, wholesale funding) is already deducted in the numerator as the FTP charge. Typical bank hurdle rates fall in the **10–15%** range. FDIC supervisory guidance cites 10%; Zachary Scott reports 12% as a representative large-bank target; McKinsey Working Paper No. 24 (2011) recommends **granular hurdles** that differ by business unit based on each unit's marginal beta contribution to systematic risk.
+
+The minimum required loan rate can be **back-solved** from the RAROC hurdle:
+
+$$r_{\text{min}} = r_{\text{FTP}} + (\text{PD} \times \text{LGD}) + c_{\text{OpEx}} + \left(\frac{\text{EC}}{\text{EAD}} \times r_{\text{hurdle}}\right)$$
+
+Any rate charged above $r_{\text{min}}$ generates economic value added (EVA). Banks use RAROC at multiple levels: **transaction-level** (approve/reject/reprice individual applications), **product-level** (assess whether the credit card portfolio as a whole clears the hurdle), **business-unit level** (compare retail versus wholesale returns), and **portfolio optimisation** (reallocate capital from low-RAROC to high-RAROC segments). McKinsey's survey of 11 global banks found that approximately 75% of economic capital at one institution was deployed in business units earning **below** the cost of capital — illustrating why RAROC discipline matters.
+
+Post-2008, the distinction between **economic capital** (internal VaR-based estimate calibrated to a target solvency standard, e.g., AA rating ≈ 99.95% confidence) and **regulatory capital** (Basel-prescribed minimum) has collapsed somewhat. Stringent post-crisis regulatory requirements mean regulatory capital is now often the binding constraint. Most banks therefore use **max(EC, RC)** as the RAROC denominator, or compute dual metrics.
+## Deposit Pricing Components
+
+[[04-deposit_pricing|Deposit pricing]] objectives include managing inflow volumes, minimising the marginal cost of new deposits, and supporting the bank's [[03-nii_nim|NIM]] targets. Deposit rates must also factor in the liquidity value of each product type (see [Deposit Pricing](04-deposit_pricing.md)).
