@@ -7,7 +7,7 @@ aliases:
 ---
 # Risk Appetite
 
-The risk appetite of a bank is driven to a large extent by the size of its free or available capital, and to a material extent by its funding model and its ability to raise sufficient levels of long-term (or stable) liquidity. Banks must maintain minimum regulatory capital ratios but should also perform a thorough analysis of their [[01-business_model|business model]] and capital needs under various scenarios. The amount of capital required as assessed by a bank in order to remain solvent at a given confidence level and time horizon is known as **risk capital** or **[[01-economic_capital|economic capital]]**.
+The risk appetite of a bank is driven to a large extent by the size of its free or available capital, and to a material extent by its funding model and its ability to raise sufficient levels of long-term (or stable) liquidity. Banks must maintain minimum regulatory capital ratios but should also perform a thorough analysis of their [[01-business_model|business model]] and capital needs under various scenarios. The amount of capital required as assessed by a bank in order to remain solvent at a given confidence level and time horizon is known as **risk capital** or **[[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/credit_concentration_risk/01-context|economic capital]]**.
 
 ## Risk Appetite Statement
 
@@ -61,8 +61,8 @@ Bank-specific KRIs include:
 - Credit loss ratio
 - Provisions coverage
 - Concentration limits
-- [[05-nsfr|Net stable funding ratio]]
-- [[04-lcr|Liquidity coverage ratio]]
+- [[03-long_term_metrics|Net stable funding ratio]]
+- [[01-short_term_metrics|Liquidity coverage ratio]]
 - Encumbrance ratio
 
 Banks are most likely to be more conservative in setting their breach levels for the indicators set above — the risk appetite boundaries are likely to be set above the regulatory minimums.

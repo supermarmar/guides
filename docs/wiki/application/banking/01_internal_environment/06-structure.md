@@ -33,7 +33,7 @@ The holding company ensures compliance with prudential and corporate governance 
 
 The core operating entity under the group is FirstRand Bank Limited, which holds the group’s banking licence issued under the [[banks_act|Banks Act]] of South Africa. This subsidiary houses the group’s main banking activities, including retail, commercial, corporate, and investment banking services.
 
-As one of the largest banking groups in South Africa, FirstRand is designated as a Domestic Systemically Important Bank (D-SIB) by the [[sarb|South African Reserve Bank]]. This designation subjects it to enhanced regulatory requirements, including higher capital buffers, stringent [[02-stress_testing|stress testing]], and recovery and resolution planning to ensure the continuity of critical financial services in times of stress.
+As one of the largest banking groups in South Africa, FirstRand is designated as a Domestic Systemically Important Bank (D-SIB) by the [[sarb|South African Reserve Bank]]. This designation subjects it to enhanced regulatory requirements, including higher capital buffers, stringent [[01-pillar_2b|stress testing]], and recovery and resolution planning to ensure the continuity of critical financial services in times of stress.
 
 *Barclays Bank PLC*
 
@@ -62,7 +62,7 @@ Each of these divisions operates semi-autonomously under the banking licence of 
 Within Barclays Bank PLC operate several business lines:
 
 - Barclays Corporate Banking – serving large corporates, financial institutions, and public sector clients through lending, trade finance, and treasury solutions.
-- Barclays Investment Bank – providing investment banking, advisory, and capital markets services globally, including debt and equity [[01-underwriting|underwriting]], M&A advisory, and derivatives trading.
+- Barclays Investment Bank – providing investment banking, advisory, and capital markets services globally, including debt and equity [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/01_introduction/01-context|underwriting]], M&A advisory, and derivatives trading.
 - Barclays International – covering non-UK retail, business banking, and wealth management activities, particularly in Europe, the Americas, Asia, and Africa.
 
 Barclays Bank PLC also houses several international branches and subsidiaries, including Barclays Bank Ireland PLC, which serves as the EU hub following Brexit to maintain passporting rights and continuity of service within the European Economic Area (EEA).
@@ -172,7 +172,7 @@ A broader definition of such banks includes community banks, credit unions, and 
 
 Some banks make greater use of wholesale funding and less use of retail deposits. They typically concentrate on loans to medium and large corporate customers. Compared to deposit-taking banks, wholesale-funded banks are likely to have:
 
-- Relatively low [[03-nii_nim|NIM]] and margins — because of lower interest rates received on low-risk corporate loans and higher interest rates paid on wholesale funding than on low-cost retail deposits
+- Relatively low [[04-nii_nim|NIM]] and margins — because of lower interest rates received on low-risk corporate loans and higher interest rates paid on wholesale funding than on low-cost retail deposits
 - Lower [[02-credit_losses|credit losses]] — because of the high quality of their borrowers
 - Lower costs — because of their simpler [[01-business_model|business model]]
 - A lower regulatory burden where they are not subject to the same regulations as deposit-taking institution.

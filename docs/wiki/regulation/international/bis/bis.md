@@ -7,7 +7,7 @@ aliases:
 ---
 # Basel
 
-This file covers the history of the BIS, the BCBS, and the evolution of the Basel accords (I → II → III → 3.1). For the application of these standards in bank [[04-capital_management|capital management]], see [Capital](\..\..\..\application\banks\04-capital.md). For the detailed computation of RWAs under each [[basel_framework|Basel framework]] for credit risk, see [Regulatory Capital (Banking Book)](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). For the mathematical foundations of the IRB model (Vasicek, loss distributions), see [Credit Losses](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\02-credit_losses.md).
+This file covers the history of the BIS, the BCBS, and the evolution of the Basel accords (I → II → III → 3.1). For the application of these standards in bank [[03-capital_management|capital management]], see [Capital](\..\..\..\application\banks\04-capital.md). For the detailed computation of RWAs under each [[basel_framework|Basel framework]] for credit risk, see [Regulatory Capital (Banking Book)](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). For the mathematical foundations of the IRB model (Vasicek, loss distributions), see [Credit Losses](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\02-credit_losses.md).
 
 ## Bank for International Settlements
 
@@ -194,9 +194,9 @@ The Basel Accord is not a law.
 2. Freedom: What is the ability of this asset to absorb losses on an ongoing basis? The better the asset at absorbing losses, the higher the tier.
 3. Subordination: Where does this asset rank relative to depositors and other creditors? The closer the ranking to these counterparties, the better quality the capital.
 
-#### [[05-market_risk|Market Risk]] Amendemnt
+#### [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|Market Risk]] Amendemnt
 
-The Committee also refined the framework to address risks other than credit risk, which was the focus of the 1988 Accord. In January 1996, following two consultative processes, the Committee issued the Amendment to the Capital Accord to incorporate market risks (or [[05-market_risk|Market Risk]] Amendment), to take effect at the end of 1997. This was designed to incorporate within the Accord a capital requirement for the market risks arising from banks' exposures to foreign exchange, traded debt securities, equities, commodities and options. An important aspect of the [[05-market_risk|Market Risk]] Amendment was that banks were, for the first time, allowed to use internal models (value-at-risk models) as a basis for measuring their [[06-market_risk_capital|market risk capital]] requirements, subject to strict quantitative and qualitative standards. Much of the preparatory work for the [[05-market_risk|market risk]] package was undertaken jointly with securities regulators.
+The Committee also refined the framework to address risks other than credit risk, which was the focus of the 1988 Accord. In January 1996, following two consultative processes, the Committee issued the Amendment to the Capital Accord to incorporate market risks (or [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|Market Risk]] Amendment), to take effect at the end of 1997. This was designed to incorporate within the Accord a capital requirement for the market risks arising from banks' exposures to foreign exchange, traded debt securities, equities, commodities and options. An important aspect of the [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|Market Risk]] Amendment was that banks were, for the first time, allowed to use internal models (value-at-risk models) as a basis for measuring their [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/01-context|market risk capital]] requirements, subject to strict quantitative and qualitative standards. Much of the preparatory work for the [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] package was undertaken jointly with securities regulators.
 
 <https://www.bis.org/publ/bcbs24a.htm>
 
@@ -206,7 +206,7 @@ While [[basel_1|Basel I]] improved and standardised the way capital requirements
 
 1. Lack of differentiation: Under this accord, all loans by a bank to a corporation had a risk weight of 100% and required the same amount of capital. A loan to a company with an AAA credit rating was treated in the same way as one to a corporation with a B rating (much riskier).
 2. Lack of correlation: There was no model of default correlation to assess how the risk of assets were correlated (especially in times of stress) or how diversification may benefit the bank
-3. Lack of breadth: The original [[basel_1|Basel I]] Accord did not consider market, operational and liquidity risk. While there was an amendment made in 1996 to include [[05-market_risk|market risk]], the requirements for assessing risk in the trading book, including [[07-var_limitations|value at risk]] (VaR) methodologies, were rudimentary and failed to recognise the risk inherent in the books
+3. Lack of breadth: The original [[basel_1|Basel I]] Accord did not consider market, operational and liquidity risk. While there was an amendment made in 1996 to include [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]], the requirements for assessing risk in the trading book, including [[03-var_limitations|value at risk]] (VaR) methodologies, were rudimentary and failed to recognise the risk inherent in the books
 4. Static measure of credit risk: It assumes that a minimum 8% CAR is adequate at all times and that the credit risk posed by counterparties does not change as the credit exposure ages.
 
 ### [[basel_2|Basel II]]
@@ -221,7 +221,7 @@ The new framework was designed to improve the way regulatory capital requirement
 
 1. To maintain an adequate amount of regulatory capital, which addressed the risk inherent in asset exposure and their default correlation and incorporated operational risk (i.e. to ensure that capital allocation was more risk-sensitive)
 2. To enhance disclosure requirements to allow market participants to be able to more easily compare the capital adequacy of different institutions
-3. To ensure that risk assessment for credit, operation, and [[05-market_risk|market risk]] were performed using quantifiable techniques
+3. To ensure that risk assessment for credit, operation, and [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] were performed using quantifiable techniques
 4. To attempt to better align economic and regulatory capital to reduce the scope for regulatory arbitrage.
 
 The framework's publication in June 2004 followed almost six years of intensive preparation. During this period, the Basel Committee consulted extensively with banking sector representatives, supervisory agencies, [[05-central_banks|central banks]] and outside observers in order to develop significantly more risk-sensitive capital requirements.
@@ -234,17 +234,17 @@ Following the June 2004 release, which focused primarily on the banking book, th
 
 #### Pillars
 
-[[basel_2|Basel II]] introduced three pillars related to risk and [[04-capital_management|capital management]], and [[basel_framework|Basel III]] further refined this methodology. Simply put, the pillars ensure that banks measure and manage their risk appropriately, supervisors monitor and enforce this, and that stakeholders and the market are kept wellinformed.
+[[basel_2|Basel II]] introduced three pillars related to risk and [[03-capital_management|capital management]], and [[basel_framework|Basel III]] further refined this methodology. Simply put, the pillars ensure that banks measure and manage their risk appropriately, supervisors monitor and enforce this, and that stakeholders and the market are kept wellinformed.
 
 ##### Pillar 1 – MCR
 
 This pillar’s purpose is to ensure that banks have adequate capital to prevent individual failures which can contribute to systemic risk and financial crises, and that this capital is managed adequately.
 
-##### [[02-stress_testing|Pillar 2]] – Supervisory review process
+##### [[01-pillar_2b|Pillar 2]] – Supervisory review process
 
 This pillar’s purpose is to ensure that supervisors are actively involved in reviewing banks’ [[01-risk_management|risk management]] systems and policies, so adherence to regulation is adequately enforced and additional capital is held where deemed necessary by the regulator.
 
-[[02-stress_testing|Pillar 2]] also seeks to ensure that risks that are not fully considered under Pillar 1 are adequately managed (e.g. [[01-irrbb_sources|Interest rate risk in the banking book]]).
+[[01-pillar_2b|Pillar 2]] also seeks to ensure that risks that are not fully considered under Pillar 1 are adequately managed (e.g. [[02-irrbb_sources|Interest rate risk in the banking book]]).
 
 ###### Pillar 3 – Market discipline
 
@@ -303,7 +303,7 @@ The enhanced [[basel_framework|Basel framework]] revises and strengthens the thr
 - an additional layer of common equity - the capital conservation buffer - that, when breached, restricts payouts to help meet the minimum common equity requirement
 - a countercyclical capital buffer, which places restrictions on participation by banks in system-wide credit booms with the aim of reducing their losses in credit busts
 - a leverage ratio - a minimum amount of loss-absorbing capital relative to all of a bank's assets and off-balance sheet exposures regardless of risk weighting
-- liquidity requirements - a minimum liquidity ratio, the [[04-lcr|Liquidity Coverage Ratio (LCR)]], intended to provide enough cash to cover funding needs over a 30-day period of stress; and a longer-term ratio, the [[05-nsfr|Net Stable Funding Ratio (NSFR)]], intended to address maturity mismatches over the entire balance sheet
+- liquidity requirements - a minimum liquidity ratio, the [[01-short_term_metrics|Liquidity Coverage Ratio (LCR)]], intended to provide enough cash to cover funding needs over a 30-day period of stress; and a longer-term ratio, the [[03-long_term_metrics|Net Stable Funding Ratio (NSFR)]], intended to address maturity mismatches over the entire balance sheet
 - additional requirements for systemically important banks, including additional loss absorbency and strengthened arrangements for cross-border supervision and resolution
 
 #### Revised Capital Sources
@@ -338,19 +338,19 @@ As mentioned above, [[basel_framework|Basel III]] introduces a non-risk-based me
 
 The Basel definition for the leverage ratio is Tier 1 capital divided by total assets (including off-balance-sheet exposures). The [[sarb|SARB]]’s definition of the leverage ratio is Tier 1 capital divided by non-risk sensitive exposure (including off-balance-sheet items).
 
-#### [[04-lcr|Liquidity Coverage Ratio (LCR)]]
+#### [[01-short_term_metrics|Liquidity Coverage Ratio (LCR)]]
 
-The [[04-lcr|LCR]] identifies the amount of unencumbered, high quality liquid assets a bank is required to hold in order to offset the cumulative net cash outflows it would encounter under an acute short-term (30-day) stress scenario.
+The [[01-short_term_metrics|LCR]] identifies the amount of unencumbered, high quality liquid assets a bank is required to hold in order to offset the cumulative net cash outflows it would encounter under an acute short-term (30-day) stress scenario.
 
-During the Covid-19 pandemic, the [[04-lcr|LCR]] was used as a tool to provide some relief to banks. In South Africa, this was done by temporarily reducing the [[04-lcr|LCR]] from 100% to 80%. In the UK, the [[ecb|ECB]] allowed banks to temporarily operate below the minimum [[04-lcr|LCR]].
+During the Covid-19 pandemic, the [[01-short_term_metrics|LCR]] was used as a tool to provide some relief to banks. In South Africa, this was done by temporarily reducing the [[01-short_term_metrics|LCR]] from 100% to 80%. In the UK, the [[ecb|ECB]] allowed banks to temporarily operate below the minimum [[01-short_term_metrics|LCR]].
 
-#### [[05-nsfr|Net Stable Funding Ratio (NSFR)]]
+#### [[03-long_term_metrics|Net Stable Funding Ratio (NSFR)]]
 
-The [[05-nsfr|NSFR]] was introduced in conjunction with the [[basel_framework|Basel III]] [[01-liquidity_framework|liquidity framework]]. The [[05-nsfr|Net Stable Funding Ratio (NSFR)]] measures the amount of longer-term, stable funding sources required by a bank given the liquidity profile of its assets and liabilities and the contingent liquidity risk arising from off-balance-sheet exposures (OBEs). The standard requires a minimum amount of funding that is expected to be stable over a 6-month horizon based on liquidity risk factors assigned to assets / liabilities and OBEs. This is intended to promote longer-term structural funding of a bank’s balance sheet. The [[05-nsfr|NSFR]] can also be viewed as implementing a maximum limit on the level of mismatch that a bank is able to undertake.
+The [[03-long_term_metrics|NSFR]] was introduced in conjunction with the [[basel_framework|Basel III]] [[01-liquidity|liquidity framework]]. The [[03-long_term_metrics|Net Stable Funding Ratio (NSFR)]] measures the amount of longer-term, stable funding sources required by a bank given the liquidity profile of its assets and liabilities and the contingent liquidity risk arising from off-balance-sheet exposures (OBEs). The standard requires a minimum amount of funding that is expected to be stable over a 6-month horizon based on liquidity risk factors assigned to assets / liabilities and OBEs. This is intended to promote longer-term structural funding of a bank’s balance sheet. The [[03-long_term_metrics|NSFR]] can also be viewed as implementing a maximum limit on the level of mismatch that a bank is able to undertake.
 
 This is calculated as: available stable funding / required funding. This measure is kept at a minimum of 100%. This was gradually introduced over time.
 
-#### Internal Liquidity Adequacy Assessment Process (ILLAAP)
+#### Internal Liquidity Adequacy Assessment Process (ILAAP)
 
 The ILAAP (also referred to as the ILAA in the UK) is a comprehensive (annual) point in time liquidity assessment undertaken by a bank. This document forms a strategic pillar of the overall liquidity management of the business. This document is reviewed by the regulator through a liquidity SREP (Supervisory Review and Evaluation Process) process to ensure that the bank is holding adequate internal liquidity as well as ensuring that the regulatory minimums are adhered to.
 
@@ -378,7 +378,7 @@ Under the 2014 [[basel_framework|Basel III]] reforms, the old Current Exposure M
 
 #### Stressed VaR (sVaR)
 
-Another proposal involves what is called stressed [[07-var_limitations|value at risk]] (sVaR). The usual approach for calculating VaR is based on how market variables behaved over the most recent 2 to 4 years. A stressed VaR is calculated from the movements in market variables during a 1-year period of significant losses (such as 2007 or 2008). [[basel_2|Basel II]] proposes that the capital for [[05-market_risk|market risk]] be supplemented by a calculation involving stressed VaR, at least doubling the capital that banks have to keep for market risks.
+Another proposal involves what is called stressed [[03-var_limitations|value at risk]] (sVaR). The usual approach for calculating VaR is based on how market variables behaved over the most recent 2 to 4 years. A stressed VaR is calculated from the movements in market variables during a 1-year period of significant losses (such as 2007 or 2008). [[basel_2|Basel II]] proposes that the capital for [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] be supplemented by a calculation involving stressed VaR, at least doubling the capital that banks have to keep for market risks.
 
 ### [[basel_framework|Basel III]] Reforms | 3.1 | IV
 
@@ -392,12 +392,12 @@ From 2011, the Committee turned its attention to improvements in the calculation
 - in 2013, margin requirements for non-centrally cleared derivatives and capital requirements for banks' equity in funds
 - in 2014, a standardised approach for measuring [[02-counterparty_exposures|counterparty credit risk]] exposures, improving the previous methodologies for assessing the [[02-counterparty_exposures|counterparty credit risk]] associated with derivatives transactions
 - in 2014, a more robust framework for calculating capital requirements for securitisations, as well as the introduction of large exposure limits to constrain the maximum loss a bank could face in the event of a sudden failure of a counterparty
-- in 2016, a revised [[05-market_risk|market risk]] framework that followed a fundamental review of trading book capital requirements
+- in 2016, a revised [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] framework that followed a fundamental review of trading book capital requirements
 - a consolidated and enhanced framework for disclosure requirements to reflect the development of the Basel standards
 
-##### Revised approach for [[05-market_risk|market risk]]
+##### Revised approach for [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]]
 
-Under the [[basel_framework|Basel III]] revisions, key enhancements have been made when calculating [[05-market_risk|market risk]]:
+Under the [[basel_framework|Basel III]] revisions, key enhancements have been made when calculating [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]]:
 
 - A revised boundary between the banking and trading books
 - Revised Internal Model Approach: The revised IMA allows for two modellable and one non-modellable component(s).
@@ -448,7 +448,7 @@ The BCBS introduced the following revisions to address these shortcomings:
 
 ##### Revised CVA framework
 
-The internally modelled approach was removed and replaced with a standardised approach and a basic approach. As CVA is a [[05-market_risk|market risk]], these two approaches were calibrated to be in line with the revised [[05-market_risk|market risk]] framework. The CVA framework was revised to achieve the following:
+The internally modelled approach was removed and replaced with a standardised approach and a basic approach. As CVA is a [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]], these two approaches were calibrated to be in line with the revised [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] framework. The CVA framework was revised to achieve the following:
 
 - Enhance its risk sensitivity
 - Strengthen its robustness

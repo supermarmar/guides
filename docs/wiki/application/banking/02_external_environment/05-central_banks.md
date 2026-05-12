@@ -29,4 +29,10 @@ Central banks are responsible for financial stability, the importance of which w
 
 ## Supervisory Role
 
-Central banks issue regulations and guidance on matters such as risks not covered in the [[bis|Basel]] regulations and [[02-stress_testing|stress testing]]. A principal element of the annual supervisory review process for individual banks is related to [ICAAP and ILAAP](01-regulatory_environment.md) submissions made by each bank. Central banks also issue statistics on a broad range of economic and banking topics. For example, in the UK, the [[bank_of_england|Bank of England]] issues a Quarterly Bulletin, a Monetary Policy Report (quarterly), and a Financial Stability Report (half yearly).
+Central banks issue regulations and guidance on matters such as risks not covered in the [[bis|Basel]] regulations and [[01-pillar_2b|stress testing]]. A principal element of the annual supervisory review process for individual banks is related to [ICAAP and ILAAP](01-regulatory_environment.md) submissions made by each bank. Central banks also issue statistics on a broad range of economic and banking topics. For example, in the UK, the [[bank_of_england|Bank of England]] issues a Quarterly Bulletin, a Monetary Policy Report (quarterly), and a Financial Stability Report (half yearly).
+
+## Lender of Last Resort
+
+In every jurisdiction, the central bank operates as a **lender of last resort**, providing emergency liquidity to a bank that cannot generate liquidity through the liquidation of assets. However, recourse to central bank funding is the last option for the bank — it signals a compromised standalone viability and should not be considered a BAU source of liquidity.
+
+Post-2009, banks in the Eurozone accessed the [[ecb|ECB]]'s 3-year repo facility as a quasi-BAU source; this reflected structural funding instability after the financial crisis rather than sound practice, and the facility was designed as a temporary measure. Under normal conditions, central bank funding (other than daily open market operations) lies outside the scope of ordinary liquidity management.

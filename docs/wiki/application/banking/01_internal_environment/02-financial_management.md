@@ -24,12 +24,31 @@ The banking book is a term for assets on a bank's balance sheet that are expecte
 - Loans/Advances to individuals/retail and companies/wholesale (the primary earning asset) net of provisions.
 - Undrawn commitments (i.e. off balance sheet loans)
 - High-quality liquid assets (HQLAs) — cash, sovereign bonds — held so the bank can finance withdrawals of deposits
-- Bonds and securities issued by other companies.
 
 ##### Book Value (Amortised Cost)
 
-Assets are regarded as being held to maturity and do not have to be marked to market. However, should they become impaired, their value will have to be reduced and be held at amortised cost as opposed to fair value.
+Assets are regarded as being held to maturity and do not have to be marked to market. However, should they become impaired, their value will have to be reduced and be held at amortised cost as opposed to fair value.*
 
+##### HQLA Eligibility Tiers
+
+The [[sarb|South African Reserve Bank]] ([[sarb|SARB]]) classifies eligible HQLA into three tiers, reflecting their credit quality and expected liquidity under stress:
+
+**Level 1** (highest quality — no haircut applied):
+- Cash (notes and coins)
+- Cash reserves held with the [[sarb|SARB]]
+- Marketable securities issued by the [[sarb|SARB]] or Public Sector Entities (PSEs), including:
+  - Treasury bills
+  - Security loans
+  - Nominal and index-linked government bonds
+  - Repurchase transactions / buy-sell-backs (used for temporary acquisition of HQLA, not themselves assets)
+
+**Level 2A** (subject to a regulatory haircut):
+- Corporate and SOE debt securities rated AA– or higher
+
+**Level 2B** (subject to a larger regulatory haircut):
+- Corporate and SOE debt securities rated BBB– or higher
+
+The tiering reflects the observed behaviour of these assets in stress events: Level 1 assets (primarily government securities) retain value and liquidity even in severe market disruption, while lower-tier assets are subject to greater price discounts and liquidity impairment under stress.
 #### Trading Book
 
 Trading book exposures are managed actively and held for “trading intent”, or short-term gain. [[bis|Basel]] defines the boundary between the trading book and banking book quite strictly, classifying exposures that satisfy any of the following as trading book exposures:
@@ -50,12 +69,11 @@ Assets are regarded as being held for sale and have to be marked to market. Thre
 - **Level 3**: If Level 1 or Level 2 values are not available, fair value may be based on a valuation carried out by the bank, most likely based on the present value of expected future cashflows
 
 For structured products and non-standard derivatives, there are no market values and it is normal for banks to base values on models — a process known as marking to model.
-
 ### Liabilities
 
-- Corporate bonds issued by the bank
 - Deposits by individuals and companies
-
+- Wholesale funding
+- Debt instruments issued by the bank
 ### Equities
 
 - Share Capital / Common Shares
@@ -64,15 +82,15 @@ For structured products and non-standard derivatives, there are no market values
 
 ## Income Statement (IS)
 
-### [[03-nii_nim|Net Interest Income]] ([[03-nii_nim|NII]])
+### [[04-nii_nim|Net Interest Income]] ([[04-nii_nim|NII]])
 
-[[03-nii_nim|Net interest income]] ([[03-nii_nim|NII]]) is defined as gross interest income on loans and securities less gross interest paid on funding instruments such as deposits and borrowing from other banks — i.e. gross interest income less cost of funding (COF).
+[[04-nii_nim|Net interest income]] ([[04-nii_nim|NII]]) is defined as gross interest income on loans and securities less gross interest paid on funding instruments such as deposits and borrowing from other banks — i.e. gross interest income less cost of funding (COF).
 
 Banks that accept deposits and make loans expect to make a positive spread on this activity. Banks attempt to fund themselves at low rates relative to the prevailing interest rate environment, and to lend money at higher rates.
 
-- [[03-nii_nim|NII]] is a significant part of retail and commercial banks' total income as banks aim to make money by borrowing funds at low rates and lending them at higher rates.
+- [[04-nii_nim|NII]] is a significant part of retail and commercial banks' total income as banks aim to make money by borrowing funds at low rates and lending them at higher rates.
 - It's relatively stable compared to trading income but can come under pressure due to factors like competition leading to lower loan prices, interest rate changes, and reluctance to impose negative rates on deposits when interest rates are very low.
-- [[03-nii_nim|NII]] is a function of your interest-earning assets (loans, HQLAs and securities e.g. deposits with [[05-central_banks|central banks]]) and interest-bearing liabilities (deposits and wholesale funding).
+- [[04-nii_nim|NII]] is a function of your interest-earning assets (loans, HQLAs and securities e.g. deposits with [[05-central_banks|central banks]]) and interest-bearing liabilities (deposits and wholesale funding).
 - The interest beard on deposits is a function of the price, relative to the reference rate, the type of deposit (instant, notice or fixed) and the volume of deposits received.
 - The interest beard on wholesale funding in a function of Treasury’s rate (which relates to the repo rate and/or JIBAR rate), the type of instrument and the exposure.
 - The interest earned on loans is a function of the price, relative to the reference rate, the type of loan product (mortgage, credit card) and the volume of the loans issued.
@@ -123,7 +141,7 @@ Banks pay corporation tax on their profit before tax. Corporation tax rates are 
 
 ### Profit & Loss (P&L)
 
-- Total income = [[03-nii_nim|NII]] + NIR
+- Total income = [[04-nii_nim|NII]] + NIR
 - EBIT = total income - operating expenses - cost of credit
 - Profit = EBIT - tax - debt interest
 - Earnings = profit - preference shareholder dividends
@@ -133,7 +151,7 @@ Banks pay corporation tax on their profit before tax. Corporation tax rates are 
 
 ### Stability of income (IS)
 
-A high [[03-nii_nim|NII]]-to-total income ratio shows that most of a bank's income is [[03-nii_nim|net interest income]], which is generally regarded as more stable than NIR.
+A high [[04-nii_nim|NII]]-to-total income ratio shows that most of a bank's income is [[04-nii_nim|net interest income]], which is generally regarded as more stable than NIR.
 
 ### Efficiency (IS)
 
@@ -149,11 +167,11 @@ Growth in EPS is an important measure for investors to compare it with other com
 
 The **net interest spread (NIS)** is the difference between the average interest rate received on assets and the average interest rate paid on deposits.
 
-#### [[03-nii_nim|Net Interest Margin]] ([[03-nii_nim|NIM]])
+#### [[04-nii_nim|Net Interest Margin]] ([[04-nii_nim|NIM]])
 
-The **[[03-nii_nim|net interest margin]] ([[03-nii_nim|NIM]])** is a bank's total [[03-nii_nim|net interest income]] (interest received from assets less interest paid on deposits and liabilities) divided by average interest-earning assets.
+The **[[04-nii_nim|net interest margin]] ([[04-nii_nim|NIM]])** is a bank's total [[04-nii_nim|net interest income]] (interest received from assets less interest paid on deposits and liabilities) divided by average interest-earning assets.
 
-An increasing [[03-nii_nim|NIM]] over time indicates improving profitability, but this could be the result of a move to higher-risk lending with higher margins and greater [[02-credit_losses|credit losses]]. Also, different levels of net interest margins at different banks may reflect different levels of risk and may be offset by different levels of [[02-credit_losses|credit losses]].
+An increasing [[04-nii_nim|NIM]] over time indicates improving profitability, but this could be the result of a move to higher-risk lending with higher margins and greater [[02-credit_losses|credit losses]]. Also, different levels of net interest margins at different banks may reflect different levels of risk and may be offset by different levels of [[02-credit_losses|credit losses]].
 
 #### Return on Assets (ROA)
 
@@ -173,4 +191,4 @@ CET1 capital-to-total RWAs ratio of different banks have only limited value beca
 
 ### Liquidity strength (BS)
 
-The higher the [[04-lcr|LCR]] the better a bank will be at sustaining short term liquidity needs during times of stress. For the full treatment of [[02-liquidity_metrics|liquidity metrics]] (LDR, LRF, HQLA tiers, [[04-lcr|LCR]], [[05-nsfr|NSFR]]), see [Liquidity Metrics](liquidity_risk/01_introduction/02-liquidity_metrics.md).
+The higher the [[01-short_term_metrics|LCR]] the better a bank will be at sustaining short term liquidity needs during times of stress. For the full treatment of [[04-liquidity_management|liquidity metrics]] (LDR, LRF, HQLA tiers, [[01-short_term_metrics|LCR]], [[03-long_term_metrics|NSFR]]), see [Liquidity Metrics](liquidity_risk/01_introduction/02-liquidity_metrics.md).

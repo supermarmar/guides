@@ -105,7 +105,7 @@ After the financial crisis, it was noted that IAS 39 was flawed and contributed 
 [[ifrs9_standard|IFRS 9]] addresses these weaknesses (as well as other weaknesses not directly related to credit risk, such as changes to hedge accounting) and has significantly changed the treatment of impaired assets – with many banks having taken years to adjust their [[01-risk_management|risk management]] processes accordingly. Some significant improvements made are:
 
 - ECLs will be recognised at all times, reducing “cliff effects”.
-- To incorporate [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/02_airb_capital/05_modelling/pd/01-model_methodology|forward looking information]] into the assessment of the expected [[02-credit_losses|credit losses]] of a loans.
+- To incorporate [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/05_modelling/pd/01-model_methodology|forward looking information]] into the assessment of the expected [[02-credit_losses|credit losses]] of a loans.
 - Only one impairment model is used and a simpler classification system for assets.
 - Improved disclosure, as banks are required to disclose the entire process to determine their ECLs in detail.
 
@@ -122,7 +122,7 @@ of IAS 39 being addressed, but these come at a cost, including:
 - Income volatility: Provisions directly affect profit and loss on the income statement, and [[ifrs9_standard|IFRS 9]] requires provisions to be changed at each reporting date if significant changes in credit risk occur. Those assets that use fair values to inform expected [[02-credit_losses|credit losses]] will experience volatility in these figures.
 - Increased recognition of ECLs: Under IAS 39, ECLs would only be calculated when losses were incurred on defaulting assets. Under [[ifrs9_standard|IFRS 9]], ECLs need to be calculated on all eligible assets and provisions held for these assets. This results in higher provisions being held earlier.
 - Increased disclosure: As discussed, banks will need to provide more detailed disclosures on the [[01-risk_management|risk management]] processes followed under the new methodology.
-- Capital impact: There will be varied impacts on capital. For example, under Pillar 1, Core Equity Tier 1 (CET1) capital is made up largely of retained earnings and increased provisions under [[ifrs9_standard|IFRS 9]] will reduce these earnings, thus reducing capital resources. Other affected areas will include [[02-stress_testing|stress testing]] and capital buffers. These impacts will be more significant for banks relying on the standardised approach.
+- Capital impact: There will be varied impacts on capital. For example, under Pillar 1, Core Equity Tier 1 (CET1) capital is made up largely of retained earnings and increased provisions under [[ifrs9_standard|IFRS 9]] will reduce these earnings, thus reducing capital resources. Other affected areas will include [[01-pillar_2b|stress testing]] and capital buffers. These impacts will be more significant for banks relying on the standardised approach.
 
 The impacts of [[ifrs9_standard|IFRS 9]] can be significant, but they also present an opportunity for banks to re-examine their [[01-risk_management|risk management]] systems and models, and to improve efficiencies and management in order to reduce the impact. The improved assessment of credit risk will also help reduce the impacts of defaults and improve financial stability.
 

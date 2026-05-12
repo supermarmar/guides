@@ -2,7 +2,7 @@
 
 The important considerations when calculating PD are:
 
-- Default of definition (DoD)
+- Definition of default (DoD)
 - Time Horizon: 1m, 2m, ... 12m .... Lifetime
 - Rating philosophy: point-in-time (PIT) versus through-the-cycle (TTC)
 
@@ -25,7 +25,7 @@ IRB PiT PD models are traditionally based on an expectation over the next twelve
 | Flooring                  | No floor                                                                                                                                                                       | 0.03% floor                                                                           |
 | Data Inputs               | Model includes all reasonable and supportable information about past events, current conditions and forecasts of future macroeconomic conditions (forward looking perspective) | Model includes only variables representing the intrinsic quality to the counterparty. |
 PIT PDs are more useful in the case of a bank needing accurate and timely information on likely defaults – i.e. it is closer to the default rate and used updated information throughout time. This will allow the bank to manage its risk and the related capital more efficiently, as well as being useful for provisioning and [[ifrs9_standard|IFRS9]] purposes. However, it does require fluctuating PDs and continuous reviewing of the bank’s clients, as well as regular changes in the bank’s capital. This can be costly.
-## Through-the-Cycle
+## <mark style="background: #FFF3A3A6;">Through-the-Cycle</mark>
 
 **TTC PD** is estimated by averaging observed default rates across a full credit cycle (expansion and contraction). Because it smooths out the cycle, it is relatively stable over time. This stability is exactly why Basel IRB uses it for Pillar 1 RWA — regulators do not want capital requirements swinging dramatically with the economy (procyclicality concern). A bank's internal rating system under IRB is designed to assign obligors to grades whose TTC PD is stable, meaning ratings don't migrate simply because the macro environment has deteriorated.
 
@@ -47,11 +47,11 @@ A bank often builds a PiT scorecard/model, maps scores to risk grades, then deri
 
 Credit rating systems focus mostly on producing a conservative PD-estimate that remains static (but stressed) over the lifetime of each loan, often by design.
 
-The broad goal of such systems is to facilitate the estimation of regulatory and [[01-economic_capital|economic capital]], which should absorb any catastrophic (or unexpected) losses under the [[basel_framework|Basel framework]] from the [[bis|BCBS]]. Any temporal effects that might affect the PD during loan life are therefore largely ignored, together with any macroeconomic influences; particularly since the latter is already assumed to be stressed to a recession-like level during PD-estimation. Doing so renders the resulting PD-estimates as through-the-cycle (TTC) in that they should at least approximate the long-run averages of 1-year (12-month) historical default rates over a full macroeconomic cycle, as required during capital estimation. While these TTC PD-estimates are certainly stable over time by design, they are also typically inaccurate within any other setting besides capital estimation.
+The broad goal of such systems is to facilitate the estimation of regulatory and [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/credit_concentration_risk/01-context|economic capital]], which should absorb any catastrophic (or unexpected) losses under the [[basel_framework|Basel framework]] from the [[bis|BCBS]]. Any temporal effects that might affect the PD during loan life are therefore largely ignored, together with any macroeconomic influences; particularly since the latter is already assumed to be stressed to a recession-like level during PD-estimation. Doing so renders the resulting PD-estimates as through-the-cycle (TTC) in that they should at least approximate the long-run averages of 1-year (12-month) historical default rates over a full macroeconomic cycle, as required during capital estimation. While these TTC PD-estimates are certainly stable over time by design, they are also typically inaccurate within any other setting besides capital estimation.
 
 Put simply, a TTC PD is a measure of the likelihood that a borrower will default over a specific time horizon, calculated in a way that smooths out fluctuations caused by economic or business cycles. It reflects a borrower's average risk of default under both favorable and unfavorable economic conditions. The goal of TTC PD is to isolate a borrower's intrinsic credit risk (their ability to meet obligations independent of short-term economic changes).
 
-![alt text](images/ttc_vs_pit_pd.png)
+![alt text](ttc_vs_pit_pd.png)
 
 In this case, the TTC population PD  seen in the graph above (population being segmented by risk grades) is also the same TTC for the borrower (i.e. this is the LRA PD calibrated at the end of the [[07-risk_quantification|risk quantification]] step per risk grade):
 
@@ -63,7 +63,7 @@ $\text{WCDR}=\text{PD}_{i}^\text{SysPiT}(12,x_{i}|\text{S}_{99.9^{th}}=N^{-1}(0.
 
 where $p^* = \text{PD}_{i}^\text{TTC}(12,x_{i},[t_a',t_b'])$
 
-For [[ifrs9_standard|IFRS 9]] models, we are interested in the PiT PD for the borrower (which is modeled during the [[03-risk-differentiation|risk differentiation]] phase) since we require not only a 12-month PD, but a lifetime one as well, or even a term-structure of PDs.
+For [[ifrs9_standard|IFRS 9]] models, we are interested in the PiT PD for the borrower (which is modeled during the [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/05_modelling/pd/03-risk-differentiation|risk differentiation]] phase) since we require not only a 12-month PD, but a lifetime one as well, or even a term-structure of PDs.
 
 ### 12m TTC to 12m Systemic PiT
 
@@ -71,7 +71,7 @@ Conditional PiT PD and LGD values can be obtained by adjusting the pre-MoC and p
 
 $\text{PD}_{i}^\text{SysPiT}(12,x_{i}|\text{S}_{1-\alpha^{th}}=N^{-1}(1-\alpha)) = N(\large\frac{N^{-1}(p^*)+\sqrt{\rho}N^{-1}(1-\alpha)}{\sqrt{1-\rho}})$ for a given $\alpha$ that corresponds to the current PiT.
 
-### 12m Systemic PiT to 12m Lifetime PD
+### 12m Systemic PiT to Lifetime PD
 
 Likewise, IRB PDs need to be extended from a 12-month horizon to a remaining lifetime. As rating is a key identifier for classifying assets between the three stages, it is necessary to extend the 12-month PD on a rating level. However, migrations between different ratings can occur over time.
 

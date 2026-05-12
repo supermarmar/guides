@@ -82,7 +82,7 @@ estimates, including where there are high estimation errors;
    - (b) relevant deficiencies in the methods, information and data have been identified
 by the credit risk control unit, validation function or internal audit function or
 any other function of the institution;
-   - (c) relevant changes to the standards of [[01-underwriting|underwriting]] or recovery policies or changes
+   - (c) relevant changes to the standards of [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/01_introduction/01-context|underwriting]] or recovery policies or changes
 in the institution’s [[02-risk_appetite|risk appetite]].
 2. The requirements laid down in paragraph 1 shall not prevent an application of the
 requirements laid down in Article 146 of Regulation (EU) No 575/2013 and any related

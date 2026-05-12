@@ -155,13 +155,13 @@ This chapter sets out the minimum regulatory capital requirements under the risk
 
 #### RWA
 
-20.3 The [[bis|Basel]] framework describes how to calculate RWA for credit risk, [[05-market_risk|market risk]] and operational risk. The requirements for calculating RWA for credit risk and [[05-market_risk|market risk]] allow banks to use different approaches, some of which banks may only use with supervisory approval.
+20.3 The [[bis|Basel]] framework describes how to calculate RWA for credit risk, [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] and operational risk. The requirements for calculating RWA for credit risk and [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] allow banks to use different approaches, some of which banks may only use with supervisory approval.
 
 20.4 The RWA that banks must use to determine compliance with the requirements set out in RBC20.1 (and the buffers in RBC30 and RBC40) is the higher of:
 
 1) the sum of the following three elements, calculated using the bank’s nominated approaches:
    - RWA for credit risk (as calculated in RBC20.6 to RBC20.8);
-   - RWA for [[05-market_risk|market risk]] (as calculated in RBC20.9); and
+   - RWA for [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] (as calculated in RBC20.9); and
    - RWA for operational risk (as calculated in RBC20.10); and
 2) 72.5% of the sum of the elements listed in point (1) above, calculated using only the standardised approaches listed in RBC20.11. This element of this requirement is referred to as the output floor, and the RWA amount that is multiplied by 72.5% is referred to as the base of the output floor.
 
@@ -176,14 +176,14 @@ This chapter sets out the minimum regulatory capital requirements under the risk
    - The internal ratings-based (IRB) approach, set out in CRE30 to CRE36.
 2) RWA for [[02-counterparty_exposures|counterparty credit risk]] arising from banking book exposures and from trading book instruments (as specified in CRE55), except the exposures listed in (3) to (6) below, using the methods outlined in CRE51.
 
-#### [[05-market_risk|Market Risk]] RWA
+#### [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|Market Risk]] RWA
 
-20.9 RWA for [[05-market_risk|market risk]] is calculated as the sum of the following:
+20.9 RWA for [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] is calculated as the sum of the following:
 
-1) RWA for [[05-market_risk|market risk]] for instruments in the trading book and for foreign exchange risk and commodities risk for exposures in the banking book, calculated using one or more of the following approaches:
-   - The standardised approach for [[05-market_risk|market risk]], set out in MAR20 to MAR23;
-   - The internal models approach (IMA) for [[05-market_risk|market risk]], set out in MAR30 to MAR33; or
-   - The simplified standardised approach for [[05-market_risk|market risk]], set out in MAR40.
+1) RWA for [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] for instruments in the trading book and for foreign exchange risk and commodities risk for exposures in the banking book, calculated using one or more of the following approaches:
+   - The standardised approach for [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]], set out in MAR20 to MAR23;
+   - The internal models approach (IMA) for [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]], set out in MAR30 to MAR33; or
+   - The simplified standardised approach for [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]], set out in MAR40.
 2) RWA for credit valuation adjustment (CVA) risk in the banking and trading book, calculated using one of the following methods set out in MAR50:
    - The basic approach to CVA risk (BA-CVA).
    - The standardised approach to CVA risk (SA-CVA).
@@ -195,7 +195,7 @@ This chapter sets out the minimum regulatory capital requirements under the risk
 
 ### RBC25: Banking vs Trading Book
 
-This chapter sets out the instruments to be included in the trading book (which are subject to [[06-market_risk_capital|market risk capital]] requirements) and those to be included in the banking book (which are subject to credit risk capital requirements).
+This chapter sets out the instruments to be included in the trading book (which are subject to [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/01-context|market risk capital]] requirements) and those to be included in the banking book (which are subject to credit risk capital requirements).
 
 #### Banking Book
 
@@ -668,7 +668,7 @@ planning consent.
 20.91 ADC exposures to residential real estate may be risk weighted at 100%, provided
 that the following criteria are met:
 20.91
-(1) prudential [[01-underwriting|underwriting]] standards meet the requirements in CRE20.71 (ie the
+(1) prudential [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/01_introduction/01-context|underwriting]] standards meet the requirements in CRE20.71 (ie the
 requirements that are used to classify regulatory real estate exposures)
 where applicable;
 (2) pre-sale or pre-lease contracts amount to a significant portion of total
@@ -858,8 +858,8 @@ and
 
 30.24 All of the following criteria must be satisfied for a sub-portfolio to be treated as a
 qualifying revolving retail exposure (QRRE). These criteria must be applied at a
-sub-portfolio level consistent with the bank’s [[08-segmentation|segmentation]] of its retail activities
-generally. [[08-segmentation|Segmentation]] at the national or country level (or below) should be the
+sub-portfolio level consistent with the bank’s [[07-segmentation|segmentation]] of its retail activities
+generally. [[07-segmentation|Segmentation]] at the national or country level (or below) should be the
 general rule.
 
 1. The exposures are revolving, unsecured, and uncommitted (both
@@ -1625,9 +1625,9 @@ EAD weighting, are not permitted.
 
 1. A bank may use data on internal default experience for the estimation of PD.
 A bank must demonstrate in its analysis that the estimates are reflective of
-[[01-underwriting|underwriting]] standards and of any differences in the rating system that
+[[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/01_introduction/01-context|underwriting]] standards and of any differences in the rating system that
 generated the data and the current rating system. Where only limited data
-are available, or where [[01-underwriting|underwriting]] standards or rating systems have
+are available, or where [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/01_introduction/01-context|underwriting]] standards or rating systems have
 changed, the bank must add a greater margin of conservatism in its estimate
 of PD. The use of pooled data across institutions may also be recognised. A
 bank must demonstrate that the internal rating systems and criteria of other

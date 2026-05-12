@@ -89,7 +89,7 @@ K_{\text{LDA}} = \text{VaR}_{99.9\%}\left(\sum_{i,j} \text{AggLoss}_{i,j}\right)
 
 where the summation is across all combinations of business lines ($i$) and risk event types ($j$).
 
-The LDA is easy to use for non-technical stakeholders as every type of business activity can be evaluated using VaR and parameters (time horizon, confidence level) already familiar from credit and [[05-market_risk|market risk]]. The challenges are complexity, less transparent assumptions, and substantial resource requirements.
+The LDA is easy to use for non-technical stakeholders as every type of business activity can be evaluated using VaR and parameters (time horizon, confidence level) already familiar from credit and [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]]. The challenges are complexity, less transparent assumptions, and substantial resource requirements.
 
 ### Qualitative Input and Model Validation
 
