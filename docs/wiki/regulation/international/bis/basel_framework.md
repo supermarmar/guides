@@ -24,8 +24,8 @@ The framework comprises the 14 standards listed below. Each standard is divided 
 | MAR | Calculation of RWA for [[05-market_risk|market risk]] |
 | OPE | Calculation of RWA for operational risk |
 | LEV | Leverage ratio |
-| [[04-lcr|LCR]] | [[04-lcr|Liquidity Coverage Ratio]] |
-| NSF | [[05-nsfr|Net Stable Funding Ratio]] |
+| [[02-lcr|LCR]] | [[02-lcr|Liquidity Coverage Ratio]] |
+| NSF | [[04-nsfr|Net Stable Funding Ratio]] |
 | LEX | Large exposures |
 | MGN | Margin requirements |
 | SRP | Supervisory review process |
@@ -52,7 +52,7 @@ This chapter sets out the eligibility criteria for regulatory capital. Three cat
 
 10.3 It is critical that banks’ risk exposures are backed by a high-quality capital base. To this end, the predominant form of Tier 1 capital must be common shares and retained earnings.
 
-![alt text](cap_basel_2_vs_basel_3.png)
+![alt text](images/basel/cap_basel_2_vs_basel_3.png)
 
 #### Common Equity Tier 1
 
@@ -151,7 +151,7 @@ This chapter sets out the minimum regulatory capital requirements under the risk
 - Tier 1 capital must be at least 6% of RWA.
 - Total capital must be at least 8% of RWA.
 
-![alt text](capital_ratios.png)
+![alt text](images/basel/capital_ratios.png)
 
 #### RWA
 
@@ -165,7 +165,7 @@ This chapter sets out the minimum regulatory capital requirements under the risk
    - RWA for operational risk (as calculated in RBC20.10); and
 2) 72.5% of the sum of the elements listed in point (1) above, calculated using only the standardised approaches listed in RBC20.11. This element of this requirement is referred to as the output floor, and the RWA amount that is multiplied by 72.5% is referred to as the base of the output floor.
 
-![alt text](rwa.png)
+![alt text](images/basel/rwa.png)
 
 #### Credit Risk RWA
 
@@ -233,7 +233,7 @@ remainder can contribute to the capital conservation buffer.*
 For example, a bank with 8% CET1 and no Additional Tier 1 or Tier 2 capital, that has 10% of non-regulatory-capital [[tlac|TLAC]] instruments, would meet its minimum risk-based capital and risk-based [[tlac|TLAC]]
 requirements, but would have a zero conservation buffer and therefore be subject to the 100% constraint on capital distributions.
 
-![alt text](ccob.png)
+![alt text](images/basel/ccob.png)
 
 #### Countercyclical Buffer (CCyB)
 
@@ -249,7 +249,7 @@ requirements, but would have a zero conservation buffer and therefore be subject
 
 30.18 For illustrative purposes, the following table sets out the conservation ratios a bank must meet at various levels of CET1 capital if the bank is subject to a 2.5% countercyclical buffer requirement.
 
-![alt text](buffers.png)
+![alt text](images/basel/buffers.png)
 
 #### Capital Conservation Best Practice
 
@@ -267,7 +267,7 @@ This chapter describes the higher loss absorbency requirements applying to globa
 
 40.4 Based on the bucketing approach set out in SCO40.19 to SCO40.22, the magnitude of the higher loss absorbency requirement for each bucket is as follows.
 
-![alt text](gsibs_loss.png)
+![alt text](images/basel/gsibs_loss.png)
 
 #### Higher Loss Absorbency: D-SIBs
 
@@ -277,7 +277,7 @@ This chapter describes the higher loss absorbency requirements applying to globa
 
 This standard describes how to calculate capital requirements for credit risk.
 
-![alt text](irb_vs_standard.png)
+![alt text](images/basel/irb_vs_standard.png)
 
 ### CRE20: Standardised Approach (Indiviudal Exposures)
 
@@ -287,11 +287,11 @@ This chapter sets out the standardised approach for credit risk as it applies to
 
 20.7 Exposures to sovereigns and their [[05-central_banks|central banks]] will be risk-weighted as follows:
 
-![alt text](sovereign_rws.png)
+![alt text](images/basel/sovereign_rws.png)
 
 20.9 For the purpose of risk-weighting exposures to sovereigns, supervisors may recognise the country risk scores assigned by Export Credit Agencies (ECAs). These ECA risk scores will correspond to risk weight categories as detailed below.
 
-![alt text](eca_rws.png)
+![alt text](images/basel/eca_rws.png)
 
 20.10 Exposures to the [[bis|Bank for International Settlements]], the International Monetary Fund, the [[ecb|European Central Bank]], the European Union, the European Stability Mechanism and the European Financial Stability Facility may receive a 0% risk weight.
 
@@ -299,7 +299,7 @@ This chapter sets out the standardised approach for credit risk as it applies to
 
 20.11 Exposures to domestic PSEs will be risk-weighted at national discretion, according to either of the following two options.
 
-![alt text](pse_rws.png)
+![alt text](images/basel/pse_rws.png)
 
 #### Banks
 
@@ -314,13 +314,13 @@ This chapter sets out the standardised approach for credit risk as it applies to
 
 20.18 Banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes will assign to their rated bank exposures the corresponding “base” risk weights determined by the external ratings according to Table 6.
 
-![alt text](ecra_rws.png)
+![alt text](images/basel/ecra_rws.png)
 
 ##### SCRA
 
 20.21 Banks incorporated in jurisdictions that do not allow the use of external ratings for regulatory purposes will apply the SCRA to all their bank exposures. The SCRA also applies to unrated bank exposures for banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes. The SCRA requires banks to classify bank exposures into one of three risk-weight buckets (ie Grades A, B and C) and assign the corresponding risk weights in Table 7.
 
-![alt text](scra_rws.png)
+![alt text](images/basel/scra_rws.png)
 
 20.22 Grade A refers to exposures to banks, where the counterparty bank has adequate capacity to meet their financial commitments (including repayments of principal and interest) in a timely manner, for the projected life of the assets or exposures and irrespective of the economic cycles and business conditions.
 
@@ -345,7 +345,7 @@ This chapter sets out the standardised approach for credit risk as it applies to
 
 20.43 Unrated corporate exposures of banks incorporated in jurisdictions that allow the use of external ratings for regulatory purposes will receive a 100% risk weight, with the exception of unrated exposures to corporate small or medium-sized entities (SMEs), as described in CRE20.47.
 
-![alt text](corp_rws.png)
+![alt text](images/basel/corp_rws.png)
 
 20.44 For corporate exposures of banks incorporated in jurisdictions that do not allow the use of external ratings for regulatory purposes, banks will assign a 100% risk weight to all corporate exposures, with the exception of:
 
@@ -590,7 +590,7 @@ total exposure amount will be determined based on the exposure’s LTV ratio in
 Table 11 below. The use of the risk weights in Table 11 is referred to as the
 “whole loan” approach.
 
-![alt text](residential_real_estate_rws.png)
+![alt text](images/basel/residential_real_estate_rws.png)
 
 20.83 As an alternative to the whole loan approach for regulatory residential real estate
 exposures that are not materially dependent on cash flows generated by the
@@ -606,7 +606,7 @@ cash flows generated by the property, the risk weight to be assigned to the tota
 exposure amount will be determined based on the exposure’s LTV ratio in Table
 12 below.
 
-![alt text](table_12.png)
+![alt text](images/basel/table_12.png)
 
 #### Commercial Real Estate
 
@@ -620,7 +620,7 @@ s LTV in Table 13 below (which sets out a whole loan approach). The risk weight
 of the counterparty for the purposes of Table 13 below and CRE20.86 below is
 prescribed in CRE20.89(1).
 
-![alt text](table_13.png)
+![alt text](images/basel/table_13.png)
 
 20.86 As an alternative to the whole loan approach for regulatory commercial real
 estate exposures that are not materially dependent on cash flows generated by
@@ -635,7 +635,7 @@ cash flows generated by the property39, the risk weight to be assigned to the
 total exposure amount will be determined based on the exposure’s LTV in Table
 14 below.
 
-![alt text](table_14.png)
+![alt text](images/basel/table_14.png)
 
 #### Other Real Estate
 
@@ -1276,7 +1276,7 @@ formula and the calculation of expected loss must not be less than the parameter
 floors indicated in the table below (the floors do not apply to the LGD for
 exposures in the sovereign asset class):
 
-![alt text](lgd_param_floors.png)
+![alt text](images/basel/lgd_param_floors.png)
 
 32.17 to 32.18 discuss how to account for collateralised exposures.
 
@@ -1394,7 +1394,7 @@ QRRE revolvers) and 0.05% for all other exposures.
 
 The LGD for each exposure that is used as input into the risk weight formula and the calculation of expected loss must not be less than the parameter floors indicated in the table below:
 
-![alt text](lgd_params_floors_2.png)
+![alt text](images/basel/lgd_params_floors_2.png)
 
 32.59 Regarding the LGD parameter floors set out in the table above, the LGD floors for
 partially secured exposures in the “other retail” category should be calculated

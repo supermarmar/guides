@@ -63,7 +63,7 @@ Holding a portion of the balance sheet in the form of liquid assets (see [Liquid
 
 This file covers the **quantitative liquidity risk metrics** used by bank treasury functions and Asset Liability Committees (ALCOs) to monitor and manage liquidity risk, including six baseline management information metrics, and the stock of high-quality liquid assets (HQLA) that forms the liquid asset buffer (LAB).
 
-For the conceptual framework of liquidity risk — definitions, sources of funding, liability stability hierarchy — see [Liquidity Framework](01-liquidity.md). For the balance sheet treatment of HQLA, see [Annual Financial Statements](../../02-afs.md). For the regulatory minimum [[01-short_term_metrics|LCR]] and [[03-long_term_metrics|NSFR]] requirements that consume these metrics, see [Basel / BIS](bis.md).
+For the conceptual framework of liquidity risk — definitions, sources of funding, liability stability hierarchy — see Liquidity Framework. For the balance sheet treatment of HQLA, see [Annual Financial Statements](examples/01-fnb_afs.md). For the regulatory minimum [[01-short_term_metrics|LCR]] and [[03-long_term_metrics|NSFR]] requirements that consume these metrics, see [Basel / BIS](../../../regulation/international/bis/bis.md).
 ### Internal Requirements
 
 Banks calculate and monitor six key baseline metrics as a matter of course. 

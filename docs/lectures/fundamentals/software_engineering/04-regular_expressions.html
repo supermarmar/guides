@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 4: regular expressions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Regular expressions</h1>
+  <p class="subtitle">A regex is a tiny language for describing patterns in text. It is the smallest tool that solves a surprisingly large class of problems, and the wrong tool for a surprisingly large class of others. This lecture covers the constructs, the Python API, the underlying theory (regular languages, Thompson's NFA), and the line at which you should stop and reach for a parser.</p>
+  <div class="meta">
+    <span>Lecture 4 of 14</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part I: the craft of writing code</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>regular expression</strong> is a string that denotes a set of strings. Reading a regex is reading its description of all the strings it would match; writing one is writing the description from a set in your head. The engine that compares the regex against an input is small (a few hundred lines of code in its classical form), the language it accepts is well understood (the regular languages of formal-language theory), and the API in any modern language is two or three functions.</p>
+
+  <p>Stephen Kleene invented the notation in 1951 as part of his work on neural nets and finite automata. Ken Thompson built the first practical engine into a text editor (QED, 1968), then into <code>grep</code> (1973). Almost every editor, log analyser, configuration tool, and data-cleaning script written since has been a downstream consequence. Two-thirds of the world's industrial text processing is regex-driven; the other third is parsers, and the rest of this lecture is partly about telling them apart.</p>
+
+  <p>In Python, the <strong>re</strong> module is the standard interface. The five functions you will use 95 per cent of the time are <code>re.search</code>, <code>re.match</code>, <code>re.findall</code>, <code>re.finditer</code>, and <code>re.sub</code>. The rest of the API is for compiled patterns, flags, and named groups.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A regex is a recipe for "yes" or "no". Given any string, the regex either matches it or does not. The cleverness is that the recipe is itself a string, so we can store, share, modify, and compose recipes the same way we store, share, modify, and compose data. The engine, internally, walks through the input one character at a time, holding a set of states the regex could be in, and asking after each character whether any state is the "accept" one. That is all there is to it.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Real-world regex engines are not the classical Kleene-Thompson construction. Most (Perl, Python, Ruby, JavaScript, Java) use a <em>backtracking</em> implementation that supports features (backreferences, lookarounds) which classical regex theory cannot express. The trade-off is that pathological patterns can run in exponential time, a class of bug known as <strong>ReDoS</strong> (regular-expression denial of service). Russ Cox's three-part essay "Regular expression matching can be simple and fast" (2007) is the canonical exposition.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Text is the universal data format. Logs, CSV files, JSON dumps, HTML pages, configuration files, source code, emails, chat messages, scraped pages, and most outputs of "machine X talking to machine Y" are sequences of characters that someone else's program produced and someone else's program (yours) has to read. The unifying skill of working with this material is pattern recognition: "show me the lines that look like a phone number", "extract the timestamp from each log entry", "find every occurrence of the word 'todo' in the codebase". Regex is the tool that turns these descriptions into one-liners.</p>
+
+  <p>The economic argument is the same as the comprehension argument from Lecture 3: a regex that takes 30 seconds to write replaces a 30-line state machine that takes an hour to write and ten minutes per change to maintain. The cost of <em>not</em> knowing regex is that you reinvent a worse one every time. The cost of knowing it is one afternoon, plus a permanent need for a reference card.</p>
+
+  <p>The deeper case is theoretical. Regex matches exactly the <strong>regular languages</strong>, type 3 in Chomsky's hierarchy (Chomsky 1956). These are the languages a finite-state automaton can recognise: bounded memory, single pass, no nesting. The languages that <em>cannot</em> be recognised this way (balanced parentheses, arbitrarily deep XML, well-formed JSON) require context-free grammars (type 2) or stronger. Knowing where the line is saves you from the most common regex anti-pattern: trying to parse HTML with a regex.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Chomsky hierarchy of formal languages">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The Chomsky hierarchy: where regex lives</text>
+
+      <!-- Concentric rectangles -->
+      <rect x="100" y="50" width="560" height="250" fill="#FBEDE4" stroke="#C76B2A" stroke-width="2" rx="10"/>
+      <text x="380" y="74" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#C76B2A">Type 0: recursively enumerable (Turing machines)</text>
+
+      <rect x="130" y="92" width="500" height="200" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2" rx="10"/>
+      <text x="380" y="116" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#C76B2A">Type 1: context-sensitive (linear-bounded automata)</text>
+
+      <rect x="170" y="138" width="420" height="148" fill="#DEEAFB" stroke="#2A3A78" stroke-width="2" rx="10"/>
+      <text x="380" y="162" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#2A3A78">Type 2: context-free (pushdown automata)</text>
+      <text x="380" y="180" text-anchor="middle" font-family="Inter" font-size="11" fill="#2A3A78">JSON, HTML, source code, balanced parens</text>
+
+      <rect x="220" y="200" width="320" height="78" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2" rx="10"/>
+      <text x="380" y="225" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#1E9D54">Type 3: regular (finite automata)</text>
+      <text x="380" y="243" text-anchor="middle" font-family="Inter" font-size="11" fill="#1E9D54">phone numbers, ISO dates, log lines,</text>
+      <text x="380" y="258" text-anchor="middle" font-family="Inter" font-size="11" fill="#1E9D54">most "does this match a pattern?" questions</text>
+
+      <!-- Annotations -->
+      <text x="700" y="245" text-anchor="end" font-family="Inter" font-size="11" fill="#5C5B57">← regex lives here</text>
+    </svg>
+    <figcaption>Chomsky's 1956 hierarchy. Every regular language is context-free; not every context-free language is regular. The shaded green region is what regex can recognise. The blue region (JSON, HTML, source code) cannot be matched by any regex, no matter how long. The classical example is that no regex matches "balanced parentheses to arbitrary depth": parentheses require unbounded memory, regex has bounded memory.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>A regex is built from six kinds of construct. Read every regex by classifying each piece into one of the six categories, in this order:</p>
+
+  <div class="defcard tint-lavender"><span class="term">Literal</span><span class="def">A character that stands for itself: <code>a</code> matches <code>a</code>; <code>banana</code> matches <code>banana</code>. The atoms.</span></div>
+  <div class="defcard tint-sky"><span class="term">Character class</span><span class="def">A set of literals, any one of which matches one position. <code>[abc]</code> matches a, b, or c; <code>[a-z]</code> matches any lowercase letter; <code>[^0-9]</code> matches anything that is not a digit; <code>\d</code> is shorthand for <code>[0-9]</code>.</span></div>
+  <div class="defcard tint-mint"><span class="term">Quantifier</span><span class="def">A repetition count attached to the previous atom: <code>x?</code> (0 or 1), <code>x*</code> (0 or more), <code>x+</code> (1 or more), <code>x{n}</code> (exactly n), <code>x{n,m}</code> (between n and m).</span></div>
+  <div class="defcard tint-peach"><span class="term">Anchor</span><span class="def">A zero-width assertion about the position in the input: <code>^</code> matches the start of the string (or line, with the <code>MULTILINE</code> flag); <code>$</code> matches the end; <code>\b</code> matches a word boundary.</span></div>
+  <div class="defcard tint-yellow"><span class="term">Alternation</span><span class="def"><code>A|B</code> matches A or B. Lowest precedence: <code>cat|dog</code> means "cat or dog", not "ca, t-or-d, og".</span></div>
+  <div class="defcard tint-lavender"><span class="term">Group</span><span class="def">Parentheses serve two purposes: scoping (limit alternation and quantifiers) and capture (record the matched substring for later use). <code>(cat|dog)s?</code> matches "cat", "dog", "cats", "dogs", and captures the animal.</span></div>
+
+  <p>Every regex is a composition of these six. Reading complicated regexes is the practice of identifying which construct each fragment is. The character <code>.</code> is a one-character class meaning "anything except newline"; the construct <code>\d{3}-\d{4}</code> is "a character class with a fixed quantifier, a literal, another character class with a fixed quantifier"; the construct <code>^[A-Z][a-z]+\s+[A-Z][a-z]+$</code> is "anchor, character class, character class plus quantifier, character class plus quantifier, repeat the pattern, anchor".</p>
+
+  <p>The hardest part of writing a regex is not the syntax but the <strong>specification</strong>: what exactly do you intend to match? "An email address" is not a regex specification; it is a famously open question. RFC 5322's grammar for valid email addresses is several pages long. A practical regex for "things that look like email addresses in this dataset" is two lines. The difference matters: the right specification is the smallest one that distinguishes what you want from what you do not want.</p>
+
+  <div class="callout warn">
+    <span class="tag">When regex is the wrong tool</span>
+    Stop and reach for a parser whenever the language you are matching has arbitrarily nested structure (JSON, XML, HTML), arbitrarily long context dependencies, or formal correctness requirements (compilers, financial protocols). The famous Stack Overflow answer "you can't parse HTML with regex" (2010, Bobince) is correct, in two senses: (a) HTML is context-free, regex is regular; (b) even where it works on small inputs, the resulting code is fragile to changes in input format. Use <code>html.parser</code>, <code>lxml</code>, <code>BeautifulSoup</code>, or a real grammar.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Character classes and shorthands</h3>
+
+  <p>The character class <code>[...]</code> matches any single character listed; <code>[^...]</code> matches any single character not listed. Inside a class, <code>-</code> denotes a range and <code>^</code> at the start denotes negation; other metacharacters lose their special meaning. Ranges follow ASCII (or Unicode) ordering: <code>[a-zA-Z0-9_]</code> matches one "word" character.</p>
+
+  <p>Common shorthands save typing. Each has an uppercase negation:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Shorthand</th><th>Equivalent</th><th>Matches</th><th>Negation</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>\d</code></td><td><code>[0-9]</code></td><td>One digit.</td><td><code>\D</code></td></tr>
+      <tr><td><code>\w</code></td><td><code>[A-Za-z0-9_]</code></td><td>One "word" character (letter, digit, underscore).</td><td><code>\W</code></td></tr>
+      <tr><td><code>\s</code></td><td><code>[ \t\r\n\f\v]</code></td><td>One whitespace character.</td><td><code>\S</code></td></tr>
+      <tr><td><code>.</code></td><td>(any but newline)</td><td>Any single character. With the <code>DOTALL</code> flag, includes newline.</td><td>n/a</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The Python <code>re</code> module supports Unicode shorthands by default: <code>\w</code> matches any letter from any script, not just ASCII. Pass <code>re.ASCII</code> to restrict.</p>
+
+  <h3>Quantifiers, greedy and lazy</h3>
+
+  <p>Every quantifier comes in two flavours. The default is <strong>greedy</strong>: match as much as possible while still allowing the rest of the pattern to succeed. Append <code>?</code> to make it <strong>lazy</strong>: match as little as possible. The difference matters whenever the pattern after the quantifier could appear inside the quantified region.</p>
+
+  <pre><code>import re
+
+text = '&lt;b&gt;bold&lt;/b&gt; and &lt;i&gt;italic&lt;/i&gt;'
+
+re.findall(r'&lt;.+&gt;', text)        # ['&lt;b&gt;bold&lt;/b&gt; and &lt;i&gt;italic&lt;/i&gt;']   greedy
+re.findall(r'&lt;.+?&gt;', text)       # ['&lt;b&gt;', '&lt;/b&gt;', '&lt;i&gt;', '&lt;/i&gt;']     lazy</code></pre>
+
+  <p>Greedy <code>.+</code> consumes everything to the last <code>&gt;</code>; lazy <code>.+?</code> stops at the first. The lesson is to pick the flavour deliberately. The default greedy behaviour is correct surprisingly often, but the bug it produces (over-matching) is silent and well-disguised.</p>
+
+  <h3>Anchors and boundaries</h3>
+
+  <p>Anchors match positions, not characters; they consume nothing.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Anchor</th><th>Matches at</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>^</code></td><td>Start of string (or start of line with <code>re.MULTILINE</code>).</td></tr>
+      <tr><td><code>$</code></td><td>End of string (or end of line with <code>re.MULTILINE</code>).</td></tr>
+      <tr><td><code>\b</code></td><td>Word boundary: between a <code>\w</code> and a <code>\W</code> (or string edge).</td></tr>
+      <tr><td><code>\B</code></td><td>Not a word boundary.</td></tr>
+      <tr><td><code>\A</code>, <code>\Z</code></td><td>True start/end of string regardless of flag.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The most useful anchor in everyday code is <code>\b</code>. Without it, <code>cat</code> matches "scatter"; <code>\bcat\b</code> matches only the whole word.</p>
+
+  <h3>Groups: capturing, non-capturing, named</h3>
+
+  <p>Parentheses do two things: scope (so a quantifier or alternation applies to the enclosed expression) and capture (so the matched substring can be retrieved or referred to later). Three flavours of group:</p>
+
+  <pre><code>(abc)        # capturing group, indexed from 1
+(?:abc)      # non-capturing group, scope only
+(?P&lt;name&gt;abc) # named capturing group (Python syntax)</code></pre>
+
+  <p>The convention is: use a non-capturing group whenever you do not need the captured value. The capture has a small cost (the engine remembers the offsets) and clutters the result. Use named groups whenever the position of the capture is not obvious; reading <code>m.group("year")</code> is friendlier than <code>m.group(2)</code>.</p>
+
+  <pre><code>m = re.match(r'(?P&lt;year&gt;\d{4})-(?P&lt;month&gt;\d{2})-(?P&lt;day&gt;\d{2})', '2026-05-17')
+m.group("year")    # '2026'
+m.group("month")   # '05'
+m.groupdict()      # {'year': '2026', 'month': '05', 'day': '17'}</code></pre>
+
+  <p>A <strong>backreference</strong> matches the same text that was captured earlier in the pattern. The notation is <code>\1</code> for the first capturing group, <code>\2</code> for the second, and so on; or <code>(?P=name)</code> for named groups. Backreferences let you express "the same string twice", a feature outside classical regular languages and one of the reasons most engines use backtracking.</p>
+
+  <pre><code># Match repeated words: "the the", "very very"
+re.findall(r'\b(\w+)\s+\1\b', text)</code></pre>
+
+  <h3>Lookaround</h3>
+
+  <p>Sometimes you want to match a pattern only when it is preceded or followed by another pattern, without including the surroundings in the match. <strong>Lookaround</strong> assertions are zero-width: they constrain the position without consuming characters.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Construct</th><th>Meaning</th><th>Example</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>(?=...)</code></td><td>Positive lookahead: only if the next characters match <code>...</code>.</td><td><code>\d+(?=px)</code> matches a number followed by "px", without capturing "px".</td></tr>
+      <tr><td><code>(?!...)</code></td><td>Negative lookahead: only if the next characters do not match.</td><td><code>foo(?!bar)</code> matches "foo" not followed by "bar".</td></tr>
+      <tr><td><code>(?&lt;=...)</code></td><td>Positive lookbehind: only if preceded by <code>...</code>.</td><td><code>(?&lt;=\$)\d+</code> matches a number preceded by a dollar sign.</td></tr>
+      <tr><td><code>(?&lt;!...)</code></td><td>Negative lookbehind: only if not preceded by <code>...</code>.</td><td><code>(?&lt;!\\)"</code> matches a quote not preceded by a backslash.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Python's lookbehind requires a fixed width (no variable-length quantifiers). The <code>regex</code> third-party module relaxes this if you need variable-length lookbehind.</p>
+
+  <h3>The Python re module</h3>
+
+  <p>The functions you will use most:</p>
+
+  <pre><code>import re
+
+# Search anywhere in the string
+m = re.search(r'\d+', 'abc123def')        # &lt;Match span=(3, 6) match='123'&gt;
+m.group()                                  # '123'
+
+# Match only at the start
+re.match(r'\d+', 'abc123')                 # None
+re.match(r'\w+', 'abc123')                 # &lt;Match span=(0, 6) match='abc123'&gt;
+
+# Full match required end-to-end
+re.fullmatch(r'\d+', '123')                # &lt;Match ...&gt;
+re.fullmatch(r'\d+', '123abc')             # None
+
+# All non-overlapping matches
+re.findall(r'\d+', 'a1 b22 c333')          # ['1', '22', '333']
+
+# Same, as an iterator of Match objects (use for groups / spans)
+for m in re.finditer(r'\d+', 'a1 b22 c333'):
+    print(m.group(), m.span())
+
+# Replace
+re.sub(r'\d+', 'N', 'a1 b22 c333')         # 'aN bN cN'
+
+# Replace with a function
+re.sub(r'\d+', lambda m: str(int(m.group()) * 2), 'a1 b22 c333')
+# 'a2 b44 c666'</code></pre>
+
+  <p>Two practical habits. First, use <strong>raw string literals</strong> (<code>r'\d+'</code>) for every regex. Without the <code>r</code> prefix, the backslashes are interpreted by Python's string parser first, producing confusing errors. Second, <strong>compile patterns you reuse</strong>:</p>
+
+  <pre><code>EMAIL = re.compile(r'[\w.-]+@[\w.-]+\.\w{2,}')
+
+for line in lines:
+    if EMAIL.search(line):
+        ...</code></pre>
+
+  <p>The cached implementation in <code>re</code> means this is rarely a performance optimisation, but the explicit compile step is clearer to the reader and allows flags to be applied once: <code>re.compile(r'...', re.IGNORECASE | re.MULTILINE)</code>.</p>
+
+  <h3>Common flags</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Flag</th><th>Effect</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>re.IGNORECASE</code> (<code>re.I</code>)</td><td>Case-insensitive matching.</td></tr>
+      <tr><td><code>re.MULTILINE</code> (<code>re.M</code>)</td><td><code>^</code> and <code>$</code> match line breaks, not just string edges.</td></tr>
+      <tr><td><code>re.DOTALL</code> (<code>re.S</code>)</td><td><code>.</code> matches newline.</td></tr>
+      <tr><td><code>re.VERBOSE</code> (<code>re.X</code>)</td><td>Allow whitespace and comments inside the pattern for readability.</td></tr>
+      <tr><td><code>re.ASCII</code> (<code>re.A</code>)</td><td>Restrict <code>\w</code>, <code>\d</code>, <code>\s</code> to ASCII (default is Unicode).</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The verbose flag is underused and worth knowing. A complicated pattern is much easier to read when broken across lines and commented:</p>
+
+  <pre><code>UK_POSTCODE = re.compile(r"""
+    ^                                    # start of string
+    ([A-Z]{1,2})                         # area:    1-2 letters
+    ([0-9][A-Z0-9]?)                     # district: digit + optional letter/digit
+    \s*                                  # optional spaces
+    ([0-9])                              # sector:  1 digit
+    ([A-Z]{2})                           # unit:    2 letters
+    $
+""", re.VERBOSE | re.IGNORECASE)</code></pre>
+
+  <h3>Pathological patterns and ReDoS</h3>
+
+  <p>Python's <code>re</code> module is a <em>backtracking</em> engine. For most patterns this is fine. For a specific family of patterns it is catastrophic. The classic example is <code>(a+)+b</code> on the input <code>aaaaaaaaaaaaaaaaa</code> with no <code>b</code>: the engine tries every way of splitting the <em>a</em>s between the inner and outer <code>+</code>, of which there are exponentially many.</p>
+
+  <p>The condition is called <strong>catastrophic backtracking</strong>; the security vulnerability it produces, where an attacker submits a crafted string to a regex on the server, is <strong>ReDoS</strong>. The defence is twofold. Avoid nested quantifiers when the inner can match a prefix the outer also can ("evil regexes" almost always have this shape). On the server side, use a non-backtracking engine: Google's <code>re2</code> library (which Russ Cox helped write, available in Python as <code>google-re2</code>) guarantees linear time in the input length, in exchange for not supporting backreferences. For untrusted inputs, this is the safer default.</p>
+
+  <h3>Six worked examples</h3>
+
+  <pre><code># 1. Strip trailing whitespace and collapse internal runs of spaces
+re.sub(r'\s+', ' ', text).strip()
+
+# 2. Parse an ISO date
+m = re.fullmatch(r'(?P&lt;y&gt;\d{4})-(?P&lt;m&gt;\d{2})-(?P&lt;d&gt;\d{2})', s)
+
+# 3. Extract every quoted string (allowing escaped quotes inside)
+re.findall(r'"((?:[^"\\]|\\.)*)"', source)
+
+# 4. Match a "loose" email (good enough for log scraping, not RFC-correct)
+re.findall(r'[\w.+-]+@[\w-]+\.[\w.-]+', logs)
+
+# 5. Find Python identifiers (after a function definition)
+re.findall(r'\bdef\s+([A-Za-z_]\w*)', source)
+
+# 6. Normalise a phone number to E.164 (UK)
+def to_e164(s: str) -&gt; str | None:
+    digits = re.sub(r'\D', '', s)
+    if digits.startswith('0'):
+        return '+44' + digits[1:]
+    if digits.startswith('44'):
+        return '+' + digits
+    return None</code></pre>
+
+  <div class="worked">
+    <strong>Worked example: parsing a log line</strong>
+    <p>The input is one line of an Apache common-log-format access log:</p>
+    <p><code>192.168.1.42 - alice [17/May/2026:14:32:01 +0100] "GET /api/v1/score HTTP/1.1" 200 1842</code></p>
+    <p>The goal is to extract IP, user, timestamp, method, path, status, and bytes into named groups. The regex, written verbosely:</p>
+    <p><code>LOG = re.compile(r"""
+    ^
+    (?P&lt;ip&gt;\d{1,3}(?:\.\d{1,3}){3})\s+
+    -\s+
+    (?P&lt;user&gt;\S+)\s+
+    \[(?P&lt;ts&gt;[^\]]+)\]\s+
+    "(?P&lt;method&gt;[A-Z]+)\s+(?P&lt;path&gt;[^\s"]+)[^"]*"\s+
+    (?P&lt;status&gt;\d{3})\s+
+    (?P&lt;bytes&gt;\d+)
+    $
+""", re.VERBOSE)</code></p>
+    <p>Notice three deliberate choices. (1) The IP uses <code>\d{1,3}(?:\.\d{1,3}){3}</code>, a non-capturing group with a fixed quantifier; this is the right shape for "four octets separated by dots" without capturing each one separately. (2) The timestamp is captured as the entire bracketed string; parsing the date itself is a separate concern, handled by <code>datetime.strptime</code> on the captured string. (3) The user agent and referrer are skipped via <code>[^"]*</code> rather than trying to match every detail; a regex that tries to validate everything is harder to maintain than two regexes that handle two concerns.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Regex is the smallest standard tool in the engineer's toolbox that solves a large class of problems: pattern matching, lightweight extraction, search-and-replace, and validation against simple formats. The six constructs (literal, class, quantifier, anchor, alternation, group) compose to express every regular language, and the Python <code>re</code> module gives you the API in five functions. Most working regexes are a dozen characters long; a complicated one that has been through code review is two dozen lines of <code>re.VERBOSE</code>, with comments.</p>
+
+  <p>The cost of fluency is one afternoon of practice plus a permanent reference card; the saving is every time you would otherwise have written a state machine by hand. The cost of <em>over</em>-use is reaching for a regex where a parser is the right answer; the discipline is to know the boundary (Chomsky's hierarchy) and to step over it deliberately. For HTML, JSON, and source code, use a parser; for log lines, identifiers, dates, and "does this string look like X", use a regex.</p>
+
+  <p>Part I ends here. You can now read and write idiomatic Python in conformity with the community style, with the right built-in types, and with the right text-processing tools. Part II turns to verification: testing (Lecture 5) and debugging (Lecture 6). The regex patterns you write here will routinely show up as test assertions in Lecture 5; the engines you debug in Lecture 6 will often be regex-driven.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the four levels of the Chomsky hierarchy. Where in the hierarchy do regex, JSON, and Python source code each sit?</li>
+      <li>Distinguish a greedy quantifier from a lazy one. Construct a one-line example where the difference matters.</li>
+      <li>Explain why parentheses do two things at once. When should you use <code>(?:...)</code> instead of <code>(...)</code>?</li>
+      <li>What is a backreference, and why does its existence put most regex engines outside classical regular-language theory?</li>
+      <li>What is ReDoS? Give one structural feature of a pattern that makes it vulnerable. What is the standard mitigation for regex on untrusted input?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="03-python_data_essentials.html">Lecture 3 (Python data essentials)</a> covered the built-in types regex operates over.</li>
+      <li><strong>Next:</strong> <a href="05-testing.html">Lecture 5 (testing)</a> uses regex routinely in test assertions and parameterised cases.</li>
+      <li><strong>Cross-link:</strong> <a href="06-debugging_and_profiling.html">Lecture 6 (debugging)</a> covers how to trace a misbehaving regex with <code>re.DEBUG</code> and online visualisers (regex101).</li>
+      <li><strong>Outside this course:</strong> Russ Cox, "Regular expression matching can be simple and fast" (2007, <a href="https://swtch.com/~rsc/regexp/regexp1.html">swtch.com/~rsc/regexp/regexp1.html</a>); Friedl, <em>Mastering Regular Expressions</em> (3rd edition, 2006); Chomsky, "Three models for the description of language" (1956).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 4 of 14</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

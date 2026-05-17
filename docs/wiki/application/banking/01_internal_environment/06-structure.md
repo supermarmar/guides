@@ -127,11 +127,11 @@ Firms need a banking licence to call themselves banks and to accept retail depos
 
 #### Retail Banks
 
-Take deposits, offer current accounts, and lend through overdrafts, loans, credit cards, and mortgages to individuals and small businesses (many of which are sole traders). They are regulated and supervised by their national regulator, and are normally listed and owned by shareholders.
+Take deposits, offer current accounts, and lend through overdrafts, loans, credit cards, and mortgages to individuals and small businesses (many of which are sole traders). They are regulated and supervised by their national regulator, and are normally listed and owned by shareholders. Examples include Monzo <img src="images/banks/monzo.png" alt="Monzo" height="22" style="vertical-align:middle;"> in the UK and Capitec <img src="images/banks/capitec.png" alt="Capitec" height="22" style="vertical-align:middle;"> in South Africa.
 
 #### Commercial banks
 
-Often active in retail banking and, in addition, take deposits from, make loans to, and offer payment and other services to companies of all sizes.
+Often active in retail banking and, in addition, take deposits from, make loans to, and offer payment and other services to companies of all sizes. Examples include NatWest <img src="images/banks/natwest.png" alt="NatWest" height="22" style="vertical-align:middle;"> in the UK and Standard Bank <img src="images/banks/standard_bank.png" alt="Standard Bank" height="22" style="vertical-align:middle;"> in South Africa.
 
 ### Investment Banks
 
@@ -142,31 +142,31 @@ Investment banks help companies to raise equity and debt capital. They help with
 - Find buyers for businesses and help companies defend against unsolicited bids
 - Are active in derivative instruments such as futures, options, and swaps, in connection with [[01-risk_management|risk management]] services offered to customers
 
-Specialised lending such as project finance, trade finance, or commodity finance is also often housed in an investment bank.
+Specialised lending such as project finance, trade finance, or commodity finance is also often housed in an investment bank. Examples include Goldman Sachs <img src="images/banks/goldman_sachs.png" alt="Goldman Sachs" height="22" style="vertical-align:middle;"> in the US and Barclays Investment Bank <img src="images/banks/barclays.png" alt="Barclays" height="22" style="vertical-align:middle;"> in the UK; in South Africa, Rand Merchant Bank operates as the investment banking division of FirstRand <img src="images/banks/firstrand.png" alt="FirstRand" height="22" style="vertical-align:middle;">.
 
 ### Universal Banks
 
 Universal banks comprise commercial banking (including retail banking) and investment banking, and often include other activities such as wealth management, fund management, and bancassurance. Universal banks have been the common model for large banks.
 
-A concern about universal banks is that deposits made by customers of the commercial bank may be put at risk by losses from trading activities in the investment bank.
+A concern about universal banks is that deposits made by customers of the commercial bank may be put at risk by losses from trading activities in the investment bank. Globally diversified examples include HSBC <img src="images/banks/hsbc.png" alt="HSBC" height="22" style="vertical-align:middle;">; in South Africa, FirstRand <img src="images/banks/firstrand.png" alt="FirstRand" height="22" style="vertical-align:middle;"> operates across retail, commercial, and investment banking through its FNB, RMB, and WesBank franchises.
 
 ### Challenger Banks
 
 The move to online banking has reduced barriers to entry. New entrant banks are likely to have low-cost operations and can challenge large incumbent banks despite their limited economies of scale. A further development is the standardisation of open APIs (interfaces built to a common standard), allowing the transfer of data between banks and approved third parties — encouraged by PSD2 (Payment Services Directive 2) in the EU and Open Banking in the UK.
 
-Fintech firms, with skills and experience in data science, are well-placed to take advantage of this opportunity. In the UK, new banks such as Atom and Monzo offer easy-to-use banking apps. Some effective challengers are not banks: ANT from China, PayPal and Stripe from the US, and Revolut from the UK have made good progress in digital payments. M-Pesa, a payment platform/money transfer service available through network operators, uses technology to provide banking services in Kenya, Tanzania, and Ghana.
+Fintech firms, with skills and experience in data science, are well-placed to take advantage of this opportunity. In the UK, new banks such as Atom and Monzo offer easy-to-use banking apps. Some effective challengers are not banks: ANT from China, PayPal and Stripe from the US, and Revolut <img src="images/banks/revolut.png" alt="Revolut" height="22" style="vertical-align:middle;"> from the UK have made good progress in digital payments. M-Pesa, a payment platform/money transfer service available through network operators, uses technology to provide banking services in Kenya, Tanzania, and Ghana. In South Africa, TymeBank <img src="images/banks/tymebank.jpg" alt="TymeBank" height="22" style="vertical-align:middle;"> has emerged as a leading digital-first challenger, operating without physical branches and offering low-cost transactional and savings products.
 
 ### Shadow Banks
 
 Shadow banks offer certain banking services but do not have banking licences and are less regulated. They cannot accept retail deposits and typically offer credit financed by wholesale borrowing. They are often more highly leveraged than regulated banks. Shadow banks are generally regarded as including asset managers, hedge funds, private equity funds, securitisation companies, and money market funds.
 
-A challenge for shadow banks is that if their wholesale funding is limited in periods of stress, they may be forced to sell assets at depressed prices. It is thought that such behaviour by shadow banks made a substantial contribution to the banking crisis of 2007–2008.
+A challenge for shadow banks is that if their wholesale funding is limited in periods of stress, they may be forced to sell assets at depressed prices. It is thought that such behaviour by shadow banks made a substantial contribution to the banking crisis of 2007–2008. Examples include BlackRock <img src="images/banks/blackrock.png" alt="BlackRock" height="22" style="vertical-align:middle;">, the world's largest asset manager, and Ninety One <img src="images/banks/ninety_one.png" alt="Ninety One" height="22" style="vertical-align:middle;">, an Anglo–South African asset manager spun off from Investec in 2020.
 
 ### Mutual Banks
 
 Mutual banks, such as building societies, are owned by their members. They typically have strong values and a commitment to their members and communities. A disadvantage is that they are not able to raise equity capital to cover their losses in periods of recession or to finance new investments such as those associated with the move to online and mobile banking.
 
-A broader definition of such banks includes community banks, credit unions, and rotating savings and credit associations such as South Africa's stokvels.
+A broader definition of such banks includes community banks, credit unions, and rotating savings and credit associations such as South Africa's stokvels. In the UK, Nationwide Building Society <img src="images/banks/nationwide.png" alt="Nationwide Building Society" height="22" style="vertical-align:middle;"> is the largest example, owned by its members and operating across mortgages, savings, and current accounts.
 
 ### Wholesale-Funded Banks
 
@@ -177,8 +177,10 @@ Some banks make greater use of wholesale funding and less use of retail deposits
 - Lower costs — because of their simpler [[01-business_model|business model]]
 - A lower regulatory burden where they are not subject to the same regulations as deposit-taking institution.
 
+A well-known example is Investec <img src="images/banks/investec.png" alt="Investec" height="22" style="vertical-align:middle;">, a dual-listed Anglo–South African specialist bank focused on corporate, institutional, and private clients with limited reliance on retail deposits.
+
 ### Development Banks
 
 Generally speaking, development financial institutions (DFIs) are alternative financial institutions including community development institutions and microfinance institutions. These entities fill a critical role in providing credit through higher-risk loans, equity stakes, and risk guarantee instruments for private sector initiatives to aid companies investing in developing countries. They are typically owned and supported by countries with developed economies.
 
-Examples of multilateral development banks include the World Bank, European Investment Bank (EIB), Asia Development Bank (ADB), Inter-American Development Bank (IADB), and African Development Bank (AfDB). Regional entities in Africa include the Trade and Development Bank, which operates in the Common Market for Eastern and Southern Africa (COMESA), the Arab Bank for Economic Development in Africa, and the Land and Agricultural Development Bank of South Africa.
+Examples of multilateral development banks include the World Bank, European Investment Bank (EIB), Asia Development Bank (ADB), Inter-American Development Bank (IADB), and the African Development Bank (AfDB) <img src="images/banks/afdb.png" alt="African Development Bank" height="22" style="vertical-align:middle;">. Regional entities in Africa include the Trade and Development Bank, which operates in the Common Market for Eastern and Southern Africa (COMESA), the Arab Bank for Economic Development in Africa, the Land and Agricultural Development Bank of South Africa, and the Development Bank of Southern Africa (DBSA) <img src="images/banks/dbsa.png" alt="DBSA" height="22" style="vertical-align:middle;">, which finances infrastructure projects across the SADC region.

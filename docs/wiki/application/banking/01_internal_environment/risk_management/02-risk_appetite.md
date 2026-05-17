@@ -40,7 +40,7 @@ A risk appetite statement must be coordinated by the [[01-risk_management|risk m
 
 The statement will anticipate scenarios of market stress and plan possible responses. Tolerances levels for the above parameters are likely to be determined at an overall corporate level as well as a business unit and departmental level. The bank can develop dashboards for various levels of seniority to monitor the desired parameters relative to their tolerance levels.
 
-The bank's risk appetite is aligned to the [ICAAP](01-regulatory_environment.md) (internal capital assessment and adequacy plan) and [ILAAP]() (internal liquidity adequacy assessment plan). The [[01-risk_management|risk management]] framework and appetite is subject to strict scrutiny by the regulator in the SREP (supervisory review and evaluation process) reviews.
+The bank's risk appetite is aligned to the [ICAAP](../../02_external_environment/01-regulatory_environment.md) (internal capital assessment and adequacy plan) and [ILAAP]() (internal liquidity adequacy assessment plan). The [[01-risk_management|risk management]] framework and appetite is subject to strict scrutiny by the regulator in the SREP (supervisory review and evaluation process) reviews.
 
 Formulating the Risk Appetite Framework (RAF) requires four main steps:
 

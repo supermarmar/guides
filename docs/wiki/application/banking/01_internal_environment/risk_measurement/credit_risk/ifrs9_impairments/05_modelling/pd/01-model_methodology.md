@@ -39,7 +39,7 @@ To estimate the empirical marginal PD’s we construct a defaults table containi
 
 Table 1 is an illustrative example of the defaults table. The number of performing accounts at the start of the observation month 201501 (i.e., $𝑀_1 =201501$) was 500 accounts (i.e., $𝑛_{1,0}$ =500). Of these 500 accounts 10 accounts defaulted in 201502, during the period (0,1] (i.e., $𝑑_{1,1} =10$), and 5 accounts defaulted in 201503, during the period (1,2] (i.e., $𝑑_1,2 =5$). Note that no forecasting is required.
 
-![alt text](wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/ifrs9_impairments/05_modelling/pd/image.png)
+![alt text](image.png)
 
 From the defaults table, the empirical PD’s, per observation month 𝑀𝑘 can be calculated as follow:
 
@@ -69,7 +69,7 @@ e estimate the marginal PD for time horizon 𝑡 as
 (4)
 For example, if a reference period of 3 months is chosen (𝑅 =3), and the reference month is 201507 (𝑀 =201507), then Table 2 illustrates the resulting marginal PDs.
 
-![alt text](wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/ifrs9_impairments/05_modelling/pd/image-1.png)
+![alt text](image-1.png)
 
 To summarise, the approach will create PD term structures based on the most recent default information and initial performing accounts as at observation month. It does not require the explicit modelling of future cures or closures, as no survival analysis is required. Below we discuss how the PD term structure is segmented.
 

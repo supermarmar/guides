@@ -31,7 +31,7 @@ PIT PDs are more useful in the case of a bank needing accurate and timely inform
 
 TTC PDs assess the probability of an entity defaulting throughout a long-term economic cycle. TTC PDs will inherently include this ability to withstand adverse economic events, as it will most often be the average PD over an economic cycle. The structure of these PDs over time is illustrated in the figure below.
 
-![alt text](pit_vs_ttc.png)
+![alt text](a-irb_capital/04_feature_engineering/pd/images/pit_vs_ttc.png)
 
 TTC PDs are smoother and can be used for a longer-term view; thus, they reduce the aforementioned costs. However, a shortfall of these PDs is that they are not as successful at identifying defaults and may cause losses in this area.
 
@@ -51,7 +51,7 @@ The broad goal of such systems is to facilitate the estimation of regulatory and
 
 Put simply, a TTC PD is a measure of the likelihood that a borrower will default over a specific time horizon, calculated in a way that smooths out fluctuations caused by economic or business cycles. It reflects a borrower's average risk of default under both favorable and unfavorable economic conditions. The goal of TTC PD is to isolate a borrower's intrinsic credit risk (their ability to meet obligations independent of short-term economic changes).
 
-![alt text](ttc_vs_pit_pd.png)
+![alt text](ifrs9_impairments/01_introduction/images/ttc_vs_pit_pd.png)
 
 In this case, the TTC population PD  seen in the graph above (population being segmented by risk grades) is also the same TTC for the borrower (i.e. this is the LRA PD calibrated at the end of the [[07-risk_quantification|risk quantification]] step per risk grade):
 

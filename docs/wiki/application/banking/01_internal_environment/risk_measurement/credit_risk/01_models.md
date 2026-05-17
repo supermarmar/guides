@@ -258,7 +258,7 @@ These components are then used to estimate and model portfolio risk using Monte 
 
 An example of a credit rating migration distribution for a firm with a specific credit rating is illustrated below:
 
-![alt text](credit_metrics.png)
+![alt text](a-irb_capital/05_modelling/images/credit_metrics.png)
 
 It should be noted that this approach can be used to assess the credit risk and migration probabilities of individual exposures.
 

@@ -32,7 +32,7 @@ For LCR purposes, HQLA must be **unencumbered** and possess the following fundam
 - **Low correlation with risky assets** — the stock of HQLA must not be subject to wrong-way (highly correlated) risk.
 - **Listed on a developed and recognised exchange** — listing increases transparency and supports liquidity under stress.
 
-Level 2 assets may represent at most 40% of total HQLA; Level 2B assets may not exceed 15% of total HQLA. See [Liquidity Metrics](04-liquidity_management.md) for the [[sarb|SARB]] HQLA tier classifications (Level 1, 2A, 2B).
+Level 2 assets may represent at most 40% of total HQLA; Level 2B assets may not exceed 15% of total HQLA. See [Liquidity Metrics](../../04-liquidity_management.md) for the [[sarb|SARB]] HQLA tier classifications (Level 1, 2A, 2B).
 
 ## Outflow Assumptions by Deposit Type
 

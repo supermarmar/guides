@@ -191,4 +191,4 @@ CET1 capital-to-total RWAs ratio of different banks have only limited value beca
 
 ### Liquidity strength (BS)
 
-The higher the [[01-short_term_metrics|LCR]] the better a bank will be at sustaining short term liquidity needs during times of stress. For the full treatment of [[04-liquidity_management|liquidity metrics]] (LDR, LRF, HQLA tiers, [[01-short_term_metrics|LCR]], [[03-long_term_metrics|NSFR]]), see [Liquidity Metrics](liquidity_risk/01_introduction/02-liquidity_metrics.md).
+The higher the [[01-short_term_metrics|LCR]] the better a bank will be at sustaining short term liquidity needs during times of stress. For the full treatment of [[04-liquidity_management|liquidity metrics]] (LDR, LRF, HQLA tiers, [[01-short_term_metrics|LCR]], [[03-long_term_metrics|NSFR]]), see [Liquidity Metrics](04-liquidity_management.md).

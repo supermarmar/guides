@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Credit risk notation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk</div>
+  <h1>Notation</h1>
+  <p class="subtitle">The symbol table for everything that follows. Every later credit-risk lecture (PD, LGD, EAD, A-IRB capital, IFRS 9 ECL) reuses these definitions, so this is the file to bookmark and the file to argue about first.</p>
+  <div class="meta">
+    <span>Credit risk, foundation file</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Source: <code>docs/wiki/.../credit_risk/03_notation.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A credit-risk model is a sequence of probabilities, ratios, and indicators stitched together across two time axes (the loan's age and the calendar) and one population axis (the obligor). Almost every dispute in a modelling team is, on inspection, a dispute about what a symbol means. This lecture is the single place those definitions live.</p>
+
+  <p>Five families of symbol carry the weight. <strong>Identifiers and time</strong> distinguish a loan \(i\) from its obligor \(i'\), the loan's age \(t\) from the calendar date \(t'\), and the outcome horizon \(k\) from both. <strong>Delinquency mechanics</strong> turn raw days-past-due into the binary default indicator the regulator and the IFRS 9 stage transitions both depend on. <strong>The PD family</strong> covers the through-the-cycle, point-in-time, conditional, unconditional, cumulative, and lifetime variants, each with a different purpose. <strong>EAD and LGD</strong> turn a default event into a monetary loss. <strong>The capital objects</strong> at the top of the stack (WCDR, K, RWA, ECL, EL shortfall) consume all of the above.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A credit model is a translation device. On one side: a borrower who pays or does not pay, an account balance that rises and falls, an economy that booms and slumps. On the other side: a single number called expected loss. Every symbol in this lecture is a step in that translation. The trick to reading any credit model is to keep asking, at every symbol, "is this about a single loan, a population of loans, or the economy as a whole?", and "is the time index the loan's age or the calendar date?". Get those two questions right and the algebra becomes mechanical.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Inconsistent notation is one of the few sources of model error that survives every layer of validation. A documentation slip that swaps the order of two arguments will not fail a unit test, will not show up in a Q-Q plot, and will not break a backtest. It will only surface when a regulator asks a junior analyst to define a term and gets an answer that contradicts the model technical document. By then the audit trail is months deep and the rebuild is expensive.</p>
+
+  <p>The risk is not theoretical. The wiki notation file from which this lecture descends contains an outright typo (a cure indicator referencing an undefined symbol), an argument-order inconsistency that propagates through six downstream formulae, a cumulative-PD definition that double-counts the survival chain, and a Vasicek formula that works in two opposite directions depending on the unstated sign convention of the forward-looking index. Each is harmless in isolation. Combined into a full ECL or capital number, they shift results by tens of basis points and turn the audit report into a multi-day discussion.</p>
+
+  <p>The supervisor cares about this for a specific reason. The IRB use test under CRR Article 144, the IFRS 9 governance expectations under PRA SS3/24, and the broader BCBS 239 data lineage requirement all hinge on the bank being able to explain, end to end, what each number means. Notation is the bottom rung of that ladder. If the symbol table is wrong, every higher rung wobbles.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The single most useful picture in credit notation is the two-axis time diagram. A loan ages from \(t = 0\) at origination to maturity along its loan-term axis. Each loan also sits at a calendar date \(t'\). The outcome window \(k\) is a horizon (usually 12 months) measured forward from a chosen observation point on either axis. Most notation errors are time-axis confusions.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The two time axes of a credit model">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two time axes and one outcome window</text>
+
+      <!-- Loan term axis -->
+      <line x1="80" y1="120" x2="760" y2="120" stroke="#52525b" stroke-width="1.5"/>
+      <text x="60" y="124" text-anchor="end" font-family="Inter" font-size="11" font-weight="600" fill="#1e3a8a">Loan term, t</text>
+      <g font-family="Inter" font-size="10" fill="#71717a">
+        <line x1="120" y1="115" x2="120" y2="125" stroke="#52525b"/><text x="120" y="142" text-anchor="middle">0 (origination)</text>
+        <line x1="280" y1="115" x2="280" y2="125" stroke="#52525b"/><text x="280" y="142" text-anchor="middle">12</text>
+        <line x1="440" y1="115" x2="440" y2="125" stroke="#52525b"/><text x="440" y="142" text-anchor="middle">24</text>
+        <line x1="600" y1="115" x2="600" y2="125" stroke="#52525b"/><text x="600" y="142" text-anchor="middle">36</text>
+        <line x1="740" y1="115" x2="740" y2="125" stroke="#52525b"/><text x="740" y="142" text-anchor="middle">maturity</text>
+      </g>
+      <text x="770" y="124" font-family="Inter" font-size="11" fill="#52525b">months</text>
+
+      <!-- Calendar axis -->
+      <line x1="80" y1="240" x2="760" y2="240" stroke="#52525b" stroke-width="1.5"/>
+      <text x="60" y="244" text-anchor="end" font-family="Inter" font-size="11" font-weight="600" fill="#9a3412">Calendar date, t'</text>
+      <g font-family="Inter" font-size="10" fill="#71717a">
+        <line x1="120" y1="235" x2="120" y2="245" stroke="#52525b"/><text x="120" y="262" text-anchor="middle">2022-Q1</text>
+        <line x1="280" y1="235" x2="280" y2="245" stroke="#52525b"/><text x="280" y="262" text-anchor="middle">2023-Q1</text>
+        <line x1="440" y1="235" x2="440" y2="245" stroke="#52525b"/><text x="440" y="262" text-anchor="middle">2024-Q1</text>
+        <line x1="600" y1="235" x2="600" y2="245" stroke="#52525b"/><text x="600" y="262" text-anchor="middle">2025-Q1</text>
+        <line x1="740" y1="235" x2="740" y2="245" stroke="#52525b"/><text x="740" y="262" text-anchor="middle">today</text>
+      </g>
+
+      <!-- Observation point and outcome window -->
+      <circle cx="440" cy="120" r="5" fill="#1e3a8a"/>
+      <circle cx="440" cy="240" r="5" fill="#9a3412"/>
+      <text x="440" y="105" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">obs point</text>
+
+      <!-- k-window highlighting -->
+      <rect x="440" y="160" width="160" height="40" fill="#fed7aa" stroke="#9a3412" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="520" y="186" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#9a3412">outcome window k = 12m</text>
+
+      <!-- Arrows linking the two -->
+      <line x1="440" y1="130" x2="440" y2="160" stroke="#9a3412" stroke-width="1" stroke-dasharray="2,2"/>
+      <line x1="600" y1="200" x2="600" y2="230" stroke="#9a3412" stroke-width="1" stroke-dasharray="2,2"/>
+
+      <!-- Population axis (visual aside) -->
+      <g transform="translate(80,310)">
+        <text x="0" y="0" font-family="Inter" font-size="11" font-weight="600" fill="#3f3f46">Population at the obs point:</text>
+        <g font-family="Inter" font-size="10" fill="#52525b">
+          <circle cx="220" cy="-4" r="4" fill="#3b82f6"/><text x="232" y="0">loan i, obligor i'</text>
+          <circle cx="340" cy="-4" r="4" fill="#3b82f6"/><text x="352" y="0">loan j, obligor j' (may share)</text>
+          <circle cx="540" cy="-4" r="4" fill="#3b82f6"/><text x="552" y="0">... cohort across loans, segmented by x_i</text>
+        </g>
+      </g>
+
+      <!-- Right-side notes -->
+      <g transform="translate(80,355)" font-family="Inter" font-size="11" fill="#71717a">
+        <text x="0" y="0" font-style="italic">A 12-month PD asks: at the observation point (t, t'), what is the chance the loan defaults somewhere inside the window k? Same window, two clocks.</text>
+      </g>
+    </svg>
+    <figcaption>A loan lives on two clocks. Loan term \(t\) starts at origination and runs to maturity; calendar time \(t'\) is the wall-clock date. The outcome horizon \(k\) (typically 12 months) is a window measured forward from a chosen observation point. The TTC PD averages across calendar time at a fixed loan-term cohort. The PiT PD conditions on the current calendar date. The lifetime PD integrates across loan term. The forward-looking adjustments work in calendar time. Confusing the two clocks is the most common single error in credit modelling.</figcaption>
+  </figure>
+
+  <p>The second picture matters because the cumulative-PD formula is the one that goes wrong most often. The survival probability \(S_{i,t}\) is already a cumulative product across loan ages; the cumulative PD is its complement, not a product over an already-cumulative quantity. The diagram below shows the chain explicitly.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 820 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survival chain and cumulative PD">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Survival chain: from 1-period marginals to cumulative and lifetime PD</text>
+
+      <!-- Boxes for each period -->
+      <g font-family="Inter" font-size="11" fill="#18181b">
+        <rect x="60" y="60" width="120" height="60" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.5"/>
+        <text x="120" y="82" text-anchor="middle" font-weight="600">Period 1</text>
+        <text x="120" y="100" text-anchor="middle" font-size="10">PD₁ᴾⁱᵀ</text>
+        <text x="120" y="114" text-anchor="middle" font-size="10">(1 − PD₁)</text>
+
+        <rect x="200" y="60" width="120" height="60" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.5"/>
+        <text x="260" y="82" text-anchor="middle" font-weight="600">Period 2</text>
+        <text x="260" y="100" text-anchor="middle" font-size="10">PD₂ᴾⁱᵀ | survived 1</text>
+        <text x="260" y="114" text-anchor="middle" font-size="10">(1 − PD₂)</text>
+
+        <rect x="340" y="60" width="120" height="60" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.5"/>
+        <text x="400" y="82" text-anchor="middle" font-weight="600">Period 3</text>
+        <text x="400" y="100" text-anchor="middle" font-size="10">PD₃ᴾⁱᵀ | survived 1,2</text>
+        <text x="400" y="114" text-anchor="middle" font-size="10">(1 − PD₃)</text>
+
+        <rect x="480" y="60" width="120" height="60" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.5"/>
+        <text x="540" y="82" text-anchor="middle" font-weight="600">...</text>
+
+        <rect x="620" y="60" width="120" height="60" fill="#fef3c7" stroke="#92400e" stroke-width="1.5"/>
+        <text x="680" y="82" text-anchor="middle" font-weight="600">Period t</text>
+        <text x="680" y="100" text-anchor="middle" font-size="10">last conditional</text>
+        <text x="680" y="114" text-anchor="middle" font-size="10">(1 − PDₜ)</text>
+      </g>
+
+      <!-- Product arrow -->
+      <g font-family="Inter" font-size="11" fill="#52525b">
+        <line x1="180" y1="90" x2="200" y2="90" stroke="#52525b" stroke-width="1.5" marker-end="url(#arr2)"/>
+        <line x1="320" y1="90" x2="340" y2="90" stroke="#52525b" stroke-width="1.5" marker-end="url(#arr2)"/>
+        <line x1="460" y1="90" x2="480" y2="90" stroke="#52525b" stroke-width="1.5" marker-end="url(#arr2)"/>
+        <line x1="600" y1="90" x2="620" y2="90" stroke="#52525b" stroke-width="1.5" marker-end="url(#arr2)"/>
+      </g>
+      <defs>
+        <marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#52525b"/></marker>
+      </defs>
+
+      <!-- Survival = product, cumulative = 1 - product -->
+      <text x="410" y="170" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#1e3a8a">Sₜ = ∏ᵥ₌₁ᵗ (1 − PDᵥᴾⁱᵀ)</text>
+      <text x="410" y="195" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#9a3412">PDᶜᵘᵐₜ = 1 − Sₜ &nbsp; ≈ &nbsp; Σᵥ PDᵥᴾⁱᵀ (small-PD approximation only)</text>
+      <text x="410" y="220" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">Lifetime PD is the cumulative PD evaluated at the contractual maturity.</text>
+
+      <!-- Warning -->
+      <g transform="translate(60,245)">
+        <rect x="0" y="0" width="700" height="28" fill="#fef2f2" stroke="#dc2626" stroke-width="1"/>
+        <text x="10" y="18" font-family="Inter" font-size="11" fill="#7f1d1d">Wrong: PDᶜᵘᵐₜ = 1 − ∏ᵥ Sᵥ. That double-products the survival chain. The wiki notation file has this bug; the corrected form is above.</text>
+      </g>
+    </svg>
+    <figcaption>The survival probability \(S_t\) is itself the cumulative product of one-period survival probabilities. The cumulative PD is its complement. The sum-of-PDs form is only an approximation that holds when individual PDs are small enough that second-order terms in the binomial expansion can be dropped.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <p>The full symbol table follows. It is grouped into ten thematic blocks. Where this lecture corrects or extends the source wiki notation file (typos, argument-order inconsistencies, an incorrect cumulative-PD definition, an under-specified Vasicek sign convention, and additions for LGD, EL, ECL, WCDR, and Basel K), the corrections sit directly inside the relevant row's definition and are mirrored back into the wiki.</p>
+
+  <h3>1. Identifiers and time</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:30%">Name</th><th style="width:30%">Symbol</th><th style="width:40%">Definition</th></tr></thead>
+      <tbody>
+        <tr><td>Loan or facility</td><td>\(i\)</td><td>A single facility on the balance sheet, repaid with interest by an obligor</td></tr>
+        <tr><td>Obligor</td><td>\(i'\)</td><td>The counterparty that owes on the facility. One obligor can hold many facilities</td></tr>
+        <tr><td>Loan term or age</td><td>\(t\)</td><td>Months since origination, \(t = 0\) at draw-down</td></tr>
+        <tr><td>Outcome horizon</td><td>\(k\)</td><td>Forward window over which an outcome is observed, in months</td></tr>
+        <tr><td>Calendar time</td><td>\(t'\)</td><td>Wall-clock date at which the loan's state is recorded</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>2. Loan attributes and the economy</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:30%">Name</th><th style="width:30%">Symbol</th><th style="width:40%">Definition</th></tr></thead>
+      <tbody>
+        <tr><td>Static loan information</td><td>\(x_i = \{x_{1,i}, \dots, x_{n,i}\}\)</td><td>Attributes that do not change over the life of the loan: product type, channel, origination LTV</td></tr>
+        <tr><td>Behavioural loan information</td><td>\(x_{i,t} = \{x_{1,i,t}, \dots, x_{n,i,t}\}\)</td><td>Attributes that change with loan age: balance, utilisation, DPD, recent arrears history</td></tr>
+        <tr><td>Macro-economic time series</td><td>\(m_{t'} = \{m_{1,t'}, \dots, m_{p,t'}\}\)</td><td>Variables shared across all loans: GDP growth, unemployment, house prices, policy rate</td></tr>
+        <tr><td>Credit limit</td><td>\(\text{Limit}_{i,t} \subset x_{i,t}\)</td><td>Maximum balance permitted on the facility at loan age \(t\)</td></tr>
+        <tr><td>Balance</td><td>\(\text{Balance}_{i,t} \subset x_{i,t}\)</td><td>Outstanding drawn amount at loan age \(t\)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3. Delinquency mechanics</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:30%">Name</th><th style="width:30%">Symbol</th><th style="width:40%">Definition</th></tr></thead>
+      <tbody>
+        <tr><td>Days past due</td><td>\(\text{DPD}_{i,t} \geq 0\)</td><td>Days since the earliest unpaid scheduled payment</td></tr>
+        <tr><td>Arrears measure</td><td>\(g_{i,t} = \dfrac{\text{DPD}_{i,t}}{30}\)</td><td>Approximate number of missed monthly payments, treating 30 days as one missed payment</td></tr>
+        <tr><td>Stickiness</td><td>\(s \geq 1\)</td><td>Number of consecutive months for which an arrears state must persist before a status is declared</td></tr>
+        <tr><td>Delinquency indicator</td><td>\(G_{i,t}(d, s) = \left[ \displaystyle\sum_{v = t - (s - 1)}^{t} \mathbf{1}\!\left[ g_{i,v} \geq d \right] = s \right]\)</td><td>One if the loan has been at arrears level \(\geq d\) for \(s\) consecutive months at time \(t\)</td></tr>
+        <tr><td>Instantaneous default</td><td>\(d_{i,t} = G_{i,t}(3, 1) = \mathbf{1}[g_{i,t} \geq 3]\)</td><td>One if the loan is at 3 or more missed payments at time \(t\) (the CRR Article 178 90-DPD limb)</td></tr>
+        <tr><td>Probation period</td><td>\(p \geq 1\)</td><td>Months a defaulted loan must remain free of new arrears before cure is recognised</td></tr>
+        <tr><td>Probation indicator</td><td>\(H_{i,t}(p) = \mathbf{1}\!\left[ \displaystyle\sum_{v = t - p}^{t - 1} d_{i,v} > 0 \right]\)</td><td>One if the loan was in instant default at any point within the last \(p\) months</td></tr>
+        <tr><td>Cure indicator</td><td>\(C_{i,t}(p) = \mathbf{1}\!\left[ d_{i,t} = 0 \;\wedge\; H_{i,t}(p) = 0 \right]\)</td><td>One if the loan is currently not in instant default and has cleared its probation window</td></tr>
+        <tr><td>Default indicator</td><td>\(D_{i,t}(p) = \mathbf{1}\!\left[ C_{i,t}(p) = 0 \right]\)</td><td>One if the loan is in default, in the sense of either instant default or unexpired probation</td></tr>
+        <tr><td>Write-off indicator</td><td>\(W_{i,t}(w) = G_{i,t}(3, w), \; w \geq 1\)</td><td>One if the loan has been at \(g \geq 3\) for \(w\) consecutive months</td></tr>
+        <tr><td>Delinquency outcome</td><td>\(G^{\*}_{i,t}(k, d, s) = G_{i, t + k}(d, s)\)</td><td>Future delinquency status at \(t + k\), observed from \(t\)</td></tr>
+        <tr><td>Default outcome</td><td>\(D^{\*}_{i,t}(k, p) = D_{i, t + k}(p)\)</td><td>Future default status at \(t + k\), observed from \(t\). Argument-order convention: outcome horizon \(k\) first, probation period \(p\) second, applied throughout</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Argument order matters</span>
+    The default-outcome operator \(D^{\*}_{i,t}(k, p)\) takes the outcome horizon \(k\) first and the probation period \(p\) second. Throughout this lecture and every downstream lecture, that order is preserved. The wiki notation file alternated between \((k, p)\) and \((p, k)\); both refer to the same object, but the inconsistency made the formulae for forward default rates and PiT marginal PDs ambiguous on first read.
+  </div>
+
+  <h3>4. Population aggregates</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:24%">Name</th><th style="width:30%">Symbol</th><th style="width:32%">Definition</th><th style="width:14%">Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Behavioural loan dataset</td><td>\(I = \{i, t, t', x_i, x_{i,t}, m_{t'}, g_{i,t}, G_{i,t}(d,s), G^{\*}_{i,t}(k,d,s), H_{i,t}(p), C_{i,t}(p), D_{i,t}(p), D^{\*}_{i,t}(k,p), W_{i,t}(w)\}\)</td><td>The full set of observable behaviour over the observation window</td><td>Wiki listed \(x_{t'}\); corrected to \(m_{t'}\)</td></tr>
+        <tr><td>At-risk loan count</td><td>\(n_0(x_i, x_{i,t}, t') = \displaystyle\sum_{i \in I(x_i, x_{i,t}, t')} \mathbf{1}[D_{i,t}(p) = 0]\)</td><td>Number of non-defaulted loans at calendar time \(t'\) in the cohort defined by \((x_i, x_{i,t})\)</td><td></td></tr>
+        <tr><td>At-risk balance</td><td>\(b_0(x_i, x_{i,t}, t') = \displaystyle\sum_{i \in I(x_i, x_{i,t}, t')} \mathbf{1}[D_{i,t}(p) = 0] \cdot \text{Balance}_{i,t}\)</td><td>Total non-defaulted exposure at calendar time \(t'\) in the cohort</td><td></td></tr>
+        <tr><td>\(k\)-month forward default rate, number-weighted</td><td>\(r(k, x_i, x_{i,t}, t') = \dfrac{1}{n_0} \displaystyle\sum_{i \in I} \mathbf{1}[D^{\*}_{i,t}(k, p) = 1] \cdot \mathbf{1}[D_{i,t}(p) = 0]\)</td><td>Share of currently non-defaulted loans that default within the next \(k\) months, evaluated at \(t'\)</td><td></td></tr>
+        <tr><td>\(k\)-month forward default rate, exposure-weighted</td><td>\(r_{\text{Bal}}(k, x_i, x_{i,t}, t') = \dfrac{1}{b_0} \displaystyle\sum_{i \in I} \mathbf{1}[D^{\*}_{i,t}(k, p) = 1] \cdot \mathbf{1}[D_{i,t}(p) = 0] \cdot \text{Balance}_{i,t}\)</td><td>Balance-weighted equivalent of \(r\)</td><td></td></tr>
+        <tr><td>\(k\)-month average default rate</td><td>\(\bar r(k, x_i, [t'_a, t'_b]) = \dfrac{1}{N_{\text{obs}}} \displaystyle\sum_{t' \in [t'_a, t'_b]} \mathbb{E}_{x_{i,t}}\!\left[ r(k, x_i, x_{i,t}, t') \right]\)</td><td>Average of \(r\) over the calendar window \([t'_a, t'_b]\), where \(N_{\text{obs}} = t'_b - t'_a + 1\) for monthly data</td><td>Wiki used divisor \(1/(b - a)\) with neither \(a\) nor \(b\) defined; corrected</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>5. PD family</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:24%">Name</th><th style="width:30%">Symbol</th><th style="width:32%">Definition</th><th style="width:14%">Notes</th></tr></thead>
+      <tbody>
+        <tr><td>\(k\)-month TTC PD</td><td>\(\text{PD}_i^{\text{TTC}}(k, x_i, [t'_a, t'_b]) \approx \bar r(k, x_i, [t'_a, t'_b])\)</td><td>Through-the-cycle PD for cohort \(x_i\), approximated by the long-run average forward default rate</td><td>The horizon \([t'_a, t'_b]\) must contain a representative mix of expansion and downturn calendar quarters</td></tr>
+        <tr><td>\(k\)-month unconditional PiT marginal PD</td><td>\(\text{PD}_{i,t}^{\text{uPiT}}(k, x_i, x_{i,t}) = P\!\left( D^{\*}_{i,t}(k, p) = 1 \mid X_i = x_i, X_{i,t} = x_{i,t} \right)\)</td><td>Probability of defaulting within \(k\) months given the loan's current information, ignoring its current state</td><td></td></tr>
+        <tr><td>\(k\)-month conditional PiT marginal PD</td><td>\(\text{PD}_{i,t}^{\text{PiT}}(k, x_i, x_{i,t}) = P\!\left( D^{\*}_{i,t}(k, p) = 1 \mid D_{i,t}(p) = 0, X_i = x_i, X_{i,t} = x_{i,t} \right)\)</td><td>Same as above, conditioned on currently non-defaulted</td><td>This is the workhorse PD for IFRS 9 ECL and for IRB risk differentiation</td></tr>
+        <tr><td>One-period survival probability</td><td>\(s_{i,v}(x_i, x_{i,v}) = 1 - \text{PD}_{i,v}^{\text{PiT}}(1, x_i, x_{i,v})\)</td><td>Probability the loan survives one more month at age \(v\), conditional on having survived to age \(v\)</td><td>Built from 1-period marginal PDs to avoid horizon confusion</td></tr>
+        <tr><td>Cumulative survival to age \(t\)</td><td>\(S_{i,t}(x_i) = \displaystyle\prod_{v = 1}^{t} s_{i,v}(x_i, x_{i,v}) = \prod_{v = 1}^{t} \left( 1 - \text{PD}_{i,v}^{\text{PiT}}(1, x_i, x_{i,v}) \right)\)</td><td>Probability the loan is still performing at age \(t\)</td><td></td></tr>
+        <tr><td>Cumulative PD to age \(t\)</td><td>\(\text{PD}_{i,t}^{\text{Cum}}(x_i) = 1 - S_{i,t}(x_i) \;\approx\; \displaystyle\sum_{v=1}^{t} \text{PD}_{i,v}^{\text{PiT}}(1, x_i, x_{i,v})\)</td><td>Probability the loan has defaulted by age \(t\). The sum form is the linear approximation, valid only for small individual PDs</td><td>Wiki used \(1 - \prod_v S_{i,v}\), which double-products an already-cumulative \(S\); corrected to \(1 - S_t\)</td></tr>
+        <tr><td>Lifetime PD</td><td>\(\text{PD}_i^{\text{Life}}(x_i) = \text{PD}_{i,T}^{\text{Cum}}(x_i)\)</td><td>Cumulative PD evaluated at the contractual maturity \(T\) of the facility</td><td>Wiki wrote \(T = \infty\); should be the contractual maturity</td></tr>
+        <tr><td>PD term structure</td><td>\(\text{PD}_i^{\text{Term}}(x_i) = \left\{ \text{PD}_{i,t}^{\text{PiT}}(1, x_i, x_{i,t}) : t \in [1, T] \right\}\)</td><td>Sequence of 1-period conditional PiT PDs over the life of the facility</td><td>Wiki used the subset symbol \(\subset\); should be \(\in\)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>6. Forward-looking adjustments</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:24%">Name</th><th style="width:30%">Symbol</th><th style="width:32%">Definition</th><th style="width:14%">Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Forward-looking index (FLI)</td><td>\(\text{FLI}_{t'} = f(m_{t' - 1})\)</td><td>A scalar function of lagged macro variables, used to shift the systematic factor in PiT calibration. <strong>Sign convention</strong>: positive \(\text{FLI}_{t'}\) means stress (default rates rise)</td><td>Wiki gave no sign convention; this lecture fixes positive = stress</td></tr>
+        <tr><td>\(k\)-month FiT (forward-in-time) PD</td><td>\(\text{PD}_{i,t,t'}^{\text{FiT}}(k, x_i, x_{i,t}) = \text{PD}_{i,t}^{\text{PiT}}(k, x_i, x_{i,t}) \cdot \phi(\text{FLI}_{t'})\)</td><td>Scaling of the conditional PiT PD by a function \(\phi\) of the FLI, capped to \([0, 1]\)</td><td>The wiki multiplied by \(\text{FLI}_{t'}\) directly, which only makes sense if \(\phi\) is identity and the FLI is scaled appropriately</td></tr>
+        <tr><td>Systemically conditional PiT PD (Vasicek)</td><td>\(\text{PD}_i^{\text{SysPiT}}(k, x_i \mid z) = N\!\left( \dfrac{N^{-1}\!\left( \text{PD}_i^{\text{TTC}}(k, x_i) \right) + \sqrt{\rho} \cdot z}{\sqrt{1 - \rho}} \right)\)</td><td>Single-factor Vasicek conditional PD, where \(z\) is the systematic shock with the sign convention positive = stress</td><td>For the Basel WCDR (Pillar 1), \(z = N^{-1}(0.999)\). For IFRS 9 FLI, \(z\) is a standardised FLI</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>7. EAD family</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:24%">Name</th><th style="width:30%">Symbol</th><th style="width:32%">Definition</th><th style="width:14%">Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Realised \(k\)-month EAD</td><td>\(\text{EAD}_{i,t}(k) = \mathbf{1}[D^{\*}_{i,t}(k, p) = 1] \cdot \text{Balance}_{i, t + k}\)</td><td>Balance at the moment of default, observed \(k\) months after \(t\)</td><td></td></tr>
+        <tr><td>Credit conversion factor (CCF)</td><td>\(\text{CCF}_{i,t}(k) = \dfrac{\text{EAD}_{i,t}(k) - \text{Balance}_{i,t}}{\text{Limit}_{i,t} - \text{Balance}_{i,t}}\)</td><td>Share of the undrawn limit that is expected to be drawn before default</td><td>This is the regulatory definition. The wiki's \(\text{EADF}\) is the ratio EAD over current balance, a related but distinct quantity</td></tr>
+        <tr><td>EAD factor (EADF)</td><td>\(\text{EADF}_{i,t}(k) = \dfrac{\text{EAD}_{i,t}(k)}{\text{Balance}_{i,t}}\)</td><td>EAD divided by current balance; the multiplicative form preferred for revolving products without a meaningful limit</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>8. LGD family</h3>
+  <p>The wiki notation file has no LGD section. The symbols below are introduced here so the downstream A-IRB LGD and IFRS 9 LGD lectures can reference one consistent dictionary.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:24%">Name</th><th style="width:30%">Symbol</th><th style="width:32%">Definition</th><th style="width:14%">Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Recovery cash flow</td><td>\(R_{i,t,\tau}\)</td><td>Cash recovered (net of workout costs) on defaulted loan \(i\) at time \(\tau\) months post-default, where the default occurred at age \(t\)</td><td></td></tr>
+        <tr><td>Effective interest rate</td><td>\(r^{\text{EIR}}_i\)</td><td>Loan-level discount rate used to present-value recoveries, equal to the contractual EIR at origination</td><td></td></tr>
+        <tr><td>Realised (workout) LGD</td><td>\(\text{LGD}^{\text{Wk}}_{i,t} = 1 - \dfrac{\displaystyle\sum_{\tau = 1}^{T_{\text{wo}}} R_{i,t,\tau} \cdot (1 + r^{\text{EIR}}_i)^{-\tau}}{\text{EAD}_{i,t}}\)</td><td>Loss share on a closed workout, present-valued at the EIR</td><td></td></tr>
+        <tr><td>Market LGD</td><td>\(\text{LGD}^{\text{Mk}}_{i,t} = 1 - \dfrac{\text{Price}^{\text{post-default}}_{i,t}}{\text{Par}_{i,t}}\)</td><td>Loss share inferred from the post-default secondary-market price of the debt instrument</td><td>Applicable to traded debt; rarely used for retail or middle-market</td></tr>
+        <tr><td>Long-run average LGD</td><td>\(\text{LGD}^{\text{LRA}}\)</td><td>Mean LGD across the historical default population, conditional on the relevant segmentation</td><td>The IRB calibration target before downturn adjustment</td></tr>
+        <tr><td>Downturn LGD</td><td>\(\text{LGD}^{\text{DT}} = \max\!\left( \text{LGD}^{\text{LRA}}, \; f_{\text{DT}}(\text{LGD}^{\text{LRA}}) \right)\)</td><td>LGD calibrated to a representative downturn period, or floored at the LRA when the downturn adjustment would be negative</td><td>Required for A-IRB capital under CRR Article 181; not used for IFRS 9 ECL</td></tr>
+        <tr><td>Best-estimate expected loss (ELBE)</td><td>\(\text{ELBE}_{i,t}\)</td><td>Best estimate of expected loss on a defaulted exposure, used in A-IRB to define LGD-in-default as \(\text{LGD}^{\text{Def}} = \text{LGD}^{\text{DT}} - \text{ELBE} \,/\, \text{EAD}\)</td><td>CRR Article 181(1)(h)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>9. Loss objects</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:24%">Name</th><th style="width:30%">Symbol</th><th style="width:32%">Definition</th><th style="width:14%">Notes</th></tr></thead>
+      <tbody>
+        <tr><td>One-year expected loss</td><td>\(\text{EL}_{i,t} = \text{PD}_{i,t}^{\text{TTC}}(12) \cdot \text{LGD}^{\text{DT}}_{i,t} \cdot \text{EAD}_{i,t}\)</td><td>The Basel one-year EL on a non-defaulted exposure, in currency</td><td>For a defaulted exposure, \(\text{EL} = \text{ELBE}\)</td></tr>
+        <tr><td>Unexpected loss (UL)</td><td>\(\text{UL}_{i,t} = L^{(0.999)}_{i,t} - \text{EL}_{i,t}\)</td><td>The 99.9% quantile of the one-year loss distribution minus EL. The object capital is sized against</td><td></td></tr>
+        <tr><td>12-month ECL</td><td>\(\text{ECL}^{12\text{m}}_{i,t} = \displaystyle\sum_{v = 1}^{12} \text{PD}_{i,v}^{\text{PiT}}(1, x_i, x_{i,v}) \cdot \text{LGD}^{\text{PiT}}_{i,v} \cdot \text{EAD}_{i,v} \cdot \text{DF}_v\)</td><td>IFRS 9 Stage 1 expected loss: weighted, present-valued, 12-month horizon. \(\text{DF}_v = (1 + r^{\text{EIR}}_i)^{-v}\)</td><td></td></tr>
+        <tr><td>Lifetime ECL</td><td>\(\text{ECL}^{\text{Life}}_{i,t} = \displaystyle\sum_{v = 1}^{T} \text{PD}_{i,v}^{\text{PiT}}(1, x_i, x_{i,v}) \cdot \text{LGD}^{\text{PiT}}_{i,v} \cdot \text{EAD}_{i,v} \cdot \text{DF}_v\)</td><td>IFRS 9 Stage 2 and Stage 3: same form, summed to maturity \(T\)</td><td></td></tr>
+        <tr><td>Worst-case default rate (WCDR)</td><td>\(\text{WCDR}_i = N\!\left( \dfrac{N^{-1}(\text{PD}_i^{\text{TTC}}) + \sqrt{R(\text{PD}_i)} \cdot N^{-1}(0.999)}{\sqrt{1 - R(\text{PD}_i)}} \right)\)</td><td>99.9% conditional default rate from the Basel one-factor Vasicek model</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>10. Capital objects</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:24%">Name</th><th style="width:30%">Symbol</th><th style="width:32%">Definition</th><th style="width:14%">Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Asset correlation</td><td>\(R(\text{PD})\)</td><td>BCBS d424 prescribed function of PD. Corporate: \(R = 0.12 \cdot \dfrac{1 - e^{-50 \text{PD}}}{1 - e^{-50}} + 0.24 \cdot \left(1 - \dfrac{1 - e^{-50 \text{PD}}}{1 - e^{-50}}\right)\). Retail QRRE has \(R = 0.04\); other retail has its own form</td><td></td></tr>
+        <tr><td>Maturity-adjustment function</td><td>\(b(\text{PD}) = \left( 0.11852 - 0.05478 \cdot \ln(\text{PD}) \right)^2\)</td><td>Smoothing coefficient used in the maturity adjustment</td><td></td></tr>
+        <tr><td>Effective maturity</td><td>\(M\)</td><td>Cash-flow weighted average maturity, in years, capped at 5</td><td></td></tr>
+        <tr><td>Maturity adjustment</td><td>\(\text{MA}(\text{PD}, M) = \dfrac{1 + (M - 2.5) \cdot b(\text{PD})}{1 - 1.5 \cdot b(\text{PD})}\)</td><td>Scales K to reflect longer-dated migration risk; equals 1 at \(M = 2.5\)</td><td></td></tr>
+        <tr><td>Capital requirement (corporate / sovereign / bank)</td><td>\(K = \left( \text{LGD}^{\text{DT}} \cdot \text{WCDR} - \text{PD} \cdot \text{LGD}^{\text{DT}} \right) \cdot \text{MA}(\text{PD}, M)\)</td><td>UL coverage per unit of EAD</td><td>For retail, \(\text{MA} \equiv 1\)</td></tr>
+        <tr><td>Risk-weighted assets</td><td>\(\text{RWA} = 12.5 \cdot K \cdot \text{EAD}\)</td><td>Pillar 1 RWA, with the 12.5 factor inverting the 8% minimum capital ratio</td><td></td></tr>
+        <tr><td>IRB expected loss</td><td>\(\text{EL}^{\text{IRB}} = \text{PD}^{\text{TTC}} \cdot \text{LGD}^{\text{DT}} \cdot \text{EAD}\)</td><td>One-year regulatory EL for the IRB book</td><td></td></tr>
+        <tr><td>EL shortfall</td><td>\(\text{Shortfall} = \max\!\left( 0, \; \text{EL}^{\text{IRB}} - \text{Provisions} \right)\)</td><td>Excess of regulatory EL over accounting provisions; deducted from CET1</td><td>CRR Article 159</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The two clocks are the source of half the bugs</h3>
+  <p>Almost every credit-model defect that survives validation comes from a confusion between loan age \(t\) and calendar date \(t'\). The TTC PD lives on the calendar axis (averaged across cycles). The lifetime PD lives on the loan-term axis (summed across ages). The PiT PD sits at a single point on both. The FLI lives on the calendar axis only. When a model document writes "PD at time \(t\)" without saying which clock, a code review three years later cannot reconstruct the intent. Always carry both subscripts and never drop one to make a formula look cleaner.</p>
+
+  <h3>Indicator brackets vs Iverson brackets vs predicate evaluation</h3>
+  <p>This lecture uses \(\mathbf{1}[\cdot]\) (the indicator function returning 0 or 1) consistently. The wiki notation file used the Iverson bracket \([\cdot]\), which is the same object but visually collides with normal square brackets used for intervals such as \([t'_a, t'_b]\). The collision is harmless until a formula is read aloud or transcribed, at which point ambiguity creeps in. Pick a convention and stick to it.</p>
+
+  <h3>The cumulative PD is the complement of the survival probability, full stop</h3>
+  <p>The chain is: 1-period marginal PDs \(\to\) 1-period survival probabilities \(\to\) cumulative survival as a product \(\to\) cumulative PD as one minus that product. The sum-of-PDs form looks like the right answer at small PDs and breaks down quickly at larger ones. For a portfolio with monthly PDs of 1%, the 60-month cumulative PD by the sum form is 60% and by the correct form is \(1 - 0.99^{60} \approx 45\%\). The 15 percentage points are not a rounding error; they are a real provisioning gap.</p>
+
+  <h3>The Vasicek sign convention</h3>
+  <p>The Basel WCDR uses \(+\sqrt{\rho} \cdot N^{-1}(0.999)\) in the numerator. \(N^{-1}(0.999) \approx 3.09\) is positive, and the formula returns a conditional PD higher than the TTC. Plug in \(N^{-1}(0.5) = 0\) and you recover the TTC. The systematic factor in this convention is "positive = stress". If you adopt the academic convention where the systematic factor \(Z\) is "positive = good times", the sign flips to \(-\sqrt{\rho} \cdot Z\) and the calculation is identical. Both are correct; what is incorrect is failing to state which convention you have chosen. The wiki file did not, and the formula it presents is right if and only if the FLI is signed so that positive means stress. State the convention in the documentation, every time.</p>
+
+  <h3>Argument order is documentation</h3>
+  <p>Across this lecture, the convention is: outcome operators take the horizon \(k\) first, then the probation period \(p\), so \(D^{\*}_{i,t}(k, p)\). PD operators take the horizon \(k\) first, then any conditioning information, so \(\text{PD}^{\text{PiT}}_{i,t}(k, x_i, x_{i,t})\). This means the leftmost argument is always the time window. The wiki had \(D^{\*}\) sometimes with \(k\) first, sometimes \(p\) first; the inconsistency is harmless to a careful reader and toxic to a junior analyst.</p>
+
+  <h3>EAD vs CCF vs EADF</h3>
+  <p>Three closely related symbols. EAD is the currency amount at default. The Basel CCF is the share of the <em>undrawn</em> limit that is expected to be drawn before default and is the regulatory convention for off-balance-sheet credit lines. The EADF is the ratio of EAD over <em>current</em> balance and is the modelling convention preferred for revolving products where the undrawn limit is not a meaningful denominator (because limits float or are large relative to typical drawn balances). The two are not interchangeable, and a model document should say which one is being estimated.</p>
+
+  <h3>LGD has more flavours than any other parameter</h3>
+  <p>Workout LGD comes from observed recovery cash flows on closed workouts. Market LGD comes from secondary-market prices on defaulted debt. LRA LGD is the historical average across both. Downturn LGD adds a margin for adverse periods. PiT LGD adds the current-state adjustment for IFRS 9. ELBE is the best-estimate LGD on already-defaulted exposures. The Basel formula uses downturn LGD. The IFRS 9 formula uses PiT (or near-PiT) LGD. The accounting and regulatory LGDs for the same loan can differ by ten or twenty percentage points; both can be right.</p>
+
+  <h3>Provisions vs EL: the regulatory-accounting bridge</h3>
+  <p>The EL shortfall \(\max(0, \text{EL}^{\text{IRB}} - \text{Provisions})\) is the CRR Article 159 mechanic that connects the accounting and regulatory worlds. If IRB EL exceeds accounting provisions, the excess is deducted from CET1 (the loss is not yet recognised on the books, so capital absorbs it). If provisions exceed IRB EL, the excess can be added back to T2 capital up to a 0.6% of RWA cap. The mechanism is the reason IFRS 9 ECL and IRB EL must both be calculated and reconciled at every reporting date, even though they answer different questions.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the difference between \(t\) and \(t'\). Which clock does the TTC PD live on, which clock does the lifetime PD live on, and which clock does the FLI live on?</li>
+      <li>Write out the cumulative PD to loan age \(t\) in terms of 1-period conditional PiT PDs. State the small-PD approximation and give a worked example where the two forms differ by more than 10 percentage points.</li>
+      <li>The Basel WCDR formula contains a term \(+\sqrt{\rho} \cdot N^{-1}(0.999)\). What is the sign convention that makes the plus sign correct, and what would have to change if you adopted the opposite convention?</li>
+      <li>Define EAD, CCF, and EADF. Give an example product for which the CCF is the natural metric and one for which the EADF is the natural metric.</li>
+      <li>Define workout LGD, market LGD, LRA LGD, downturn LGD, PiT LGD, and ELBE. Which of these enters the Basel K formula and which enters the IFRS 9 ECL formula?</li>
+      <li>Explain the EL shortfall mechanic under CRR Article 159. When does the shortfall hit CET1, and when can excess provisions be added back to T2 capital?</li>
+      <li>State the conditions on the calendar window \([t'_a, t'_b]\) under which the long-run average forward default rate is a reasonable estimator of the TTC PD.</li>
+      <li>The default-outcome operator is \(D^{\*}_{i,t}(k, p)\). State which argument is the outcome horizon and which is the probation period, and explain why argument order is part of the model documentation rather than a stylistic choice.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Source:</strong> <code>docs/wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/03_notation.md</code>. The wiki file is being updated in parallel to align with the conventions adopted here (typo and inconsistency fixes; the LGD, EL, ECL, WCDR, and K sections are new in the lecture and will follow into the wiki).</p>
+
+    <p><strong>Within the credit-risk series:</strong></p>
+    <ul>
+      <li>The PD-family symbols defined here are unpacked in the A-IRB PD lectures (TTC calibration, master scale, LRA) and again in the IFRS 9 PD lectures (PiT calibration, lifetime curves).</li>
+      <li>The LGD-family and EAD-family symbols are used in the corresponding A-IRB and IFRS 9 component lectures.</li>
+    </ul>
+
+    <p><strong>Forward references:</strong></p>
+    <ul>
+      <li>A-IRB capital lectures: WCDR, \(R(\text{PD})\), \(b(\text{PD})\), \(M\), and the K formula at the centre of the framework.</li>
+      <li>IFRS 9 impairment lectures: PiT PD, lifetime PD, the FLI, and the ECL formula.</li>
+      <li>Counterparty credit risk: EAD via SA-CCR or IMM, not via the CCF.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>BCBS d424 (Basel III finalisation, December 2017). The source of \(R(\text{PD})\), the maturity adjustment, the asset correlations, and the WCDR.</li>
+      <li>CRR Articles 154 to 181 (EU). The legislative definitions of PD, LGD, EAD, ELBE, and the IRB use test.</li>
+      <li>PRA SS3/24 and SS4/24. The UK supervisory expectations on IRB and IFRS 9 governance.</li>
+      <li>EBA "Guidelines on PD estimation, LGD estimation and the treatment of defaulted exposures" (2017). The MoC framework and the LRA-vs-downturn distinction.</li>
+      <li>IFRS 9 standard, paragraphs 5.5.1 to 5.5.20. The ECL recognition and stage transition mechanics.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / foundation file.</span>
+  <span><a href="index.html">Back to credit risk</a> &middot; <a href="a-irb_capital/01-context.html">Next: A-IRB context</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../assets/lecture.js"></script>
+</body>
+</html>

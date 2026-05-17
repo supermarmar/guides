@@ -46,4 +46,4 @@ All banks are required to hold a buffer of **unencumbered liquid assets** — th
 
 The stock of assets in the LAB is more commonly known, in the context of the [[basel_framework|Basel III]] [[01-short_term_metrics|LCR]], as the **stock of high-quality liquid assets (HQLA)**. Regulators expect HQLA to retain both value and market liquidity in a stressed environment — meaning they can be monetised without large discounts in sale or repo markets, even under fire-sale conditions.
 
-Central bank eligibility of an asset is not a criterion for HQLA classification, because central bank funding should not be considered a BAU source of liquidity (see [Liquidity Framework](01-liquidity.md)).
+Central bank eligibility of an asset is not a criterion for HQLA classification, because central bank funding should not be considered a BAU source of liquidity (see [Liquidity Framework](../../04-liquidity_management.md)).

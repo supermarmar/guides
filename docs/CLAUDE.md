@@ -38,7 +38,7 @@ The user is an actuary and credit risk modelling expert preparing for the **ASSA
 ```
 docs/
 ├── wiki/               ← canonical reference notes (markdown)
-│   ├── application/    ← institution-type content (banks/)
+│   ├── application/    ← institution-type content (banking/)
 │   ├── fundamentals/   ← domain-agnostic skills
 │   └── regulation/     ← regulatory frameworks by jurisdiction
 ├── flashcards/         ← F107 daily practice decks (Obsidian / Anki format)
@@ -47,7 +47,7 @@ docs/
 └── copilot/            ← (reserved)
 ```
 
-The `wiki/` subdirectory mirrors the structure described in the root CLAUDE.md under `docs/`. The root CLAUDE.md uses `docs/` paths directly — mentally map those to `docs/wiki/` within this directory.
+The root CLAUDE.md documents the full layout of `wiki/` (including the `application/banking/01_internal_environment/{pricing,risk_management,risk_measurement}/` subtree and the regulation jurisdictions). Read section 2 there for the authoritative tree.
 
 ---
 

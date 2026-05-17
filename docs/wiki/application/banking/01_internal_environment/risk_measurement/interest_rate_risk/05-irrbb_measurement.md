@@ -95,7 +95,7 @@ Given a change in rates, the [[04-nii_nim|NII]] sensitivity in each time band is
 
 **Example — 100bp rate increase:**
 
-| Time band | Gap (Rm) | Remaining term (months) | Rate change (bps) | [[03-nii_nim|NII]] Sensitivity (R) |
+| Time band | Gap (Rm) | Remaining term (months) | Rate change (bps) | [[04-nii_nim|NII]] Sensitivity (R) |
 |---|---|---|---|---|
 | 0–3m | −20 | 12 | 100 | −200,000 |
 | 3–6m | −15 | 9 | 100 | −112,500 |

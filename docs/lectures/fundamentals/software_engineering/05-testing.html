@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: testing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Testing: unit, integration, property-based</h1>
+  <p class="subtitle">A test is an automated assertion that the code behaves as you expect. The test suite is the only definition of "correct" that survives the original author. This lecture covers the three test levels, the pytest framework, the Arrange-Act-Assert pattern, Hypothesis for property-based testing, test doubles, the coverage trap, and Kent Beck's red-green-refactor cycle.</p>
+  <div class="meta">
+    <span>Lecture 5 of 14</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part II: testing and debugging</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>test</strong> is a small program that exercises another program with known inputs and asserts that the outputs are correct. When the assertion fails, the test fails; when every assertion passes, you have evidence (not proof) that the program works for the cases the tests cover. A <strong>test suite</strong> is a collection of tests run automatically, on every change, by a continuous-integration server.</p>
+
+  <p>Tests are usually classified by their <em>scope</em>. A <strong>unit test</strong> exercises a single function or class in isolation, with all its collaborators replaced by simpler stand-ins. An <strong>integration test</strong> exercises several real components together: a function plus the database it writes to, or a service plus the HTTP API it calls. An <strong>end-to-end</strong> test drives the whole system from the outside, the way a user would. The three levels trade speed and isolation against realism: a unit test runs in milliseconds and tells you the function is correct in isolation; an end-to-end test runs in minutes and tells you the system works.</p>
+
+  <p>Python's standard test framework is <strong>pytest</strong>, with <strong>Hypothesis</strong> for property-based testing and <strong>coverage.py</strong> for measuring how much of the code is exercised. The setup cost for a new project is minutes; the working idiom (functions named <code>test_*</code> containing <code>assert</code> statements) is small enough to recite. Three commands carry most of the practice: <code>pytest</code> to run, <code>pytest -k name</code> to filter, <code>pytest --lf</code> to re-run only the last failures.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A test is a frozen example of how the code should behave. When you write <code>assert square(3) == 9</code>, you have recorded, in code, that "the meaning of <code>square</code> includes the case of three going to nine". Once that example is in the suite, no future change to <code>square</code> can break that case without the test failing first and someone having to look at it. The test is a one-way ratchet on the behaviour: behaviour can grow, but it cannot quietly regress. The discipline of writing tests is the discipline of writing down enough examples that the ratchet covers the behaviour you care about.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Tests are not proofs. A passing test suite is evidence that no example you wrote down behaves wrongly; it says nothing about cases you did not write down. The discipline of formal verification (Coq, Isabelle, Dafny, TLA+) produces proof rather than evidence and is used in compilers, distributed protocols, and safety-critical avionics. For everyday application code, the cost is too high; the test suite is the engineering substitute. Hillel Wayne's "Practical TLA+" (2018) is the accessible entry point if the proof side ever becomes relevant.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Tests pay back along the cost-of-defects curve introduced in Lecture 1. A regression that the test suite catches in CI, two minutes after the offending commit, costs the author a few minutes to investigate. The same regression caught by a user, in production, two days later, costs the team an outage, a post-mortem, a hotfix, and the trust of whichever customer was affected. The order-of-magnitude differences in Boehm's curve are mostly a statement about the cost of paged engineers and rolled-back releases.</p>
+
+  <p>The deeper case is the one Forsgren, Humble and Kim make in <em>Accelerate</em> (2018). Across a decade of DORA survey data, the practices most strongly correlated with high delivery performance are (1) version control of everything, (2) automated tests, (3) trunk-based development, and (4) continuous integration. Teams with strong automated testing deploy more often, recover faster, and have lower change-failure rates than teams without. The result contradicts the older intuition that tests slow you down. The mechanism is that tested code can be changed without fear, and code that can be changed without fear is shipped faster.</p>
+
+  <p>Kent Beck's <em>Test-Driven Development by Example</em> (2003) makes the same point at the individual level. Writing a test before the code (1) forces you to specify what "done" means, (2) keeps each change small enough to fit in working memory, and (3) gives you immediate feedback when something breaks. Beck's claim is not that TDD produces more correct code, although the empirical evidence (Erdogmus et al. 2005; Fucci et al. 2017) modestly supports it; the claim is that TDD produces a steadier, less anxious development rhythm. Tests are scaffolding for the writer as well as for the reader.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Three abstractions organise everything in the lecture. The first is the <strong>test pyramid</strong>; the second is the <strong>AAA pattern</strong>; the third is the distinction between <strong>example-based</strong> and <strong>property-based</strong> testing.</p>
+
+  <h3>The pyramid (Cohn)</h3>
+
+  <p>Mike Cohn's <em>Succeeding with Agile</em> (2009) introduced the test pyramid as a visual heuristic for how to spend the testing budget. Many, fast, isolated unit tests at the base; fewer integration tests in the middle; very few end-to-end tests at the top. The pyramid is a guide to <em>proportion</em>, not a rule; the underlying principle is that tests at higher levels are more expensive to write, slower to run, and more brittle, so their value has to be higher to justify them.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Cohn test pyramid">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Cohn's test pyramid: many cheap, few expensive</text>
+
+      <!-- Pyramid layers -->
+      <polygon points="380,50 480,130 280,130" fill="#FBEDE4" stroke="#C76B2A" stroke-width="2"/>
+      <text x="380" y="100" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#C76B2A">end-to-end</text>
+
+      <polygon points="280,130 480,130 540,230 220,230" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+      <text x="380" y="190" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#C76B2A">integration</text>
+
+      <polygon points="220,230 540,230 620,320 140,320" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+      <text x="380" y="285" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#1E9D54">unit</text>
+
+      <!-- Side annotations -->
+      <g font-family="Inter" font-size="11" fill="#5C5B57">
+        <text x="640" y="90" text-anchor="start">slow (minutes per test)</text>
+        <text x="640" y="105" text-anchor="start">brittle to UI / data changes</text>
+        <text x="640" y="120" text-anchor="start">tens of tests</text>
+
+        <text x="640" y="180" text-anchor="start">moderate (seconds)</text>
+        <text x="640" y="195" text-anchor="start">cover seams between components</text>
+        <text x="640" y="210" text-anchor="start">hundreds of tests</text>
+
+        <text x="640" y="270" text-anchor="start">fast (milliseconds)</text>
+        <text x="640" y="285" text-anchor="start">cover a single function</text>
+        <text x="640" y="300" text-anchor="start">thousands of tests</text>
+      </g>
+
+      <g font-family="Inter" font-size="11" fill="#5C5B57" text-anchor="end">
+        <text x="120" y="90">user-perspective</text>
+        <text x="120" y="180">multi-component</text>
+        <text x="120" y="270">function-level</text>
+      </g>
+    </svg>
+    <figcaption>The pyramid is a budget heuristic, not a rule. A team that inverts it (many end-to-end tests, few unit tests) ends up with a slow suite that breaks on every UI tweak and tells nobody where the bug is. A team that respects the pyramid ends up with a suite that runs in under a minute on every commit, and a smaller, deliberate set of integration and end-to-end tests that prove the system hangs together.</figcaption>
+  </figure>
+
+  <h3>Arrange, Act, Assert</h3>
+
+  <p>Every test, regardless of level, fits one shape. <strong>Arrange</strong>: set up the input data and any context the code under test needs. <strong>Act</strong>: call the code under test. <strong>Assert</strong>: check the output against the expected value. The pattern is sometimes called "Given/When/Then" (Cucumber, BDD). A test that does not have these three sections visible is usually doing too much.</p>
+
+  <pre><code>def test_square_of_three_is_nine():
+    # Arrange
+    x = 3
+
+    # Act
+    result = square(x)
+
+    # Assert
+    assert result == 9</code></pre>
+
+  <p>The discipline pays off when tests fail. A failing test with a clear Arrange section tells you immediately what data it ran with; a failing test with a one-line assert tells you what it expected. The opposite, a 30-line test that mixes setup, calls, and assertions, is essentially debugged anew on every failure.</p>
+
+  <h3>Example-based vs property-based</h3>
+
+  <p>An <strong>example-based</strong> test pins one specific input to one specific output: <code>assert square(3) == 9</code>. A <strong>property-based</strong> test asserts a relationship that should hold for all inputs in some space: "for every non-negative <em>x</em>, <code>square(x)</code> is non-negative". The framework (Hypothesis, in Python; QuickCheck in Haskell, originally) generates random inputs, runs the assertion, and on failure <em>shrinks</em> the failing input towards a minimal counterexample.</p>
+
+  <pre><code>from hypothesis import given, strategies as st
+
+@given(st.floats(min_value=0, allow_nan=False))
+def test_square_is_non_negative(x):
+    assert square(x) &gt;= 0</code></pre>
+
+  <p>Property-based tests find edge cases that human authors do not think to write (zero, negative zero, NaN, the largest representable float, the empty list). The cost is that the property itself must be worth stating: most production code has more examples than properties, so property tests complement rather than replace example tests.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>pytest in 80 per cent</h3>
+
+  <p>pytest is the standard Python test framework. A pytest test is a function whose name begins with <code>test_</code>, in a file whose name begins with <code>test_</code>, in any directory the runner discovers. The body uses bare <code>assert</code> statements; pytest rewrites them at import time to give detailed failure messages.</p>
+
+  <pre><code># tests/test_pricing.py
+from pricing import compute_pd
+
+def test_compute_pd_returns_a_probability():
+    pd = compute_pd(score=0.5, segment="retail")
+    assert 0 &lt;= pd &lt;= 1
+
+def test_compute_pd_is_monotonic_in_score():
+    low  = compute_pd(score=0.2, segment="retail")
+    high = compute_pd(score=0.8, segment="retail")
+    assert high &gt; low</code></pre>
+
+  <p>Run with <code>pytest</code>; useful flags:</p>
+
+  <pre><code>pytest                          # run everything
+pytest tests/test_pricing.py    # run one file
+pytest -k "monotonic"           # filter by name (substring)
+pytest -m "not slow"            # filter by marker
+pytest --lf                     # run only the last-failed tests
+pytest -x                       # stop on first failure
+pytest -v                       # verbose: one line per test
+pytest -s                       # do not capture stdout</code></pre>
+
+  <h3>Parametrize for table-driven tests</h3>
+
+  <p>When the same test logic should run on many inputs, use <code>@pytest.mark.parametrize</code> rather than copying the function:</p>
+
+  <pre><code>import pytest
+
+@pytest.mark.parametrize("x, expected", [
+    (0, 0),
+    (1, 1),
+    (3, 9),
+    (-2, 4),
+    (10, 100),
+])
+def test_square(x, expected):
+    assert square(x) == expected</code></pre>
+
+  <p>This is a single test function executed five times, with five rows in the output. The pattern is the natural fit for table-driven specifications: a list of (input, expected) pairs, each row a self-contained example.</p>
+
+  <h3>Fixtures: setup and teardown without inheritance</h3>
+
+  <p>A <strong>fixture</strong> is a function that produces a value for tests to consume. Pytest's fixture model uses dependency injection: any test that names a fixture as a parameter gets the fixture's value passed in. Fixtures replace the older xUnit-style <code>setUp</code> and <code>tearDown</code> methods.</p>
+
+  <pre><code>import pytest
+from pricing import PricingModel
+
+@pytest.fixture
+def model():
+    m = PricingModel.load("config/default.yaml")
+    yield m              # value handed to the test
+    m.close()            # teardown after the test
+
+def test_model_calibrates_on_default_segment(model):
+    result = model.calibrate(segment="retail")
+    assert result.converged</code></pre>
+
+  <p>Fixtures have a <em>scope</em>, which controls when they are re-created. The default is <code>function</code> (a fresh instance per test). For expensive setup (a database connection, a loaded model), use <code>module</code> or <code>session</code> scope to share across tests. Beware shared state: a session-scoped fixture mutated by one test will leak into the next.</p>
+
+  <pre><code>@pytest.fixture(scope="session")
+def db():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(SCHEMA_SQL)
+    yield conn
+    conn.close()</code></pre>
+
+  <h3>Test doubles (Meszaros)</h3>
+
+  <p>When the code under test depends on something inconvenient (a database, an API, a clock, a random-number generator, an LLM), unit tests replace it with a <strong>test double</strong>. Gerard Meszaros's <em>xUnit Test Patterns</em> (2007) gives the canonical taxonomy. Four are worth distinguishing.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Double</th><th>What it is</th><th>When to use</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Dummy</strong></td><td>An object passed but never used.</td><td>Filling a required argument.</td></tr>
+      <tr><td><strong>Stub</strong></td><td>Returns canned values to questions.</td><td>The code under test reads from a dependency; you control the reads.</td></tr>
+      <tr><td><strong>Spy</strong></td><td>Stub plus recording of calls made to it.</td><td>You want to assert "the dependency was called with X".</td></tr>
+      <tr><td><strong>Mock</strong></td><td>Spy with pre-programmed expectations; fails the test if the expectations are not met.</td><td>Verifying interaction patterns. Use sparingly.</td></tr>
+      <tr><td><strong>Fake</strong></td><td>A working alternative implementation, simpler than the production one.</td><td>An in-memory database for tests that would otherwise hit Postgres.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The Python standard library's <code>unittest.mock</code> module provides <code>Mock</code>, <code>MagicMock</code>, and <code>patch</code>; the third-party <code>pytest-mock</code> integrates the same machinery as a fixture (<code>mocker</code>). The general advice (Khorikov, <em>Unit Testing</em>, 2020) is to prefer real objects, then fakes, then stubs, then spies, then mocks, in that order. Mocking is brittle: a test that asserts "the database's <code>save</code> method was called with this exact argument" breaks the moment you refactor to call <code>save_all</code> instead, even if the behaviour is unchanged.</p>
+
+  <h3>Property-based testing with Hypothesis</h3>
+
+  <p>Hypothesis (MacIver, ongoing since 2013) brings the QuickCheck idea (Claessen and Hughes 2000) to Python. You describe the input space using <strong>strategies</strong>; Hypothesis generates examples, runs your assertion, and shrinks any counterexample to a minimal form.</p>
+
+  <pre><code>from hypothesis import given, strategies as st
+
+@given(st.lists(st.integers()))
+def test_reverse_is_involution(xs):
+    assert list(reversed(list(reversed(xs)))) == xs
+
+@given(st.integers(min_value=0), st.integers(min_value=0))
+def test_addition_is_commutative(a, b):
+    assert a + b == b + a
+
+@given(st.text())
+def test_json_round_trip(s):
+    import json
+    assert json.loads(json.dumps(s)) == s</code></pre>
+
+  <p>The trick is finding the property worth asserting. The four idiomatic shapes:</p>
+
+  <ol>
+    <li><strong>Round-trip</strong>: encode-then-decode is the identity. <code>parse(format(x)) == x</code>.</li>
+    <li><strong>Invariant</strong>: a relationship that holds for all inputs. "sorted output has the same length as the input".</li>
+    <li><strong>Idempotence</strong>: applying twice equals applying once. <code>normalise(normalise(x)) == normalise(x)</code>.</li>
+    <li><strong>Oracle</strong>: a slow but obviously-correct implementation. "the fast sort agrees with bubble sort on all inputs".</li>
+  </ol>
+
+  <p>When Hypothesis finds a counterexample, the report tells you the exact input and the steps it took to shrink it (often from a 50-item list to a 2-item one). Saving the failing case to a regression file means the example becomes part of the suite forever.</p>
+
+  <h3>Coverage and its limits</h3>
+
+  <p><strong>Coverage</strong> is the fraction of source lines (or branches) the test suite executes when run. <code>coverage.py</code> measures it; <code>pytest --cov</code> integrates with pytest. A line that is never executed by any test is one whose behaviour your suite says nothing about.</p>
+
+  <p>Two cautions. First, <em>line coverage</em> is a weak measure; branch coverage is tighter (does every conditional take both paths?), and even branch coverage misses untested combinations. Second, coverage is subject to <strong>Goodhart's law</strong>: when 80 per cent coverage becomes the team target, people write tests that touch lines without asserting anything, and coverage rises without improving the suite. Coverage is a diagnostic for the absence of tests, not a measure of the presence of good ones. Treat it as a smoke alarm, not a thermostat.</p>
+
+  <div class="callout warn">
+    <span class="tag">100 per cent coverage is not the goal</span>
+    A test suite at 100 per cent line coverage can still miss every interesting edge case if every test asserts only that the function does not raise. Conversely, a suite at 70 per cent coverage that catches every regression for two years is excellent. Use coverage to identify <em>untested</em> regions and decide, deliberately, whether they need tests. Trivial getters and setters, pass-through methods, dataclasses, and the bodies of <code>__repr__</code> usually do not.
+  </div>
+
+  <h3>The TDD cycle (Beck)</h3>
+
+  <p>Beck's <em>Test-Driven Development by Example</em> (2003) prescribes a three-step loop:</p>
+
+  <ol>
+    <li><strong>Red.</strong> Write a failing test for the smallest piece of behaviour you want next. Run it; confirm it fails.</li>
+    <li><strong>Green.</strong> Write the simplest code that makes the test pass. Resist the urge to generalise.</li>
+    <li><strong>Refactor.</strong> With the test passing, improve the structure of the code without changing its behaviour. Run the test after every change; it must stay green.</li>
+  </ol>
+
+  <p>The loop has two non-obvious benefits beyond the obvious one (you get a test). First, the "red" step is a forcing function for specification: you cannot write a failing test for behaviour you cannot describe. Second, the "refactor" step is safe because the test is the harness; you can rearrange the code aggressively, knowing that the test will tell you when you have broken it.</p>
+
+  <p>TDD is a personal discipline, not a team mandate. Many practitioners adopt it for greenfield code and skip it for exploratory work. The lectures that follow assume only that tests <em>exist</em>, not that you wrote them first.</p>
+
+  <h3>Test smells</h3>
+
+  <p>A smell is a surface feature that suggests a deeper problem. Khorikov's <em>Unit Testing</em> (2020) catalogues the worst test smells, of which six are common enough to name.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Smell</th><th>Symptom</th><th>Underlying problem</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Brittle test</td><td>Breaks on internal refactors that do not change behaviour.</td><td>Over-mocking; testing internals instead of contracts.</td></tr>
+      <tr><td>Flaky test</td><td>Passes sometimes, fails sometimes, on the same code.</td><td>Time, randomness, shared state, network. Fix the cause; do not retry.</td></tr>
+      <tr><td>Slow test</td><td>Takes seconds or more.</td><td>Hitting a real database or network. Move to integration tier.</td></tr>
+      <tr><td>Test interdependence</td><td>Test B passes only when A runs first.</td><td>Shared state via fixture scope or module variables.</td></tr>
+      <tr><td>Assertion roulette</td><td>Test has ten asserts; failure does not say which behaviour broke.</td><td>One test is doing too many things. Split.</td></tr>
+      <tr><td>Mystery guest</td><td>Test relies on an external file or fixture not visible in the test body.</td><td>Move inputs inline, or name the fixture explicitly.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: testing a PD calibrator with three styles</strong>
+    <p>The unit under test is <code>calibrate(scores, observed_default_rate)</code>, which fits a logistic recalibration so the predicted default rate matches the observed rate on the calibration sample.</p>
+    <p>Example-based unit test, AAA pattern:</p>
+    <p><code>def test_calibrate_matches_observed_rate():
+    scores = pd.Series([0.1, 0.3, 0.5, 0.7, 0.9])
+    odr = 0.30
+    cal = calibrate(scores, odr)
+    assert abs(cal.predicted_rate - odr) &lt; 1e-6</code></p>
+    <p>Parametrised version covering several segments:</p>
+    <p><code>@pytest.mark.parametrize("odr", [0.05, 0.10, 0.30, 0.50])
+def test_calibrate_matches_each_rate(odr):
+    scores = pd.Series([0.1, 0.3, 0.5, 0.7, 0.9])
+    cal = calibrate(scores, odr)
+    assert abs(cal.predicted_rate - odr) &lt; 1e-6</code></p>
+    <p>Property-based version asserting monotonicity:</p>
+    <p><code>@given(
+    scores=st.lists(st.floats(min_value=0, max_value=1), min_size=10, max_size=100),
+    odr=st.floats(min_value=0.01, max_value=0.5),
+)
+def test_calibrate_is_monotonic_in_score(scores, odr):
+    cal = calibrate(pd.Series(scores), odr)
+    sorted_scores  = sorted(scores)
+    sorted_outputs = [cal.predict(s) for s in sorted_scores]
+    assert sorted_outputs == sorted(sorted_outputs)</code></p>
+    <p>The three styles tell complementary stories. The example tests state one fact each, in plain code. The parametrised test states that the calibration works at several rates without repeating itself. The property test states the deeper fact that calibration preserves the score ordering, a thing the example tests do not assert and which is the property a reviewer would most want to know is preserved across refactors.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Tests are the standing record of what "correct" means for your code, written in code. The discipline is: many small example tests at the unit level, a deliberate smaller set of integration tests at the seams, a very small set of end-to-end tests for the critical paths. Use pytest, parametrize for tables, fixtures for setup, and Hypothesis for properties. Prefer real objects over fakes, fakes over stubs, stubs over spies, spies over mocks. Treat coverage as a smoke alarm, not a target.</p>
+
+  <p>The economic argument is two-fold and converges. Tests shift defects left on Boehm's curve, so each defect costs less to fix; tests also enable the trunk-based, continuous-delivery flow that the DORA programme finds is associated with higher delivery performance. The deeper effect is on the writer: tested code can be changed without fear, and code that can be changed without fear is the only kind that ships fast for years.</p>
+
+  <p>Lecture 6 turns to the question that arises whenever the suite, or the user, says "this is wrong": how to find out why. The skills are complementary; tests prevent and detect, debugging diagnoses.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Describe Cohn's test pyramid in one sentence each per layer. Why is an inverted pyramid (many end-to-end, few unit) a smell?</li>
+      <li>Write the smallest pytest function that asserts <code>square(3) == 9</code>, labelling the Arrange, Act, and Assert sections.</li>
+      <li>Distinguish a stub from a mock from a fake. For each, give one situation in which it is the right choice.</li>
+      <li>State three properties that would make good property-based tests (round-trip, invariant, idempotence, oracle). Pick a function from your work and write the property for one of them.</li>
+      <li>Why is line coverage a misleading single metric? What does branch coverage add, and what does it still miss?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="04-regular_expressions.html">Lecture 4 (regex)</a> is a routine source of test assertions for parsing and validation.</li>
+      <li><strong>Next:</strong> <a href="06-debugging_and_profiling.html">Lecture 6 (debugging)</a> covers what to do when the suite, or production, says the code is wrong.</li>
+      <li><strong>Cross-link:</strong> <a href="13-ci_cd.html">Lecture 13 (CI/CD)</a> is where the test suite earns its keep, running on every commit.</li>
+      <li><strong>Cross-link:</strong> <a href="12-code_review_and_prs.html">Lecture 12 (code review)</a> is where the test smells listed here are caught at PR time.</li>
+      <li><strong>Outside this course:</strong> Beck, <em>Test-Driven Development by Example</em> (2003); Meszaros, <em>xUnit Test Patterns</em> (2007); Khorikov, <em>Unit Testing: Principles, Practices, and Patterns</em> (2020); Forsgren, Humble, Kim, <em>Accelerate</em> (2018); MacIver, Hypothesis documentation.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 5 of 14</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

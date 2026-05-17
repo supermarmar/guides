@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 1: loss distributions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="index.html">Risk modelling</a></div>
+  <h1>Loss distributions</h1>
+  <p class="subtitle">The size of a single claim is a random variable. Choosing the right family to model it is the first decision in every risk model, every reinsurance treaty, every solvency calculation. Get the tail wrong and everything downstream is wrong.</p>
+  <div class="meta">
+    <span>Lecture 1 of 8</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Source: <code>UP / Ch 15 - Loss Distribution.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>loss distribution</strong> is the probability law of the size of a single insurance claim. The empirical shape is consistent across lines: a large mass of small claims, a peak, and a long thin tail of rare large claims. That shape rules out the normal distribution and pushes you toward a small family of positively skewed, long-tailed distributions (exponential, gamma, lognormal, Pareto, Burr, Weibull). The job in this lecture is to recognise each shape, know its moments, fit it to data, and test whether the fit holds up.</p>
+
+  <p>Two practical complications dominate. Large claims are routinely <em>limited</em> by reinsurance, so the data you see is truncated above. Small claims may not be reported because of a policy excess, so the data is truncated below. Both effects bias every estimator if ignored. The tail of the distribution, which matters most, is the part most likely to be missing from your sample.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Think of car insurance. Most accidents are minor: a dented bumper, a couple of hundred pounds. A smaller number are serious: a write-off, a few thousand. A very small number are catastrophic: serious injury, a court award, hundreds of thousands. The histogram of claim sizes is not bell-shaped. It is a steep slope from zero, a hump near a few hundred, and a long flat tail running out to the right. That shape is the loss distribution, and choosing which family captures the tail is what this lecture is about.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What is beyond the source</span>
+    The source covers the standard families and the chi-squared goodness-of-fit test. This lecture adds the language of light versus heavy tails (exponential bound, polynomial bound), the relationship between Pareto, Burr, and Weibull as a single Burr family, and a section on censoring and truncation bias that will reappear in lecture 4 on reinsurance.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>An insurer or reinsurer faces four standing questions, all of which dissolve into a loss distribution choice. <em>What premium should we charge?</em> The pure premium is the expected claim per policy, which is the mean of the loss distribution. <em>What reserves should we hold?</em> The reserve covers expected future claims, which is again the mean, often weighted by reporting delay. <em>What reinsurance should we buy, and at what price?</em> The reinsurer is paid for the right-tail of the distribution above a retention; the price is sensitive to how heavy that tail is. <em>Are we solvent?</em> Solvency is the probability that aggregate claims stay below capital plus premium income, which depends on the upper percentiles of the distribution.</p>
+
+  <p>Three of those four questions are about the tail, not the mean. A normal distribution fitted to claim data will get the mean approximately right and the 99.5th percentile completely wrong. The Pareto and lognormal families exist precisely because the normal fails in the tail. The actuarial discipline is therefore not "fit a distribution" but "fit one that captures the tail you are pricing".</p>
+
+  <p>Beyond insurance: the same loss distributions underpin credit-risk loss-given-default modelling (LGD is bounded between 0 and 1, often modelled with a beta distribution or its tail with a Pareto), operational-risk capital under Basel (Lognormal-Poisson and Burr are common in the loss-distribution approach), and any frequency-severity decomposition in finance.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Picture three densities drawn on the same axis. All three have mean roughly 1,000 and are zero below zero. They look almost identical near the mode, but they part company in the right tail: at 4,500 the exponential has died down to near zero, the lognormal still has a small probability, and the Pareto still has a meaningful one. That difference is what matters when you are pricing a cover that pays only when X exceeds 4,500.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Loss density tails compared">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three loss densities with the same mean, different tails</text>
+
+      <!-- Axes -->
+      <line x1="60" y1="320" x2="720" y2="320" stroke="#52525b" stroke-width="1.5"/>
+      <line x1="60" y1="60" x2="60" y2="320" stroke="#52525b" stroke-width="1.5"/>
+
+      <!-- x-axis ticks -->
+      <text x="60" y="340" font-family="Inter" font-size="11" fill="#71717a" text-anchor="middle">0</text>
+      <text x="222" y="340" font-family="Inter" font-size="11" fill="#71717a" text-anchor="middle">1,000</text>
+      <text x="384" y="340" font-family="Inter" font-size="11" fill="#71717a" text-anchor="middle">2,500</text>
+      <text x="546" y="340" font-family="Inter" font-size="11" fill="#71717a" text-anchor="middle">4,500</text>
+      <text x="700" y="340" font-family="Inter" font-size="11" fill="#71717a" text-anchor="middle">7,000</text>
+      <text x="390" y="365" font-family="Inter" font-size="11" font-weight="600" fill="#52525b" text-anchor="middle">claim size x</text>
+
+      <!-- y-axis label -->
+      <text x="30" y="190" font-family="Inter" font-size="11" font-weight="600" fill="#52525b" text-anchor="middle" transform="rotate(-90,30,190)">density f(x)</text>
+
+      <!-- Vertical dashed line at 4500 -->
+      <line x1="546" y1="60" x2="546" y2="320" stroke="#a1a1aa" stroke-width="1" stroke-dasharray="3,3"/>
+      <text x="546" y="55" font-family="Inter" font-size="10" fill="#71717a" text-anchor="middle" font-style="italic">tail comparison point</text>
+
+      <!-- Exponential mean 1000: f(x) = (1/1000) e^(-x/1000) -->
+      <!-- Plotted points -->
+      <path d="M 60,75 Q 90,140 130,200 T 220,260 T 320,290 T 420,305 T 546,312 L 720,317"
+            fill="none" stroke="#0d9488" stroke-width="2.5"/>
+      <text x="220" y="180" font-family="Inter" font-size="11" font-weight="600" fill="#0d9488">Exponential (1/1000)</text>
+      <text x="220" y="194" font-family="Inter" font-size="10" fill="#115e59" font-style="italic">light tail</text>
+
+      <!-- Lognormal -->
+      <path d="M 60,318 Q 100,160 160,90 T 280,180 T 420,275 T 546,300 L 720,312"
+            fill="none" stroke="#6366f1" stroke-width="2.5"/>
+      <text x="430" y="240" font-family="Inter" font-size="11" font-weight="600" fill="#6366f1">Lognormal</text>
+      <text x="430" y="254" font-family="Inter" font-size="10" fill="#3730a3" font-style="italic">medium tail</text>
+
+      <!-- Pareto -->
+      <path d="M 60,72 Q 120,180 200,240 T 340,290 T 480,308 T 620,313 L 720,315"
+            fill="none" stroke="#b45309" stroke-width="2.5"/>
+      <text x="540" y="280" font-family="Inter" font-size="11" font-weight="600" fill="#b45309">Pareto (3, 2000)</text>
+      <text x="540" y="294" font-family="Inter" font-size="10" fill="#92400e" font-style="italic">heavy tail</text>
+
+      <!-- Survival comparison annotation -->
+      <text x="380" y="115" font-family="Inter" font-size="10" fill="#52525b" text-anchor="middle">P(X &gt; 4500) at this point:</text>
+      <text x="380" y="129" font-family="Inter" font-size="10" font-weight="600" fill="#0d9488" text-anchor="middle">Exp 1.1%</text>
+      <text x="445" y="129" font-family="Inter" font-size="10" font-weight="600" fill="#6366f1" text-anchor="middle">Lognormal &asymp;5%</text>
+      <text x="520" y="129" font-family="Inter" font-size="10" font-weight="600" fill="#b45309" text-anchor="middle">Pareto 2.9%</text>
+    </svg>
+    <figcaption>The three families look similar at modest values. At 4,500, the exponential survival is 1.1%, the Pareto's is roughly 2.9%, the lognormal in this parametrisation around 5%. A reinsurer who priced this tail using the wrong family would be wrong by a factor of two to four. (Numbers from the source PDF's tail-weight comparison.)</figcaption>
+  </figure>
+
+  <p>The shape of the tail is captured by how fast the survival function $S(x) = 1 - F(x)$ goes to zero. Three regimes worth distinguishing:</p>
+
+  <div class="defcard">
+    <div class="term">Light tail</div>
+    <div class="def">$S(x)$ decays at least exponentially: $S(x) \le e^{-c x}$ for some $c > 0$. Examples: exponential, gamma, Weibull with shape $\ge 1$. All moments exist.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Medium tail</div>
+    <div class="def">$S(x)$ decays faster than any polynomial but slower than an exponential. The lognormal is the prototype: $\ln X$ is normal, so $X$ has a "stretched" right tail. All moments exist, but tail percentiles are surprisingly large.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Heavy tail</div>
+    <div class="def">$S(x)$ decays only polynomially: $S(x) \sim x^{-\alpha}$ as $x \to \infty$. The Pareto and Burr families are the prototypes. Only moments of order less than $\alpha$ exist; for $\alpha \le 2$ the variance is infinite, for $\alpha \le 1$ the mean is infinite.</div>
+  </div>
+
+  <p>One more conceptual anchor before the detail: the <strong>law of total variance</strong>, which will reappear in every later lecture in this course. For any two random variables $X$ and $Y$,</p>
+  <p>$$ \operatorname{Var}(X) = E[\operatorname{Var}(X \mid Y)] + \operatorname{Var}(E[X \mid Y]) $$</p>
+  <p>and the law of total expectation $E[X] = E[E[X \mid Y]]$. These two identities power every compound-distribution result in lectures 2 and 3.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Notation and characterising functions</h3>
+
+  <p>For a continuous random variable $X$ representing a single claim amount, four characterising functions are in constant use.</p>
+
+  <div class="defcard">
+    <div class="term">CDF</div>
+    <div class="def">$F_X(x) = P(X \le x)$. The probability the claim is no larger than $x$. Always non-decreasing, right-continuous, with $F(-\infty) = 0$ and $F(\infty) = 1$.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">PDF</div>
+    <div class="def">$f_X(x) = F_X'(x)$. Non-negative, integrates to 1, and probabilities over intervals are integrals: $P(a \le X \le b) = \int_a^b f_X(x)\,dx$.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">MGF</div>
+    <div class="def">$M_X(t) = E[e^{t X}]$ where the integral converges. The MGF determines the distribution uniquely, and moments fall out as $E[X^k] = M_X^{(k)}(0)$.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">CGF</div>
+    <div class="def">$C_X(t) = \ln M_X(t)$. The cumulant generating function. Variance and skew read directly off its second and third derivatives at zero: $\operatorname{Var}(X) = C_X''(0)$, $\operatorname{skew}(X) = C_X'''(0)$, coefficient of skewness $= C_X'''(0) / [C_X''(0)]^{3/2}$.</div>
+  </div>
+
+  <p>The two conditional identities used everywhere downstream:</p>
+  <p>$$ E[X] = E[E[X \mid Y]] \qquad \operatorname{Var}(X) = E[\operatorname{Var}(X \mid Y)] + \operatorname{Var}(E[X \mid Y]) $$</p>
+
+  <h3>The exponential distribution</h3>
+
+  <p>$X \sim \operatorname{Exp}(\lambda)$ with rate parameter $\lambda > 0$. The simplest loss distribution and the natural starting point.</p>
+  <p>$$ f(x) = \lambda e^{-\lambda x}, \quad F(x) = 1 - e^{-\lambda x}, \quad x > 0 $$</p>
+  <p>$$ M(t) = \left(1 - \frac{t}{\lambda}\right)^{-1} \text{ for } t < \lambda, \quad E(X) = \frac{1}{\lambda}, \quad \operatorname{Var}(X) = \frac{1}{\lambda^2} $$</p>
+  <p>The exponential has the <strong>memoryless property</strong>: $P(X > s + t \mid X > s) = P(X > t)$. Given that a claim has exceeded $s$, the conditional distribution of the excess is exponential again. This is a strong assumption: in real claims data, large claims tend to have heavier-tailed excesses, not the same tail. The exponential is therefore a useful benchmark, rarely the right fit for losses with serious tail risk.</p>
+
+  <h3>The gamma distribution</h3>
+
+  <p>$X \sim \operatorname{Gamma}(\alpha, \lambda)$ with shape $\alpha > 0$ and rate $\lambda > 0$. Generalises the exponential (which is $\operatorname{Gamma}(1, \lambda)$) by allowing the density to start at zero and rise to a mode before falling.</p>
+  <p>$$ f(x) = \frac{\lambda^\alpha}{\Gamma(\alpha)} x^{\alpha - 1} e^{-\lambda x}, \quad x > 0 $$</p>
+  <p>$$ M(t) = \left(1 - \frac{t}{\lambda}\right)^{-\alpha}, \quad E(X) = \frac{\alpha}{\lambda}, \quad \operatorname{Var}(X) = \frac{\alpha}{\lambda^2} $$</p>
+  <p>A useful identity: if $X \sim \operatorname{Gamma}(\alpha, \lambda)$ with $2\alpha$ integer, then $2\lambda X \sim \chi^2_{2\alpha}$. Software that does not have a direct gamma fitter can therefore use a chi-squared routine on the transformed variable.</p>
+
+  <h3>The lognormal distribution</h3>
+
+  <p>If $\ln X \sim N(\mu, \sigma^2)$, then $X \sim \operatorname{Lognormal}(\mu, \sigma^2)$ on $(0, \infty)$. Equivalently, $X = e^Z$ for $Z$ normal. The lognormal is the standard medium-tail loss distribution because it falls out of multiplicative random processes (claims that arise from a product of independent shocks tend to be approximately lognormal).</p>
+  <p>$$ E(X) = e^{\mu + \sigma^2 / 2}, \quad \operatorname{Var}(X) = e^{2\mu + \sigma^2}\!\left(e^{\sigma^2} - 1\right) $$</p>
+
+  <p>The lognormal has no closed-form CDF (the integral is the normal CDF in disguise), but every statistics package can evaluate it because the transformation $Y = \ln X$ reduces every probability to a standard normal calculation. The MGF, importantly, <em>does not exist</em>: $E[e^{tX}]$ diverges for any $t > 0$ because the right tail is too heavy for the exponential moment.</p>
+
+  <h3>The Pareto family</h3>
+
+  <p>Three parametrisations are in standard use. They are all the same idea (polynomially decaying tail) with slight differences in convenience.</p>
+
+  <div class="defcard">
+    <div class="term">Two-parameter</div>
+    <div class="def">$X \sim \operatorname{Pa}(\alpha, \lambda)$ with $F(x) = 1 - \left(\frac{\lambda}{\lambda + x}\right)^\alpha$ on $x > 0$. Mean $\frac{\lambda}{\alpha - 1}$ for $\alpha > 1$. Variance exists only for $\alpha > 2$.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Three-parameter</div>
+    <div class="def">$X \sim \operatorname{Pa}(\alpha, \lambda, k)$ with $F(x) = 1 - \left(\frac{\lambda}{\lambda + x}\right)^\alpha$ but a density $f(x) \propto x^{k - 1}$ near zero. Reduces to the two-parameter form when $k = 1$.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Burr</div>
+    <div class="def">$X \sim \operatorname{Burr}(\alpha, \lambda, \gamma)$ with $F(x) = 1 - \left(\frac{\lambda}{\lambda + x^\gamma}\right)^\alpha$. Reduces to the two-parameter Pareto when $\gamma = 1$ and to the Weibull-like behaviour when $\alpha$ is large.</div>
+  </div>
+
+  <p>The Pareto is the prototype heavy-tailed loss distribution and is the standard reinsurance pricing model for catastrophe layers. The decisive parameter is $\alpha$: it controls the polynomial decay rate of the survival function. Empirically, fire and motor portfolios often show $\alpha$ between 2 and 3; catastrophe lines between 1 and 1.5; cyber-loss distributions sometimes fall below 1 (mean does not exist).</p>
+
+  <h3>The Weibull distribution</h3>
+
+  <p>$X \sim W(c, \gamma)$ with $F(x) = 1 - \exp(-c x^\gamma)$ on $x > 0$. The shape parameter $\gamma$ flexes the tail.</p>
+  <p>$$ f(x) = c \gamma x^{\gamma - 1} \exp(-c x^\gamma) $$</p>
+  <p>For $\gamma = 1$ it reduces to the exponential with rate $c$. For $\gamma > 1$ the hazard rate is increasing (large claims are <em>less</em> likely than in the exponential) and the tail is lighter than exponential. For $\gamma < 1$ the hazard rate is decreasing and the tail is heavier than exponential but still lighter than Pareto. The Weibull is the standard reliability-engineering distribution and is sometimes used for catastrophe losses with $\gamma$ near 0.5.</p>
+
+  <h3>The tail-weight comparison</h3>
+
+  <p>The source PDF's headline example. Four densities are parametrised so that the right-tail behaviour can be compared at $x = 4{,}500$.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Distribution</th><th>$f(4{,}500)$</th><th>$1 - F(4{,}500)$</th><th>Tail rank</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Weibull $(c = 1/2000^2, \gamma = 2)$</td><td>$8.75 \times 10^{-10}$</td><td>$1.24 \times 10^{-7}$</td><td>1 (lightest)</td></tr>
+        <tr><td>Exponential $(\lambda = 1/1000)$</td><td>$1.11 \times 10^{-5}$</td><td>$1.11 \times 10^{-2}$</td><td>2</td></tr>
+        <tr><td>Pareto $(\alpha = 3, \lambda = 2000)$</td><td>$1.34 \times 10^{-5}$</td><td>$2.91 \times 10^{-2}$</td><td>3</td></tr>
+        <tr><td>Weibull $(c = 1/500, \gamma = 1/2)$</td><td>$1.66 \times 10^{-5}$</td><td>$4.98 \times 10^{-2}$</td><td>4 (heaviest)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Note the orders of magnitude. The lightest Weibull ($\gamma = 2$) gives a survival probability of one in eight million; the heaviest ($\gamma = 1/2$) gives one in twenty. The same data, fit to four families, gives reinsurance prices that differ by a factor of half a million. This is why the choice of family matters.</p>
+
+  <h3>Estimation: method of moments</h3>
+
+  <p>The simplest estimator. Match the first $k$ sample moments to the first $k$ population moments and solve for the parameters. For a single-parameter distribution, equate $\bar{X} = E(X)$. For a two-parameter distribution, equate $\bar{X}$ and the sample variance $s_n^2 = \frac{1}{n}\sum (x_i - \bar{x})^2$ to their population counterparts.</p>
+
+  <p>For a gamma $(\alpha, \lambda)$ fit:</p>
+  <p>$$ \bar{x} = \frac{\alpha}{\lambda}, \quad s_n^2 = \frac{\alpha}{\lambda^2} \;\;\Longrightarrow\;\; \hat{\lambda} = \frac{\bar{x}}{s_n^2}, \quad \hat{\alpha} = \frac{\bar{x}^2}{s_n^2} $$</p>
+
+  <p>Method of moments is fast and almost always wrong in the tail. The first two moments are dominated by the bulk of the data, so the fitted parameters reflect the bulk and ignore the tail. Use as a starting value for MLE, not as a final answer.</p>
+
+  <h3>Estimation: maximum likelihood</h3>
+
+  <p>The likelihood of a sample $x_1, \dots, x_n$ from $f(\cdot; \theta)$ is</p>
+  <p>$$ L(\theta) = \prod_{i=1}^n f(x_i; \theta) $$</p>
+  <p>and the log-likelihood is</p>
+  <p>$$ \ell(\theta) = \sum_{i=1}^n \ln f(x_i; \theta) $$</p>
+  <p>Maximise $\ell$ over $\theta$. For an exponential the MLE is $\hat{\lambda} = 1/\bar{x}$; for a normal it is the sample mean and variance; for a lognormal, fit a normal to the log of the data; for a gamma, the MLE has no closed form and is solved numerically.</p>
+
+  <h3>Estimation: method of percentiles</h3>
+
+  <p>If method-of-moments is bulk-driven and MLE is computationally heavier, the method of percentiles is a compromise. For a one-parameter fit, solve $F(x_m; \theta) = 0.5$ where $x_m$ is the sample median; for two parameters, use the sample lower and upper quartiles. The advantage in loss work is that percentiles are robust to a few outliers, which is exactly what loss data has too many of. The disadvantage is statistical inefficiency: a percentile fit throws away information from the rest of the sample.</p>
+
+  <h3>Goodness of fit: the chi-squared test</h3>
+
+  <p>The standard test. Partition the support into $k$ disjoint cells, count the observed frequency $O_i$ in each, compute the expected frequency $E_i = n \cdot P(\text{cell } i \mid \hat{\theta})$ under the fitted distribution, and form</p>
+  <p>$$ Q = \sum_{i = 1}^{k} \frac{(O_i - E_i)^2}{E_i} $$</p>
+  <p>Under the null hypothesis $H_0$ that the data follows the specified distribution, $Q \sim \chi^2_{k - c - 1}$ where $c$ is the number of parameters estimated from the data. Reject $H_0$ at level $\alpha$ if $Q > \chi^2_{k - c - 1, \alpha}$.</p>
+
+  <p>The two practical traps. (1) Each cell should have expected frequency at least 5; otherwise the chi-squared approximation breaks down. Merge cells in the tail. (2) The test is "did the fit pass" not "is the fit good". With a small sample you fail to reject almost everything; with a large sample you reject almost everything. Always look at the fit visually, with a Q-Q plot or log-log survival plot, alongside the test.</p>
+
+  <h3>Censoring and truncation</h3>
+
+  <p>The forensic part of the lecture. Real claim data is almost never an unbiased sample from the underlying loss distribution.</p>
+
+  <div class="defcard">
+    <div class="term">Truncated</div>
+    <div class="def">Some values are missing from the sample. Example: claims below a policy excess never reach the insurer. The sample is a conditional distribution, $X \mid X > L$ where $L$ is the excess. Fitting an unconditional model to a truncated sample will overstate the mean and the lower tail.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Censored</div>
+    <div class="def">Some values are known only to be above (or below) a limit. Example: claims above a reinsurance retention $M$ are recorded as exactly $M$ because the insurer only paid up to $M$. The likelihood now splits: a density contribution for exact observations and a $1 - F(M)$ contribution for censored ones.</div>
+  </div>
+
+  <p>The likelihood for a right-censored sample (claims below $M$ exact, claims above $M$ recorded as $M$):</p>
+  <p>$$ L(\theta) = \prod_{x_i < M} f(x_i; \theta) \cdot \big[1 - F(M; \theta)\big]^m $$</p>
+  <p>where $m$ is the number of censored observations. The MLE is found by taking the log, differentiating with respect to $\theta$, and solving. Ignoring the censoring (treating the $M$ observations as exact claims of size $M$) gives a parameter estimate that systematically understates the tail. Lecture 4 returns to this when pricing reinsurance from reinsurer's data, which is censored from below by the retention.</p>
+
+  <h3>A worked summary example</h3>
+
+  <p>An insurer has 10 motor claims (in GBP): 320, 410, 580, 720, 860, 1{,}100, 1{,}450, 2{,}300, 4{,}600, 11{,}000. Fit an exponential by method of moments and by MLE.</p>
+
+  <div class="worked">Sample mean   x_bar = (320 + 410 + ... + 11,000) / 10 = 2,334
+
+Method of moments:    set E(X) = 1/lambda = x_bar
+                      lambda_hat = 1 / 2,334 = 0.000428
+MLE (exponential):    lambda_hat = 1 / x_bar = 0.000428 (identical)
+
+Predicted P(X &gt; 10,000) under this fit:
+  exp(-0.000428 * 10,000) = exp(-4.28) = 0.0139 (about 1.4%)
+
+Sample evidence:      1 claim out of 10 was above 10,000, so observed share is 10%.
+
+Conclusion:           Exponential underestimates the tail by a factor of 7.
+                      Refit as Pareto or lognormal before pricing reinsurance.</div>
+
+  <p>The mismatch between 1.4% and 10% is small in absolute terms (one observation) but is exactly the discrepancy that matters when pricing the cover that pays only above 10,000. The next step would be a Pareto fit; the MLE for a two-parameter Pareto requires numerical solution, but a quick check via the empirical log-log survival plot would tell you immediately whether the polynomial-tail assumption is plausible.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The tail is the product</h3>
+  <p>Premiums, reserves, and reinsurance all depend on the tail. The body of the loss distribution describes claims you can self-insure cheaply. The tail describes claims that destroy capital. A good actuarial fit gets the tail right within the noise of your data; a great fit also tells you how much noise there is in the tail estimate. A common professional vice is to report a fitted parameter to four decimal places when the data supports only one.</p>
+
+  <h3>No moments, no problem</h3>
+  <p>For Pareto with $\alpha \le 1$, the mean does not exist. The textbook reaction is to switch distributions. The grandmaster reaction is to ask whether the data really comes from a distribution with no mean, in which case classical pricing (charge expected loss plus loading) breaks down, and pricing must be done by setting reserves to cover a specified percentile rather than the mean. Cyber-risk pricing currently sits in this regime: every classical pricing tool produces nonsense because the loss process has no finite expected value.</p>
+
+  <h3>Lognormal is the actuarial default</h3>
+  <p>If you have to pick one family without inspecting the data, the lognormal wins. It is positive, positively skewed, has all moments, fits a remarkable range of empirical loss data (motor, fire, health), and is easy to fit (a normal to the log). Pareto and Burr are improvements when the tail is genuinely polynomial; Weibull is useful when the hazard rate has a clear monotone direction. But the lognormal is the safe first guess.</p>
+
+  <h3>Mixture models are usually closer to truth than any single family</h3>
+  <p>Real losses are often two processes: a high-frequency low-severity process (small accidents, theft, minor damage) and a low-frequency high-severity process (write-offs, lawsuits, catastrophes). A single distribution rarely captures both. A mixture, $f(x) = p \cdot f_1(x) + (1 - p) \cdot f_2(x)$, with $f_1$ a lognormal for the body and $f_2$ a Pareto for the tail, is usually closer to the empirical CDF than either family alone. The cost is two extra parameters; the benefit is realism in pricing.</p>
+
+  <h3>Censoring bias is the silent killer in reinsurance pricing</h3>
+  <p>A reinsurer who fits a Pareto to its own loss data (claims that exceeded the retention) and forgets that the data is truncated below at $M$ will systematically underestimate $\alpha$ and overprice the next layer. The likelihood that ignores the truncation is wrong by exactly the conditional-versus-unconditional distinction in lecture 4. Always condition the MLE on the truncation point.</p>
+
+  <h3>Distributions, not point estimates</h3>
+  <p>Every parameter estimate has a sampling distribution. The 95% confidence interval for an MLE of a Pareto $\alpha$ at typical sample sizes (200 to 500 claims above retention) is wide enough that the tail price changes by tens of percent. Always quote the interval, and ensure the pricing builds in a margin for the parameter uncertainty as well as the process uncertainty. Lecture 8 on empirical Bayes credibility is the formal way to do this.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the law of total variance and explain in words why it matters for compound risk models.</li>
+      <li>Why is the normal distribution generally a poor choice for individual claim amounts? Name two structural features it cannot capture.</li>
+      <li>Define a "light", "medium", and "heavy" tail in terms of the survival function. Place exponential, lognormal, and Pareto on that scale.</li>
+      <li>State the PDF, CDF, mean, variance, and MGF of the exponential, gamma, and Pareto distributions.</li>
+      <li>Why does the lognormal have no MGF? What does that imply for compound-distribution work in later lectures?</li>
+      <li>For a two-parameter Pareto $\operatorname{Pa}(\alpha, \lambda)$, for which $\alpha$ does the mean exist? The variance? Give one example of a real loss process where each regime is plausible.</li>
+      <li>State the method-of-moments estimator and the maximum likelihood estimator for the exponential rate $\lambda$. Why are they identical here?</li>
+      <li>State the chi-squared goodness-of-fit statistic, its null distribution, and the cell-size rule of thumb. Name one practical pitfall the test has when the sample is large.</li>
+      <li>Define truncation and censoring. Write the likelihood for a sample of $n$ uncensored claims and $m$ claims censored at $M$ from above.</li>
+      <li>You fit an exponential by MLE to 100 claims and the model predicts $P(X > 10{,}000) = 1.4\%$. The observed share is 10%. What two next steps are appropriate, and why?</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next in this course</h4>
+    <ul>
+      <li><a href="02-risk_models_individual_and_collective.html">Lecture 2: risk models I</a>: the individual and collective risk models that sit on top of a loss distribution.</li>
+      <li><a href="04-reinsurance.html">Lecture 4: reinsurance</a>: where censoring and truncation reappear as the actual data problem reinsurers face.</li>
+      <li><a href="05-ruin_theory.html">Lecture 5: ruin theory</a>: the adjustment coefficient $R$ depends on the MGF of the loss distribution, so the choice of family directly drives the ruin bound.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / Ch 15 - Loss Distribution.pdf</code> (WST322 / CS2-15).</li>
+    </ul>
+    <h4>Cross-references</h4>
+    <ul>
+      <li>Operational-risk loss modelling (Basel loss-distribution approach) uses lognormal-Poisson and Burr in the same way. See <code>docs/wiki/application/banking/01_internal_environment/risk_measurement/operational_risk/02-loss_data.md</code>.</li>
+      <li>Credit-risk LGD modelling uses similar shapes (often beta on the unit interval, or transformed Pareto in the right tail). See <code>docs/wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/01_introduction/02-credit_losses.md</code>.</li>
+    </ul>
+    <h4>Further reading</h4>
+    <ul>
+      <li>Klugman, Panjer and Willmot, <em>Loss Models</em>, chapters 5 to 7. The canonical reference for actuarial loss distributions.</li>
+      <li>Embrechts, Kluppelberg and Mikosch, <em>Modelling Extremal Events</em>. The book on heavy tails.</li>
+      <li>McNeil, Frey and Embrechts, <em>Quantitative Risk Management</em>, chapter 7. Loss distributions and tail estimation across insurance and finance.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All risk-modelling lectures</a></span>
+  <span>Lecture 1 of 8: loss distributions</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+
+</body>
+</html>

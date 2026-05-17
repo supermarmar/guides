@@ -9,7 +9,7 @@ aliases:
 
 Economic capital is internally calculated by the bank and is a measure of the bank's total risk as they see it, without reference to regulatory prescriptions. It is calculated as part of the Internal Capital Adequacy Assessment Process (ICAAP) and represents the amount of capital a bank believes it needs based on its own [[02-risk_appetite|risk appetite]] and strategy.
 
-For the broader treatment of the [[01-pillar_2b|Pillar 2]] capital framework (Pillar 2A/2B add-ons, buffers, capital requirements table), see [Capital — Pillar 2](..\..\04-capital.md). This file focuses on the **computation mechanics of economic capital** used in the ICAAP, including Pillar 2A risk-specific quantification and [[01-pillar_2b|Pillar 2B]] stress capital.
+For the broader treatment of the [[01-pillar_2b|Pillar 2]] capital framework (Pillar 2A/2B add-ons, buffers, capital requirements table), see [Capital — Pillar 2](../../../03-capital_management.md). This file focuses on the **computation mechanics of economic capital** used in the ICAAP, including Pillar 2A risk-specific quantification and [[01-pillar_2b|Pillar 2B]] stress capital.
 
 While Pillar 1 regulatory capital is a rule-prescribed floor, economic capital is the bank's own best estimate of required capital. The two measures differ in several important dimensions:
 
@@ -30,7 +30,7 @@ Economic capital for credit risk is conceptually computed using the same Vasicek
 $$\text{EC}_{\text{credit}} = \text{VaR}_{q} - \text{EL}$$
 where $q$ is the bank's internal confidence level (e.g., 99.95%).
 
-Key differences from the IRB regulatory capital formula (see [Regulatory Capital](..\..\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md)):
+Key differences from the IRB regulatory capital formula (see [Regulatory Capital](../a-irb_capital/01_introduction/01-context.md)):
 
 - **PIT PDs**: Economic capital typically uses PIT PDs which are higher in downturns and lower in expansions, rather than the TTC PDs used in regulatory capital.
 - **Higher confidence level**: The bank's own target confidence level $q$ reflects its target credit rating and [[02-risk_appetite|risk appetite]]. A bank targeting an AA rating (implied default probability ~0.03%) would use approximately $q = 99.97\%$.

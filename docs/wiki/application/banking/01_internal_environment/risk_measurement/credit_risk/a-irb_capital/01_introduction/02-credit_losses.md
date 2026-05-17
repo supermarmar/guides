@@ -9,7 +9,7 @@ aliases:
 
 When estimating the amount of [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/credit_concentration_risk/01-context|economic capital]] needed to support their credit risk activities, banks employ an analytical framework that relates the overall required [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/credit_concentration_risk/01-context|economic capital]] for credit risk to their portfolio’s probability density function (PDF) of credit losses, also known as loss distribution of a credit portfolio. Figure below shows this relationship. Although the various modelling approaches would differ, all of them would consider estimating such a PDF.
 
-![image_1.png](credit_losses.png)
+![image_1.png](images/credit_losses.png)
 
 <https://www.bis.org/bcbs/irbriskweight.pdf>
 
@@ -17,7 +17,7 @@ Mechanisms for allocating [[wiki/application/banking/01_internal_environment/ris
 
 Figure below illustrates how variation in realised losses over time leads to a distribution of losses for a bank:
 
-![image_1.png](losses_over_time.png)
+![image_1.png](images/losses_over_time.png)
 
 The worst case one could imagine would be that banks lose their entire credit portfolio in a given year. This event, though, is highly unlikely, and holding capital against it would be economically inefficient. Banks have an incentive to minimise the capital they hold, because reducing capital frees up economic resources that can be directed to profitable investments. On the other hand, the less capital a bank holds, the greater is the likelihood that it will not be able to meet its own debt obligations, i.e. that losses in a given year will not be covered by profit plus available capital, and that the bank will become insolvent. Thus, banks and their supervisors must carefully balance the risks and rewards of holding capital.
 
@@ -102,7 +102,7 @@ The conditional expected loss for an exposure is estimated as the product of the
 
 This can be illustrated below. Ideally, ELs should be covered by provisions. However, if there is a shortfall between EL and provisions (EL> provisions), then this shortfall is deducted from Tier 1 capital. Likewise, if there is an excess, [[bis|Basel]] describes how much you are allowed to include in your Tier 2 capital.
 
-![image](el_vs_ul.png)
+![image](images/el_vs_ul.png)
 
 Basel requires banks to compare **total regulatory EL** against **total ECL provisions** across the entire portfolio:
 

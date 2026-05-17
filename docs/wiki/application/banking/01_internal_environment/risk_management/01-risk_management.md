@@ -25,7 +25,18 @@ The reward system of the bank must encourage employees to seek out business and 
 
 ## Lines of Defence
 
-![alt text](lines_of_defence.png)
+![alt text](images/lines_of_defence.png)
+
+The three-lines model was codified by the Institute of Internal Auditors in 2013 as a general-purpose risk and control framework. In the original IIA model, external auditors and regulators are not a "line" at all; they are described as "external controls" that complement the three internal lines. Arndorfer and Minto (BIS Financial Stability Institute, *The "four lines of defence model" for financial institutions*, Occasional Paper No 11, December 2015) argued that for regulated financial institutions this is not enough, and proposed a fourth line that brings external auditors and supervisors formally inside the assurance architecture. Bank supervisors have broadly adopted this framing. The IIA itself moved a different direction in 2020, dropping "defence" and rebranding the model as the *Three Lines Model* without adding a fourth line. Both framings are still in active use; the four-lines version is the one used in banking.
+
+The FSI paper identifies four ways in which the three-lines model tends to fail in banks, each tied to a real incident:
+
+1. **Misaligned 1L incentives.** UBS accumulated US RMBS positions in 2006 to 2007 whose true size never reached top management in usable form, because the desks were paid for growth and the reporting was watered down on the way up.
+2. **Lack of 2L organisational independence.** Risk functions report to the board on paper but to senior management in practice. Embedded risk officers eventually adopt the views of the desks they sit next to.
+3. **Lack of 2L skills and expertise.** Société Générale's back office and risk control teams opened multiple inquiries into Jérôme Kerviel's positions in 2008 but accepted his untruthful explanations because they lacked the seniority to challenge them. The loss was 4.9 billion EUR.
+4. **Inadequate 3L risk assessment.** UBS's internal audit reviewed the critical mortgage-derivatives desk and detected control weaknesses, but the report took months to finalise and arrived too late to matter.
+
+The four-lines model's distinctive claim is that the third line (internal audit), the external auditor, and the supervisor form a **regulatory triangle**, with bilateral information flows on every side. The supervisor's relationship with internal audit has two modes that should be run by different teams: a *vertical* (hierarchical) mode where the supervisor assesses the quality of internal audit, and a *horizontal* (collaborative) mode where the supervisor shares its own view of risks and inspection findings in exchange for material from internal audit. The horizontal channel works only where internal auditors have *safe harbour* protection when they disclose confidential information in good faith; this exists for external auditors in most jurisdictions but is unevenly extended to internal auditors.
 
 ### 1st LOD (Risk Ownership)
 
@@ -52,5 +63,5 @@ It comprises various risk management and compliance functions (ie support functi
 
 Finally, there are additional external levels of controls that complement the three existing internal layers of controls.
 
-- External auditors are among the most common bodies in this category as they are required by law for most organisations.
-- Regulatory authorities
+- **External auditors** are among the most common bodies in this category as they are required by law for most organisations. Their statutory opinion is on the financial statements. Supervisors set the standards their opinion has to satisfy and can request specific audit scope items. In many jurisdictions external auditors have a duty to report matters of "material significance" to the supervisor.
+- **Regulatory authorities**. In the UK this is the PRA (prudential) and the FCA (conduct). In the euro area it is the ECB, supported by national competent authorities. In South Africa it is the Prudential Authority (within SARB) and the FSCA. BCBS Core Principle 16 (in *The internal audit function in banks*, 2012) requires supervisors to communicate regularly with the bank's internal audit function on risks identified, mitigation measures, and follow-up.

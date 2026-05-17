@@ -86,7 +86,7 @@ The DoD for impairment models should therefore be aligned to the IRB model DoD w
 
 ### Days Past Due (DPD)
 
-Banks commonly specified three payments (or 90 DPD) in arrears as a pragmatic point of ‘default’ [B5.5.37](a), long before the introduction of the [[basel_2|Basel II]] Capital Accords. That said, this threshold can generally range between 30–180 days based on managerial discretion and some analysis.
+Banks commonly specified three payments (or 90 DPD) in arrears as a pragmatic point of ‘default’ B5.5.37, long before the introduction of the [[basel_2|Basel II]] Capital Accords. That said, this threshold can generally range between 30–180 days based on managerial discretion and some analysis.
 
 ### Return to Default
 
@@ -109,7 +109,7 @@ When preparing the training dataset for PIT PD calibration:
 
 ## Cure
 
-[[ifrs9_standard|IFRS 9]] is not prescriptive in terms of defining when an account has cured [5.5.7](a). Hence, a default flag can be created under the following alternatives of cure.
+[[ifrs9_standard|IFRS 9]] is not prescriptive in terms of defining when an account has cured 5.5.7. Hence, a default flag can be created under the following alternatives of cure.
 
 - Instant Cure: An account returns to performing immediately after the cause of default is removed.
 - Probabtion Period: This is used when an account needs to wait for a certain amount of time (e.g. 6m) before returning to performing. It reduces the risk of multiple defaults.

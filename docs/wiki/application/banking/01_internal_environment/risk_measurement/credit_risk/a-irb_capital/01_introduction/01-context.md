@@ -9,7 +9,7 @@ aliases:
 
 What we call regulatory capital differs from what is known as [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/credit_concentration_risk/01-context|economic capital]]. In effect there are two approaches to consider the supply and demand of capital. The regulatory approach dictates the rules on which the demand is to be set, as well as the admissibility of supply, while an internal or economic approach considers the internal best estimate of demand and supply. Regulatory capital supply compared to a predetermined scalar of demand is what the regulators determine as adequate for a bank’s operations. [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/credit_concentration_risk/01-context|Economic capital]] is what the bank itself views as appropriate for its activities. Usually, it is lower than regulatory capital, in that it incorporates a portfolio effect reflecting diversification of activities, but it may also include an additional small capital cushion or buffer.
 
-For the broader treatment of bank [[03-capital_management|capital management]] (sources of capital, Pillar 1/2/3 framework, buffers, [[tlac|TLAC]]/[[mrel|MREL]], leverage ratio, capital allocation, and [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/credit_concentration_risk/01-context|economic capital]]), see [Capital](..\..\..\..\04-capital.md). For the historical evolution of the [[bis|Basel]] accords, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md). This file focuses on the **computation of risk-weighted assets (RWAs) for credit risk** under each [[basel_framework|Basel framework]].
+For the broader treatment of bank [[03-capital_management|capital management]] (sources of capital, Pillar 1/2/3 framework, buffers, [[tlac|TLAC]]/[[mrel|MREL]], leverage ratio, capital allocation, and [[wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/credit_concentration_risk/01-context|economic capital]]), see [Capital](../../../../03-capital_management.md). For the historical evolution of the [[bis|Basel]] accords, see [Basel / BIS](../../../../../../../regulation/international/bis/bis.md). This file focuses on the **computation of risk-weighted assets (RWAs) for credit risk** under each [[basel_framework|Basel framework]].
 
 ## Pillar 1: Minimum Capital Requirements (MCR)
 
@@ -17,7 +17,7 @@ The motivation to develop credit risk models stemmed from the need to develop qu
 
 ### [[basel_1|Basel I]]
 
-Under [Basel I](..\..\..\..\..\..\regulation\international\bis\bis.md), a bank’s assets were allotted via a **simple** rule of thumb to one of four broad risk categories, each with a ‘risk weighting’ that ranged from 0%-100%. A portfolio of corporate loans, for instance, received a risk weight of 100%, while retail mortgages – perceived to be safer – received a more favourable risk weighting of 50%.
+Under [Basel I](../../../../../../../regulation/international/bis/bis.md), a bank’s assets were allotted via a **simple** rule of thumb to one of four broad risk categories, each with a ‘risk weighting’ that ranged from 0%-100%. A portfolio of corporate loans, for instance, received a risk weight of 100%, while retail mortgages – perceived to be safer – received a more favourable risk weighting of 50%.
 
 Minimum capital $K$ was then set in proportion to the weighted sum of these risk-weighted assets (RWAs).
 

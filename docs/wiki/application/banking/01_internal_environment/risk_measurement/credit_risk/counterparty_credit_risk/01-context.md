@@ -9,7 +9,7 @@ aliases:
 
 Most of the credit risk that has been discussed in the banking book originates where assets are held to maturity. The trading book, on the other hand, consists mainly of [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]], but credit risk also originates here. The trading book is primarily made up of shorter-term trades for outcomes such as short-term gains, hedging risk, and placing trades on the market for clients.
 
-For the broader treatment of bank [[03-capital_management|capital management]] (Pillar 1/2/3 framework, buffers, [[tlac|TLAC]]/[[mrel|MREL]]), see [Capital](..\..\..\..\04-capital.md). For the historical evolution of [[bis|Basel]] CCR/CVA reforms, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md). For the mathematical foundations of counterparty exposure measurement (EE, EPE, EEPE, survival curves, Monte Carlo), see [Counterparty Exposures](02-counterparty_exposures.md). For banking book regulatory capital computation (SA, IRB, ASRF), see [Regulatory Capital (Banking Book)](..\..\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). This file focuses on the **computation of regulatory capital for credit risk in the trading book**: CCR and CVA.
+For the broader treatment of bank [[03-capital_management|capital management]] (Pillar 1/2/3 framework, buffers, [[tlac|TLAC]]/[[mrel|MREL]]), see [Capital](../../../03-capital_management.md). For the historical evolution of [[bis|Basel]] CCR/CVA reforms, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md). For the mathematical foundations of counterparty exposure measurement (EE, EPE, EEPE, survival curves, Monte Carlo), see [Counterparty Exposures](02-counterparty_exposures.md). For banking book regulatory capital computation (SA, IRB, ASRF), see [Regulatory Capital (Banking Book)](../a-irb_capital/01_introduction/01-context.md). This file focuses on the **computation of regulatory capital for credit risk in the trading book**: CCR and CVA.
 
 ## Trading Book Boundary
 
@@ -28,7 +28,7 @@ Trading book exposures are managed actively and held for "trading intent" or sho
 
 [[bis|Basel]] regulation clearly identifies the trading book asset types that produce credit risk:
 
-- **Derivatives** (OTC): Over-the-counter derivatives are bilateral contracts with substantial CCR that must be carefully measured and managed. Exchange-traded derivatives are margined and guaranteed by exchanges, minimising credit risk. For detailed product descriptions of derivatives (swaps, options, forwards), see [Banking Products](..\..\..\..\06-products.md).
+- **Derivatives** (OTC): Over-the-counter derivatives are bilateral contracts with substantial CCR that must be carefully measured and managed. Exchange-traded derivatives are margined and guaranteed by exchanges, minimising credit risk. For detailed product descriptions of derivatives (swaps, options, forwards), see [Banking Products](../../../05-products.md).
 - **Long settlement transactions**: Similar to derivatives but longer term, and thus present higher credit risk due to the extended period over which a counterparty could default.
 - **Securities financing transactions (repo)**: Involve counterparties using owned assets to secure funding. If counterparties default, they could lose their assets or make losses on selling assets.
 

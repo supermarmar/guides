@@ -102,13 +102,13 @@ In preparing the modelling dataset, we observe all predictive information of loa
 
 More formally, a process $Z_𝑡 (𝑑, 𝑠, 𝑘) = G(d,s,t+k)$ prepares a given loan’s monthly performance history by evaluating G at ‘future’ time $𝑡 + 𝑘$, though assigns the result to time 𝑡.
 
-![alt text](wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/ifrs9_impairments/05_modelling/sicr/image.png)
+![alt text](image.png)
 
 Various SICR-definitions are generated using the $Z_𝑡(𝑑, 𝑠, 𝑘)$-process simply by systematically varying its parameters $(𝑑, 𝑠, 𝑘)$.
 
 The parameter space includes: 1) the threshold 𝑑 ∈ {1, 2} of $𝑔_0$-measured delinquency beyond which SICR is triggered; 2) the level of stickiness 𝑠 ∈ {1, 2, 3} within the delinquency test; and 3) the choice of outcome period 𝑘 ∈ {3, 6, 9, 12} when modelling SICR-outcomes. While the parameter spaces of 𝑑 and 𝑠 are appreciatively small, the same luxury does not hold for the outcome period 𝑘, which can indeed assume many values.
 
-![alt text](wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/ifrs9_impairments/05_modelling/sicr/image-1.png)
+![alt text](image-1.png)
 
 Each entry in the table can serve as a particular target definition in building a corresponding SICR-model using some technique.
 

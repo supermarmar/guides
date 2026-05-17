@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: generalised linear models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Statistics</a></div>
+  <h1>Generalised linear models</h1>
+  <p class="subtitle">The most important practical lecture in the course. Linear regression, logistic regression, Poisson regression, gamma regression, Tweedie regression, beta regression: ten apparently separate models unified by one framework. Three components (a response distribution from the exponential family, a linear predictor, and a link function) generate every regulated credit-risk model in routine use and most of statistical actuarial science besides. By the end of this lecture you should be able to derive the IRLS update for any GLM, choose a distribution-link pair for a given target, and read the deviance of a fitted model the way an experienced practitioner reads a balance sheet.</p>
+  <div class="meta">
+    <span>Lecture 5 of 9</span>
+    <span>Reading time, 90 minutes</span>
+    <span>Part II: statistical modelling</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>generalised linear model</strong> (GLM) extends ordinary linear regression by allowing the response distribution to come from the exponential family and by relating the mean of the response to a linear combination of predictors through a <strong>link function</strong>. The three components are a <em>random</em> component (the response $Y_i$ has a distribution in the exponential family), a <em>systematic</em> component (the linear predictor $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$), and a <em>link</em> $g$ relating the two by $g(\mu_i) = \eta_i$, where $\mu_i = E[Y_i \mid \mathbf{x}_i]$. Linear regression is the special case (identity link, normal response); logistic regression is another (logit link, binomial response); Poisson regression is another (log link, Poisson response).</p>
+
+  <p>The framework rewards careful study because almost every regulated credit-risk model is a GLM. <strong>Probability of default (PD)</strong> is a logistic regression. <strong>Loss given default (LGD)</strong> is a Tweedie or beta regression. <strong>Exposure at default (EAD)</strong> or the credit conversion factor is a fractional logit. <strong>Operational-risk frequency</strong> is a Poisson or negative-binomial regression. <strong>Insurance claim severity</strong> is a gamma or lognormal regression. Each model uses the same MLE machinery, the same Fisher-scoring optimiser, the same Wald and likelihood-ratio inference, and the same diagnostic toolkit. Mastering one GLM means understanding ten.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Linear regression assumes the target is normal and uses the mean directly. Logistic regression assumes the target is binary and squashes a linear function through a logistic curve to keep predictions in $[0, 1]$. Poisson regression assumes the target is a count and exponentiates a linear function to keep predictions positive. The recipe is always: pick a distribution that matches the target, pick a function that maps a linear predictor to that distribution's parameter, fit by maximum likelihood. The exponential family is the family of distributions for which this recipe has a clean closed form and good optimiser behaviour. Everything else is application.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Where this sits in the stats world
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Where this sits in the stats world</h2></div>
+
+  <div class="callout insight">
+    <span class="tag">Pillar 4, the workhorse cell</span>
+    This is the deepest dive into <strong>pillar 4</strong> (statistical modelling) on the <a href="index.html">stats world map</a>. Lecture 04 mapped out the model zoo; this lecture works through the most populated cell of the zoo (supervised, parametric, discriminative) using the exponential family as the unifying principle. The inferential machinery is exactly pillar 3 (lecture 03): MLE, score and information, Wald and likelihood-ratio tests, asymptotic confidence intervals, the bootstrap. The probability machinery is exactly pillar 2 (lecture 02): each response distribution is one of the named distributions from the zoo. GLMs are the place where pillars 2, 3, and 4 fuse into a working object.
+  </div>
+
+  <p>Three adjacencies to keep in view. <em>Lecture 06 (time series)</em> extends GLMs to dependence indexed by time: VAR is GLM-like, GARCH is GLM on the variance, state-space models are GLMs with latent state. <em>Lecture 07 (survival)</em> extends GLMs to censored time-to-event data; the Cox proportional hazards model is a partial-likelihood GLM with an infinite-dimensional baseline hazard. <em>Lecture 09 (Bayesian)</em> re-derives every GLM in this lecture under a posterior framework; the resulting Bayesian GLMs are the standard tool for low-default portfolios and hierarchical credit data. If lecture 05 is the workhorse, lectures 06-09 are the workhorse working under harder constraints.</p>
+
+  <p>A scoping note. This lecture treats <em>fixed-effects</em> GLMs with IID conditional-on-covariates response. <em>Mixed-effects GLMs</em> (also called generalised linear mixed models, GLMMs) introduce random effects for grouped data (loans nested in branches, branches nested in regions) and require numerical integration over the random effects. They are an important extension, briefly mentioned in section 8, but the heavy machinery belongs to a more advanced course.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons to learn GLMs more deeply than the typical applied user. First, GLMs are the regulatory default. Basel A-IRB, IFRS 9 ECL, Solvency II internal models, motor and household pricing in personal lines insurance: in every regulated quantitative domain, the production model is a GLM, often with a regularisation modifier. The reason is the combination of interpretable coefficients, well-understood standard errors, transparent diagnostics, and a fifty-year audit trail. Replacing a GLM with a gradient-boosted tree in regulated capital remains an uphill negotiation; replacing it with a different GLM (better link, better distribution) is routine.</p>
+
+  <p>Second, GLMs unify what looks like ten separate methods. A user who has internalised the exponential family writes one estimation routine, one set of diagnostics, one model-comparison framework, and applies them to logistic, Poisson, gamma, Tweedie, beta, and lognormal regressions interchangeably. The mental load is one model, not ten. The same user who hasn't internalised the unification carries ten parallel mental models, each with subtly different conventions, and makes errors at the boundaries.</p>
+
+  <p>Third, GLMs are the bridge from classical statistics to modern machine learning. Logistic regression with $L_2$ regularisation is ridge regression on the logit scale; with $L_1$ regularisation it is lasso. Poisson regression with a neural-network mean function is a generalised additive model with a learned basis. The cross-entropy loss minimised by every classification neural network is exactly the negative log-likelihood of a multinomial logistic regression. Understanding GLMs first makes the rest of supervised machine learning a sequence of well-named extensions.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The mental model</h2></div>
+
+  <p>Every GLM is built from three slot-in components. The diagram below shows the slots and a half-dozen distribution-link pairs that fit into them.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The three components of a GLM">
+      <defs>
+        <marker id="ar05" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The three components of a GLM</text>
+
+      <!-- Random component -->
+      <rect x="40" y="60" width="220" height="100" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="150" y="84" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#5b21b6">Random component</text>
+      <text x="150" y="104" text-anchor="middle" font-family="Inter" font-size="11" fill="#7c3aed">Y | x ~ exponential family</text>
+      <text x="150" y="124" text-anchor="middle" font-family="Inter" font-size="11" fill="#7c3aed">with mean μ = E[Y | x]</text>
+      <text x="150" y="148" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#5b21b6">normal, binomial, Poisson, gamma…</text>
+
+      <!-- Systematic component -->
+      <rect x="300" y="60" width="220" height="100" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="410" y="84" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#115e59">Systematic component</text>
+      <text x="410" y="104" text-anchor="middle" font-family="Inter" font-size="11" fill="#0d9488">η = β₀ + β₁x₁ + … + βₚxₚ</text>
+      <text x="410" y="124" text-anchor="middle" font-family="Inter" font-size="11" fill="#0d9488">a linear predictor in x</text>
+      <text x="410" y="148" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">linear in β, not necessarily in x</text>
+
+      <!-- Link -->
+      <rect x="560" y="60" width="220" height="100" rx="12" fill="#FEF3C7" stroke="#a16207" stroke-width="2"/>
+      <text x="670" y="84" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#713f12">Link function</text>
+      <text x="670" y="104" text-anchor="middle" font-family="Inter" font-size="11" fill="#a16207">g(μ) = η</text>
+      <text x="670" y="124" text-anchor="middle" font-family="Inter" font-size="11" fill="#a16207">monotone, differentiable</text>
+      <text x="670" y="148" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#713f12">identity, logit, log, inverse…</text>
+
+      <!-- horizontal connector -->
+      <line x1="260" y1="110" x2="300" y2="110" stroke="#71717a" stroke-width="1.5"/>
+      <line x1="520" y1="110" x2="560" y2="110" stroke="#71717a" stroke-width="1.5"/>
+
+      <!-- Examples grid -->
+      <text x="410" y="195" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#18181b">Filling in the slots gives the named GLMs:</text>
+
+      <!-- Row headers -->
+      <text x="30" y="235" text-anchor="start" font-family="Inter" font-size="11" font-weight="600" fill="#27272a">Random</text>
+      <text x="270" y="235" text-anchor="start" font-family="Inter" font-size="11" font-weight="600" fill="#27272a">Link g(μ)</text>
+      <text x="450" y="235" text-anchor="start" font-family="Inter" font-size="11" font-weight="600" fill="#27272a">Inverse h = g⁻¹</text>
+      <text x="630" y="235" text-anchor="start" font-family="Inter" font-size="11" font-weight="600" fill="#27272a">Named model</text>
+
+      <line x1="30" y1="240" x2="800" y2="240" stroke="#a1a1aa" stroke-width="1"/>
+
+      <text x="30" y="258" font-family="JetBrains Mono" font-size="11" fill="#27272a">Normal</text>
+      <text x="270" y="258" font-family="JetBrains Mono" font-size="11" fill="#27272a">μ (identity)</text>
+      <text x="450" y="258" font-family="JetBrains Mono" font-size="11" fill="#27272a">η</text>
+      <text x="630" y="258" font-family="Inter" font-size="11" fill="#27272a">OLS linear regression</text>
+
+      <text x="30" y="278" font-family="JetBrains Mono" font-size="11" fill="#27272a">Binomial</text>
+      <text x="270" y="278" font-family="JetBrains Mono" font-size="11" fill="#27272a">log(μ / (1−μ))</text>
+      <text x="450" y="278" font-family="JetBrains Mono" font-size="11" fill="#27272a">1 / (1+e⁻ᵑ)</text>
+      <text x="630" y="278" font-family="Inter" font-size="11" fill="#27272a">Logistic regression (PD)</text>
+
+      <text x="30" y="298" font-family="JetBrains Mono" font-size="11" fill="#27272a">Binomial</text>
+      <text x="270" y="298" font-family="JetBrains Mono" font-size="11" fill="#27272a">Φ⁻¹(μ) (probit)</text>
+      <text x="450" y="298" font-family="JetBrains Mono" font-size="11" fill="#27272a">Φ(η)</text>
+      <text x="630" y="298" font-family="Inter" font-size="11" fill="#27272a">Probit regression</text>
+
+      <text x="30" y="318" font-family="JetBrains Mono" font-size="11" fill="#27272a">Poisson</text>
+      <text x="270" y="318" font-family="JetBrains Mono" font-size="11" fill="#27272a">log(μ)</text>
+      <text x="450" y="318" font-family="JetBrains Mono" font-size="11" fill="#27272a">eᵑ</text>
+      <text x="630" y="318" font-family="Inter" font-size="11" fill="#27272a">Poisson regression (op risk)</text>
+
+      <text x="30" y="338" font-family="JetBrains Mono" font-size="11" fill="#27272a">Gamma</text>
+      <text x="270" y="338" font-family="JetBrains Mono" font-size="11" fill="#27272a">1 / μ (inverse)</text>
+      <text x="450" y="338" font-family="JetBrains Mono" font-size="11" fill="#27272a">1 / η</text>
+      <text x="630" y="338" font-family="Inter" font-size="11" fill="#27272a">Gamma regression (severity)</text>
+
+      <text x="30" y="358" font-family="JetBrains Mono" font-size="11" fill="#27272a">Tweedie</text>
+      <text x="270" y="358" font-family="JetBrains Mono" font-size="11" fill="#27272a">log(μ)</text>
+      <text x="450" y="358" font-family="JetBrains Mono" font-size="11" fill="#27272a">eᵑ</text>
+      <text x="630" y="358" font-family="Inter" font-size="11" fill="#27272a">Tweedie regression (LGD)</text>
+
+      <text x="30" y="378" font-family="JetBrains Mono" font-size="11" fill="#27272a">Beta</text>
+      <text x="270" y="378" font-family="JetBrains Mono" font-size="11" fill="#27272a">log(μ / (1−μ))</text>
+      <text x="450" y="378" font-family="JetBrains Mono" font-size="11" fill="#27272a">1 / (1+e⁻ᵑ)</text>
+      <text x="630" y="378" font-family="Inter" font-size="11" fill="#27272a">Beta regression (LGD on (0,1))</text>
+
+      <text x="30" y="398" font-family="JetBrains Mono" font-size="11" fill="#27272a">Multinomial</text>
+      <text x="270" y="398" font-family="JetBrains Mono" font-size="11" fill="#27272a">log(μⱼ / μ_K)</text>
+      <text x="450" y="398" font-family="JetBrains Mono" font-size="11" fill="#27272a">softmax</text>
+      <text x="630" y="398" font-family="Inter" font-size="11" fill="#27272a">Multinomial logit (rating)</text>
+    </svg>
+    <figcaption>One framework, three slots, eight named models. The random component sets the response distribution; the systematic component is always a linear predictor; the link function bridges them in a way that respects the support of the response (logit keeps a probability in $[0, 1]$, log keeps a rate positive, identity assumes no constraint). The combination $\mu = g^{-1}(\eta) = h(\mathbf{x}^\top \boldsymbol{\beta})$ is the mean function of the model. Estimation is by maximum likelihood, always.</figcaption>
+  </figure>
+
+  <p>One slogan: <strong>distribution sets the variance, link sets the shape</strong>. The distribution determines how $\text{Var}(Y \mid \mu)$ depends on $\mu$ (constant for normal, $\mu(1-\mu)/n$ for binomial, $\mu$ for Poisson, $\mu^2$ for gamma); the link determines whether the conditional mean is linear, logistic, exponential, or rational in $\mathbf{x}^\top \boldsymbol{\beta}$. Choosing the pair correctly is the entire modelling decision; everything downstream is mechanical.</p>
+
+  <p>A second slogan: <strong>canonical links are the easy default</strong>. The exponential-family form (section 5.2) gives a unique link that simplifies the score equation; it is called the canonical link. Identity for normal, logit for binomial, log for Poisson, inverse for gamma. Canonical-link GLMs have a simpler IRLS update and orthogonal score / information, which is why they dominate practice. Non-canonical links (probit for binomial, complementary log-log for binomial, identity for Poisson) are used when the canonical link's implications (the shape of the mean function, the boundary behaviour) are wrong for the application.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The detail</h2></div>
+
+  <h3>5.1 Linear regression revisited</h3>
+
+  <p>The ordinary linear regression model is</p>
+
+  $$Y_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip} + \epsilon_i, \quad \epsilon_i \overset{\text{iid}}{\sim} \mathcal{N}(0, \sigma^2),$$
+
+  <p>or in matrix form, $\mathbf{Y} = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\epsilon}$ with $\boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \sigma^2 \mathbf{I})$. The conditional mean $E[Y_i \mid \mathbf{x}_i] = \mathbf{x}_i^\top \boldsymbol{\beta}$ is linear in $\boldsymbol{\beta}$ (and in $\mathbf{x}_i$, though only because the link is the identity). The conditional variance is the constant $\sigma^2$.</p>
+
+  <p>The <strong>ordinary least squares (OLS)</strong> estimator minimises $\sum (Y_i - \mathbf{x}_i^\top \boldsymbol{\beta})^2$ and solves to $\hat{\boldsymbol{\beta}} = (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \mathbf{Y}$. Three things are worth remembering. First, $\hat{\boldsymbol{\beta}}$ is the orthogonal projection of $\mathbf{Y}$ onto the column space of $\mathbf{X}$; the residual vector $\mathbf{Y} - \mathbf{X} \hat{\boldsymbol{\beta}}$ is orthogonal to every column of $\mathbf{X}$, which is the geometric content of the normal equations. Second, under the assumptions above, $\hat{\boldsymbol{\beta}} = \boldsymbol{\beta} + (\mathbf{X}^\top \mathbf{X})^{-1} \mathbf{X}^\top \boldsymbol{\epsilon}$, so $\hat{\boldsymbol{\beta}} \sim \mathcal{N}(\boldsymbol{\beta}, \sigma^2 (\mathbf{X}^\top \mathbf{X})^{-1})$ exactly; this is the basis of the Wald test on each coefficient and the F-test on a group of coefficients. Third, the <strong>Gauss-Markov theorem</strong> says that among all linear unbiased estimators of $\boldsymbol{\beta}$, OLS has the minimum variance, even without the normality assumption (only the zero-mean, constant-variance, uncorrelated-errors part).</p>
+
+  <p>Six assumptions underwrite the textbook treatment. <em>Linearity</em>: $E[Y \mid \mathbf{x}]$ is genuinely linear in $\mathbf{x}$ (after any transformations). <em>Independence</em> of the errors across observations. <em>Homoscedasticity</em>: $\text{Var}(\epsilon_i)$ is constant. <em>Normality</em> of the errors (needed for finite-sample exact inference; relaxable by the CLT for large $n$). <em>No (or limited) multicollinearity</em>: $\mathbf{X}^\top \mathbf{X}$ is invertible and not ill-conditioned. <em>Exogeneity</em>: $E[\epsilon_i \mid \mathbf{x}_i] = 0$, no omitted relevant variable correlated with included predictors. Violations of each have named remedies: weighted least squares for heteroscedasticity, robust (sandwich) standard errors for unknown heteroscedasticity, ridge / lasso for multicollinearity, instrumental variables for exogeneity failures.</p>
+
+  <h3>5.2 The exponential family</h3>
+
+  <p>The <strong>exponential family</strong> is the collection of distributions whose density (or mass) function can be written as</p>
+
+  $$f(y; \theta, \phi) = \exp\!\left\{ \frac{y \theta - b(\theta)}{a(\phi)} + c(y, \phi) \right\},$$
+
+  <p>where $\theta$ is the <strong>canonical parameter</strong>, $\phi$ is the <strong>dispersion parameter</strong>, and $b$, $a$, $c$ are known functions specific to the distribution. The form looks technical; the consequences are concrete and uniform.</p>
+
+  <p>From the form alone, two moment identities follow by differentiating the log-likelihood and taking expectations:</p>
+
+  $$E[Y] = b'(\theta), \qquad \text{Var}(Y) = b''(\theta) \cdot a(\phi).$$
+
+  <p>The function $V(\mu) = b''(\theta(\mu))$ is the <strong>variance function</strong>; it depends on the mean alone and encodes the mean-variance relationship for the chosen distribution. The dispersion parameter $a(\phi)$ rescales it.</p>
+
+  <p>Six standard distributions are exponential-family members, and the table below gives each one's canonical parameter, mean function, variance function, and canonical link.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Distribution</th><th>$\theta(\mu)$</th><th>$b(\theta)$</th><th>$\mu = b'(\theta)$</th><th>$V(\mu)$</th><th>Canonical link</th></tr></thead>
+      <tbody>
+        <tr><td>Normal $\mathcal{N}(\mu, \sigma^2)$</td><td>$\mu$</td><td>$\theta^2/2$</td><td>$\theta$</td><td>$1$</td><td>Identity</td></tr>
+        <tr><td>Bernoulli $\text{Bern}(\mu)$</td><td>$\log(\mu/(1-\mu))$</td><td>$\log(1+e^\theta)$</td><td>$e^\theta/(1+e^\theta)$</td><td>$\mu(1-\mu)$</td><td>Logit</td></tr>
+        <tr><td>Binomial $\text{Bin}(n, \mu)$</td><td>$\log(\mu/(1-\mu))$</td><td>$n \log(1+e^\theta)$</td><td>$n \cdot e^\theta/(1+e^\theta)$</td><td>$\mu(1-\mu)/n$</td><td>Logit</td></tr>
+        <tr><td>Poisson $\text{Pois}(\mu)$</td><td>$\log \mu$</td><td>$e^\theta$</td><td>$e^\theta$</td><td>$\mu$</td><td>Log</td></tr>
+        <tr><td>Gamma $\text{Gamma}(\nu, \mu)$</td><td>$-1/\mu$</td><td>$-\log(-\theta)$</td><td>$-1/\theta$</td><td>$\mu^2$</td><td>Inverse</td></tr>
+        <tr><td>Inverse Gaussian</td><td>$-1/(2\mu^2)$</td><td>$-\sqrt{-2\theta}$</td><td>$1/\sqrt{-2\theta}$</td><td>$\mu^3$</td><td>$1/\mu^2$</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The variance function captures everything important about the response distribution. Constant variance ($V = 1$) signals a normal response: dispersion does not depend on level. Variance proportional to the mean ($V = \mu$) signals a Poisson response: typical of counts, where larger expected counts have larger variance. Variance proportional to $\mu^2$ signals a gamma response: the coefficient of variation is constant, typical of multiplicative loss processes. Variance proportional to $\mu^3$ signals an inverse Gaussian. Variance $\mu(1-\mu)$ signals a binomial. <strong>If you know the empirical mean-variance relationship in your data, you know which distribution to use.</strong> A simple plot of $|Y_i - \bar{Y}_g|$ against the group mean $\bar{Y}_g$ across covariate bins reveals the relationship.</p>
+
+  <h3>5.3 The GLM definition</h3>
+
+  <p>A <strong>generalised linear model</strong> for a response $Y$ with predictors $\mathbf{x}$ consists of three pieces:</p>
+
+  <ol>
+    <li><strong>Random component.</strong> $Y_i \mid \mathbf{x}_i$ follows an exponential-family distribution with mean $\mu_i$ and (possibly known) dispersion $\phi$.</li>
+    <li><strong>Systematic component.</strong> A linear predictor $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$.</li>
+    <li><strong>Link function.</strong> A monotone differentiable function $g$ with $g(\mu_i) = \eta_i$, i.e. $\mu_i = g^{-1}(\eta_i) = h(\eta_i)$.</li>
+  </ol>
+
+  <p>The <strong>canonical link</strong> is the one satisfying $g(\mu) = \theta(\mu)$, i.e. the link equals the natural parameter of the exponential family. The canonical link has two analytical advantages: it yields the simplest score function ($\sum_i (Y_i - \mu_i) \mathbf{x}_i / a(\phi)$, exactly), and it makes the observed and expected information matrices equal, which simplifies inference.</p>
+
+  <p>Two practical extensions are common. An <strong>offset</strong> is a known regressor with coefficient fixed at 1; for Poisson regression on rates (events per unit exposure), use $\log(\text{exposure})$ as an offset so the linear predictor models the log-rate, not the log-count. <strong>Weights</strong> account for unequal precision across observations: $a(\phi)$ becomes $\phi/w_i$. Both are first-class features of any GLM software.</p>
+
+  <h3>5.4 Logistic regression</h3>
+
+  <p>Logistic regression is the GLM with binomial response and logit link. It is the production model for PD modelling in essentially every retail and SME credit-risk system, and it is the easiest GLM to derive from scratch.</p>
+
+  <p>Setup: $Y_i \in \{0, 1\}$ with $P(Y_i = 1 \mid \mathbf{x}_i) = \mu_i$. Linear predictor $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$. Logit link $g(\mu) = \log(\mu/(1-\mu)) = \eta$. Inverse link $\mu = h(\eta) = 1/(1 + e^{-\eta})$, the logistic function. The likelihood is</p>
+
+  $$L(\boldsymbol{\beta}) = \prod_{i=1}^n \mu_i^{Y_i} (1 - \mu_i)^{1 - Y_i},$$
+
+  <p>and the log-likelihood is</p>
+
+  $$\ell(\boldsymbol{\beta}) = \sum_{i=1}^n \left[ Y_i \log \mu_i + (1 - Y_i) \log(1 - \mu_i) \right] = \sum_{i=1}^n \left[ Y_i \eta_i - \log(1 + e^{\eta_i}) \right].$$
+
+  <p>The second form, after substituting $\mu_i = 1/(1+e^{-\eta_i})$ and simplifying, makes the score function easy. Differentiating with respect to $\boldsymbol{\beta}$:</p>
+
+  $$\nabla_{\boldsymbol{\beta}} \ell(\boldsymbol{\beta}) = \sum_{i=1}^n (Y_i - \mu_i) \mathbf{x}_i = \mathbf{X}^\top (\mathbf{Y} - \boldsymbol{\mu}).$$
+
+  <p>This is the canonical-link score in its most compact form: "residual times design matrix". The MLE satisfies $\mathbf{X}^\top (\mathbf{Y} - \boldsymbol{\mu}(\hat{\boldsymbol{\beta}})) = \mathbf{0}$. Unlike OLS, there is no closed form; an iterative algorithm is required. The Hessian is</p>
+
+  $$\nabla^2_{\boldsymbol{\beta}} \ell(\boldsymbol{\beta}) = -\mathbf{X}^\top \mathbf{W} \mathbf{X}, \quad \mathbf{W} = \text{diag}(\mu_i (1 - \mu_i)),$$
+
+  <p>which is negative definite; the log-likelihood is concave; the MLE is unique whenever it exists.</p>
+
+  <p>The <strong>Newton-Raphson</strong> update is $\boldsymbol{\beta}^{(t+1)} = \boldsymbol{\beta}^{(t)} - [\nabla^2 \ell]^{-1} \nabla \ell$. Substituting,</p>
+
+  $$\boldsymbol{\beta}^{(t+1)} = \boldsymbol{\beta}^{(t)} + (\mathbf{X}^\top \mathbf{W} \mathbf{X})^{-1} \mathbf{X}^\top (\mathbf{Y} - \boldsymbol{\mu}^{(t)}).$$
+
+  <p>This is the canonical <strong>iteratively reweighted least squares (IRLS)</strong> form: at each iteration solve a weighted-least-squares problem with response $\mathbf{z}^{(t)} = \mathbf{X} \boldsymbol{\beta}^{(t)} + \mathbf{W}^{-1}(\mathbf{Y} - \boldsymbol{\mu}^{(t)})$ and weights $\mathbf{W}^{(t)}$. The "working response" $z$ and "working weights" $W$ change each iteration; the WLS subroutine does not. IRLS is the standard fitting algorithm for every canonical-link GLM, and software implementations (R's <code>glm</code>, Python's <code>statsmodels</code>, SAS PROC GENMOD) all use it.</p>
+
+  <p>Interpretation of coefficients. A unit increase in $x_j$ multiplies the odds $\mu/(1-\mu)$ by $e^{\beta_j}$; this is the <strong>odds ratio</strong> for $x_j$. For small $\mu$, the odds and the probability coincide, so $e^{\beta_j}$ is approximately the multiplicative effect on the default probability. For moderate $\mu$, the difference matters. Reporting odds ratios with confidence intervals (Wald: $e^{\hat{\beta}_j \pm z \cdot \text{SE}(\hat{\beta}_j)}$) is the convention.</p>
+
+  <p>Alternatives to the logit. <strong>Probit</strong> uses $g(\mu) = \Phi^{-1}(\mu)$, the inverse normal CDF; numerically similar to logit except in the tails. <strong>Complementary log-log</strong> uses $g(\mu) = \log(-\log(1-\mu))$; asymmetric, with a slower-rising lower tail; the natural link when $Y$ arises from the discretisation of an underlying time-to-event (a connection to lecture 07 on survival).</p>
+
+  <div class="callout warn">
+    <span class="tag">Class imbalance and separation</span>
+    Two common failure modes in logistic PD modelling. <em>Class imbalance</em>: a 1 per cent default rate means the algorithm is mostly seeing non-defaults. The MLE still works, but the standard error of the intercept becomes large and naive prediction at $\hat{\mu} = 0.5$ never fires. Use the log-odds, undersample non-defaults with appropriate weights, or apply class-weighted likelihoods. <em>Separation</em>: a predictor that perfectly separates defaults from non-defaults causes the MLE for that coefficient to go to infinity (the IRLS does not converge). Firth's penalised likelihood (Firth 1993) adds a Jeffreys-prior penalty that yields finite estimates and is the standard fix.
+  </div>
+
+  <h3>5.5 Poisson regression, overdispersion, and the negative binomial</h3>
+
+  <p>Poisson regression is the GLM for count data: $Y_i \in \{0, 1, 2, \ldots\}$, $Y_i \mid \mathbf{x}_i \sim \text{Poisson}(\mu_i)$, log link $\log \mu_i = \mathbf{x}_i^\top \boldsymbol{\beta}$. Operational-risk loss-event counts, monthly fraud incidents, claim frequencies in motor insurance, rare-default counts in low-default portfolios: all natural Poisson regressions.</p>
+
+  <p>The variance function $V(\mu) = \mu$ is the hallmark and the most common source of trouble. Real count data typically have variance larger than the mean (<strong>overdispersion</strong>), often by a factor of 2 to 10. Two remedies. <strong>Quasi-Poisson</strong> retains the Poisson mean structure but allows $\text{Var}(Y_i) = \phi \mu_i$ with $\phi$ estimated from the data; the point estimates are unchanged, but standard errors are inflated by $\sqrt{\phi}$. <strong>Negative binomial regression</strong> uses the negative-binomial distribution, $Y_i \mid \mathbf{x}_i \sim \text{NB}(\mu_i, \kappa)$, with $\text{Var}(Y_i) = \mu_i + \kappa \mu_i^2$; a single extra parameter $\kappa$ governs the level of overdispersion.</p>
+
+  <p>An offset is almost mandatory in Poisson regression because the rate parameter $\mu$ scales with exposure. For loan-portfolio default-event modelling, use $\log(\text{loan-years on book})$ as an offset so the linear predictor models the log-rate per loan-year, not the log-count. Without the offset, a longer-observed portfolio looks "riskier" simply because it has been observed for longer.</p>
+
+  <p><strong>Zero-inflation</strong> is a related failure mode. Many count datasets contain an excess of zeros beyond what a Poisson or negative-binomial predicts (most loans never default at all, regardless of risk). Zero-inflated Poisson (ZIP) and zero-inflated negative binomial (ZINB) models combine a Bernoulli "structural zero" component with a count distribution for the non-structural zeros. Hurdle models are a related variant. Both are easy to fit in modern software and routinely improve fit when zeros are over-represented.</p>
+
+  <h3>5.6 Gamma, inverse Gaussian, and Tweedie</h3>
+
+  <p>For positive, right-skewed continuous responses, three GLMs dominate.</p>
+
+  <p><strong>Gamma regression.</strong> $Y_i \mid \mathbf{x}_i \sim \text{Gamma}$ with mean $\mu_i$ and constant coefficient of variation (variance $\propto \mu^2$). The canonical link is the inverse $g(\mu) = 1/\mu$, but the log link is far more common in practice because the inverse link can produce negative fitted means for some $\mathbf{x}$. Used for insurance claim severity, loss given default in some regulated frameworks, and any positive-skewed continuous outcome.</p>
+
+  <p><strong>Inverse Gaussian regression.</strong> Same support as gamma but variance $\propto \mu^3$. Heavier tails for large $\mu$ than gamma. Used for failure-time data and severity with very heavy tails.</p>
+
+  <p><strong>Tweedie regression.</strong> Tweedie distributions form a one-parameter family indexed by $p \in [0, \infty) \setminus (0, 1)$, with variance $\text{Var}(Y) = \phi \mu^p$. Special cases: $p = 0$ is normal, $p = 1$ is Poisson, $p = 2$ is gamma, $p = 3$ is inverse Gaussian. For $1 &lt; p &lt; 2$, the Tweedie is a <strong>compound Poisson-gamma</strong>: $Y = \sum_{j=1}^N X_j$ where $N$ is Poisson and $X_j$ are IID gamma. This is the natural model for total claim amount (a Poisson number of claims, each with a gamma severity) and, by analogy, for LGD with two distinct components (zero recoveries with positive probability, plus a continuous-positive recovery distribution). The Tweedie GLM handles both components in a single likelihood without zero-inflation machinery, which is why it has become the standard in actuarial pricing and is increasingly common in regulated LGD modelling.</p>
+
+  <h3>5.7 Beta, fractional, ordinal, multinomial</h3>
+
+  <p><strong>Beta regression.</strong> For responses in the open interval $(0, 1)$ (rates, proportions, fractions). $Y_i \mid \mathbf{x}_i \sim \text{Beta}(\mu_i \phi, (1 - \mu_i) \phi)$ with mean $\mu$ and dispersion $\phi$. Logit link by default. Mass points at 0 or 1 require zero-inflated / one-inflated extensions or a transformation $Y' = (Y(n-1) + 0.5)/n$ to keep $Y'$ strictly in $(0, 1)$. The natural model for an LGD bounded in $[0, 1]$ if the boundary mass is small.</p>
+
+  <p><strong>Fractional logit.</strong> Papke and Wooldridge's (1996) quasi-likelihood for responses in $[0, 1]$ (closed interval, mass points allowed). Uses the binomial likelihood as a quasi-likelihood with a robust sandwich variance. Easier to fit than beta regression with zero-inflation and produces robust standard errors by default. The dominant model for credit conversion factors (CCF / EAD modelling) and a strong alternative for LGD.</p>
+
+  <p><strong>Ordinal logistic regression.</strong> For ordered categorical responses (rating bucket 1 through 7, severity low / medium / high). The <strong>proportional odds model</strong> (McCullagh 1980) is the standard: model the cumulative log-odds $\log[P(Y \le k)/P(Y > k)]$ as $\alpha_k - \mathbf{x}^\top \boldsymbol{\beta}$, with $K-1$ intercepts and one common slope vector. The proportional-odds assumption (constant slopes across thresholds) is testable; when it fails, partial proportional odds or adjacent-category models are alternatives.</p>
+
+  <p><strong>Multinomial logistic regression.</strong> For unordered categorical responses with $K$ categories. Choose a reference category (say $K$) and model $\log(P(Y = k)/P(Y = K)) = \mathbf{x}^\top \boldsymbol{\beta}_k$ for each $k \ne K$. Equivalent to softmax classification in machine learning. Used in credit risk for the migration model when ratings are treated as nominal categories rather than ordinal buckets.</p>
+
+  <h3>5.8 Estimation: MLE via Fisher scoring</h3>
+
+  <p>The unified estimation algorithm for any GLM is <strong>Fisher scoring</strong>, which for canonical-link models reduces to IRLS. The general derivation:</p>
+
+  <p>The score function is $U(\boldsymbol{\beta}) = \nabla_{\boldsymbol{\beta}} \ell$. For any GLM with link $g$,</p>
+
+  $$U_j(\boldsymbol{\beta}) = \sum_i \frac{(Y_i - \mu_i) x_{ij}}{V(\mu_i) g'(\mu_i) a(\phi)}.$$
+
+  <p>The Fisher information is $\mathcal{I}(\boldsymbol{\beta}) = E[-\nabla^2 \ell] = \mathbf{X}^\top \mathbf{W} \mathbf{X}/a(\phi)$ with weights $W_{ii} = 1/[V(\mu_i) (g'(\mu_i))^2]$. The Fisher-scoring update is</p>
+
+  $$\boldsymbol{\beta}^{(t+1)} = \boldsymbol{\beta}^{(t)} + \mathcal{I}(\boldsymbol{\beta}^{(t)})^{-1} U(\boldsymbol{\beta}^{(t)}),$$
+
+  <p>which after substitution simplifies to a weighted least squares update with working response $z_i = \eta_i + (Y_i - \mu_i) g'(\mu_i)$ and working weights $W_{ii}$. For canonical links, $g'(\mu) = 1/V(\mu)$ and the algorithm is precisely IRLS.</p>
+
+  <p>Asymptotic inference is the standard pillar-3 apparatus. Under regularity conditions,</p>
+
+  $$\hat{\boldsymbol{\beta}} \sim \mathcal{N}\!\big(\boldsymbol{\beta}, \mathcal{I}(\boldsymbol{\beta})^{-1}\big) \text{ asymptotically.}$$
+
+  <p>Standard errors come from the diagonal of $\hat{\mathcal{I}}^{-1}$; Wald tests on coefficients use $\hat{\beta}_j / \widehat{\text{SE}}(\hat{\beta}_j) \sim \mathcal{N}(0, 1)$; likelihood-ratio tests for nested models use $-2[\ell(\hat{\boldsymbol{\beta}}_{H_0}) - \ell(\hat{\boldsymbol{\beta}}_{H_1})] \sim \chi^2_q$ in distribution; confidence intervals from the Wald or LR pivot.</p>
+
+  <h3>5.9 Diagnostics</h3>
+
+  <p>Five diagnostic objects are central to any GLM workflow.</p>
+
+  <p><strong>Deviance.</strong> The likelihood-ratio statistic between the fitted model and the saturated model (one parameter per observation, perfect fit). For a model with log-likelihood $\ell$, deviance is</p>
+
+  $$D = 2 [\ell_{\text{sat}} - \ell].$$
+
+  <p>For nested models with deviance $D_0 \supset D_1$, the difference $D_0 - D_1 \to \chi^2_q$ in distribution under $H_0 : \boldsymbol{\beta}_{H_0} = \boldsymbol{\beta}_{H_1}$; this is the GLM analogue of the F-test in OLS. The scaled deviance $D/\phi$ is the relevant statistic when $\phi$ is unknown; the AIC adjustment ($\text{AIC} = D + 2p$) and BIC adjustment ($\text{BIC} = D + p \log n$) are derived from this.</p>
+
+  <p><strong>Residuals.</strong> Several flavours, each with a different purpose. <em>Pearson residuals</em>: $r_i^P = (Y_i - \hat{\mu}_i)/\sqrt{V(\hat{\mu}_i)}$, the standardised version of raw residuals. <em>Deviance residuals</em>: $r_i^D = \text{sign}(Y_i - \hat{\mu}_i) \sqrt{d_i}$, where $d_i$ is the contribution of observation $i$ to the deviance; sums of squared deviance residuals equal the total deviance. <em>Anscombe residuals</em>: a transformation that yields approximately-normal residuals even for non-normal responses, useful for QQ plots. <em>Working residuals</em>: the residuals on the linear-predictor scale from the final IRLS iteration, useful for partial residual plots and added-variable plots.</p>
+
+  <p><strong>Influence.</strong> The hat matrix is $\mathbf{H} = \mathbf{W}^{1/2} \mathbf{X} (\mathbf{X}^\top \mathbf{W} \mathbf{X})^{-1} \mathbf{X}^\top \mathbf{W}^{1/2}$, with diagonal entries (leverages) summing to $p$. <strong>Cook's distance</strong> measures the change in $\hat{\boldsymbol{\beta}}$ when observation $i$ is removed; values above $4/n$ flag candidates for inspection. <strong>DFBETAS</strong> measures the change in each coefficient on a standardised scale. These are unchanged from OLS in spirit, just generalised to the weighted form.</p>
+
+  <p><strong>Calibration plots.</strong> For probability-valued outputs (PD models), bin the predicted probabilities into deciles and plot predicted versus empirical default rate. A well-calibrated model produces points near the 45-degree line. The <strong>Hosmer-Lemeshow test</strong> formalises this with a chi-square statistic over the bins, but its sensitivity to bin count and its failure for large $n$ make it a weak diagnostic; visual calibration plots are usually more informative. Modern alternatives include calibration belts and the spline-based Steyerberg calibration.</p>
+
+  <p><strong>Goodness of fit.</strong> For non-binary responses, the deviance residual sum of squares and the Pearson chi-square statistic both serve as goodness-of-fit checks. For binary responses, the AUC (area under the ROC curve) is the dominant discrimination measure, with values above 0.7 conventionally acceptable for credit-risk PD and above 0.75 for low-default portfolios. The Kolmogorov-Smirnov statistic (max difference between cumulative distributions of scores for defaulters and non-defaulters) is the second standard discrimination measure in credit risk.</p>
+
+  <h3>5.10 Model selection and regularisation</h3>
+
+  <p>Three layers of decision in a GLM build.</p>
+
+  <p><strong>Variable selection.</strong> Forward selection, backward elimination, and stepwise selection are the classical algorithms; they have known optimality failures (the resulting model depends on selection path, p-values lose their meaning post-selection) but remain in use because of habit and software availability. The modern alternative is penalised likelihood (below). For regulated models, the variable selection is often a combination of business-rule pre-screening (rule out commercially sensitive variables) and forward selection on the survivors.</p>
+
+  <p><strong>Model comparison.</strong> For nested models, the likelihood-ratio test is the right tool. For non-nested models (different link, different distribution, different variable set), use AIC for predictive purposes (AIC favours larger models more than BIC) or BIC for "true model" identification (BIC favours sparser models in large samples). Cross-validation gives a direct estimate of out-of-sample log-loss and is the right metric when prediction is the objective.</p>
+
+  <p><strong>Regularisation.</strong> Add a penalty to the negative log-likelihood:</p>
+
+  $$\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} \left\{ -\ell(\boldsymbol{\beta}) + \lambda P(\boldsymbol{\beta}) \right\}.$$
+
+  <p>Three standard penalties. <em>Ridge</em> ($P = \|\boldsymbol{\beta}\|_2^2$) shrinks coefficients towards zero, never to zero; reduces variance at the cost of bias; equivalent to a Gaussian prior on $\boldsymbol{\beta}$ (MAP estimation). <em>Lasso</em> ($P = \|\boldsymbol{\beta}\|_1$) shrinks coefficients to zero exactly, performing simultaneous estimation and variable selection; equivalent to a Laplace prior. <em>Elastic net</em>: a convex combination of the two; handles correlated predictors better than pure lasso. The tuning parameter $\lambda$ is chosen by cross-validation. Regularised GLMs in glmnet (Friedman, Hastie, Tibshirani 2010) are the modern toolchain.</p>
+
+  <p>For regulated credit-risk practice, regularisation is allowed but watched. Ridge and elastic-net penalties stabilise estimates without zeroing coefficients, which is regulator-acceptable. Lasso's variable-selection behaviour is sometimes uncomfortable for capital models (the set of variables changes if you refit on a slightly different sample), and regulated build processes often run lasso for feature shortlisting and refit unpenalised on the survivors.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Worked example: PD, LGD, EAD as three GLMs</h2></div>
+
+  <p>An A-IRB capital model has three components: PD, LGD, and EAD (or CCF). Each is a GLM with a distinct distribution-link choice. Working through all three on the same conceptual portfolio shows how the framework operationalises.</p>
+
+  <div class="worked">
+    <strong>PD model: logistic regression.</strong>
+    <p>Target: $Y_i = 1$ if loan $i$ defaults within 12 months, else 0. Distribution: Bernoulli. Link: logit. Predictors: credit score, debt-to-income, months on book, employment status (categorical), product type (categorical), one or two macro variables for through-the-cycle calibration.</p>
+    <p><strong>Fitted form:</strong> $\log[\hat{\mu}_i / (1 - \hat{\mu}_i)] = -5.32 - 0.012 \cdot \text{score}_i + 1.45 \cdot \text{DTI}_i + 0.04 \cdot \text{MoB}_i + \ldots$ The intercept reflects the base log-odds; the slope on score is negative (higher score, lower default odds); the slope on DTI is positive (more leveraged, more risk). Odds ratios: $e^{-0.012} = 0.988$ per score point; $e^{1.45} = 4.26$ per unit of DTI (large).</p>
+    <p><strong>Diagnostics:</strong> AUC 0.81, KS 0.42, Hosmer-Lemeshow $\chi^2_8 = 6.4$ (acceptable), calibration plot near the 45-degree line across deciles. Through-the-cycle adjustment scales the intercept to match the long-run average default rate observed across a full cycle.</p>
+  </div>
+
+  <div class="worked">
+    <strong>LGD model: Tweedie or beta regression.</strong>
+    <p>Target: $Y_i \in [0, 1]$ = realised loss as fraction of EAD at default, observed only for defaulters. Mass points at 0 (full recovery) and 1 (total loss). Distribution: Tweedie with $p \approx 1.5$ (compound Poisson-gamma, handles the mass at zero naturally) or beta with separate handlers for the boundaries. Link: log (Tweedie) or logit (beta). Predictors: collateral coverage ratio, time to default, workout type, industry, vintage.</p>
+    <p><strong>Fitted form (Tweedie, log link):</strong> $\log \hat{\mu}_i = -0.85 - 0.42 \cdot \text{collateral-ratio}_i + 0.18 \cdot \text{distress-indicator}_i + \ldots$ Coefficients are interpreted as percentage changes in expected LGD; a unit increase in collateral coverage reduces expected LGD by about 35 per cent ($e^{-0.42} \approx 0.66$).</p>
+    <p><strong>Diagnostics:</strong> deviance ratio close to 1; QQ plot of Anscombe residuals straight; calibration plot stratified by rating bucket within tolerance. The boundary masses are checked separately: predicted versus realised proportion of zero-recoveries.</p>
+  </div>
+
+  <div class="worked">
+    <strong>EAD / CCF model: fractional logit.</strong>
+    <p>Target: $Y_i \in [0, 1]$ = realised credit conversion factor for revolving exposures (cash drawdown beyond current outstanding, at default, expressed as a fraction of undrawn limit). Mass at 0 (no further drawdown) and at 1 (full limit used). Distribution: quasi-binomial (fractional logit). Link: logit. Predictors: current utilisation, time to default, behavioural score, product type.</p>
+    <p><strong>Fitted form:</strong> $\log[\hat{\mu}_i/(1-\hat{\mu}_i)] = -1.20 + 2.10 \cdot \text{utilisation}_i + 0.06 \cdot \text{months-to-default}_i + \ldots$ Robust standard errors via the Huber-White sandwich estimator handle the quasi-likelihood. Predictions are clipped to $[0, 1]$ by the logit link automatically.</p>
+    <p><strong>Diagnostics:</strong> calibration plot near 45 degrees; mean prediction error within rating bucket below regulatory thresholds; boundary mass concordance acceptable.</p>
+  </div>
+
+  <p>The same MLE machinery fits all three. The same IRLS algorithm runs underneath all three (with different working weights). The same Wald-test, AIC-comparison, and bootstrap-CI workflow applies to all three. The only modelling decisions are the distribution and the link; everything else is mechanical. This is the payoff of the GLM framework: ten models compressed to one set of moves.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Common pitfalls and cognitive traps</h2></div>
+
+  <h3>Choosing the wrong distribution</h3>
+
+  <p>Fitting an OLS to a count outcome and getting a perfectly serviceable $R^2$. The fitted model can produce negative predicted means, has the wrong mean-variance relationship, and gives inflated standard errors for low-count observations. The correct move is to inspect the empirical mean-variance relationship before choosing the GLM; the variance function tells you which distribution the data want.</p>
+
+  <h3>Choosing the wrong link</h3>
+
+  <p>Logistic regression with a probit link, or vice versa, will rarely make a noticeable difference; the tails diverge but the centre coincides. <em>Identity</em> link for a binomial response, however, predicts probabilities outside $[0, 1]$ for some inputs. Identity for Poisson predicts negative rates. Always choose a link that respects the support of the response.</p>
+
+  <h3>Ignoring overdispersion</h3>
+
+  <p>A Poisson regression fitted to overdispersed data produces correct point estimates (by quasi-likelihood properties) but understated standard errors. Wald test p-values are anti-conservative; confidence intervals are too narrow; coefficients that "shouldn't" be significant become significant. Inspect the deviance over the degrees of freedom (should be near 1 for a correctly specified Poisson); if it is much larger, move to quasi-Poisson or negative binomial.</p>
+
+  <h3>Treating odds ratios as relative risks</h3>
+
+  <p>For small $\mu$ the odds ratio approximates the relative risk; for moderate $\mu$ it overstates it (sometimes substantially). A study reporting an odds ratio of 3 with $\hat{\mu} = 0.2$ in the reference group corresponds to a relative risk of 1.7, not 3. The error is widespread in epidemiology and seeping into credit-risk reporting; always check the base rate.</p>
+
+  <h3>Selection bias and survivorship</h3>
+
+  <p>An LGD model fitted only on observed defaults conditions on a non-random subsample; the resulting model does not generalise to the population of all exposures. The standard fix is the Heckman selection correction (a probit on selection plus a corrected regression on the selected). In credit-risk practice the issue is usually handled by stratified estimation rather than by a formal Heckman correction, but the danger of selection bias is real and underdiagnosed.</p>
+
+  <h3>Multicollinearity that hides in the variance</h3>
+
+  <p>Two strongly correlated predictors will produce large standard errors on both coefficients but reasonable joint predictions. The pattern is unstable signs and inflated variance-inflation factors (VIFs above 5 or 10). The cure: drop one, combine them (PCA), or use ridge regression to share the explanatory burden. Forward selection plus correlation-aware screening is the usual production pipeline.</p>
+
+  <div class="callout warn">
+    <span class="tag">A regulator's checklist</span>
+    Five questions a model-risk reviewer will ask about any GLM. (1) Why this distribution? Justify by the variance function. (2) Why this link? Justify by support. (3) How were variables selected? Document the procedure and disclose post-selection inference adjustments. (4) Are coefficient signs intuitive? Counter-intuitive signs raise immediate questions about confounding or data quality. (5) Does the calibration plot match across rating buckets, over time, and under stress scenarios? Discrimination (AUC) is not enough; calibration is what regulators care about.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8: Frontiers
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 8</span><h2>Frontiers and what's beyond</h2></div>
+
+  <p>Four extensions sit just past the syllabus.</p>
+
+  <p><strong>Generalised additive models (GAMs).</strong> Replace the linear predictor $\mathbf{x}^\top \boldsymbol{\beta}$ with $\sum_j f_j(x_j)$, where each $f_j$ is a smooth function (spline, kernel) estimated non-parametrically. Hastie and Tibshirani (1990) and Wood's <code>mgcv</code> implementation are the canonical references. GAMs preserve the interpretability of GLMs (each $f_j$ can be plotted) while allowing arbitrary smooth non-linearities. The natural next step when a GLM's linearity assumption is the binding constraint and a black-box ML model is more flexibility than needed.</p>
+
+  <p><strong>Generalised linear mixed models (GLMMs).</strong> Add random effects to GLMs for grouped or longitudinal data: $g(\mu_{ij}) = \mathbf{x}_{ij}^\top \boldsymbol{\beta} + \mathbf{z}_{ij}^\top \mathbf{u}_j$, with $\mathbf{u}_j$ random. Used for loans nested in branches, claims nested in policyholders, defaults nested in industries. Estimation requires integration over the random effects (Laplace approximation, adaptive quadrature, MCMC). The Bayesian formulation in lecture 09 makes this much easier than the frequentist one. The R <code>lme4</code> and Python <code>statsmodels</code> implementations handle most production needs.</p>
+
+  <p><strong>Quasi-likelihood and GEE.</strong> When the full distributional form is uncertain but the mean-variance relationship is known, quasi-likelihood estimation defines a "score function" by analogy with MLE and produces consistent estimates with robust standard errors. Generalised estimating equations (Liang and Zeger 1986) extend quasi-likelihood to longitudinal data with a working correlation structure. Used widely in epidemiology and increasingly in credit-risk panels.</p>
+
+  <p><strong>Penalised likelihood and inference after selection.</strong> Lasso and elastic-net produce sparse GLMs but invalidate the standard MLE inference (sampling distribution conditional on the selected support is non-standard). The selective-inference literature (Tibshirani, Taylor, Lockhart, Tibshirani 2014; Fithian, Sun, Taylor 2017) supplies conditional p-values and CIs that account for the selection. This is the frontier where modern statistics is reconciling lasso's predictive power with classical inferential validity.</p>
+
+  <p><strong>Distributional regression.</strong> Classical GLMs model only the mean. <strong>GAMLSS</strong> (generalised additive models for location, scale, and shape; Rigby and Stasinopoulos 2005) models all distributional parameters as functions of covariates: mean, dispersion, skewness, kurtosis. The "quantile regression" tradition (Koenker) models conditional quantiles directly. Both are increasingly common where the conditional distribution is the inferential target (value-at-risk, tail risk, distributional forecasting).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 9: Synthesis, recall, connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 9</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the GLM framework. Three components (exponential-family response, linear predictor, link function) generate ten named models. One estimation algorithm (IRLS / Fisher scoring) fits them all. One inferential toolkit (Wald and likelihood-ratio tests, asymptotic CIs, the bootstrap) makes claims about coefficients. One diagnostic toolkit (deviance, residuals, hat matrix, calibration plots) audits the fits. One model-comparison toolkit (LRT, AIC, BIC, CV) chooses among alternatives. Three regularisation options (ridge, lasso, elastic net) trade bias for variance. The result is the single most useful modelling object in regulated credit risk and in much of applied statistics.</p>
+
+  <p>The lectures that follow each extend GLMs in a specific direction. <strong>Lecture 06 (time series)</strong> introduces dependence indexed by time and rebuilds GLM inference under it: ARMA models for the conditional mean, GARCH for the conditional variance, state-space models for latent dynamics. <strong>Lecture 07 (survival)</strong> introduces censoring and rebuilds GLM-style inference for time-to-event data: Cox PH is a partial-likelihood GLM, parametric AFT models are direct GLMs on log-time. <strong>Lecture 08 (Markov chains)</strong> introduces state dependence and re-derives transition-matrix estimation as a constrained multinomial GLM. <strong>Lecture 09 (Bayesian)</strong> re-derives every GLM in this lecture as a posterior-inference problem, gaining hierarchical structure, weakly informative priors, and credible intervals in exchange for an MCMC computational cost.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Write down the three components of a GLM. For OLS, logistic regression, and Poisson regression, give the distribution, link, and inverse link.</li>
+      <li>Derive the variance function of the binomial (with $n$ trials, success probability $\mu$). What does it tell you about the precision of the proportion estimate as $\mu$ varies?</li>
+      <li>Starting from the binomial log-likelihood, derive the score function for logistic regression. Why is it called the canonical-link score?</li>
+      <li>State the IRLS update for logistic regression. What are the working response and the working weights?</li>
+      <li>You fit a Poisson regression and the deviance is 1,200 on 200 degrees of freedom. What does this suggest, and what are the standard remedies?</li>
+      <li>An LGD response lies in $[0, 1]$ with mass points at 0 and 1. List three GLM choices and their trade-offs. Which would you recommend as a default for an A-IRB LGD model?</li>
+      <li>Distinguish the odds ratio from the relative risk. When are they approximately equal? When do they diverge?</li>
+      <li>State the deviance-based likelihood-ratio test for nested GLMs. What is its asymptotic distribution under the null?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 04 (<a href="04-statistical_modelling_taxonomy.html">modelling taxonomy</a>) located GLMs in the supervised-parametric-discriminative cell of the model zoo; this lecture worked through that cell in detail.</li>
+      <li><strong>Inferential foundations:</strong> Lecture 03 (<a href="03-inferential_statistics.html">inferential statistics</a>) supplied the MLE, Wald, LRT, and bootstrap machinery; lecture 02 (<a href="02-probability.html">probability</a>) supplied the exponential-family distributions.</li>
+      <li><strong>Next:</strong> Lecture 06 (time series) extends GLMs to time-indexed data; lecture 07 (survival) extends to censored data; lecture 08 (Markov) extends to state-indexed data.</li>
+      <li><strong>Outside this course:</strong> the credit-risk modelling track lives almost entirely inside this lecture; the insurance pricing literature is a GAMs-and-GLMs literature; modern boosting (XGBoost, LightGBM) is an algorithmic extension of GLM ideas with non-parametric mean functions.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Statistics course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 5 of 9</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

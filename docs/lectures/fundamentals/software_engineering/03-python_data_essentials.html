@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 3: Python data essentials</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Python data essentials</h1>
+  <p class="subtitle">Most performance and most clarity comes from picking the right built-in type and letting Python do the work. This lecture covers the seven types you will use every day, the three protocols that unify them, and the comprehensions and iteration patterns that the language is genuinely good at.</p>
+  <div class="meta">
+    <span>Lecture 3 of 14</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: the craft of writing code</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Python ships with a small set of built-in types, organised around three protocols. The <strong>sequence</strong> protocol (lists, tuples, strings, bytes) gives you ordered, indexable collections. The <strong>mapping</strong> protocol (dicts) gives you keyed lookup. The <strong>set</strong> protocol (sets, frozensets) gives you uniqueness and fast membership testing. Almost every Python program you will read or write is a composition of these three.</p>
+
+  <p>The two cross-cutting properties to keep track of are <strong>mutability</strong> (can the object be changed in place?) and the <strong>iteration protocol</strong> (can it be looped over, and if so, how many times?). Lists, dicts, and sets are mutable; tuples, strings, bytes, and frozensets are not. Every container is iterable; some, called generators, can only be iterated once.</p>
+
+  <p>The third thing that distinguishes a working Python programmer from a beginner is fluency in <strong>comprehensions</strong>, the language's preferred way of building one collection from another. A comprehension is a <code>for</code>-loop with a filter, written as a single expression. The compiler optimises them; the reader recognises them; the linter rewards them. Once you internalise comprehensions, you stop writing manual loops for transformation, and most of your code shrinks.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Programming languages give you primitives and let you compose them. C gives you arrays and pointers, and you build everything from those. Python gives you, instead, a list, a dictionary, and a set, and presumes you will reach for one of them before you reach for an array. The trick of writing fluent Python is that 80 per cent of what you would have hand-coded in C is already a built-in operation, faster than what you would have written and with edge cases already handled. The lecture is about learning where the language already does what you want.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Two practical observations motivate the lecture. The first is that the choice of container drives the time complexity of the program. Looking up a value in a list of <em>n</em> items takes time proportional to <em>n</em>; looking it up in a dict or set takes constant time. A program that runs in 30 seconds with a list-based "is this in the data?" check often runs in 0.1 seconds with the same data stored in a set. The right type is, almost always, the cheapest possible performance optimisation.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Operation</th><th>list</th><th>tuple</th><th>dict</th><th>set</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Index / get by key</td><td>O(1)</td><td>O(1)</td><td>O(1) avg</td><td>n/a</td></tr>
+      <tr><td>Search ("in" check)</td><td>O(n)</td><td>O(n)</td><td>O(1) avg</td><td>O(1) avg</td></tr>
+      <tr><td>Append / add</td><td>O(1) amort.</td><td>n/a</td><td>O(1) avg</td><td>O(1) avg</td></tr>
+      <tr><td>Insert at position</td><td>O(n)</td><td>n/a</td><td>n/a</td><td>n/a</td></tr>
+      <tr><td>Delete by value</td><td>O(n)</td><td>n/a</td><td>O(1) avg</td><td>O(1) avg</td></tr>
+      <tr><td>Iterate all</td><td>O(n)</td><td>O(n)</td><td>O(n)</td><td>O(n)</td></tr>
+      <tr><td>Memory per item</td><td>~56 bytes</td><td>~48 bytes</td><td>~232 bytes</td><td>~216 bytes</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The second observation is the one Lecture 2 named as a Zen line: "there should be one obvious way to do it". Python ships with idiomatic constructs for almost every common data manipulation: <code>enumerate</code> for indexed iteration, <code>zip</code> for parallel iteration, <code>dict.get</code> for fallback lookups, <code>collections.Counter</code> for tallies, <code>itertools</code> for combinations. A practitioner who knows these reaches for them instinctively and produces code that is shorter, faster, and easier to read than a colleague who reinvents each one.</p>
+
+  <p>Beazley and Jones organise the entire <em>Python Cookbook</em> (3rd edition, O'Reilly 2013) around this principle: most real-world data problems have a one-line solution in the standard library, and the "trick" is knowing which one-line solution. The same logic governs interview questions, code review, and almost every line of pandas you will ever write.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Three abstract protocols organise the entire menu of built-in types. Every container in Python implements at least one. Knowing which protocol you need usually picks the type for you.</p>
+
+  <div class="defcard tint-lavender"><span class="term">Sequence</span><span class="def">Ordered, indexed by integers, supports <code>len</code> and <code>x[i]</code>. Members include <code>list</code>, <code>tuple</code>, <code>str</code>, <code>bytes</code>, <code>range</code>. Used when order matters or when items are accessed by position.</span></div>
+  <div class="defcard tint-sky"><span class="term">Mapping</span><span class="def">Keyed lookup, supports <code>x[key]</code> and <code>key in x</code>. The principal member is <code>dict</code>. Variants in <code>collections</code>: <code>defaultdict</code>, <code>OrderedDict</code>, <code>Counter</code>, <code>ChainMap</code>. Used when items are accessed by name, not position.</span></div>
+  <div class="defcard tint-mint"><span class="term">Set</span><span class="def">Unordered, unique, supports <code>x in s</code> in constant time, plus algebraic operations (<code>|</code>, <code>&amp;</code>, <code>-</code>, <code>^</code>). Members are <code>set</code> and <code>frozenset</code>. Used when uniqueness or membership is the question.</span></div>
+
+  <h3>Mutability is the second axis</h3>
+
+  <p>A type is <strong>mutable</strong> if you can change the object in place without changing its identity. Lists, dicts, and sets are mutable. Tuples, strings, bytes, frozensets, and the numeric types are not. The distinction matters for two reasons.</p>
+
+  <p>First, only immutable objects can be used as dict keys or set members. Hashing a mutable object would be unsafe because the hash could change while the object is in the table. Tuples of immutables are themselves immutable, so a tuple of strings is a valid key; a list of strings is not.</p>
+
+  <p>Second, mutability interacts with function arguments. Python passes arguments by reference; if a function mutates a list passed to it, the caller sees the mutation. This is the source of the "mutable default argument" anti-pattern from Lecture 2: <code>def f(x=[])</code> uses one list for all calls and accumulates state across them.</p>
+
+  <pre><code>def append_once(item, target=None):
+    target = target if target is not None else []
+    target.append(item)
+    return target</code></pre>
+
+  <h3>The iteration protocol</h3>
+
+  <p>Every Python loop is sugar for the <strong>iteration protocol</strong>: an object that has an <code>__iter__</code> method returns an <em>iterator</em>; an iterator has a <code>__next__</code> method that returns successive values and raises <code>StopIteration</code> when exhausted. A <code>for x in xs:</code> loop is internally equivalent to <code>it = iter(xs); while True: try: x = next(it) except StopIteration: break ...</code>.</p>
+
+  <p>The distinction between an <em>iterable</em> (an object you can iterate over) and an <em>iterator</em> (the single-use cursor produced by <code>iter</code>) catches many beginners. Lists, dicts, sets, and strings are iterables; you can loop over them as many times as you like. The output of <code>iter(...)</code>, of a <code>map(...)</code>, of a <code>filter(...)</code>, or of a generator expression is an iterator; once consumed, it is exhausted.</p>
+
+  <pre><code>xs = [1, 2, 3]
+list(xs)         # [1, 2, 3]
+list(xs)         # [1, 2, 3]   (iterable, can be re-used)
+
+g = (x * x for x in xs)
+list(g)          # [1, 4, 9]
+list(g)          # []          (iterator, exhausted)</code></pre>
+
+  <p>The reason the language draws the distinction is memory. An iterator produces values one at a time and discards them; a list holds them all in memory. Reading a 10 GB file as an iterator costs ~kilobytes of memory; loading it into a list costs 10 GB. Generators and itertools (Step 4) are the tools that let you write iterator-friendly code.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why one protocol per question</span>
+    The trio of sequence, mapping, and set is not the only way to organise data structures, but it maps cleanly onto the three most common questions: "what is at position <em>i</em>?" (sequence), "what is associated with name <em>k</em>?" (mapping), and "is <em>x</em> in this collection?" (set). The other major data structures, queues, stacks, trees, graphs, are either compositions of these or specialisations available in <code>collections</code> or <code>heapq</code>. The language deliberately offers a small high-level toolbox rather than every possible container.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Lists: ordered, mutable, the workhorse sequence</h3>
+
+  <p>A <strong>list</strong> is a dynamic array. Created with square brackets or <code>list(...)</code>. Indexed by integers from 0 to <code>len(lst) - 1</code>; negative indices count from the end. Slicing produces a new list; assignment to a slice mutates the original.</p>
+
+  <pre><code>xs = [3, 1, 4, 1, 5, 9, 2, 6]
+xs[0]            # 3
+xs[-1]           # 6
+xs[1:4]          # [1, 4, 1]
+xs[:3]           # [3, 1, 4]
+xs[::2]          # [3, 4, 5, 2]   (every second item)
+xs[::-1]         # [6, 2, 9, 5, 1, 4, 1, 3]   (reversed)
+
+xs.append(11)            # in-place add at end
+xs.extend([7, 8])        # in-place add many
+xs.insert(0, 0)          # in-place insert at position
+xs.remove(4)             # remove first occurrence
+xs.pop()                 # remove and return last item
+xs.sort()                # in-place ascending
+sorted(xs, reverse=True) # new list, descending</code></pre>
+
+  <p>The two sort methods, <code>list.sort()</code> (in place) and the <code>sorted(iterable)</code> built-in (returns a new list), both accept a <code>key</code> callable. The implementation is <strong>Timsort</strong> (Peters 2002), an adaptive, stable merge sort that is the default sort algorithm in Python, Java, and Android. Worst case O(n log n); much better on partially sorted data, which is what real-world inputs usually are.</p>
+
+  <p>Idiomatic patterns with lists:</p>
+
+  <pre><code># Build by comprehension, not loop
+squares = [x * x for x in range(10)]
+
+# Filter and transform in one step
+positives = [x for x in xs if x > 0]
+
+# Flatten a list of lists
+flat = [item for sublist in nested for item in sublist]
+
+# Sort by a key
+records.sort(key=lambda r: r["score"], reverse=True)
+
+# Unpack with star
+first, *middle, last = [1, 2, 3, 4, 5]</code></pre>
+
+  <h3>Tuples: ordered, immutable, used as records</h3>
+
+  <p>A <strong>tuple</strong> is an immutable sequence. Created with parentheses or <code>tuple(...)</code>. Trailing comma matters: <code>(1,)</code> is a one-tuple; <code>(1)</code> is the integer one in parentheses. Tuples cost less memory than lists and support hashing, so they can be used as dict keys.</p>
+
+  <p>Two distinct usage patterns are worth distinguishing. The first is the <strong>record</strong> tuple, where each position has a fixed meaning (point = (x, y), date = (year, month, day)). The second is the <strong>homogeneous</strong> tuple, where positions are interchangeable, used mostly when an immutable list is needed.</p>
+
+  <p>For record tuples, prefer <code>NamedTuple</code> or a dataclass, both of which give names to the positions:</p>
+
+  <pre><code>from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: float
+    y: float
+
+p = Point(1.0, 2.0)
+p.x         # 1.0, more readable than p[0]
+p[0]        # 1.0, still works
+distance = (p.x ** 2 + p.y ** 2) ** 0.5</code></pre>
+
+  <p>Tuple unpacking is the most underused idiom in Python:</p>
+
+  <pre><code># Swap without a temporary
+a, b = b, a
+
+# Multiple return values
+def stats(xs):
+    return min(xs), max(xs), sum(xs) / len(xs)
+
+lo, hi, avg = stats(scores)
+
+# Iterate over pairs
+for name, score in zip(names, scores):
+    print(name, score)</code></pre>
+
+  <h3>Strings: immutable sequences of Unicode code points</h3>
+
+  <p>A Python 3 <strong>string</strong> is a sequence of Unicode code points. Indexing, slicing, and iteration treat the string as a sequence of single-character strings (Python has no separate char type). The <code>bytes</code> type is the parallel sequence of integers, used for binary data and for encoded text.</p>
+
+  <p>Three things to commit to memory. First, strings are <em>immutable</em>; methods like <code>upper</code>, <code>replace</code>, <code>strip</code> return new strings. Second, string concatenation in a loop is O(n²); the idiom is <code>"".join(parts)</code>. Third, <strong>f-strings</strong> (PEP 498, Python 3.6+) are the canonical way to interpolate values; the older <code>%</code> and <code>str.format</code> still work but should not be used in new code.</p>
+
+  <pre><code>name = "alice"
+score = 0.873
+print(f"{name} scored {score:.1%}")     # "alice scored 87.3%"
+
+# join, not loop concatenation
+parts = ["alpha", "beta", "gamma"]
+", ".join(parts)                        # "alpha, beta, gamma"
+
+# Common string methods
+"  hello world  ".strip()               # "hello world"
+"hello world".replace("world", "Mars")  # "hello Mars"
+"a,b,c,d".split(",")                    # ["a", "b", "c", "d"]
+"camelCase".lower()                     # "camelcase"
+"abc".startswith("ab")                  # True</code></pre>
+
+  <p>For multiline templates, use triple-quoted strings or <code>textwrap.dedent</code>. For path-like strings, use <code>pathlib.Path</code> rather than <code>os.path</code> manipulation. For SQL or shell, never concatenate user input; use parameterised queries.</p>
+
+  <div class="callout warn">
+    <span class="tag">Encoding is a one-way trip</span>
+    A <code>str</code> is text; a <code>bytes</code> is binary. The two are not interchangeable. The conversion has two directions: <code>str.encode(encoding)</code> turns text into bytes; <code>bytes.decode(encoding)</code> turns bytes into text. Mishandling encoding (assuming UTF-8 when the source is Latin-1, or the reverse) produces the famous "mojibake" garbled text. The rule is: decode at the boundary (when reading from a file, a network, a database), encode at the boundary (when writing). Inside your program, all text should be <code>str</code>.
+  </div>
+
+  <h3>Dicts: the universal mapping</h3>
+
+  <p>A <strong>dict</strong> is a hash table. Created with <code>{}</code> or <code>dict(...)</code>. Keys must be hashable (immutable); values can be anything. Since Python 3.7 (CPython 3.6), dicts preserve insertion order, making them suitable for any case where ordered key-value pairs are needed.</p>
+
+  <pre><code>portfolio = {"AAPL": 100, "MSFT": 50, "GOOG": 25}
+
+portfolio["AAPL"]                # 100
+portfolio.get("TSLA")            # None  (no KeyError)
+portfolio.get("TSLA", 0)         # 0     (default)
+portfolio["TSLA"] = 75           # in-place insert
+"AAPL" in portfolio              # True
+del portfolio["MSFT"]
+
+for ticker, qty in portfolio.items():
+    print(ticker, qty)
+
+# Build from pairs
+pairs = [("AAPL", 100), ("MSFT", 50)]
+portfolio = dict(pairs)
+
+# Build by comprehension
+sq = {n: n * n for n in range(5)}</code></pre>
+
+  <p>The <code>collections</code> module ships three dict variants worth knowing.</p>
+
+  <p><strong>defaultdict</strong> takes a factory function and creates default values on first access:</p>
+
+  <pre><code>from collections import defaultdict
+
+counts = defaultdict(int)
+for word in "the quick brown fox the lazy dog the".split():
+    counts[word] += 1
+# counts: {"the": 3, "quick": 1, ...}</code></pre>
+
+  <p><strong>Counter</strong> is a specialised dict for tallying:</p>
+
+  <pre><code>from collections import Counter
+
+c = Counter("mississippi")
+c.most_common(2)                # [("i", 4), ("s", 4)]</code></pre>
+
+  <p><strong>ChainMap</strong> stacks several dicts and searches them in order, used for configuration layering (defaults, then file, then environment, then command line).</p>
+
+  <h3>Sets: uniqueness and membership</h3>
+
+  <p>A <strong>set</strong> is an unordered collection of unique hashable items. Created with <code>{1, 2, 3}</code> or <code>set(...)</code>; the empty set is <code>set()</code> (note: <code>{}</code> is an empty dict). Sets support algebraic operations: union (<code>|</code>), intersection (<code>&amp;</code>), difference (<code>-</code>), symmetric difference (<code>^</code>).</p>
+
+  <pre><code>tickers_a = {"AAPL", "MSFT", "GOOG"}
+tickers_b = {"MSFT", "AMZN", "META"}
+
+tickers_a | tickers_b      # {"AAPL", "MSFT", "GOOG", "AMZN", "META"}
+tickers_a &amp; tickers_b      # {"MSFT"}
+tickers_a - tickers_b      # {"AAPL", "GOOG"}
+tickers_a ^ tickers_b      # {"AAPL", "GOOG", "AMZN", "META"}
+
+"AAPL" in tickers_a         # True, O(1)</code></pre>
+
+  <p>Sets are the right answer to a surprising number of problems: deduplication (<code>list(set(xs))</code>, although order is lost), fast membership testing, finding the items in one collection but not another. <strong>frozenset</strong> is the immutable variant, usable as a dict key.</p>
+
+  <h3>Comprehensions: the one-line transformation</h3>
+
+  <p>A <strong>comprehension</strong> is a compact expression that builds a list, set, dict, or generator by iterating over a source. The general form is</p>
+
+  <pre><code>[ expr for var in iterable if condition ]</code></pre>
+
+  <p>Replacing the outer brackets gives the other comprehensions:</p>
+
+  <pre><code>[ ... ]   # list comprehension
+{ ... }   # set comprehension (no colon in expr)
+{ k: v ... } # dict comprehension
+( ... )   # generator expression (lazy, single-use)</code></pre>
+
+  <p>Multiple <code>for</code> clauses and conditions are allowed:</p>
+
+  <pre><code># Cartesian product
+pairs = [(i, j) for i in range(3) for j in range(3) if i != j]
+
+# Flatten
+flat = [item for row in matrix for item in row]
+
+# Transpose
+transposed = [[row[i] for row in matrix] for i in range(len(matrix[0]))]</code></pre>
+
+  <p>Comprehensions are clearer and faster than the equivalent loops. The compiler emits specialised bytecode (<code>LIST_APPEND</code>, <code>SET_ADD</code>, <code>MAP_ADD</code>) that skips one level of method-call overhead. Two limits to keep in mind: a comprehension with more than two <code>for</code> clauses is usually unreadable (refactor to a loop or a function), and side effects in a comprehension are a code smell (the comprehension is for building a value, not for triggering work).</p>
+
+  <h3>Generators and itertools: lazy iteration</h3>
+
+  <p>A <strong>generator expression</strong> looks like a list comprehension with parentheses but produces values one at a time:</p>
+
+  <pre><code>squares = (x * x for x in range(10 ** 9))
+sum(squares)         # works in O(1) memory; would OOM as a list</code></pre>
+
+  <p>A <strong>generator function</strong> uses <code>yield</code>:</p>
+
+  <pre><code>def fibonacci():
+    a, b = 0, 1
+    while True:
+        yield a
+        a, b = b, a + b
+
+from itertools import islice
+list(islice(fibonacci(), 10))     # [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]</code></pre>
+
+  <p>The <strong>itertools</strong> module is the small, fast library of iteration primitives. The half-dozen you should know by name:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Function</th><th>What it does</th><th>Example</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>chain(a, b, ...)</code></td><td>Concatenate iterables.</td><td><code>chain([1,2], [3,4])</code> → 1, 2, 3, 4</td></tr>
+      <tr><td><code>islice(it, n)</code></td><td>Take the first <em>n</em> items.</td><td><code>islice(g, 10)</code> → first 10 of <em>g</em></td></tr>
+      <tr><td><code>groupby(it, key)</code></td><td>Group consecutive items by key (sort first).</td><td><code>groupby(sorted(xs), key=lambda x: x.kind)</code></td></tr>
+      <tr><td><code>product(a, b)</code></td><td>Cartesian product.</td><td><code>product([1,2], "ab")</code> → (1,'a'), (1,'b'), (2,'a'), (2,'b')</td></tr>
+      <tr><td><code>combinations(it, r)</code></td><td>All r-length combinations.</td><td><code>combinations([1,2,3], 2)</code> → (1,2), (1,3), (2,3)</td></tr>
+      <tr><td><code>accumulate(it, fn)</code></td><td>Running totals.</td><td><code>accumulate([1,2,3,4])</code> → 1, 3, 6, 10</td></tr>
+      <tr><td><code>tee(it, n)</code></td><td>Split one iterator into n.</td><td>care: stores intermediate values</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Used together, itertools and generators let you write pipelines that process arbitrarily large streams in fixed memory. This is the same paradigm that pandas, Spark, and Unix pipes are built on.</p>
+
+  <pre><code>from itertools import islice
+
+def lines(path):
+    with open(path) as f:
+        yield from f      # one line at a time
+
+def parse(line):
+    name, score = line.strip().split(",")
+    return name, float(score)
+
+# Process a 10 GB file in constant memory
+records = (parse(line) for line in lines("scores.csv"))
+top10 = sorted(islice(records, 1_000_000), key=lambda r: -r[1])[:10]</code></pre>
+
+  <h3>The data model: dunders and protocols</h3>
+
+  <p>The behaviour of every operation in Python, indexing, comparison, iteration, arithmetic, printing, is defined by special methods on the class, called <strong>dunders</strong> (double-underscore). A class that implements <code>__len__</code> supports <code>len(x)</code>; <code>__getitem__</code> supports <code>x[i]</code>; <code>__iter__</code> supports <code>for x in obj</code>. The full list is in the language reference; the most commonly implemented dozen are below.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Dunder</th><th>Enables</th><th>Example use</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>__init__(self, ...)</code></td><td>Construction.</td><td>Any class.</td></tr>
+      <tr><td><code>__repr__(self)</code></td><td>Unambiguous debug representation.</td><td>What a debugger or REPL prints.</td></tr>
+      <tr><td><code>__str__(self)</code></td><td>Human-readable string.</td><td>What <code>print</code> produces.</td></tr>
+      <tr><td><code>__eq__(self, other)</code></td><td><code>==</code> and <code>!=</code>.</td><td>Value equality.</td></tr>
+      <tr><td><code>__hash__(self)</code></td><td>Use as dict key or set member.</td><td>Required if <code>__eq__</code> is defined and you want hashability.</td></tr>
+      <tr><td><code>__lt__(self, other)</code></td><td><code>&lt;</code> and sorting.</td><td>Sortable types.</td></tr>
+      <tr><td><code>__len__(self)</code></td><td><code>len(x)</code>.</td><td>Containers.</td></tr>
+      <tr><td><code>__getitem__(self, key)</code></td><td><code>x[i]</code> and iteration fallback.</td><td>Sequences, mappings.</td></tr>
+      <tr><td><code>__iter__(self)</code></td><td><code>for x in obj</code>.</td><td>Anything iterable.</td></tr>
+      <tr><td><code>__contains__(self, x)</code></td><td><code>x in obj</code>.</td><td>Containers.</td></tr>
+      <tr><td><code>__enter__</code>, <code>__exit__</code></td><td><code>with</code>-statement support.</td><td>Resources, locks, transactions.</td></tr>
+      <tr><td><code>__call__(self, ...)</code></td><td>Make instances callable.</td><td>Functors, decorators.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The <strong>dataclass</strong> decorator (PEP 557, Python 3.7+) generates a sensible <code>__init__</code>, <code>__repr__</code>, and <code>__eq__</code> from annotated class attributes. For data-holding classes (records, configurations, value objects), it is now the default.</p>
+
+  <pre><code>from dataclasses import dataclass
+
+@dataclass(frozen=True, slots=True)
+class Borrower:
+    id: int
+    score: float
+    segment: str
+
+b = Borrower(1, 0.87, "retail")
+b.score                          # 0.87
+b == Borrower(1, 0.87, "retail") # True
+{b}                              # works because frozen makes it hashable</code></pre>
+
+  <p><code>frozen=True</code> makes the instance immutable (and therefore hashable). <code>slots=True</code> (PEP 487 / Python 3.10) skips the per-instance <code>__dict__</code>, saving memory; recommended for any class that will exist in large numbers.</p>
+
+  <div class="worked">
+    <strong>Worked example: rewriting a tally function</strong>
+    <p>The task: given a list of credit applications, count how many came from each of five geographic regions.</p>
+    <p>Beginner version:</p>
+    <p><code>counts = {}
+for app in applications:
+    region = app["region"]
+    if region in counts:
+        counts[region] = counts[region] + 1
+    else:
+        counts[region] = 1</code></p>
+    <p>Intermediate version (with defaultdict):</p>
+    <p><code>from collections import defaultdict
+counts = defaultdict(int)
+for app in applications:
+    counts[app["region"]] += 1</code></p>
+    <p>Idiomatic version:</p>
+    <p><code>from collections import Counter
+counts = Counter(app["region"] for app in applications)</code></p>
+    <p>The third version is the same operation in the language's preferred shape. It uses a generator expression (no intermediate list), a Counter (no manual defaulting), and one line instead of five. Counter also gives you <code>.most_common()</code> for free, which the first two versions do not. The third version is also faster: Counter is implemented in C and skips the Python-level loop overhead.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The Python data toolkit is small and well chosen. Three protocols (sequence, mapping, set) and two cross-cutting properties (mutability, iteration) describe the entire menu. Within each protocol, the built-in implementation (list, dict, set) is the default, with a few specialised variants in <code>collections</code> for common patterns. Comprehensions are the language's preferred way to transform one collection into another; generators and itertools let you do the same on streams that do not fit in memory.</p>
+
+  <p>The data model (dunders) is the contract behind every operator and built-in function. A class that implements the right dunders behaves like a built-in; this is how libraries like NumPy and pandas integrate so cleanly with Python syntax. For records, value objects, and configurations, <code>@dataclass</code> is now the default; for anything more involved, study the data model in the language reference. The Beazley and Jones <em>Python Cookbook</em> remains the most efficient way to acquire the idioms by example.</p>
+
+  <p>Lecture 4 turns to the one piece of text handling that gets its own language: regular expressions. After that, Part II turns to verification (testing) and diagnosis (debugging), where the types you have chosen here will materially affect how easy it is to write the tests and read the stack traces.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the three container protocols. For each, give one container that implements it, and one question it answers.</li>
+      <li>Why must dict keys be hashable? What property of a list disqualifies it as a key?</li>
+      <li>Distinguish an iterable from an iterator with one short program in which the difference shows up.</li>
+      <li>Rewrite the following loop as a comprehension: <code>out = []</code><br><code>for x in xs:</code><br><code>&nbsp;&nbsp;&nbsp;&nbsp;if x > 0: out.append(x ** 0.5)</code></li>
+      <li>What four dunders does the <code>@dataclass</code> decorator generate by default? What does <code>frozen=True</code> add, and why is it required for use as a dict key?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="02-style_and_idiom.html">Lecture 2 (style and idiom)</a> introduced comprehensions as a Pythonic pattern; this lecture made them precise.</li>
+      <li><strong>Next:</strong> <a href="04-regular_expressions.html">Lecture 4 (regular expressions)</a> covers the small domain-specific language for text matching.</li>
+      <li><strong>Cross-link:</strong> <a href="05-testing.html">Lecture 5 (testing)</a> uses dataclasses and frozensets routinely for assertion construction.</li>
+      <li><strong>Outside this course:</strong> Beazley &amp; Jones, <em>Python Cookbook</em> (3rd edition, 2013); the CPython data-model reference (<a href="https://docs.python.org/3/reference/datamodel.html">docs.python.org/3/reference/datamodel.html</a>); Ramalho, <em>Fluent Python</em> (2nd edition, 2022) for a deep treatment of dunders and protocols.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 3 of 14</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

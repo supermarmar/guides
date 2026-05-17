@@ -85,4 +85,4 @@ South African banks tend to have floating rate assets (linked to the prime rate)
 
 Interest rate risk in the banking book may be hedged to mitigate rate risk and lock in [[04-nii_nim|NII]]. However, hedging instruments come at a cost, reducing earnings. Furthermore, **behavioural risks** arise from hedging: early redemptions or prepayments can result in "naked" hedges that no longer have underlying offsetting exposures, incurring a cost to unwind.
 
-For [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] hedging instruments (FRAs, futures, swaps, options) see [Hedging Instruments](wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models.md).
+For [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]] hedging instruments (FRAs, futures, swaps, options) see [Hedging Instruments](../market_risk/02-models.md).

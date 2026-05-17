@@ -9,7 +9,7 @@ aliases:
 
 This file covers the **mathematical foundations of counterparty exposure measurement** used in trading book CCR capital calculation, including the exposure metric definitions (EE, EPE, EEPE), the derivation of market-implied probability of default from credit spreads and survival curves, and the simulation approaches used to compute these exposures.
 
-For the regulatory capital formulas that consume these exposure measures (SA-CCR, IMM, BA-CVA, SA-CVA), see [Regulatory Capital (Trading Book)](wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/counterparty_credit_risk/01-context.md). For the analogous mathematical foundations for banking book credit risk (Vasicek model, loss distributions, TTC PDs), see [Credit Losses](..\..\02_airb_capital_modelling\01_introduction\02-credit_losses.md). For the historical evolution of [[bis|Basel]]'s CCR/CVA framework, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md).
+For the regulatory capital formulas that consume these exposure measures (SA-CCR, IMM, BA-CVA, SA-CVA), see [Regulatory Capital (Trading Book)](01-context.md). For the analogous mathematical foundations for banking book credit risk (Vasicek model, loss distributions, TTC PDs), see [Credit Losses](../a-irb_capital/01_introduction/02-credit_losses.md). For the historical evolution of [[bis|Basel]]'s CCR/CVA framework, see [Basel / BIS](..\..\..\..\..\..\regulation\international\bis\bis.md).
 
 ## Exposure Concepts
 

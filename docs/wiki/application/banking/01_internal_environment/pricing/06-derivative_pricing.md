@@ -7,7 +7,7 @@ aliases:
 ---
 # Derivative Pricing
 
-This file covers investment banking pricing — the pricing of transactional and advisory services, and the mathematical foundations of derivative pricing including risk-neutral pricing, Black-Scholes, dynamic hedging, swaps, and the breakdown of these models under stress. For interest rate and FX derivatives used in asset-liability management see [Market Risk](../market_risk/05-market_risk.md) and [IRRBB Measurement](../market_risk/04-irrbb_measurement.md). For [[03-proprietary_trading_xva|xVA]] adjustments to derivative fair values see [Proprietary Trading and xVA](../market_risk/08-proprietary_trading_xva_pension.md).
+This file covers investment banking pricing — the pricing of transactional and advisory services, and the mathematical foundations of derivative pricing including risk-neutral pricing, Black-Scholes, dynamic hedging, swaps, and the breakdown of these models under stress. For interest rate and FX derivatives used in asset-liability management see [Market Risk](../risk_measurement/market_risk/01-context.md) and [IRRBB Measurement](../risk_measurement/interest_rate_risk/05-irrbb_measurement.md). For [[03-proprietary_trading_xva|xVA]] adjustments to derivative fair values see [Proprietary Trading and xVA](../risk_measurement/market_risk/03-proprietary_trading_xva.md).
 
 ## Investment Banking Services and Pricing Regimes
 
@@ -107,7 +107,7 @@ This allows a bank to safely fund a fixed-rate loan (earning 4%) with variable-r
 Net margin = 4% (fixed rate on loan) − 2% (fixed paid on swap) = 2% fixed
 ```
 
-Most LIBOR rates were phased out from end-2021 following the 2012–13 manipulation scandal. Replacements include **SONIA** (Sterling Overnight Index Average, [[bank_of_england|Bank of England]]) and **SOFR** (Secured Overnight Financing Rate, Federal Reserve). See [Yield Curves and Benchmarks](../market_risk/02-yield_curves_benchmarks.md) for further detail.
+Most LIBOR rates were phased out from end-2021 following the 2012–13 manipulation scandal. Replacements include **SONIA** (Sterling Overnight Index Average, [[bank_of_england|Bank of England]]) and **SOFR** (Secured Overnight Financing Rate, Federal Reserve). See [Yield Curves and Benchmarks](../risk_measurement/interest_rate_risk/03-yield_curves_benchmarks.md) for further detail.
 
 ### Currency Swaps
 
@@ -118,7 +118,7 @@ Interest payments on currency swaps can be structured as fixed-fixed, floating-f
 ### Derivative Costs of Manufacture
 
 The total price of a derivative includes the theoretical Black-Scholes price plus **costs of manufacture**:
-- **Collateral costs** — cash or securities posted to counterparties under CSA arrangements (see [Behavioural Modelling](../liquidity_risk/01_introduction/03-behavioural_modelling.md))
+- **Collateral costs** — cash or securities posted to counterparties under CSA arrangements (see [Behavioural Modelling](../risk_measurement/liquidity_risk/05-behavioural_modelling.md))
 - **Capital for credit risk and CVA risk** — holding regulatory capital against the risk of counterparty deterioration (not just default)
 - **For options:** costs of borrowing cash to buy the underlying, or borrowing the underlying to sell short
 - **Delta and vega hedging rebalancing costs** — dealing costs and locked-in losses from convex-vs-linear hedging

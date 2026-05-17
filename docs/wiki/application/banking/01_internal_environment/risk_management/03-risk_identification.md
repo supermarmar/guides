@@ -11,7 +11,7 @@ Banks face many risks that may change based on their operating model and the nat
 
 ## Liquidity Risk
 
-**Liquidity risk** is the uncertainty in meeting (or not meeting) all obligations when they become due. A bank must at all times be able to service its obligations as they fall due on both sides of the balance sheet. It arises structurally from the maturity transformation [[01-business_model|business model]] (see [Business Model](01-business_model.md)) — long-dated assets funded by short-dated liabilities — creating a mismatch that must be actively managed.
+**Liquidity risk** is the uncertainty in meeting (or not meeting) all obligations when they become due. A bank must at all times be able to service its obligations as they fall due on both sides of the balance sheet. It arises structurally from the maturity transformation [[01-business_model|business model]] (see [Business Model](../01-business_model.md)) — long-dated assets funded by short-dated liabilities — creating a mismatch that must be actively managed.
 
 This is one of the major risks faced by the bank. It can be split into two:
 

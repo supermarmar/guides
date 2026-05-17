@@ -384,7 +384,7 @@ Repos are a key tool for:
 - **Trading strategies**: Repo allows investment banks to finance long positions in securities.
 - **Central bank operations**: [[05-central_banks|Central banks]] use repos as a primary monetary policy tool.
 
-OTC derivatives (swaps, forwards) and securities financing transactions (repo) carry **[[02-counterparty_exposures|counterparty credit risk]] (CCR)** — the risk that the counterparty defaults before settlement, requiring the position to be replaced at a worse price. For the regulatory capital treatment of CCR and CVA arising from these instruments, see [Regulatory Capital (Trading Book)](credit_risk\05_counterparty_modelling\01_introduction\01-regulatory_capital.md).
+OTC derivatives (swaps, forwards) and securities financing transactions (repo) carry **[[02-counterparty_exposures|counterparty credit risk]] (CCR)** — the risk that the counterparty defaults before settlement, requiring the position to be replaced at a worse price. For the regulatory capital treatment of CCR and CVA arising from these instruments, see [Regulatory Capital (Trading Book)](risk_measurement/credit_risk/counterparty_credit_risk/01-context.md).
 
 #### Asset-Backed Securities (ABS)
 

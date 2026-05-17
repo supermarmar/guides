@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 10: risk measurement</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../index.html">Lectures</a> / Banking / Internal environment / Risk management</div>
+  <h1>Risk measurement</h1>
+  <p class="subtitle">Once a risk has been identified, the bank has to put a number on it. Measurement is where statistics, accounting, and judgement collide. This lecture is about the techniques, their assumptions, and the moments at which they fail.</p>
+  <div class="meta">
+    <span>Lecture 10 of Phase 1</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Source: <code>docs/wiki/application/banking/01_internal_environment/risk_management/04-risk_measurement.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Risk measurement is the step that turns a named risk into a quantified exposure. The output goes into the appetite statement, the capital model, the pricing engine, and the regulatory return. The inputs are data, statistics, and management judgement, in roughly equal weight.</p>
+
+  <p>A bank's measurement toolkit spans five methodology families: <strong>sensitivity and analytical</strong> methods (Greeks, PV01, FRTB SBM), <strong>scenario and stress testing</strong> (historical, hypothetical, reverse), <strong>statistical and econometric</strong> models (regression, GLMs, time-series, LDA, factor models), <strong>simulation</strong> (Monte Carlo, historical, filtered historical), and <strong>qualitative and expert</strong> methods (RCSA, Delphi, judgemental overlays). Machine learning is not a sixth family; it is a cross-cutting estimator class that can sit inside any of the others. Once each risk has been measured at the sub-portfolio level, the numbers have to be <strong>aggregated</strong> up to the firm, and that is where copulas, inter-risk correlations, and BCBS 239 come in. Two areas dominate the residual risk of getting it wrong: the <strong>tail of the loss distribution</strong>, which is where capital sits, and <strong>model risk</strong> itself, which is the regulated risk that the model is wrong.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Measuring risk is like a doctor reading a patient's vital signs. Each reading uses a different instrument (blood pressure cuff, thermometer, ECG), each instrument has its calibration and its blind spots, and the diagnosis is never any single number, it is the picture across the whole panel. A bank that runs its capital model in isolation, or its VaR in isolation, or its liquidity stress test in isolation, is the doctor who only ever looks at temperature. The patient who walks in with a normal temperature and a heart attack does not respond well to that diagnostic.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>In 1998 Long-Term Capital Management collapsed. Its founders included two Nobel laureates and the partner roster read like a who's-who of modern finance. Their measurement framework was state of the art: variance-covariance VaR calibrated to historical data, with sophisticated treatment of correlations across markets. The data sample, however, came from the post-1987 period in which the bond markets had been broadly orderly. When Russia defaulted, correlations across "uncorrelated" markets jumped to 1, the historical sample turned out not to represent the future, and the fund lost $4.6 billion in four months. The measurement was rigorous. The assumption that history was a guide to the tail was not.</p>
+
+  <p>The 2008 financial crisis carried the same lesson at industry scale. The Gaussian copula approach to default correlation (popularised by David X. Li's 2000 paper and used in the pricing and rating of mortgage CDOs) assumed that joint defaults could be modelled with a thin-tailed dependence structure. When US house prices fell nationally, regional default rates moved together far more than the copula had assumed, and AAA-rated tranches that the models had said would lose nothing lost almost everything. Joe Nocera and others later called it "the formula that killed Wall Street". It was less the formula than the willingness of the industry to take its outputs literally.</p>
+
+  <p>For the supervisor, measurement is what the SREP examines most directly. Pillar 1 capital is a measurement. Pillar 2A add-ons are a measurement of risks that Pillar 1 does not capture properly. Stress tests are a measurement of the balance sheet under hypothetical scenarios. The robustness of the underlying measurement framework determines how much of the bank's own internal model the regulator is willing to trust. A bank with weak measurement gets capital add-ons, simplified standardised treatments, and a thicker supervisory floor.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The single most important visual in risk measurement is the distinction between a normal distribution and a fat-tailed one. The body of the two distributions looks similar. The tails do not. A risk model calibrated to the body of the normal and used to set capital at the 99.9% confidence level underestimates the tail loss by a factor that can run into multiples.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Normal vs fat-tailed loss distribution">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Why "fat tails" matter: loss distribution and the 99.9% VaR</text>
+
+      <!-- Axes -->
+      <line x1="80" y1="380" x2="780" y2="380" stroke="#52525b" stroke-width="1.5"/>
+      <line x1="80" y1="60" x2="80" y2="380" stroke="#52525b" stroke-width="1.5"/>
+      <text x="430" y="412" text-anchor="middle" font-family="Inter" font-size="11" fill="#52525b">Loss (£m)</text>
+      <text x="50" y="220" text-anchor="middle" font-family="Inter" font-size="11" fill="#52525b" transform="rotate(-90,50,220)">Probability density</text>
+
+      <!-- X-axis tick labels -->
+      <text x="430" y="396" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">0</text>
+      <text x="580" y="396" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">2σ</text>
+      <text x="660" y="396" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">3σ</text>
+      <text x="730" y="396" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">4σ+</text>
+
+      <!-- Normal distribution (thin blue) - bell centred at x=430, peak y=80, baseline y=380 -->
+      <path d="M 80,380 Q 180,380 260,378 Q 320,375 360,340 Q 400,260 430,80 Q 460,260 500,340 Q 540,375 600,378 Q 680,380 780,380" fill="none" stroke="#3b82f6" stroke-width="2.5"/>
+
+      <!-- Fat-tailed distribution (orange) - lower peak, fatter tails -->
+      <path d="M 80,380 Q 180,372 260,360 Q 320,348 360,310 Q 400,240 430,140 Q 460,240 500,310 Q 540,348 600,360 Q 680,372 780,380" fill="none" stroke="#f97316" stroke-width="2.5" stroke-dasharray="0"/>
+
+      <!-- Shaded fat-tail region -->
+      <path d="M 660,380 Q 700,378 740,376 Q 760,374 780,372 L 780,380 Z" fill="#fed7aa" stroke="none" opacity="0.7"/>
+
+      <!-- 99.9% VaR line for normal -->
+      <line x1="610" y1="80" x2="610" y2="380" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="610" y="74" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">99.9% VaR (Normal)</text>
+
+      <!-- 99.9% VaR line for fat-tailed -->
+      <line x1="720" y1="80" x2="720" y2="380" stroke="#f97316" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="720" y="74" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#9a3412">99.9% VaR (Fat-tailed)</text>
+
+      <!-- Underestimate arrow -->
+      <line x1="612" y1="100" x2="718" y2="100" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arr)"/>
+      <text x="665" y="92" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#dc2626">Capital shortfall</text>
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626"/>
+        </marker>
+      </defs>
+
+      <!-- Legend -->
+      <g transform="translate(560,135)">
+        <line x1="0" y1="6" x2="24" y2="6" stroke="#3b82f6" stroke-width="2.5"/>
+        <text x="32" y="10" font-family="Inter" font-size="11" fill="#1e3a8a">Normal (thin-tailed) loss distribution</text>
+        <line x1="0" y1="26" x2="24" y2="26" stroke="#f97316" stroke-width="2.5"/>
+        <text x="32" y="30" font-family="Inter" font-size="11" fill="#9a3412">Fat-tailed (empirical) distribution</text>
+        <rect x="0" y="42" width="24" height="10" fill="#fed7aa" stroke="none"/>
+        <text x="32" y="51" font-family="Inter" font-size="11" fill="#9a3412">Extra mass in the tail</text>
+      </g>
+
+      <text x="410" y="440" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">A 2-sigma VaR was the 1990s standard. The 99.9% Basel level is roughly 3.1 sigma. The gap to the empirical tail is where capital is set or lost.</text>
+    </svg>
+    <figcaption>The same body, two very different tails. The fat-tailed distribution assigns meaningfully more probability to losses far from the mean. A model calibrated to the body and extrapolated to the tail is exactly where LTCM, the 2008 mortgage CDO market, and most "six-sigma" bank events came from.</figcaption>
+  </figure>
+
+  <p>A second visual matters almost as much, because it explains what the Gaussian copula got wrong in 2008. Two scatter plots of the same marginals, drawn from two different copulas, produce qualitatively different joint extremes. The Gaussian disperses its joint extremes; the Student-t (or Clayton) keeps them clustered in the corner where joint defaults actually happen.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 820 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tail dependence: Gaussian vs Student-t copula">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Tail dependence: same marginals, different copulas</text>
+
+      <!-- Left panel: Gaussian copula -->
+      <g transform="translate(40,50)">
+        <rect x="0" y="0" width="340" height="320" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="170" y="-12" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#1e3a8a">Gaussian copula (ρ = 0.6)</text>
+        <text x="170" y="340" text-anchor="middle" font-family="Inter" font-size="10" fill="#52525b">Risk 1 (quantile)</text>
+        <text x="-12" y="170" text-anchor="middle" font-family="Inter" font-size="10" fill="#52525b" transform="rotate(-90,-12,170)">Risk 2 (quantile)</text>
+
+        <!-- Gaussian-distributed scatter, ellipse-shaped, sparse corners -->
+        <g fill="#3b82f6" opacity="0.55">
+          <!-- body (mid-range) -->
+          <circle cx="170" cy="160" r="2"/><circle cx="155" cy="170" r="2"/><circle cx="180" cy="155" r="2"/><circle cx="165" cy="175" r="2"/><circle cx="190" cy="150" r="2"/>
+          <circle cx="160" cy="155" r="2"/><circle cx="175" cy="165" r="2"/><circle cx="150" cy="180" r="2"/><circle cx="200" cy="145" r="2"/><circle cx="145" cy="190" r="2"/>
+          <circle cx="195" cy="155" r="2"/><circle cx="185" cy="170" r="2"/><circle cx="170" cy="180" r="2"/><circle cx="160" cy="165" r="2"/><circle cx="205" cy="160" r="2"/>
+          <circle cx="140" cy="175" r="2"/><circle cx="210" cy="170" r="2"/><circle cx="155" cy="195" r="2"/><circle cx="220" cy="180" r="2"/><circle cx="130" cy="160" r="2"/>
+          <circle cx="225" cy="190" r="2"/><circle cx="135" cy="200" r="2"/><circle cx="115" cy="170" r="2"/><circle cx="230" cy="175" r="2"/><circle cx="120" cy="195" r="2"/>
+          <circle cx="240" cy="195" r="2"/><circle cx="110" cy="180" r="2"/><circle cx="105" cy="190" r="2"/><circle cx="245" cy="205" r="2"/><circle cx="95" cy="165" r="2"/>
+          <circle cx="250" cy="180" r="2"/><circle cx="125" cy="215" r="2"/><circle cx="265" cy="200" r="2"/><circle cx="85" cy="195" r="2"/><circle cx="270" cy="215" r="2"/>
+          <!-- thinner extension -->
+          <circle cx="280" cy="220" r="2"/><circle cx="75" cy="180" r="2"/><circle cx="285" cy="200" r="2"/><circle cx="80" cy="210" r="2"/><circle cx="60" cy="190" r="2"/>
+          <circle cx="295" cy="235" r="2"/><circle cx="70" cy="220" r="2"/><circle cx="300" cy="225" r="2"/><circle cx="55" cy="170" r="2"/><circle cx="305" cy="240" r="2"/>
+          <!-- sparse corners -->
+          <circle cx="320" cy="260" r="2"/><circle cx="35" cy="240" r="2"/>
+          <circle cx="310" cy="250" r="2"/><circle cx="45" cy="225" r="2"/>
+        </g>
+
+        <!-- Highlight corner: thin/sparse cluster -->
+        <rect x="285" y="245" width="55" height="75" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="312" y="280" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#dc2626">No joint</text>
+        <text x="312" y="295" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#dc2626">tail cluster</text>
+      </g>
+
+      <!-- Right panel: Student-t copula -->
+      <g transform="translate(440,50)">
+        <rect x="0" y="0" width="340" height="320" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+        <text x="170" y="-12" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#9a3412">Student-t copula (ρ = 0.6, df = 4)</text>
+        <text x="170" y="340" text-anchor="middle" font-family="Inter" font-size="10" fill="#52525b">Risk 1 (quantile)</text>
+        <text x="-12" y="170" text-anchor="middle" font-family="Inter" font-size="10" fill="#52525b" transform="rotate(-90,-12,170)">Risk 2 (quantile)</text>
+
+        <!-- Student-t scatter, similar body but heavy clustering in corners -->
+        <g fill="#f97316" opacity="0.55">
+          <!-- body (same as Gaussian) -->
+          <circle cx="170" cy="160" r="2"/><circle cx="155" cy="170" r="2"/><circle cx="180" cy="155" r="2"/><circle cx="165" cy="175" r="2"/><circle cx="190" cy="150" r="2"/>
+          <circle cx="160" cy="155" r="2"/><circle cx="175" cy="165" r="2"/><circle cx="150" cy="180" r="2"/><circle cx="200" cy="145" r="2"/><circle cx="145" cy="190" r="2"/>
+          <circle cx="195" cy="155" r="2"/><circle cx="185" cy="170" r="2"/><circle cx="170" cy="180" r="2"/><circle cx="160" cy="165" r="2"/><circle cx="205" cy="160" r="2"/>
+          <circle cx="140" cy="175" r="2"/><circle cx="210" cy="170" r="2"/><circle cx="155" cy="195" r="2"/><circle cx="220" cy="180" r="2"/><circle cx="130" cy="160" r="2"/>
+          <circle cx="225" cy="190" r="2"/><circle cx="135" cy="200" r="2"/><circle cx="115" cy="170" r="2"/><circle cx="230" cy="175" r="2"/><circle cx="120" cy="195" r="2"/>
+          <!-- denser corners (tail dependence) -->
+          <circle cx="295" cy="265" r="2"/><circle cx="305" cy="270" r="2"/><circle cx="288" cy="278" r="2"/><circle cx="312" cy="285" r="2"/><circle cx="298" cy="292" r="2"/>
+          <circle cx="318" cy="262" r="2"/><circle cx="282" cy="290" r="2"/><circle cx="307" cy="298" r="2"/><circle cx="290" cy="262" r="2"/><circle cx="315" cy="278" r="2"/>
+          <circle cx="300" cy="250" r="2"/><circle cx="322" cy="295" r="2"/><circle cx="285" cy="252" r="2"/><circle cx="295" cy="305" r="2"/><circle cx="310" cy="245" r="2"/>
+          <circle cx="278" cy="265" r="2"/><circle cx="325" cy="270" r="2"/><circle cx="293" cy="248" r="2"/><circle cx="305" cy="312" r="2"/><circle cx="318" cy="305" r="2"/>
+          <!-- lower-left corner cluster -->
+          <circle cx="45" cy="55" r="2"/><circle cx="35" cy="50" r="2"/><circle cx="52" cy="42" r="2"/><circle cx="28" cy="65" r="2"/><circle cx="58" cy="58" r="2"/>
+          <circle cx="22" cy="48" r="2"/><circle cx="40" cy="38" r="2"/><circle cx="50" cy="65" r="2"/><circle cx="32" cy="58" r="2"/><circle cx="45" cy="72" r="2"/>
+          <circle cx="60" cy="50" r="2"/><circle cx="18" cy="58" r="2"/><circle cx="42" cy="60" r="2"/><circle cx="55" cy="75" r="2"/><circle cx="38" cy="78" r="2"/>
+        </g>
+
+        <!-- Highlight corner: dense cluster -->
+        <rect x="275" y="240" width="60" height="80" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="305" y="275" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#dc2626">Joint tail</text>
+        <text x="305" y="290" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#dc2626">cluster</text>
+      </g>
+
+      <text x="410" y="405" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">Same marginals, same linear correlation, different copula. The Gaussian's missing corner is the 2008 mortgage CDO loss.</text>
+    </svg>
+    <figcaption>Tail dependence is a property of the copula, not the marginals. Two models with identical linear correlation can produce qualitatively different joint extreme behaviour. This is the single most important visual for understanding why 2008 happened.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The five trade-offs of every risk model</h3>
+  <p>Every measurement choice navigates the same five tensions. <strong>Clarity and simplicity</strong>, because a model nobody understands is a model that nobody can challenge. <strong>IT cost</strong>, because a model that runs for three days cannot be used to make a same-day pricing decision. <strong>Data availability</strong>, because most banks have plenty of recent data and very little tail data. <strong>Non-linearity</strong>, because risks compound in ways that linear approximations miss. And <strong>over-reliance on assumptions</strong>, because every assumption built into a model is a forecast about the future from a sample of the past.</p>
+
+  <p>The most important caveat: numbers from a model are not the final answer. Management judgement is integral to risk management. Some risks (reputational, strategic, conduct) are largely unquantifiable. Benchmarking against peer banks is helpful for validation but creates its own problem: if every bank uses the same model with the same assumptions, an error common to all of them becomes systemic rather than idiosyncratic. The 2008 mortgage CDO crisis was exactly this dynamic at industry scale.</p>
+
+  <div class="callout warn">
+    <span class="tag">The use test</span>
+    Pillar 1 IMA, IMM, and IRB approvals all require the bank to demonstrate that the model is used in actual day-to-day decisions (pricing, limit setting, capital allocation, performance measurement), not only for the regulatory return. A model that produces a number nobody acts on fails the test, even if its mathematics are impeccable. The use test is the supervisory anchor for the broader principle that measurement is only useful when it changes a decision.
+  </div>
+
+  <h3>The measurement toolkit: five families plus an ML cross-cut</h3>
+
+  <h4>Sensitivity and analytical methods</h4>
+  <p>Closed-form derivatives that measure how a position's value changes for a small move in a single risk factor. The Greeks (delta, gamma, vega, rho, theta) for options, PV01 or DV01 for fixed income, key-rate durations across the term structure, convexity for second-order interest-rate sensitivity, spread DV01 for credit, FX delta per currency pair. Fast, transparent, and the workhorse of intraday market-risk monitoring and the FRTB Sensitivities-Based Method. The weakness is linearisation: for large moves or discontinuous payoffs (digital options, structured credit tranches) the approximation breaks down and full revaluation is required.</p>
+
+  <h4>Scenario analysis and stress testing</h4>
+  <p>Evaluating portfolio impact under a defined set of risk-factor moves, without imposing a distributional assumption on the moves. Three flavours: historical (2008, LTCM, the 2020 pandemic week), hypothetical (a synthetic recession, a 200 bp parallel rate shock), and reverse stress tests (what set of moves would breach the capital floor or render the business model unviable). Reverse stress testing under PRA SS3/18 is now an explicit Pillar 2A expectation: forward scenarios anchor on plausible loss paths, reverse engineering exposes the cliff edge. The regulator-prescribed variant covers the EBA EU-wide stress test, the Bank of England's annual cyclical scenario, US DFAST and CCAR, and Pillar 2B. Scenario analysis is the dominant technique where data does not support a distributional approach: operational tail events, climate transition, sovereign default, and concentrated wholesale exposures.</p>
+
+  <h4>Statistical and econometric models</h4>
+  <p>Fit a closed-form distribution or regression to historical experience and project future outcomes. Logistic regression and gradient-boosted scorecards for PD, GLMs for LGD, time-series models (ARMA, GARCH, EGARCH) for market-risk volatility, Cox proportional-hazards for time to default, variance-covariance VaR, and the loss-distribution approach for operational risk (Poisson frequency, lognormal or generalised Pareto severity, convolved to give the aggregate loss). Retail credit portfolios, where data is plentiful and homogeneous segments can be defined, are the natural home. Wholesale credit, with few defaults, is much less hospitable. A recurring choice inside the family is between <strong>through-the-cycle</strong> (smoothed long-run averages, used for IRB capital) and <strong>point-in-time</strong> (tracks the current state of the economy, used for IFRS 9 ECL) estimators. Using PIT inside a capital model creates procyclicality, which is the dynamic the Basel countercyclical capital buffer was designed to dampen.</p>
+
+  <h4>Simulation methods</h4>
+  <p>Generate a large number of possible portfolio outcomes and read risk measures off the resulting empirical distribution. Three standard implementations: Monte Carlo (sample from a chosen joint distribution and revalue), historical simulation (replay the last N days of observed moves on today's portfolio), filtered historical simulation (combine historical innovations with a current-volatility filter). Simulation is the dominant technique for VaR and ES in trading books with non-linear instruments, for economic capital aggregation, and for full balance-sheet projections. Two technical choices matter: the joint distribution being sampled is itself a modelling assumption (a Gaussian copula gives different tail behaviour from a Student-t on the same marginals), and variance-reduction techniques (antithetic variates, importance sampling) can cut required paths by an order of magnitude.</p>
+
+  <h4>Qualitative and expert methods</h4>
+  <p>Risks that cannot be calibrated from historical data, either because the data does not exist (a new product, an emerging risk) or because the loss is intrinsically hard to quantify (reputational, conduct, strategic). RCSA, Delphi panels, expert scenario workshops, and judgemental overlays applied to model output. Central to operational risk; the principal tool for climate and emerging-risk assessment; the standard mechanism for setting inter-risk correlation assumptions in economic capital aggregation, where data is too sparse to estimate dependencies directly.</p>
+
+  <h4>Machine learning as a cross-cut</h4>
+  <p>ML is not a parallel family so much as a class of estimator that sits inside any of the others: as the regression engine inside a PD scorecard, as the conditional density used to generate Monte Carlo paths, as the producer of economic-state inputs for stress scenarios, or as the pattern detector inside operational-risk early-warning indicators. Banking adoption has favoured lower-risk applications first (fraud, marketing, transaction monitoring), with regulatory PD / LGD / EAD lagging behind because of the model-risk burden and the SR 11-7 / SS1/23 expectation of explainability.</p>
+
+  <p>The standard list of considerations for adopting AI and ML in risk management:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:28%">Consideration</th>
+          <th style="width:72%">Why it matters</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Explainability and interpretability</td>
+          <td>Output must be sense-checked, not blindly accepted. SHAP values, partial-dependence plots, monotonic features, and surrogate models help. The PRA's SS1/23 and the EU AI Act both push toward documented explainability for material models.</td>
+        </tr>
+        <tr>
+          <td>Bias</td>
+          <td>Bias in the calibration data produces biased outputs. If past credit decisions reflected discrimination, the model will reproduce it. Bias testing must be an explicit part of validation.</td>
+        </tr>
+        <tr>
+          <td>Overfitting and feature engineering</td>
+          <td>ML models can fit a calibration set perfectly and generalise poorly. Disciplined train / validate / test splits, regularisation, and hyperparameter tuning matter more than in classical models.</td>
+        </tr>
+        <tr>
+          <td>IT infrastructure integration</td>
+          <td>A model that performs well in research but takes a day to score every transaction is unusable in production. Compute cost, latency, and integration with source systems are first-order design constraints.</td>
+        </tr>
+        <tr>
+          <td>Model supervision and recalibration</td>
+          <td>Dynamic models adapt quickly but can drift outside the original validation envelope. Static models are stable but go stale. The bank must decide explicitly which regime each model operates in.</td>
+        </tr>
+        <tr>
+          <td>Regulation</td>
+          <td>GDPR, the EU AI Act, the PRA's SS1/23, and equivalent regulations elsewhere constrain what data can be used and how models must be governed.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Most real measurement exercises combine several families. ALM uses sensitivity (duration gap), scenario analysis (NII and EVE under prescribed shocks), and simulation (stochastic balance-sheet projections) in parallel. Cashflow projection for funding planning combines deterministic scenarios with statistical or ML behavioural modelling of non-maturity deposits. Credit portfolio management combines factor models, copula simulation, and scenario analysis. Operational risk capital combines LDA, internal and external loss data, scenario analysis, and ML early-warning. The supervisory expectation under ICAAP and SREP is that the bank can articulate why each technique is appropriate for the risk being measured.</p>
+
+  <h3>Risk aggregation</h3>
+  <p>Once each risk has been measured at the sub-portfolio level, the numbers must be combined to give a firm-wide picture. Risks offset, risk action at the sub-portfolio level may be unnecessary if a firm-level offset already exists, and measurement must consider not only position size but also potential loss and effect on capital. Five aggregation approaches dominate, in increasing order of sophistication.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The aggregation ladder">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The aggregation ladder: trading diversification benefit against model risk</text>
+
+      <!-- Axes -->
+      <line x1="80" y1="240" x2="780" y2="240" stroke="#52525b" stroke-width="1.5"/>
+      <line x1="80" y1="60" x2="80" y2="240" stroke="#52525b" stroke-width="1.5"/>
+
+      <!-- Axis labels -->
+      <text x="430" y="295" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#52525b">Model sophistication and data demand →</text>
+      <text x="40" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#52525b" transform="rotate(-90,40,150)">Diversification benefit captured →</text>
+
+      <!-- Five rungs -->
+      <g font-family="Inter" font-size="11" fill="#18181b">
+        <!-- 1. Summation -->
+        <rect x="100" y="210" width="120" height="28" fill="#fef3c7" stroke="#92400e" stroke-width="1.5"/>
+        <text x="160" y="228" text-anchor="middle" font-weight="600">Summation</text>
+        <text x="160" y="258" text-anchor="middle" font-size="9" fill="#71717a">No diversification</text>
+
+        <!-- 2. Constant diversification -->
+        <rect x="240" y="180" width="120" height="28" fill="#fde68a" stroke="#92400e" stroke-width="1.5"/>
+        <text x="300" y="198" text-anchor="middle" font-weight="600">Constant divers.</text>
+        <text x="300" y="228" text-anchor="middle" font-size="9" fill="#71717a">Flat % haircut</text>
+
+        <!-- 3. Variance-covariance -->
+        <rect x="380" y="140" width="120" height="28" fill="#fcd34d" stroke="#92400e" stroke-width="1.5"/>
+        <text x="440" y="158" text-anchor="middle" font-weight="600">Variance-covar.</text>
+        <text x="440" y="188" text-anchor="middle" font-size="9" fill="#71717a">Pairwise corr.</text>
+
+        <!-- 4. Copula -->
+        <rect x="520" y="100" width="120" height="28" fill="#fbbf24" stroke="#92400e" stroke-width="1.5"/>
+        <text x="580" y="118" text-anchor="middle" font-weight="600">Copula</text>
+        <text x="580" y="148" text-anchor="middle" font-size="9" fill="#71717a">Tail dependence</text>
+
+        <!-- 5. Full modelling -->
+        <rect x="660" y="65" width="120" height="28" fill="#f59e0b" stroke="#92400e" stroke-width="1.5"/>
+        <text x="720" y="83" text-anchor="middle" font-weight="600">Full modelling</text>
+        <text x="720" y="113" text-anchor="middle" font-size="9" fill="#71717a">Every factor</text>
+      </g>
+
+      <!-- Connecting arrow / trend line -->
+      <line x1="160" y1="210" x2="720" y2="79" stroke="#dc2626" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+
+      <!-- Right-side annotation: model risk -->
+      <text x="800" y="220" text-anchor="end" font-family="Inter" font-size="10" font-style="italic" fill="#dc2626">Model risk introduced ↑</text>
+
+      <text x="410" y="312" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#71717a">More sophisticated approaches capture more diversification, but each step adds calibration and model risk.</text>
+    </svg>
+    <figcaption>Each rung adds a layer of dependence modelling and pulls in more diversification benefit. Each rung also adds calibration assumptions that can be wrong. The honest aggregation answer sits between summation and full modelling, and the choice is governed by data availability, materiality, and supervisory expectation.</figcaption>
+  </figure>
+
+  <p>For total economic capital across the bank under the variance-covariance formulation:</p>
+
+  $$\mathrm{EC}_{\text{total}} \;=\; \sqrt{\mathbf{EC}^{\top} \, \boldsymbol{\Sigma} \, \mathbf{EC}}$$
+
+  <p>where \(\mathbf{EC}\) is the vector of risk-type economic capital and \(\boldsymbol{\Sigma}\) is the inter-risk correlation matrix. A typical ICAAP inter-risk correlation matrix looks like the table below (the values are illustrative; the actual numbers are bank-specific and routinely challenged by the supervisor):</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:18%">\(\boldsymbol{\Sigma}\)</th>
+          <th>Credit</th>
+          <th>Market</th>
+          <th>Operational</th>
+          <th>IRRBB</th>
+          <th>Business</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th>Credit</th><td><strong>1.00</strong></td><td>0.50</td><td>0.30</td><td>0.50</td><td>0.50</td></tr>
+        <tr><th>Market</th><td>0.50</td><td><strong>1.00</strong></td><td>0.30</td><td>0.70</td><td>0.50</td></tr>
+        <tr><th>Operational</th><td>0.30</td><td>0.30</td><td><strong>1.00</strong></td><td>0.30</td><td>0.30</td></tr>
+        <tr><th>IRRBB</th><td>0.50</td><td>0.70</td><td>0.30</td><td><strong>1.00</strong></td><td>0.50</td></tr>
+        <tr><th>Business</th><td>0.50</td><td>0.50</td><td>0.30</td><td>0.50</td><td><strong>1.00</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Inter-risk correlations (credit / operational, market / credit, climate / credit) are difficult to estimate from data and are typically set conservatively from expert judgement or supervisory guidance, in the 0.3 to 0.5 range. The diagonal is always 1, the matrix must be symmetric, and the choice of off-diagonal values is what determines the firm-level diversification benefit, which usually lands in the 10 to 25% range. This line is one of the most heavily debated entries in the ICAAP.</p>
+
+  <p>BCBS 239 sits behind all of this. The Basel Committee's 2013 standard required G-SIBs to be able to aggregate risk data quickly, accurately, and across business lines by January 2016. Complex group structures and businesses spanning legal entities and regions must not hinder aggregation. Compliance is still uneven a decade later, and BCBS 239 deficiencies are a routine finding in supervisory reviews.</p>
+
+  <h3>Copula families and tail dependence</h3>
+  <p>A <strong>copula</strong> is a function linking a multivariate joint distribution to its marginals: each marginal can be chosen independently, and the joint dependence is specified separately. Four families dominate, and they differ most importantly in how they treat joint extremes.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:20%">Copula family</th>
+          <th style="width:24%">Tail dependence</th>
+          <th style="width:56%">Where it is used and what it gets wrong</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Gaussian</td>
+          <td>None (\(\lambda_L = \lambda_U = 0\))</td>
+          <td>Tractable, easy to calibrate from a correlation matrix, the workhorse of CreditMetrics and the original synthetic CDO market. In the limit, joint extremes are no more correlated than the body of the distribution. This is the failure mode the 2008 mortgage CDO market hit.</td>
+        </tr>
+        <tr>
+          <td>Student-t</td>
+          <td>Symmetric (\(\lambda_L = \lambda_U &gt; 0\))</td>
+          <td>Same elliptical structure as the Gaussian but with a degrees-of-freedom parameter controlling tail heaviness. Often the first improvement over Gaussian when joint stress matters.</td>
+        </tr>
+        <tr>
+          <td>Clayton (Archimedean)</td>
+          <td>Lower tail only (\(\lambda_L &gt; 0\), \(\lambda_U = 0\))</td>
+          <td>Suitable for joint default modelling where the concern is co-movement in losses rather than gains.</td>
+        </tr>
+        <tr>
+          <td>Gumbel (Archimedean)</td>
+          <td>Upper tail only (\(\lambda_L = 0\), \(\lambda_U &gt; 0\))</td>
+          <td>Used in operational risk and insurance for joint large-loss modelling.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The tail-dependence coefficient <code>lambda_L</code> is the limiting conditional probability that one variable lies in its lower tail given that the other does. For the Gaussian, <code>lambda_L = 0</code> regardless of correlation; for the Student-t, it is strictly positive as long as the degrees of freedom are finite. Choosing the copula chooses how the model behaves in exactly the region capital is set against.</p>
+
+  <h3>Diversification, correlation, and wrong-way risk</h3>
+  <p>Diversification protects against <strong>idiosyncratic</strong> risk (the borrower that defaults for borrower-specific reasons). It does not protect against <strong>systemic</strong> risk (the recession that defaults a whole sector). The limitations are worth memorising.</p>
+
+  <div class="defcard">
+    <h4>Five limitations of diversification</h4>
+    <p>Specialised or regional banks may have no realistic path to diversify (US banks before interstate banking deregulation).</p>
+    <p>Diversification is not a solution to risks the bank does not understand; lending into unfamiliar sectors exchanges one risk for several others.</p>
+    <p>It is not a substitute for credit quality. Provisions and capital absorb losses only up to a point.</p>
+    <p>Default correlation rises sharply in deteriorating conditions, faster than asset return correlation. Diversification calculated in benign periods is weaker in a stress.</p>
+    <p>Diversification for investment returns is not the same as diversification for credit risk. The former is about the upside, the latter the downside.</p>
+  </div>
+
+  <p>The US Comptroller of the Currency has identified eight kinds of borrower relationship producing high correlation: same group structure, same guarantor, dependence on the same manufacturer, same industry or sector, all in the financial sector, concentrated geographically, owned by a foreign government, or secured by a common debt or equity instrument. Product areas where correlation has caused historic concentration risk include retail (credit cards, home equity), leveraged loans, CDOs, and commercial real estate. The 2008 crisis was, in retrospect, a national-scale commercial and residential real estate concentration event.</p>
+
+  <p><strong>Wrong-way risk</strong> arises in counterparty credit exposure when the size of the exposure is positively correlated with the probability of the counterparty's default. General wrong-way risk is driven by macroeconomic factors; specific wrong-way risk is structural (an option bought from a counterparty referencing the counterparty's own equity). Both are addressed in the Basel IMM and SA-CCR rules, and they are the canonical reason for collateral haircuts and CVA capital. The AIG / Lehman dynamic in 2008 is the largest realised instance of correlation between a credit exposure and the counterparty providing the hedge.</p>
+
+  <h3>Tail risk and extreme value theory</h3>
+  <p>Tail-aware risk measures and extreme value theory are central rather than incidental, because almost every realised loss event in banking history sits in the part of the distribution where the normal approximation has already broken down.</p>
+
+  <h4>Coherent risk measures and the four axioms</h4>
+  <p>Artzner, Delbaen, Eber and Heath (1999) defined a coherent risk measure by four axioms: <strong>monotonicity</strong> (if A always loses at least as much as B, A is at least as risky), <strong>subadditivity</strong> (Risk(A + B) is no greater than Risk(A) + Risk(B), so diversification cannot increase risk), <strong>positive homogeneity</strong> (doubling the position doubles the risk), and <strong>translation invariance</strong> (adding cash reduces risk by the same amount). VaR fails subadditivity in general; expected shortfall (ES, also called CVaR or TVaR) satisfies all four. This is the theoretical reason FRTB replaced VaR with ES at the 97.5% level for trading-book capital, effective January 2023.</p>
+
+  <h4>Extreme value theory</h4>
+  <p>EVT provides the asymptotic distribution of extreme observations under weak assumptions about the underlying loss distribution. Two approaches.</p>
+
+  <p><strong>Block maxima.</strong> Partition the sample into blocks (monthly, quarterly), take the maximum loss per block, and fit the generalised extreme value (GEV) distribution to the resulting series. The Fisher-Tippett-Gnedenko theorem guarantees that block maxima of any well-behaved underlying converge to one of three GEV types (Gumbel, Fréchet, Weibull), parameterised by a shape parameter that controls tail heaviness. The approach is data-hungry because most of the sample is discarded.</p>
+
+  <p><strong>Peaks over threshold (POT).</strong> Fit a generalised Pareto distribution (GPD) to losses exceeding a chosen high threshold. The Pickands-Balkema-de Haan theorem guarantees that exceedances over a sufficiently high threshold converge to a GPD. POT uses the data more efficiently than block maxima but requires the analyst to choose a threshold. Mean-excess plots and Hill plots are the standard diagnostics.</p>
+
+  <p>EVT is standard for the tail of operational loss distributions (LDA body fitted with a lognormal, tail with a GPD), for stressed-VaR and stress-ES, and for climate transition losses where the tail is the entire point. The caveat is that EVT is an asymptotic result. In finite samples with very few tail observations, both the shape parameter and tail-VaR are estimated with wide confidence intervals. EVT does not eliminate tail uncertainty; it bounds it.</p>
+
+  <h4>Spectral and distortion measures</h4>
+  <p>A <strong>distortion risk measure</strong> assigns weights to the loss distribution that depend on the quantile. VaR weights one quantile; ES weights all losses beyond a threshold equally. A <strong>spectral risk measure</strong> generalises ES with an arbitrary non-increasing weighting function, allowing a risk-averse user to place heavier weight on more extreme losses. The Wang transform is one analytically tractable example used in insurance pricing. Spectral measures retain coherence as long as the weighting function is non-increasing, and they appear in some banks' economic capital frameworks where management risk-aversion is expressed explicitly rather than implicitly through a chosen confidence level.</p>
+
+  <h3>Model risk and validation</h3>
+  <p>Every measurement model has model risk, and model risk is now a regulated risk type in its own right. The two anchor texts are <strong>SR 11-7</strong> (Federal Reserve, 2011) and <strong>SS1/23</strong> (PRA, 2023, superseding SS3/18). Both formalise the discipline of validating, monitoring, and governing the models that produce regulatory and management numbers.</p>
+
+  <p>The three sources of model risk are <strong>specification</strong> (the functional form or distribution does not represent the underlying risk), <strong>parameter</strong> (form is correct but estimates are wrong because the sample is small, biased, or non-representative), and <strong>implementation</strong> (mathematics and parameters are correct but the production code, feeds, or version control are not). The three SR 11-7 validation pillars are <strong>conceptual soundness</strong>, <strong>ongoing monitoring</strong>, and <strong>outcomes analysis</strong>.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:22%">Technique</th>
+          <th style="width:48%">What it does</th>
+          <th style="width:30%">What it protects against</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Backtesting</td>
+          <td>Kupiec proportion-of-failures test checks whether the breach count matches the stated confidence level (binomial likelihood ratio). Christoffersen independence test checks whether breaches cluster in time. Both combine in Christoffersen's conditional coverage. The Basel traffic-light approach translates breach counts on 250-day windows into a regulatory capital multiplier: zero to four green (multiplier 3.0), five to nine yellow (scaling to 3.85), ten or more red (4.0 plus a likely revocation conversation).</td>
+          <td>Silent calibration drift; miscalibration of the confidence level; regime change the model does not detect.</td>
+        </tr>
+        <tr>
+          <td>Challenger models</td>
+          <td>An independent model run in parallel with the production model on the same exposures, calibrated under different assumptions or with a different functional form. Material divergence prompts investigation.</td>
+          <td>Overfitting, specification bias, and supervisory groupthink.</td>
+        </tr>
+        <tr>
+          <td>Benchmarking</td>
+          <td>External comparators (peer banks, vendor models, supervisory benchmarks).</td>
+          <td>Useful for individual-bank validation but reintroduces the systemic-risk problem: convergence on the same answer is not convergence on the correct answer.</td>
+        </tr>
+        <tr>
+          <td>Margins of conservatism</td>
+          <td>Explicit add-ons sized to identified weaknesses. The EBA Guidelines structure MoCs into category A (data and methodology deficiencies), category B (drift between calibration and application portfolio), and category C (residual uncertainty). Reduced as the underlying deficiency is remediated.</td>
+          <td>Known but unfixable model weaknesses being silently ignored rather than carried explicitly on the capital plan.</td>
+        </tr>
+        <tr>
+          <td>Model inventory and tiering</td>
+          <td>Every material model logged, with validation intensity scaled to materiality. Board-level ownership under the senior managers regime. Independent validation function reports to the CRO, not to model development.</td>
+          <td>Shadow models, undocumented changes, and validation captured by the model development team.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Simple often beats complex</h3>
+  <p>The 2008 crisis taught a generation of risk managers that more sophisticated does not mean more accurate. A model with three parameters that you can explain to the board often outperforms a model with thirty parameters fitted to ten years of benign data. Andrew Haldane's "The dog and the frisbee" (BIS, 2012) made the case formally: under uncertainty about the data-generating process, simpler models often have lower out-of-sample error than complex ones, because complex models overfit the historical sample. The leverage ratio (a single number, no model) outperformed the risk-weighted capital ratio (a sophisticated weighted average) as a predictor of which banks would fail in 2008. The lesson is not "abandon models", it is "match the model's complexity to the data's information content".</p>
+
+  <h3>The Gaussian copula story</h3>
+  <p>David X. Li's 2000 paper "On Default Correlation: A Copula Function Approach" gave the industry a tractable way to model joint defaults across many names. The formulation used a Gaussian copula to link marginal default-time distributions and became the standard pricing engine for synthetic CDOs. The flaw was a thin tail in the dependence structure: the Gaussian has zero tail dependence, so joint extreme defaults are no more correlated than the body of the distribution. When US housing markets fell nationally in 2007 to 2008, tranches the model had said were independent turned out to be highly correlated, and the entire stack repriced violently. The episode is the canonical case study in the limits of any model that depends on the historical sample being representative, and a clean argument for Student-t, Clayton, or full simulation in any context where joint tails matter.</p>
+
+  <h3>Procyclicality and the TTC versus PIT choice</h3>
+  <p>A point-in-time PD tracks the current state of the economy; a through-the-cycle PD smooths cyclical variation. Using PIT inside a capital model creates procyclicality: capital requirements rise as the cycle deteriorates, forcing banks to deleverage exactly when credit is most needed, which deepens the downturn. IRB capital therefore uses TTC PD. IFRS 9 ECL, which is meant to be forward-looking and responsive to current conditions, uses PIT (or hybrid) PD. The two estimators of the same physical phenomenon serve different purposes, and the choice is policy as much as it is methodology. The Basel countercyclical capital buffer was introduced to lean against the residual procyclicality the choice does not remove.</p>
+
+  <h3>Model risk as a measurement risk</h3>
+  <p>Every measurement model has model risk: the risk that the model is wrong. SR 11-7 in the US and SS1/23 in the UK formalise the discipline. The standard mitigants are an inventory of material models, an independent validation function, ongoing performance monitoring, formal challenger models, and explicit margins of conservatism added to model outputs. The deeper point is that the act of measurement does not eliminate uncertainty about the true risk; it transforms one kind of uncertainty into another, and the residual uncertainty needs to be carried somewhere on the capital plan.</p>
+
+  <h3>The "weapons of model destruction" problem</h3>
+  <p>Cathy O'Neil's framing: when many actors rely on the same model, the model's errors do not cancel out, they amplify. Every bank using the same VaR methodology with the same historical window reaches the same wrong answer at the same moment. Every credit card issuer using the same fraud score lets the same fraud through. The solution is not for each bank to invent its own methodology (regulators require consistency) but to combine the standard model with idiosyncratic overlays, alternative challenger models, and judgement that does not look like everyone else's.</p>
+
+  <h3>The aggregation correlation matrix is mostly judgement</h3>
+  <p>The economic capital aggregation formula is mathematically clean. The correlation matrix that feeds it is, in almost every bank, a collection of educated guesses. There is no recent data set that supports a precise correlation estimate between credit and operational risk, or between liquidity and reputational risk, at the firm level. Banks therefore set these correlations conservatively (typically in the 0.3 to 0.5 range) and document the choice. The diversification benefit that emerges is sensitive to those choices, and a supervisor reviewing the ICAAP will probe the documentation directly.</p>
+
+  <h3>When measurement and management diverge</h3>
+  <p>A subtler failure mode: the measurement framework can be technically correct and operationally irrelevant. The risk number rolls into a weekly committee pack, the committee ticks it, and the business unit continues to do what it was going to do anyway. Measurement is only useful if it changes a decision. The strongest risk functions build the loop explicitly: every risk metric on the committee dashboard has an attached decision criterion, and the meeting minutes record which decisions were made in response. Measurement that does not surface in decisions is theatre.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the five trade-offs that every risk model must navigate.</li>
+      <li>Name the five methodology families in the measurement toolkit, and explain why machine learning is treated as a cross-cut rather than a sixth family.</li>
+      <li>What is a "fat-tailed" loss distribution, and why does it matter for a model calibrated to the body of the distribution but used to set 99.9% capital?</li>
+      <li>State the four Artzner axioms for a coherent risk measure. Which axiom does VaR fail, and which standard risk measure satisfies all four?</li>
+      <li>Compare the block-maxima and peaks-over-threshold approaches in extreme value theory. What does each estimate, and what is the principal practical difficulty of each?</li>
+      <li>Name two copula families with non-zero tail dependence and explain why the Gaussian copula does not have tail dependence.</li>
+      <li>List the five aggregation approaches in increasing order of sophistication and identify one trade-off for each.</li>
+      <li>Write down the variance-covariance formula for total economic capital and explain each term. What range does the inter-risk correlation matrix typically sit in, and why?</li>
+      <li>State the three SR 11-7 pillars of model validation, and give one validation technique that operates under each pillar.</li>
+      <li>Explain the difference between general and specific wrong-way risk, and give one example of each.</li>
+      <li>What does BCBS 239 require, and why does it matter for risk measurement?</li>
+      <li>Explain procyclicality, the difference between TTC and PIT PD estimators, and why the choice between them matters for capital versus ECL.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Source:</strong> <code>docs/wiki/application/banking/01_internal_environment/risk_management/04-risk_measurement.md</code></p>
+
+    <p><strong>Within this lecture series:</strong></p>
+    <ul>
+      <li>Lecture 7 (<a href="01-risk_management.html">risk management process</a>): measurement is the third step in the process, after identification and ahead of mitigation.</li>
+      <li>Lecture 8 (<a href="02-risk_appetite.html">risk appetite</a>): the KRIs in the appetite statement are measurements; their reliability depends on the framework here.</li>
+      <li>Lecture 9 (<a href="03-risk_identification.html">risk identification</a>): the taxonomy that defines what is being measured.</li>
+    </ul>
+
+    <p><strong>Forward references:</strong></p>
+    <ul>
+      <li><a href="05-risk_mitigation.html">Risk mitigation</a>: the toolkit for acting on what measurement reveals.</li>
+      <li><a href="06-economic_capital.html">Economic capital</a>: the headline measurement output that feeds capital allocation and the ICAAP.</li>
+      <li><a href="07-icaap.html">ICAAP</a> and <a href="08-srep.html">SREP</a>: where measurement gets stress-tested and challenged.</li>
+      <li>The risk measurement section of the lecture series goes deep on each technique: PD / LGD / EAD modelling under A-IRB, VaR / ES under market risk, the SMA under operational risk, ALM under liquidity and IRRBB.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>Artzner, Delbaen, Eber and Heath, "Coherent measures of risk" (1999). The paper that established the four axioms and identified VaR's failure of subadditivity.</li>
+      <li>Embrechts, Klüppelberg and Mikosch, "Modelling Extremal Events for Insurance and Finance" (1997). The standard reference for EVT in financial applications.</li>
+      <li>BCBS, "Supervisory framework for the use of backtesting in conjunction with internal models" (1996). The origin of the traffic-light approach.</li>
+      <li>EBA, "Guidelines on PD estimation, LGD estimation and the treatment of defaulted exposures" (2017). The EU's MoC framework and the source of categories A, B, and C.</li>
+      <li>BCBS 239, "Principles for effective risk data aggregation and risk reporting" (2013). The reference standard for aggregation infrastructure.</li>
+      <li>Andrew Haldane and Vasileios Madouros, "The dog and the frisbee" (BIS, 2012). The argument that simpler models often beat complex ones under genuine uncertainty.</li>
+      <li>David X. Li, "On Default Correlation: A Copula Function Approach" (2000). The original paper. Read alongside Felix Salmon's retrospective for the cautionary tale.</li>
+      <li>SR 11-7 (Federal Reserve, 2011) and PRA SS1/23 (Bank of England, 2023): the two supervisory anchors for model risk management.</li>
+      <li>Cathy O'Neil, "Weapons of Math Destruction" (2016). On what happens when many actors use the same model.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Phase 1 / Internal environment / Risk management 4 of 8.</span>
+  <span><a href="03-risk_identification.html">Previous: risk identification</a> &middot; <a href="05-risk_mitigation.html">Next: risk mitigation</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script src="../../../../assets/lecture.js"></script>
+</body>
+</html>

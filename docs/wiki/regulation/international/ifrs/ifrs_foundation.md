@@ -17,7 +17,7 @@ The IFRS Foundation has a three-tier governance structure that strengthens our a
 - Trustees from around the world who set our organisational strategy, govern our work and oversee our boards; and
 - A monitoring board of public authorities which enhances our public accountability and oversees the work of our Trustees.
 
-![Local image](foundation.png)
+![Local image](../bis/images/ifrs9/foundation.png)
 
 ## **Monitoring Board**
 
@@ -67,9 +67,9 @@ We receive income from two main sources: contributed revenue and earned revenue.
 
 Contributed revenue is made up of voluntary contributions from jurisdictions; seed funding for the ISSB from Canada, China, Germany and Japan; philanthropic grants; and contributions from companies. Most jurisdictions have established either a levy on companies or a system of publicly supported financing, although funding mechanisms vary.
 
-![local image](uk_funding.png)
+![local image](../bis/images/ifrs9/uk_funding.png)
 
-![alt text](big4_funding.png)
+![alt text](../bis/images/ifrs9/big4_funding.png)
 
 Deloitte, EY, KPMG and PwC have licensing agreements with the Foundation, for which annual fees are received in addition to their voluntary contributions.
 

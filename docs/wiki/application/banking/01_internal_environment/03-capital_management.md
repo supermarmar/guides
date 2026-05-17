@@ -13,7 +13,7 @@ Liquidity and capital can easily be confused. The important distinction is that 
 
 A bank’s capital position and the measurement of capital position is of utmost importance to ensure a bank remains a going concern. Bank capital can be considered as the funding set aside by the bank to cover expected and unexpected losses. The strategy of the bank is therefore closely linked to its capital position and will determine the composition of the capital base.
 
-The need for capital arises due to credit, market, operational, and other financial and non-financial risks that could lead to financial losses. A bank with an adequate capital base will be able to absorb these losses and remain solvent. These losses are categorised as expected losses and unexpected losses. The calculations for capital to be held for expected losses and unexpected losses are set out in the [Basel regulations](..\..\regulation\international\bis\bis.md) and enforced by national regulators.
+The need for capital arises due to credit, market, operational, and other financial and non-financial risks that could lead to financial losses. A bank with an adequate capital base will be able to absorb these losses and remain solvent. These losses are categorised as expected losses and unexpected losses. The calculations for capital to be held for expected losses and unexpected losses are set out in the [Basel regulations](../../../regulation/international/bis/bis.md) and enforced by national regulators.
 
 Banks’ normal course of business involves exposing themselves to risk of loss due to customer loan defaults as well as other risks. [[02-credit_losses|Credit losses]] will vary from one year to the next and are, unsurprisingly, closely correlated to the economic cycle. The extent of losses will be dictated by the amount of exposure, product type, customer credit quality, and the existence of collateral.
 
@@ -26,7 +26,7 @@ Banks must also, however, account for unexpected losses. This should be self-evi
 
 It is for these unexpected losses that banks require a buffer of capital to absorb, and if the bank is to manage itself on a going concern basis, this buffer must be sufficient to absorb losses and still remain above the regulatory minimum. Otherwise, of course, it would no longer be a going concern. This is because a bank that falls even 1 basis point below the regulator’s minimum may suffer a loss of confidence and potentially a run on the bank (as well as the inevitable credit rating downgrade). In most cases, it is the unexpected losses that can lead to the failure of a bank, rather than the expected losses.
 
-Unexpected losses are harder to estimate than expected losses and can arise due to a variety of events, including operational losses. The capital the bank holds therefore needs to cover not only expected losses, but unexpected losses as well. In fact, expected losses should be covered by the spread or profit margin of the products sold for a mature bank. For a detailed treatment of the credit loss distribution, expected losses, unexpected losses, and the Vasicek model underpinning the IRB capital formula, see [Credit Losses](credit_risk\02_airb_capital_modelling\01_introduction\02-credit_losses.md).
+Unexpected losses are harder to estimate than expected losses and can arise due to a variety of events, including operational losses. The capital the bank holds therefore needs to cover not only expected losses, but unexpected losses as well. In fact, expected losses should be covered by the spread or profit margin of the products sold for a mature bank. For a detailed treatment of the credit loss distribution, expected losses, unexpected losses, and the Vasicek model underpinning the IRB capital formula, see [Credit Losses](risk_measurement/credit_risk/a-irb_capital/01_introduction/02-credit_losses.md).
 
 Different banks will have different methodologies to determine the size of their unexpected losses and consequently the required size of their capital base. The size of the bank, the risk they are exposed to, and the operating model are all factors that will determine how the bank manages their capital
 
@@ -158,7 +158,7 @@ The composition of the capital base for the bank is very important. The base req
 
 Pillar 1 uses the risk-weighted assets (RWA) method. Each type of asset the bank holds is assigned a weight and the combined total RWAs multiplied by the [[bis|Basel]] minimum required capital percentage, leads to the minimum required Pillar 1 capital holding. Pillar 1 requirements are determined by considering the credit, market, and operational risks of the bank:
 
-- For credit risk, a bank can apply the standardised approach, foundation internal ratings based (F-IRB) approach, or advanced IRB (A-IRB) approach. For the detailed computation of RWAs under each approach, see [Regulatory Capital](credit_risk\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). This also includes [[02-counterparty_exposures|counterparty credit risk]] as well.
+- For credit risk, a bank can apply the standardised approach, foundation internal ratings based (F-IRB) approach, or advanced IRB (A-IRB) approach. For the detailed computation of RWAs under each approach, see [Regulatory Capital](risk_measurement/credit_risk/a-irb_capital/01_introduction/01-context.md). This also includes [[02-counterparty_exposures|counterparty credit risk]] as well.
 - For [[wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models|market risk]], the bank can apply the standardised approach or an internal [[03-var_limitations|value at risk]] (VaR) model.
 - For operational risk, the basic indicator approach, standardised approach, or advanced measurement approach can be used. With the coming updates to [[basel_framework|Basel III]], the advanced measurement approach will, however, be falling away.
 
@@ -226,7 +226,7 @@ Banks conduct their own [[01-pillar_2b|stress testing]] to determine their addit
 In South Africa, the [[01-pillar_2b|Pillar 2B]] contains both elements of the total [[01-pillar_2b|Pillar 2]] requirements of the UK. [[01-pillar_2b|Pillar 2B]] capital is generally not disclosed publicly. [[01-pillar_2b|Pillar 2B]] does not include requirements for systemically important banks which are set separately.
 #### [[tlac|TLAC]]
 
-Over and above the capital requirements outlined in the [[basel_framework|Basel framework]], the [[fsb|Financial Stability Board]] has also introduced a term sheet containing a separate capital structure over and above [[bis|Basel]] prescribed minimums. The [[fsb|Financial Stability Board]] is an international body that makes recommendations about, and monitors, the global financial system. This structure is applicable to [[g_sibs|G-SIBS]] ([[g_sibs|Global Systemically Important Banks]]) only, but some authorities are considering its application potentially for D-SIBS (Domestic Systemically Important Banks) as well. The framework is referred to as [[tlac|TLAC]] or total loss absorbing capacity. For the full regulatory detail on [[tlac|TLAC]], see [TLAC Principles and Term Sheet](..\..\regulation\international\fsb\tlac.md).
+Over and above the capital requirements outlined in the [[basel_framework|Basel framework]], the [[fsb|Financial Stability Board]] has also introduced a term sheet containing a separate capital structure over and above [[bis|Basel]] prescribed minimums. The [[fsb|Financial Stability Board]] is an international body that makes recommendations about, and monitors, the global financial system. This structure is applicable to [[g_sibs|G-SIBS]] ([[g_sibs|Global Systemically Important Banks]]) only, but some authorities are considering its application potentially for D-SIBS (Domestic Systemically Important Banks) as well. The framework is referred to as [[tlac|TLAC]] or total loss absorbing capacity. For the full regulatory detail on [[tlac|TLAC]], see [TLAC Principles and Term Sheet](../../../regulation/international/fsb/tlac.md).
 
 **Purpose — the "too big to fail" problem.** The GFC exposed a brutal dilemma: when a G-SIB (Global Systemically Important Bank) neared failure, regulators faced two bad options — let it collapse in a disorderly way (systemic contagion) or bail it out with taxpayer money (moral hazard). They almost always chose the bailout. TLAC was designed to make a _third option_ viable: **orderly resolution without public funds**. The mechanism is bail-in — creditors absorb losses and are converted into equity, the bank is recapitalized, and it emerges from resolution still able to perform its critical economic functions.
 
@@ -237,7 +237,7 @@ The minimum TLAC requirement is set as the _higher_ of:
 
 These sit _below_ the combined buffer requirements (capital conservation buffer + G-SIB surcharge), which must be held on top. So a G-SIB's total loss-absorbing stack is: TLAC minimum + capital buffers.
 
-![alt text](tlac.png)
+![alt text](risk_measurement/credit_risk/a-irb_capital/01_introduction/images/tlac.png)
 
 **It's not just capital.** This is the key distinction. Basel III capital (CET1, AT1, Tier 2) covers loss absorption on a going-concern and gone-concern basis. TLAC goes further: it must also cover _recapitalization_ needs post-resolution. To achieve that scale, eligible instruments include not only regulatory capital but also qualifying **bail-in-able senior unsecured debt** — instruments that can be written down or converted in resolution. Calling it purely a "capital requirement" misses this debt component.
 
@@ -259,7 +259,7 @@ The EU parallel is **MREL** (Minimum Requirement for own funds and Eligible Liab
 
 The intent of [[mrel|MREL]] is that it broadly aligns to [[tlac|TLAC]] for [[g_sibs|G-SIBs]] and allows for the potential for additional capital requirements (for the purpose of recapitalisation) for smaller non-SIBs.
 
-![alt text](mrel.png)
+![alt text](risk_measurement/credit_risk/a-irb_capital/01_introduction/images/mrel.png)
 
 #### Leverage Ratio
 

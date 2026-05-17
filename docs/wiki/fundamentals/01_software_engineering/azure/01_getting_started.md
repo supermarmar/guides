@@ -90,12 +90,12 @@ git config --global user.email "your.email@gmail.com"
 
 1. In VS Code, click the Extensions icon (left sidebar) and install the following:
 
-![alt text](ext_1.png)
-![alt text](ext_2.png)
+![alt text](images/ext_1.png)
+![alt text](images/ext_2.png)
 
 1. Activate your file icons theme by going here:
 
-![alt text](file_icons.png)
+![alt text](images/file_icons.png)
 
 ***
 

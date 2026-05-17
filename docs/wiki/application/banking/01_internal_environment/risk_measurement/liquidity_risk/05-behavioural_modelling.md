@@ -15,7 +15,7 @@ Key nuances in [[05-behavioural_modelling|behavioural modelling]] include:
 
 - Digital/mobile-based accounts may behave differently from branch or postal accounts, varying by customer demographic.
 - In markets such as South Africa, very low-income customers may withdraw entire salary payments in cash on pay day, creating predictable but concentrated outflow events.
-- The best approach for optimum liability strategy must be based on conservatism, with supplementary forward-looking stress scenarios, as covered in [Liquidity Metrics](04-liquidity_management.md).
+- The best approach for optimum liability strategy must be based on conservatism, with supplementary forward-looking stress scenarios, as covered in [Liquidity Metrics](../../04-liquidity_management.md).
 
 ## Contractual vs Behavioural Tenor
 

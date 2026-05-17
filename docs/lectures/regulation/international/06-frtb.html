@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 6: FRTB, the fundamental review of the trading book</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="../index.html">Regulation</a> / <a href="index.html">International</a></div>
+  <h1>FRTB: the fundamental review of the trading book</h1>
+  <p class="subtitle">Between 2007 and 2009 the world's largest banks reported trading-book losses many multiples of what their Basel II.5 market-risk capital had implied. The Basel Committee responded by rebuilding the market-risk framework from first principles. The Fundamental Review of the Trading Book redrew the trading-banking book boundary on objective criteria, replaced value-at-risk with stressed expected shortfall, made internal models approvable only at the trading-desk level, identified the non-modellable risk factors that had been hiding inside portfolio-level capital, and added a separate default risk charge. The result is the most significant rewrite of market-risk capital in three decades.</p>
+  <div class="meta">
+    <span>Lecture 6 of 12</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Source: <code>docs/wiki/regulation/international/bis/bcbs_d424.md</code> and BCBS d457</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The <strong>Fundamental Review of the Trading Book (FRTB)</strong> is the Basel Committee's complete redesign of the market-risk capital framework, finalised in BCBS d457 (January 2019, after an earlier 2016 standard d352 was revised). It does five things. First, it redraws the boundary between trading book and banking book on objective tests, with a presumption-based classification and a capital floor on any subsequent switch. Second, it replaces the Basel II.5 standardised approach with a Sensitivities-Based Method (SBM) that capitalises delta, vega, and curvature risks across seven risk classes, plus a Default Risk Charge (DRC) and a Residual Risk Add-On (RRAO). Third, it replaces 10-day 99 per cent value-at-risk with 10-day 97.5 per cent expected shortfall calibrated to a period of significant stress, with liquidity horizons running from 10 to 120 days. Fourth, it makes internal-model approval a desk-by-desk decision, gated by a Profit and Loss Attribution test, a backtest, and a Risk Factor Eligibility Test, with any factor failing the latter capitalised as a Non-Modellable Risk Factor (NMRF) under Stressed Expected Shortfall. Fifth, it adds a Default Risk Charge that mirrors the old Incremental Risk Charge with a one-year 99.9 per cent confidence level. Implementation is 1 January 2025 in the EU and 1 January 2027 in the UK, with most other jurisdictions in the 2025 to 2026 window.</p>
+
+  <p>The change is not an incremental tightening. The whole architecture of market-risk capital has been rewritten. Banks that ran a single bank-wide value-at-risk model and topped it up with stressed VaR and an Incremental Risk Charge now run, per trading desk, an expected shortfall calculation across multiple liquidity horizons, plus separate stressed expected shortfalls for every non-modellable risk factor, plus a default risk charge, plus a standardised approach that has to be reported in parallel because of the output floor. Anyone who has not lived through it underestimates the implementation burden.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine you run a casino. Before FRTB, the regulator asked one question once a day: "if the next 24 hours look like your worst 24 hours in the past 250 days, how much do you lose?" You answered "fifty thousand", they multiplied by three, and that was your reserve. After FRTB, the regulator asks each table separately, every day, three questions. First: "across the worst 2.5 per cent of days in your worst year ever, what is your average loss, and how does that scale up if you cannot exit the table for 60 days?" Second: "are there any chips on this table whose price you cannot actually observe from real trades? If so, stress each one separately and add the worst case." Third: "if any player at this table goes bust overnight, what do you lose?" Add the three answers, do it for every table, then add up across the casino. If any table fails its statistical hygiene check, that table can no longer use your fancy answer, it has to revert to the regulator's textbook answer with a penalty multiplier. That is FRTB.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What is beyond the source</span>
+    The repo's wiki note on FRTB (the BCBS 219 stub) lists the three pillars (boundary, SA, IMA) at a paragraph each. This lecture goes much deeper. It walks through the SBM mechanics with the bucket-aggregation formula and the seven risk classes, develops the expected shortfall calibration including the liquidity-horizon scaling, sets out the three IMA gates (RFET, backtest, PLA) with the actual test metrics (Kolmogorov-Smirnov, Spearman, the traffic-light bands), explains why NMRFs often dominate IMA capital for illiquid fixed income, contrasts the DRC with the old Incremental Risk Charge, and traces implementation status across EU (CRR3), UK (PRA PS9-24), and US (proposed Basel III endgame). The grandmaster section adds the practitioner observations on PLA failure modes, desk reorganisation, and the IMA-versus-SA economics that have driven many banks to abandon internal models entirely.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The post-mortem of 2007 to 2009 identified four specific failures of the Basel II.5 market-risk framework, each of which FRTB explicitly tries to fix.</p>
+
+  <p>The first failure was the trading-banking book boundary. Before FRTB, the boundary was largely a matter of management intent: if a bank declared an instrument to be held for short-term trading, it sat in the trading book and attracted a market-risk capital charge based on a 10-day value-at-risk. If the bank declared the same instrument to be held to maturity or as a longer-term investment, it sat in the banking book and attracted credit-risk capital based on its risk-weighted carrying value. The two capital regimes produced very different numbers for the same instrument. Banks gamed this by booking illiquid corporate bonds and structured credit into the trading book during good years (lower capital under VaR) and quietly reclassifying when markets froze. The Senior Supervisors Group reported in 2008 that several large banks had material trading-book positions whose price they could not observe from any traded market, and whose VaR was therefore essentially fictional.</p>
+
+  <p>The second failure was the choice of value-at-risk as the risk measure. VaR at 99 per cent confidence asks: "what is the loss I will exceed only one day in a hundred?". It answers a question about the quantile of the distribution, not about the tail. Two portfolios with identical VaR can have very different average losses on the days when VaR is breached. VaR also lacks the mathematical property of sub-additivity (the VaR of a sum can exceed the sum of the VaRs), which makes it a non-coherent risk measure in the Artzner et al sense and gives perverse incentives when allocating capital across desks. The trading losses in the crisis were repeatedly orders of magnitude above the pre-stress VaR estimates because the actual distributions had far fatter tails than the recent-history calibration captured.</p>
+
+  <p>The third failure was the internal-model approval architecture. Under Basel II.5, an internal model was approved at the bank-wide level. Capital was calculated on a single aggregated VaR for the consolidated trading portfolio. This had two consequences. First, model performance was assessed against aggregate backtests, so a desk-level model that produced systematically inaccurate predictions could be hidden inside the bank-wide aggregation. Second, the bank-wide approach made cross-desk diversification benefit very large, so internal-model capital came in materially below what the standardised approach would have demanded. The post-crisis review found that the diversification benefit captured in the models was unstable across market regimes.</p>
+
+  <p>The fourth failure was the treatment of illiquid risk factors. Pricing models in 2007 routinely used inputs (correlation skews, basis spreads, off-the-run yield-curve points) for which there was no daily traded-price observation. These were marked using internal proxies and entered the VaR calculation as if they had observable risk. When markets seized, the marks turned out to be wishful, and the VaR turned out to ignore the dimension along which the actual losses occurred. FRTB calls these Non-Modellable Risk Factors and capitalises them separately, with a calibration that is deliberately more conservative than the modellable factors.</p>
+
+  <p>The fifth motivation, less prominent in the publicity but central to the technical design, was the loss of risk sensitivity in the original standardised approach. The Basel I and Basel II.5 standardised approaches used coarse buckets and notional-based add-ons that bore little relationship to the actual price sensitivity of the underlying instruments. As internal-model approvals were tightened, more banks reverted to the standardised approach, and the lack of risk sensitivity became a binding problem. FRTB's SBM is, in effect, a regulator-mandated sensitivity calculator: every bank must compute delta, vega, and curvature for every position against every defined risk factor, then aggregate using prescribed correlations and weights. The standardised approach is now both a permanent fallback for desks that lose IMA approval and the basis for the 72.5 per cent output floor introduced in BCBS d424.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>FRTB market-risk capital is built in three vertical strands: the boundary that decides what is in the trading book at all, the Standardised Approach that every bank must compute, and the Internal Model Approach that some desks may use instead. SA and IMA each have their own internal architecture. Both feed into a single total market-risk capital requirement, with the output floor binding the IMA result from below.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FRTB capital architecture">
+      <defs>
+        <marker id="arrFrtb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5B47E0"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">FRTB market-risk capital: boundary, SA, IMA</text>
+
+      <!-- Top: boundary -->
+      <g transform="translate(80,45)">
+        <rect width="720" height="68" rx="8" fill="#1e293b" stroke="#0f172a"/>
+        <text x="360" y="22" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#f1f5f9">Step 1: Trading book or banking book?</text>
+        <text x="360" y="40" text-anchor="middle" font-family="Inter" font-size="10" fill="#cbd5e1">Objective criteria. Presumption lists. Switching capital floor.</text>
+        <text x="360" y="55" text-anchor="middle" font-family="Inter" font-size="10" fill="#cbd5e1">If banking book: credit-risk capital (lectures 2 to 5). If trading book: continue below.</text>
+      </g>
+
+      <!-- SA (left column) -->
+      <g transform="translate(40,140)">
+        <rect width="380" height="320" rx="10" fill="#eef2ff" stroke="#a5b4fc"/>
+        <text x="190" y="24" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#3730a3">Standardised Approach (SA-FRTB)</text>
+        <text x="190" y="42" text-anchor="middle" font-family="Inter" font-size="10" fill="#4338ca">Mandatory for every bank. Floor for IMA via output floor.</text>
+
+        <g transform="translate(20,60)">
+          <rect width="340" height="74" rx="6" fill="#ffffff" stroke="#6366f1"/>
+          <text x="170" y="20" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#3730a3">Sensitivities-Based Method (SBM)</text>
+          <text x="170" y="36" text-anchor="middle" font-family="Inter" font-size="9" fill="#4338ca">Delta + Vega + Curvature, across 7 risk classes:</text>
+          <text x="170" y="50" text-anchor="middle" font-family="Inter" font-size="9" fill="#4338ca">GIRR, CSR non-sec, CSR sec CTP, CSR sec other,</text>
+          <text x="170" y="62" text-anchor="middle" font-family="Inter" font-size="9" fill="#4338ca">equity, commodity, FX. Prescribed weights and rho.</text>
+        </g>
+
+        <g transform="translate(20,148)">
+          <rect width="340" height="60" rx="6" fill="#ffffff" stroke="#6366f1"/>
+          <text x="170" y="20" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#3730a3">Default Risk Charge (DRC)</text>
+          <text x="170" y="36" text-anchor="middle" font-family="Inter" font-size="9" fill="#4338ca">Jump-to-default for credit and equity.</text>
+          <text x="170" y="48" text-anchor="middle" font-family="Inter" font-size="9" fill="#4338ca">1-year horizon, 99.9 per cent confidence.</text>
+        </g>
+
+        <g transform="translate(20,222)">
+          <rect width="340" height="60" rx="6" fill="#ffffff" stroke="#6366f1"/>
+          <text x="170" y="20" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#3730a3">Residual Risk Add-On (RRAO)</text>
+          <text x="170" y="36" text-anchor="middle" font-family="Inter" font-size="9" fill="#4338ca">Exotic underlyings (1 per cent of notional).</text>
+          <text x="170" y="48" text-anchor="middle" font-family="Inter" font-size="9" fill="#4338ca">Other residual risks (0.1 per cent of notional).</text>
+        </g>
+
+        <text x="190" y="305" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#3730a3">SA capital = SBM + DRC + RRAO</text>
+      </g>
+
+      <!-- IMA (right column) -->
+      <g transform="translate(460,140)">
+        <rect width="380" height="320" rx="10" fill="#fef3c7" stroke="#f59e0b"/>
+        <text x="190" y="24" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#92400e">Internal Model Approach (IMA)</text>
+        <text x="190" y="42" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">Optional. Approved desk-by-desk. Gated by RFET, backtest, PLA.</text>
+
+        <g transform="translate(20,60)">
+          <rect width="340" height="74" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+          <text x="170" y="20" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#92400e">Expected Shortfall (ES) for modellable factors</text>
+          <text x="170" y="36" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">10-day, 97.5 per cent ES, stressed calibration.</text>
+          <text x="170" y="50" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">Liquidity horizons 10, 20, 40, 60, 120 days</text>
+          <text x="170" y="62" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">by risk-factor class.</text>
+        </g>
+
+        <g transform="translate(20,148)">
+          <rect width="340" height="60" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+          <text x="170" y="20" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#92400e">Stressed Expected Shortfall (SES) for NMRFs</text>
+          <text x="170" y="36" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">Each non-modellable factor stressed individually.</text>
+          <text x="170" y="48" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">Often dominates IMA capital for illiquid books.</text>
+        </g>
+
+        <g transform="translate(20,222)">
+          <rect width="340" height="60" rx="6" fill="#ffffff" stroke="#f59e0b"/>
+          <text x="170" y="20" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#92400e">Default Risk Charge (IMA-DRC)</text>
+          <text x="170" y="36" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">Same architecture as SA-DRC.</text>
+          <text x="170" y="48" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">Capitalised separately from ES.</text>
+        </g>
+
+        <text x="190" y="305" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#92400e">IMA capital = ES + SES + IMA-DRC</text>
+      </g>
+
+      <!-- Bottom: total -->
+      <g transform="translate(80,485)">
+        <rect width="720" height="60" rx="8" fill="#dcfce7" stroke="#16a34a"/>
+        <text x="360" y="22" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#166534">Total market-risk capital</text>
+        <text x="360" y="40" text-anchor="middle" font-family="Inter" font-size="10" fill="#166534">Sum over IMA desks (with PLA multiplier if amber) + sum over SA desks. Output floor at 72.5 per cent of full-SA RWAs.</text>
+      </g>
+
+      <!-- arrows from boundary to SA / IMA -->
+      <line x1="230" y1="113" x2="230" y2="138" stroke="#5B47E0" stroke-width="1.5" marker-end="url(#arrFrtb)"/>
+      <line x1="650" y1="113" x2="650" y2="138" stroke="#5B47E0" stroke-width="1.5" marker-end="url(#arrFrtb)"/>
+      <line x1="230" y1="460" x2="230" y2="483" stroke="#5B47E0" stroke-width="1.5" marker-end="url(#arrFrtb)"/>
+      <line x1="650" y1="460" x2="650" y2="483" stroke="#5B47E0" stroke-width="1.5" marker-end="url(#arrFrtb)"/>
+    </svg>
+    <figcaption>FRTB capital architecture. The boundary decision routes positions to one regime or the other. Every bank must compute the SA on its full trading book, both because some desks will not have IMA approval and because the SA is the basis for the BCBS d424 output floor. The IMA, where approved, replaces the SBM and IMA-DRC components for that desk only. The Residual Risk Add-On (RRAO) is an SA-only component.</figcaption>
+  </figure>
+
+  <p>Three flows of capital matter. Capital flows up from each individual position through risk-factor sensitivities into the SBM, DRC, and RRAO components. Capital flows from non-modellable factors into SES at full granularity (the NMRF SES does not benefit from diversification across factors except within tightly defined factor pairs). And capital flows desk-by-desk into the bank-wide aggregate: a single failed desk does not bring down the whole IMA approval, but it does push that desk's positions onto the SA with a capital surcharge.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The trading-banking book boundary</h3>
+
+  <p>FRTB rewrites the boundary on three principles. Classification is at instrument level, not portfolio level. Intent is supplemented by objective criteria. And any reclassification after initial designation triggers a capital floor that locks in the higher of the two capital amounts. The objective tests are: whether the instrument is recognised at fair value through profit or loss in the accounts; whether the bank's intent is to trade or to hedge another trading-book position; and whether the bank has the ability to manage the position as a trading position (price observability, liquidity, hedging capacity). An instrument that fails any of these is presumed to belong in the banking book.</p>
+
+  <p>The standard also lists positions that are presumed to be in one book or the other unless the supervisor agrees otherwise. Listed equities, instruments held with the intent to securitise, and trading-related repo are presumed trading book. Unlisted equities, holdings designated as available-for-sale or hold-to-collect under the accounting standards, securitisation warehousing positions, and direct real-estate holdings are presumed banking book. The presumption can be rebutted in writing to the supervisor, but the burden of proof sits with the bank.</p>
+
+  <div class="defcard">
+    <div class="term">Capital floor on switches</div>
+    <div class="def">When a bank reclassifies an instrument between books, the bank's total market-risk plus credit-risk capital must not fall below what it would have been under the previous classification. The differential is disclosed and held as a capital surcharge until the position runs off. The aim is to remove the historical incentive to switch instruments mid-life to chase a lower capital number.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Internal risk transfers</div>
+    <div class="def">FRTB tightens the rules for internal hedges between the banking book and the trading book. To get capital recognition for the hedge, the trading-book leg must be matched by a back-to-back external trade with a third party (for credit-risk and equity-risk transfers), or must be booked into a specifically identified internal-hedge portfolio with disclosure (for general interest-rate risk). Without these features, the internal hedge is ignored for capital and the banking-book position is capitalised as if unhedged.</div>
+  </div>
+
+  <h3>The Standardised Approach: Sensitivities-Based Method (SBM)</h3>
+
+  <p>The SBM is a regulator-prescribed sensitivity calculation. For every position, the bank computes the delta, vega, and curvature with respect to a list of standardised risk factors. The sensitivities are weighted by prescribed shocks, aggregated within each bucket using prescribed within-bucket correlations, and then aggregated across buckets using prescribed across-bucket correlations.</p>
+
+  <p>The seven risk classes are: General Interest Rate Risk (GIRR), Credit Spread Risk for non-securitisations (CSR non-sec), Credit Spread Risk for securitisations in the correlation trading portfolio (CSR sec CTP), Credit Spread Risk for other securitisations (CSR sec non-CTP), equity risk, commodity risk, and foreign-exchange risk. Each risk class has its own buckets (for example, 18 buckets for equities split by sector and economy maturity, 16 buckets for credit spread by sector and rating, several maturities for GIRR), its own prescribed shock sizes, and its own correlation matrices.</p>
+
+  <p>The within-bucket aggregation for delta, within a single risk class and bucket, is:</p>
+
+  <p>$$K_b = \sqrt{\max\left(0, \sum_k WS_k^2 + \sum_k \sum_{l \neq k} \rho_{kl} \, WS_k \, WS_l\right)}$$</p>
+
+  <p>where $WS_k = RW_k \cdot s_k$ is the weighted sensitivity (risk weight times the position's delta to factor $k$), and $\rho_{kl}$ is the prescribed within-bucket correlation. The across-bucket aggregation is structurally identical, using bucket-level capital $K_b$ and prescribed across-bucket correlations $\gamma_{bc}$:</p>
+
+  <p>$$\text{Delta} = \sqrt{\sum_b K_b^2 + \sum_b \sum_{c \neq b} \gamma_{bc} \, S_b \, S_c}$$</p>
+
+  <p>where $S_b = \sum_k WS_k$ is the net weighted sensitivity for the bucket. The vega and curvature components are computed by the same algebra against vega and second-order sensitivities respectively. The total SBM capital for a risk class is the sum of the delta, vega, and curvature charges, and the total SBM capital is the sum across the seven risk classes (no cross-class diversification is permitted).</p>
+
+  <p>SBM also requires computation under three correlation scenarios: low, medium, and high. The medium scenario uses the prescribed $\rho$ and $\gamma$ values. The low scenario floors them at zero (no diversification benefit). The high scenario raises them by a prescribed multiplier (more concentrated risk). The capital charge is the maximum over the three scenarios. This is a deliberate hedge against correlation breakdown of the kind seen in 2008.</p>
+
+  <div class="defcard">
+    <div class="term">Default Risk Charge (SA-DRC)</div>
+    <div class="def">A separate capital charge for jump-to-default risk on credit and equity positions in the trading book. Each position has a jump-to-default loss given default applied (typically 100 per cent for equities, 75 per cent for senior unsecured debt, lower for secured). Net long and short jump-to-default amounts within an obligor are offset; net amounts across obligors are weighted by external-rating-based default risk weights (0.5 per cent for AAA up to 100 per cent for unrated and CCC) and summed within three buckets (corporate, sovereign, local government) and across rating bands. Mirrors the old Incremental Risk Charge but in standardised form.</div>
+  </div>
+
+  <div class="defcard">
+    <div class="term">Residual Risk Add-On (RRAO)</div>
+    <div class="def">A simple notional-based add-on for risks not captured by the SBM. Exotic underlyings (longevity, weather, exotic correlation products) attract a 1.0 per cent charge on gross notional. Other residual risks not categorised as exotic but still imperfectly captured (gap risk, behavioural risk, correlation risk in vanilla products) attract 0.1 per cent on gross notional. Designed to remove the incentive to engineer products that fall through the SBM grid.</div>
+  </div>
+
+  <h3>The Internal Model Approach: Expected Shortfall</h3>
+
+  <p>For desks with IMA approval, the SBM and SA-DRC are replaced by an Expected Shortfall calculation plus a Stressed Expected Shortfall for non-modellable factors, plus an IMA Default Risk Charge.</p>
+
+  <p>Expected Shortfall is the average loss conditional on being in the tail beyond a confidence level. Formally:</p>
+
+  <p>$$ES_{\alpha}(X) = \frac{1}{1-\alpha} \int_{\alpha}^{1} VaR_u(X) \, du$$</p>
+
+  <p>at confidence level $\alpha = 97.5$ per cent for FRTB. The 97.5 per cent ES is calibrated (under a normal distribution) to give roughly the same number as 99 per cent VaR, but ES has the practical advantage of being a coherent risk measure: it is sub-additive, so the diversification incentives are well-behaved across desks. The conceptual advantage is that ES is sensitive to the shape of the tail, not just the quantile, so two portfolios with the same VaR but different tail shapes will get different ES.</p>
+
+  <p>FRTB requires ES to be calibrated to a period of significant financial stress, identified by the bank from at least the period since 2007. The calibration is done on a reduced set of risk factors (the "P factors") for which long stress-period data exist, then scaled up to the full set of current risk factors. This is the FRTB equivalent of stressed VaR, but built into the primary measure rather than added on top.</p>
+
+  <p>Liquidity horizons replace the uniform 10-day holding period of Basel II.5. The intuition is that during stress, illiquid risk factors cannot be hedged or exited in 10 days. FRTB defines five liquidity horizons (10, 20, 40, 60, and 120 days) and assigns each risk-factor class to one. Liquid equity and FX get 10 days. Investment-grade credit spreads get 20 to 40 days. High-yield credit spreads get 60 days. Securitisation spreads and emerging-market sovereign spreads get 120 days. The ES is calculated separately for each horizon, scaling each shock to the horizon length, and the totals combined via:</p>
+
+  <p>$$IMCC = \sqrt{ES_T^2 + \sum_{j \geq 2} \left( ES_{T,j} \sqrt{\frac{LH_j - LH_{j-1}}{T}} \right)^2}$$</p>
+
+  <p>where $T = 10$ days is the base horizon and $LH_j$ is the liquidity horizon for the $j$-th risk-factor class. The IMCC (Internally Modelled Capital Charge) is then scaled by a multiplier (typically 1.5 to 2 depending on backtest performance) to produce the modellable-factor capital.</p>
+
+  <h3>The three IMA gates: RFET, backtest, PLA</h3>
+
+  <p>An IMA-approved desk has to pass three tests on an ongoing basis. Failure of any one can move the desk out of IMA and onto the SA, sometimes with a multiplier.</p>
+
+  <div class="defcard">
+    <div class="term">Risk Factor Eligibility Test (RFET)</div>
+    <div class="def">A risk factor is modellable only if at least 24 real-price observations have been recorded in the past 12 months, with no gap longer than 30 days. A "real price" means an executed trade, a committed quote, or a price-source observation that meets the standard's verifiability criteria. Factors that fail the RFET become Non-Modellable Risk Factors (NMRFs) and exit the ES calculation to be capitalised under SES. The test is applied factor-by-factor, every quarter.</div>
+  </div>
+
+  <div class="defcard">
+    <div class="term">Backtest</div>
+    <div class="def">Desk-level backtest comparing the desk's one-day VaR (at both 97.5 per cent and 99 per cent confidence levels) against actual and hypothetical P&L. Over a one-year rolling window of 250 business days, the number of exceptions is scored on a traffic-light scale. The 99 per cent VaR test gives green up to 4 exceptions, amber from 5 to 9, red from 10. Red triggers loss of IMA for the desk. Amber triggers a capital multiplier on the desk's ES.</div>
+  </div>
+
+  <div class="defcard">
+    <div class="term">Profit and Loss Attribution test (PLA)</div>
+    <div class="def">Compares two daily P&L time series for the desk: the hypothetical P&L (HPL) from the front-office pricing system, and the risk-theoretical P&L (RTPL) recomputed from the risk-management system using only the risk factors that feed into the IMA. The two should agree closely if the risk-management system captures the same risks as the pricing system. The test uses two metrics: the Spearman correlation between the two series (must exceed 0.80 for green) and the Kolmogorov-Smirnov test statistic of distributional difference (must be below 0.09 for green). Falling into the amber zone triggers a capital surcharge; falling into the red zone removes IMA approval.</div>
+  </div>
+
+  <p>The PLA test is widely regarded as the hardest to pass in practice. Fixed-income desks with structured product positions frequently fail because the front-office pricer uses inputs (basis spreads, correlation skews, prepayment models) that the risk system simplifies or proxies. Equity and FX desks generally pass with margin. The 2019 BCBS d457 revision relaxed the PLA thresholds materially from the original 2016 d352 calibration after industry quantitative impact studies showed widespread failure even on desks with no real model deficiency.</p>
+
+  <h3>Non-Modellable Risk Factors and SES</h3>
+
+  <p>Non-Modellable Risk Factors are the FRTB innovation that surprised the industry most. A risk factor that fails the RFET cannot enter the ES calculation. Instead, the bank must compute a Stressed Expected Shortfall (SES) for each NMRF separately. The SES is calibrated to the worst stress period for that specific factor, with a liquidity horizon at least equal to the longest applicable horizon for the factor's risk class. Diversification across NMRFs is limited: factors within an idiosyncratic non-modellable category get full aggregation, but cross-factor diversification is capped at a conservative bound.</p>
+
+  <p>For an illiquid credit-trading desk holding bespoke single-name credit positions, the dominant capital component is often the SES, not the ES. Each name's spread is its own risk factor; if real trades for that name do not occur regularly enough to pass the RFET, every name becomes an NMRF, each with its own stressed shock, with limited offset. The result for some books is that the IMA total exceeds the equivalent SA total, and the bank rationally chooses to keep the desk on the SA. This was an unintended consequence of the FRTB design and is one of the reasons banks have substantially reduced bespoke credit-trading inventory in advance of FRTB implementation.</p>
+
+  <h3>Default Risk Charge (DRC)</h3>
+
+  <p>The DRC replaces the Basel II.5 Incremental Risk Charge (IRC) and is conceptually similar. It captures the risk of a sudden default event (jump-to-default) on credit and equity positions in the trading book, separately from the spread risk captured by ES and SBM. The DRC is calibrated to a one-year horizon and 99.9 per cent confidence level, matching the IRB credit-risk capital architecture, but with a constant level of risk assumption (positions are assumed to be held for the full year) and constraints on how short positions can be netted against long positions.</p>
+
+  <p>Under the IMA-DRC, the bank may use its own default-correlation model subject to floors on the systematic factor weight and the obligor-specific PDs. The model must include at least two systematic factors. Under the SA-DRC, the calculation is simpler but more conservative: external-rating-based default risk weights are applied to the net jump-to-default loss, aggregated within prescribed buckets.</p>
+
+  <div class="worked">
+    <h4>Worked example: SBM delta for a small equity portfolio</h4>
+    <p>Suppose a bank holds two equity positions in the same advanced-economy financial sector bucket (a single bucket within the equity risk class). Position 1 is long 100 in a large bank stock with spot price 50 and delta sensitivity 100 (one share of delta per share held). Position 2 is short 60 in a large insurance stock with spot price 80 and delta sensitivity minus 60. The prescribed risk weight for this bucket is 30 per cent, applied to the spot-equivalent sensitivity. The within-bucket correlation $\rho$ is 0.25 (large advanced-economy financials).</p>
+    <p>Weighted sensitivities:</p>
+    <p>$$WS_1 = 0.30 \times 100 \times 50 = 1{,}500 \qquad WS_2 = 0.30 \times (-60) \times 80 = -1{,}440$$</p>
+    <p>Bucket-level capital:</p>
+    <p>$$K_b = \sqrt{1500^2 + (-1440)^2 + 2 \times 0.25 \times 1500 \times (-1440)}$$</p>
+    <p>$$K_b = \sqrt{2{,}250{,}000 + 2{,}073{,}600 - 1{,}080{,}000} = \sqrt{3{,}243{,}600} \approx 1{,}801$$</p>
+    <p>The negative cross term reflects the partial hedge between the long and short positions; if the bank had matched the long and the short more precisely, the cross term would have offset more of the gross risk. With only one bucket in play, the across-bucket aggregation reduces to $K_b$, so the delta capital for this risk class under the medium correlation scenario is approximately 1,801. The same calculation is repeated for the low and high scenarios, and the maximum is taken. Vega and curvature charges are computed by the same algebra against the option components of the portfolio. The total SBM for this risk class is the sum of delta, vega, and curvature for the medium-scenario maximum.</p>
+  </div>
+
+  <h3>Implementation status across jurisdictions</h3>
+
+  <p>FRTB was first published as BCBS d352 in January 2016, then materially revised after the 2017 to 2018 quantitative impact studies showed unworkable calibrations in several places. The revised final standard is BCBS d457, published January 2019. Implementation has slipped repeatedly. The current state:</p>
+
+  <div class="defcard">
+    <div class="term">European Union</div>
+    <div class="def">FRTB is incorporated into the CRR3 package, which entered into force on 1 January 2025. Reporting under FRTB has been required since September 2021. The Commission used its CRR Article 461a delegated power in 2024 to defer the binding capital application of the FRTB market-risk own-funds requirement by one year to 1 January 2026, on competitive-equality grounds.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">United Kingdom</div>
+    <div class="def">PRA Policy Statement PS9-24 (September 2024) sets the UK implementation of Basel 3.1 including FRTB. The original UK implementation date of 1 January 2025 was first delayed to 1 January 2026, then to 1 January 2027 in September 2024 to align with the US, with full phase-in by 1 January 2030. The UK approach is close to BCBS d457 with several PRA-specific adjustments on data infrastructure and reporting.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">United States</div>
+    <div class="def">The Federal Reserve, OCC, and FDIC proposed FRTB as part of the Basel III Endgame package in July 2023, with implementation originally targeted for 1 July 2025 and full phase-in by 1 July 2028. The proposal has been substantially reworked in 2024 to 2025 amid heavy industry pushback, and the implementation date has slipped. The US version is materially different in places (treatment of internal risk transfers, NMRF stress calibration).</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Other jurisdictions</div>
+    <div class="def">Japan implemented FRTB on a phased basis from March 2024. Australia, Canada, and Hong Kong have all set 2024 or 2025 dates. South Africa's SARB is following the BCBS timetable with a 2026 to 2027 implementation expected through the Prudential Standards.</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The IMA-vs-SA decision is now per-desk, not bank-wide</h3>
+  <p>Under Basel II.5 the IMA-or-SA choice was effectively binary at bank level: a bank either had model approval or it did not. FRTB makes it per desk. A bank can run IMA on its liquid government-bond desk, its equity-derivatives desk, and its FX desk, while running SA on its bespoke credit-derivatives desk because the bespoke book cannot pass the RFET. This has changed how trading floors are organised. Many banks have explicitly reorganised desks so that the natural unit of model approval is also the natural unit of business management, which means smaller, more homogeneous desks than the pre-FRTB structure.</p>
+
+  <h3>PLA failure is endemic in fixed income</h3>
+  <p>The Profit and Loss Attribution test is supposed to detect risk-management systems that materially mis-state desk risks. In practice, even well-managed desks fail when their front-office pricers use inputs the risk system cannot replicate. The classic example is a mortgage trading desk whose pricer uses a prepayment model with dozens of inputs, against a risk system that captures duration, convexity, and a small number of basis spreads. The PLA test will fail, not because the risk system is wrong, but because the pricer is doing something the test architecture cannot represent. The 2019 d457 revision relaxed the PLA thresholds materially to address this; banks still complain that PLA failure is the single biggest practical risk to their IMA approval.</p>
+
+  <h3>NMRFs and SES can dominate IMA capital for illiquid books</h3>
+  <p>The original FRTB design assumed NMRFs would be a small minority of risk factors. Quantitative impact studies after 2016 showed that for credit-trading and bespoke-structured-product desks, the majority of risk factors fail the RFET, and SES dominates total IMA capital. This has had two consequences. First, banks have invested heavily in real-price data acquisition (subscriptions to TRACE in the US, MIFID II data in Europe, industry pooled data initiatives) to convert NMRFs into modellable factors. Second, for some desks the cure has been worse than the disease and the bank has decided that the SA, which has no NMRF treatment because it does not use risk factors at all in the same way, is cheaper than IMA-plus-SES.</p>
+
+  <h3>ES is theoretically coherent but harder to backtest than VaR</h3>
+  <p>VaR is a quantile: you observe whether each day's loss exceeded the quantile, count exceptions, and apply a binomial test. ES is a conditional expectation: it depends on the average of all losses beyond the quantile, which means you cannot backtest a single number against a single outcome each day. The FRTB resolution is to backtest VaR (at both 97.5 per cent and 99 per cent) as a proxy for whether the underlying loss distribution is being modelled accurately, then to capitalise on ES. The result is a slight intellectual fudge: the measure that is capitalised is not the measure that is backtested.</p>
+
+  <h3>The boundary rules force discipline on classification</h3>
+  <p>Before FRTB, banks could move illiquid positions across the boundary to suit current capital incentives. The capital floor on any post-classification switch removes the incentive entirely. The practical effect has been that banks now classify with much more care at trade inception, because errors are expensive to correct. New product approval committees now include a formal FRTB boundary determination as part of the approval workflow.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    The FRTB ES uses a stressed calibration, which is conceptually similar to but not the same as the Basel II.5 stressed VaR. Stressed VaR was added on top of current-period VaR. FRTB ES replaces both with a single stressed measure, but scales the stressed shocks to the current portfolio's risk-factor set. Reading FRTB capital numbers as if they were "stressed VaR plus VaR" double-counts the stress component. The capital is a single stressed expected shortfall, not a sum.
+  </div>
+
+  <h3>The standardised approach is now a serious framework, not a punishment</h3>
+  <p>Pre-FRTB, the standardised approach was a deliberately punitive fallback for banks that lost IMA approval. Post-FRTB, the SA is risk-sensitive enough to be a genuine alternative, and the output floor at 72.5 per cent of full-SA RWAs makes SA computations material for every bank regardless of IMA approval. Banks now run the SA as a parallel calculation on every position, every day. The systems work to enable this is substantial: every bank needs a sensitivity engine that can produce SBM-compliant deltas, vegas, and curvatures across the seven risk classes at the prescribed granularity, ideally close to real time.</p>
+
+  <h3>Trading-book complexity has shrunk in advance of FRTB</h3>
+  <p>The most predictive indicator of FRTB's impact has been the change in trading-book composition since 2018. Bespoke single-name credit, illiquid structured credit, exotic correlation products, and long-dated weather and longevity derivatives have all shrunk materially in major bank balance sheets, not because FRTB has prohibited them but because the implied capital has made them uneconomic. Trading floors today are smaller, simpler, and more concentrated on liquid risk than they were in 2007. FRTB capital is itself only part of the story; the regulatory message, that bespoke risk is expensive, has been received.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Name the four failures of the Basel II.5 market-risk framework that FRTB is designed to fix. Give one specific example of each.</li>
+      <li>Describe the three objective tests for trading-book classification under FRTB. What is the consequence of reclassifying an instrument between books after initial designation?</li>
+      <li>List the seven risk classes within the Sensitivities-Based Method. Which two of them are entirely new to the FRTB framework relative to the pre-FRTB standardised approach for market risk?</li>
+      <li>Write out the within-bucket SBM delta aggregation formula. Explain in words what each symbol means and why the cross term involves a within-bucket correlation $\rho$.</li>
+      <li>FRTB replaces 10-day 99 per cent VaR with 10-day 97.5 per cent expected shortfall. Give two reasons why expected shortfall is theoretically preferable to value-at-risk, and one practical disadvantage.</li>
+      <li>What is a liquidity horizon in FRTB, and why does it matter? Name the five horizons and give an example of a risk factor that falls into each.</li>
+      <li>What are the three IMA approval gates? For each one, state the metric used and the threshold below which a desk loses IMA approval entirely.</li>
+      <li>What is a Non-Modellable Risk Factor, and how is it capitalised? Why is SES sometimes the dominant component of total IMA capital for an illiquid book?</li>
+      <li>How does the FRTB Default Risk Charge differ from the Basel II.5 Incremental Risk Charge? Why is jump-to-default capitalised separately from credit-spread risk?</li>
+      <li>A bank tells you it has decided to keep its bespoke single-name credit-trading desk on the Standardised Approach rather than apply for IMA approval. Give three reasons why this might be the right commercial decision even if the bank could in principle qualify for IMA.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Earlier in this course</h4>
+    <ul>
+      <li><a href="03-basel_2.html">Lecture 3: Basel II</a>: the 1996 market-risk amendment introduced VaR-based capital with internal-model approval at bank level. FRTB is the wholesale rewrite of that approach.</li>
+      <li><a href="04-basel_3.html">Lecture 4: Basel III</a>: the immediate post-crisis package introduced Basel II.5 (stressed VaR and the Incremental Risk Charge) as an interim fix while FRTB was being designed.</li>
+      <li><a href="05-bcbs_d424.html">Lecture 5: Basel III finalisation (BCBS d424)</a>: the 2017 package introduced the 72.5 per cent output floor that binds FRTB IMA capital from below, plus the revised standardised approaches for credit, CVA, and operational risk.</li>
+    </ul>
+    <h4>Next in this course</h4>
+    <ul>
+      <li>Lecture 7: BCBS 239 risk-data aggregation principles. FRTB cannot work without daily desk-level risk-data reporting, which presupposes the BCBS 239 data architecture.</li>
+      <li>Lecture 8: CRR3 and the EU implementation of Basel 3.1 including FRTB.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>docs/wiki/regulation/international/bis/bcbs_d424.md</code>: the 2017 finalisation high-level summary, which lists FRTB as part of the consolidated Basel III package.</li>
+      <li><code>docs/wiki/regulation/international/bis/bcbs_219.md</code>: short repo stub on FRTB (boundary, IMA, SA at one paragraph each).</li>
+      <li><code>docs/wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models.md</code>: the market-risk models wiki note, which is the parent technical reference for the topic.</li>
+      <li>BCBS d352, Minimum capital requirements for market risk, January 2016 (the original FRTB standard, superseded).</li>
+      <li>BCBS d457, Minimum capital requirements for market risk, January 2019 (the current FRTB standard). <a href="https://www.bis.org/bcbs/publ/d457.htm">bis.org/bcbs/publ/d457.htm</a>.</li>
+    </ul>
+    <h4>Cross-references</h4>
+    <ul>
+      <li>For the application of FRTB to a real trading book, see <code>docs/wiki/application/banking/01_internal_environment/risk_measurement/market_risk/02-models.md</code>.</li>
+      <li>For the CVA capital framework, which under BCBS d424 was rewritten to be calibration-consistent with FRTB SBM, see lecture 5 and the wiki note on counterparty credit risk.</li>
+      <li>For the wider Basel III finalisation including the output floor that interacts with FRTB IMA capital, see lecture 5.</li>
+    </ul>
+    <h4>Further reading</h4>
+    <ul>
+      <li>BCBS d457, Minimum capital requirements for market risk, January 2019 revision. The definitive text.</li>
+      <li>BCBS d457 note: Explanatory note on the minimum capital requirements for market risk. <a href="https://www.bis.org/bcbs/publ/d457_note.htm">bis.org/bcbs/publ/d457_note.htm</a>.</li>
+      <li>ISDA, FRTB Implementation Considerations, several papers 2019 to 2024. The single best practitioner source on implementation pain points (PLA failure modes, NMRF data acquisition, SA-IMA economics).</li>
+      <li>EBA, Final draft Regulatory Technical Standards on FRTB, multiple papers under CRR3 mandates. The detailed European implementation.</li>
+      <li>PRA Policy Statement PS9-24, Implementation of the Basel 3.1 standards near-final part 2, September 2024. The UK implementation.</li>
+      <li>Artzner, Delbaen, Eber, Heath, Coherent measures of risk, Mathematical Finance 1999. The theoretical foundation for preferring expected shortfall to value-at-risk.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All international lectures</a></span>
+  <span>Lecture 6 of 12: FRTB, the fundamental review of the trading book</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

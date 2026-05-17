@@ -110,7 +110,7 @@ Suspense account treatment, payment holidays, and contractual changes (e.g. inte
 
 The graph below shows the historical trend of accounts that default in the next 12 months due to the DPD criteria.
 
-![alt text](wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/01_introduction/images/12m_portfolio_level_90dpd_odr_over_time.png)
+![alt text](images/12m_portfolio_level_90dpd_odr_over_time.png)
 
 #### Technical Past Due
 
@@ -217,7 +217,7 @@ As the probation period increases, the re-default rate declines. Too short → m
 
 Based on the analysis, it was concluded that for 90+ DPD and Forebearance a 12-month probation period is used.
 
-![alt text](wiki/application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/01_introduction/images/12m_portfolio_level_90dpd_redefault_over_time.png)
+![alt text](images/12m_portfolio_level_90dpd_redefault_over_time.png)
 
 ### LGD DoD
 

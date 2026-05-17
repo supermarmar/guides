@@ -7,7 +7,7 @@ aliases:
 ---
 # Basel
 
-This file covers the history of the BIS, the BCBS, and the evolution of the Basel accords (I → II → III → 3.1). For the application of these standards in bank [[03-capital_management|capital management]], see [Capital](\..\..\..\application\banks\04-capital.md). For the detailed computation of RWAs under each [[basel_framework|Basel framework]] for credit risk, see [Regulatory Capital (Banking Book)](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\01-regulatory_capital.md). For the mathematical foundations of the IRB model (Vasicek, loss distributions), see [Credit Losses](..\..\..\application\banks\credit_risk\02_airb_capital_modelling\01_introduction\02-credit_losses.md).
+This file covers the history of the BIS, the BCBS, and the evolution of the Basel accords (I → II → III → 3.1). For the application of these standards in bank [[03-capital_management|capital management]], see [Capital](\..\..\..\application\banks\04-capital.md). For the detailed computation of RWAs under each [[basel_framework|Basel framework]] for credit risk, see [Regulatory Capital (Banking Book)](../../../application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/01_introduction/01-context.md). For the mathematical foundations of the IRB model (Vasicek, loss distributions), see [Credit Losses](../../../application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/01_introduction/02-credit_losses.md).
 
 ## Bank for International Settlements
 
@@ -78,7 +78,7 @@ In 1974, the collapse of Bankhaus Herstatt in Germany and of Franklin National B
 
 The Committee's first meeting took place in February 1975, and meetings have been held regularly three or four times a year since. Since its inception, the Basel Committee has expanded its membership from the G10 to 45 institutions from 28 jurisdictions. Starting with the Basel Concordat, first issued in 1975 and revised several times since, the Committee has established a series of international standards for bank regulation, most notably its landmark publications of the accords on capital adequacy which are commonly known as [[basel_1|Basel I]], [[basel_2|Basel II]] and, most recently, [[basel_framework|Basel III]].
 
-![alt text](bcbs_structure.png)
+![alt text](images/basel/bcbs_structure.png)
 
 ### Basel Committee Charter
 
@@ -170,11 +170,11 @@ At the outset, one important aim of the Committee's work was to close gaps in in
 
 A first step in this direction was the paper issued in 1975 that came to be known as the "Concordat". The Concordat set out principles for sharing supervisory responsibility for banks' foreign branches, subsidiaries and joint ventures between host and parent (or home) supervisory authorities.
 
-![alt text](concordat.png)
+![alt text](images/basel/concordat.png)
 
 In May 1983, the Concordat was revised and re-issued as Principles for the supervision of banks' foreign establishments.
 
-![alt text](may_1983.png)
+![alt text](images/basel/may_1983.png)
 
 ### Basel Capital Accord
 
@@ -346,7 +346,7 @@ During the Covid-19 pandemic, the [[01-short_term_metrics|LCR]] was used as a to
 
 #### [[03-long_term_metrics|Net Stable Funding Ratio (NSFR)]]
 
-The [[03-long_term_metrics|NSFR]] was introduced in conjunction with the [[basel_framework|Basel III]] [[01-liquidity|liquidity framework]]. The [[03-long_term_metrics|Net Stable Funding Ratio (NSFR)]] measures the amount of longer-term, stable funding sources required by a bank given the liquidity profile of its assets and liabilities and the contingent liquidity risk arising from off-balance-sheet exposures (OBEs). The standard requires a minimum amount of funding that is expected to be stable over a 6-month horizon based on liquidity risk factors assigned to assets / liabilities and OBEs. This is intended to promote longer-term structural funding of a bank’s balance sheet. The [[03-long_term_metrics|NSFR]] can also be viewed as implementing a maximum limit on the level of mismatch that a bank is able to undertake.
+The [[03-long_term_metrics|NSFR]] was introduced in conjunction with the [[basel_framework|Basel III]] [[04-liquidity_management|liquidity framework]]. The [[03-long_term_metrics|Net Stable Funding Ratio (NSFR)]] measures the amount of longer-term, stable funding sources required by a bank given the liquidity profile of its assets and liabilities and the contingent liquidity risk arising from off-balance-sheet exposures (OBEs). The standard requires a minimum amount of funding that is expected to be stable over a 6-month horizon based on liquidity risk factors assigned to assets / liabilities and OBEs. This is intended to promote longer-term structural funding of a bank’s balance sheet. The [[03-long_term_metrics|NSFR]] can also be viewed as implementing a maximum limit on the level of mismatch that a bank is able to undertake.
 
 This is calculated as: available stable funding / required funding. This measure is kept at a minimum of 100%. This was gradually introduced over time.
 
@@ -374,7 +374,7 @@ The stress events included in the ILAAP need to be severe as well as plausible. 
 
 In 2005, the Basel Committee became concerned that banks were reducing their capital requirements by shifting exposures from the banking book to the trading book. Structured products whose values depended on the creditworthiness of companies were increasingly put in the trading book, despite being less liquid than other instruments. The 10-day, 99% confidence VaR calculation was considered inappropriate for these products. Regulators proposed an “incremental default risk charge” (IDRC) at 99.9% confidence and a 1-year time horizon for trading book instruments sensitive to default risk. In 2008, the Basel Committee recognised that most losses in the credit market turmoil of 2007–08 were from changes in credit ratings, widening credit spreads and loss of liquidity (not solely defaults), and amended proposals accordingly. The IDRC became the **Incremental Risk Charge (IRC)**.
 
-Under the 2014 [[basel_framework|Basel III]] reforms, the old Current Exposure Method (CEM) and Standardised Method (SM) for measuring CCR EADs were replaced by the **Standardised Approach for CCR (SA-CCR)** and the **Internal Model Method (IMM)**. The CVA capital charge was introduced as part of [[basel_framework|Basel III]] (2010) and was substantially revised in the 2017 [[basel_framework|Basel III]] finalisation (effective 2019), replacing the internally modelled CVA approach with a standardised approach (SA-CVA) and a basic approach (BA-CVA). For the full computation mechanics of SA-CCR, IMM, and CVA capital charges, see [Regulatory Capital (Trading Book)](..\..\..\application\banks\credit_risk\05_counterparty_modelling\01_introduction\01-regulatory_capital.md). For the mathematical foundations of EE/EPE/EEPE and survival curve construction, see [Counterparty Exposures](..\..\..\application\banks\credit_risk\05_counterparty_modelling\01_introduction\02-counterparty_exposures.md).
+Under the 2014 [[basel_framework|Basel III]] reforms, the old Current Exposure Method (CEM) and Standardised Method (SM) for measuring CCR EADs were replaced by the **Standardised Approach for CCR (SA-CCR)** and the **Internal Model Method (IMM)**. The CVA capital charge was introduced as part of [[basel_framework|Basel III]] (2010) and was substantially revised in the 2017 [[basel_framework|Basel III]] finalisation (effective 2019), replacing the internally modelled CVA approach with a standardised approach (SA-CVA) and a basic approach (BA-CVA). For the full computation mechanics of SA-CCR, IMM, and CVA capital charges, see [Regulatory Capital (Trading Book)](../../../application/banking/01_internal_environment/risk_measurement/credit_risk/counterparty_credit_risk/01-context.md). For the mathematical foundations of EE/EPE/EEPE and survival curve construction, see [Counterparty Exposures](../../../application/banking/01_internal_environment/risk_measurement/credit_risk/counterparty_credit_risk/02-counterparty_exposures.md).
 
 #### Stressed VaR (sVaR)
 

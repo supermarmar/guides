@@ -138,9 +138,9 @@ FNB's income is subject to South African corporation tax at **28%**, consistent 
 
 | Line Item | FNB FY2024 Commentary |
 |---|---|
-| **[[03-nii_nim|NII]]** | Primary income driver; grew 7%; high [[03-nii_nim|NII]]/total income ratio (estimated 60–65%) |
+| **[[04-nii_nim|NII]]** | Primary income driver; grew 7%; high [[04-nii_nim|NII]]/total income ratio (estimated 60–65%) |
 | **+ NIR** | Fee-driven; grew 8%; transactional, insurance, wealth fees |
-| **= Total Income** | [[03-nii_nim|NII]] dominant; stable income profile |
+| **= Total Income** | [[04-nii_nim|NII]] dominant; stable income profile |
 | **Less: Operational Expenses** | Branch network + staff + IT; low cost-to-income ratio by SA standards |
 | **Less: Cost of Credit** | Credit loss ratio ~86 bps FY2024; [[ifrs9_standard|IFRS 9]] ECL across full retail book |
 | **= EBIT** | Strong; growing |
@@ -221,7 +221,7 @@ FNB's large retail deposit base naturally supports a healthy **[[01-short_term_m
 | Trading book | ❌ Largely absent | No proprietary trading; hedging derivatives only |
 | Fair value hierarchy (L1/L2/L3) | ⚠️ Limited | Applies only to HQLA portfolio and hedging derivatives |
 | Retail deposits as liabilities | ✅ Dominant | Largest retail deposit franchise in SA; core competitive advantage |
-| [[03-nii_nim|NII]] as primary income | ✅ Dominant (~60–65% of total income) | Closest to the framework's retail bank description |
+| [[04-nii_nim|NII]] as primary income | ✅ Dominant (~60–65% of total income) | Closest to the framework's retail bank description |
 | Non-interest income (fees) | ✅ Exactly as described | Account fees, card fees, commitment fees, insurance, wealth — all present |
 | Trading income | ❌ Absent | Not a meaningful income line |
 | Operational expenses | ✅ Full fit | Branch network, staff, IT, marketing — all as framework describes |
@@ -239,14 +239,14 @@ FNB's large retail deposit base naturally supports a healthy **[[01-short_term_m
 | Dimension | FNB | RMB |
 |---|---|---|
 | **Framework fit** | Near-complete | Partial |
-| **Primary income driver** | [[03-nii_nim|NII]] (~60–65%) | NIR (trading + fees) |
+| **Primary income driver** | [[04-nii_nim|NII]] (~60–65%) | NIR (trading + fees) |
 | **Balance sheet** | Retail/commercial credit + deposits | Wholesale credit + trading book |
 | **Trading book** | Absent | Central and significant |
 | **Deposit base** | Large, retail, sticky, low-cost | Corporate only; rate-sensitive |
 | **[[02-credit_losses|Credit losses]]** | Meaningful; rate-sensitive; [[ifrs9_standard|IFRS 9]] fully applicable | Low; wholesale quality; less cycle-sensitive |
 | **ROE** | ~41% — high via deposit cost advantage | ~20% — high via fee/trading model |
 | **Cost structure** | Branch + staff + digital IT | Banker bonuses; no branch network |
-| **Income stability** | High ([[03-nii_nim|NII]] dominant) | Low (trading + deal fees) |
+| **Income stability** | High ([[04-nii_nim|NII]] dominant) | Low (trading + deal fees) |
 
 ---
 

@@ -102,7 +102,7 @@ Climate risk is expected to impact the financial position of firms and individua
 
 - **PD impact**: At a minimum, physical and transition risks are expected to increase PDs. Climate events that reduce cashflows or increase costs push marginal borrowers into default.
 - **LGD impact**: Where assets used as security on a loan are materially damaged (e.g. a mortgaged house damaged by wildfire), this increases LGD. Financial market disruptions can also devalue collateral assets.
-- **Impairment ([[ifrs9_standard|IFRS 9]])**: Models typically use macroeconomic forecasts to determine impairments. As macroeconomic impacts are expected due to climate change, impairment impacts on credit portfolios will follow. See [international/ifrs/ifrs9_staging.md](ifrs9_staging.md) for staging framework.
+- **Impairment ([[ifrs9_standard|IFRS 9]])**: Models typically use macroeconomic forecasts to determine impairments. As macroeconomic impacts are expected due to climate change, impairment impacts on credit portfolios will follow. See [international/ifrs/ifrs9_staging.md](../../../../../regulation/international/ifrs/ifrs9_staging.md) for staging framework.
 - **Supply chain effects**: A new emissions policy affecting energy generation can flow through the entire economy — loan exposures on the brink of default could be pushed into full default.
 
 There is currently **no benchmark or best practice approach** for adjusting PDs and LGDs for climate risk. This is an evolving area.

@@ -7,13 +7,13 @@ aliases:
 ---
 # Deposit Pricing
 
-This file covers the pricing of bank deposit products — product types and their value to the bank, price elasticity theory, cannibalisation, strategies for reducing the marginal cost of deposits, and the role of the term liquidity premium. For the structural liquidity management implications of deposit behaviour see [Liquidity Framework](../liquidity_risk/01_introduction/01-liquidity_framework.md) and [LCR](../liquidity_risk/01_introduction/04-lcr.md). For the [[01-pricing_framework|pricing framework]] overview and [[04-nii_nim|NIM]] management see [Pricing Framework](01-pricing_framework.md).
+This file covers the pricing of bank deposit products — product types and their value to the bank, price elasticity theory, cannibalisation, strategies for reducing the marginal cost of deposits, and the role of the term liquidity premium. For the structural liquidity management implications of deposit behaviour see [Liquidity Framework](../04-liquidity_management.md) and [LCR](../risk_measurement/liquidity_risk/02-lcr.md). For the [[01-pricing_framework|pricing framework]] overview and [[04-nii_nim|NIM]] management see [Pricing Framework](01-pricing_framework.md).
 
 ## Deposit Product Types
 
-Deposit products sit on a spectrum from fully flexible to fully locked-in. The more flexibility the product offers, the lower the rate; the less flexibility, the higher the rate. For product descriptions see [Products](05-products.md).
+Deposit products sit on a spectrum from fully flexible to fully locked-in. The more flexibility the product offers, the lower the rate; the less flexibility, the higher the rate. For product descriptions see [Products](../05-products.md).
 
-**Instant access deposits** (call accounts, savings accounts) — customers may withdraw at any time. Banks can still use these funds for term lending because aggregate inflows and outflows tend to net off, leaving a stable funding core. However, banks must hold HQLA against these deposits to cover stress outflows (governed by [[basel_framework|Basel III]] [[01-short_term_metrics|LCR]] rules — see [LCR](../liquidity_risk/01_introduction/04-lcr.md)), which reduces the net return from holding them as funding.
+**Instant access deposits** (call accounts, savings accounts) — customers may withdraw at any time. Banks can still use these funds for term lending because aggregate inflows and outflows tend to net off, leaving a stable funding core. However, banks must hold HQLA against these deposits to cover stress outflows (governed by [[basel_framework|Basel III]] [[01-short_term_metrics|LCR]] rules — see [LCR](../risk_measurement/liquidity_risk/02-lcr.md)), which reduces the net return from holding them as funding.
 
 **Notice accounts** — withdrawals require advance notice (common periods: 32, 60, 90 days). No HQLA required, making them more valuable to the bank as a stable funding source. Regulations typically permit an early breakage fee that covers the bank's lost interest.
 
