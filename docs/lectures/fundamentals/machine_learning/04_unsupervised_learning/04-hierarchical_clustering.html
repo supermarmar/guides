@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 17: hierarchical clustering</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Unsupervised learning</a></div>
+  <h1>Hierarchical clustering</h1>
+  <p class="subtitle">K-means (lecture 1 of this sub-module) demands a fixed number of clusters $K$ chosen up front and returns one flat partition. Hierarchical clustering does neither: it builds a complete nested tree of groupings, from every observation in its own cluster to the whole dataset in one, and lets the number of clusters be read off the tree afterwards, at whatever level of granularity the problem actually needs.</p>
+  <div class="meta">
+    <span>Lecture 17 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part III: unsupervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Hierarchical clustering builds a nested sequence of partitions using a dissimilarity function (lecture 3) between observations, without ever fixing the number of clusters $K$ in advance. There are two directions. <strong>Divisive</strong> clustering works top-down: start with all observations in one cluster and repeatedly split the least homogeneous cluster (the one with the largest internal diameter) into two, until every observation is its own cluster; the standard algorithm is <strong>DIANA</strong> (divisive analysis). <strong>Agglomerative</strong> clustering works bottom-up: start with every observation as its own cluster and repeatedly merge the two most similar clusters, until all observations sit in a single cluster; the standard algorithm is <strong>AGNES</strong> (agglomerative nesting). Both produce a full <strong>dendrogram</strong>, a tree recording every split or merge and the dissimilarity at which it happened; cutting the dendrogram horizontally at any height gives a flat partition into however many clusters that height implies, so the number of clusters is a choice made after seeing the whole tree rather than a hyperparameter fixed before clustering starts. Agglomerative merging additionally depends on a <strong>linkage</strong> rule, average (UPGMA), complete, or single, that defines the dissimilarity between two clusters (as opposed to two individual points), and the choice of linkage materially changes the shape of clusters the algorithm finds.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine sorting a box of assorted items by first grouping the two most similar items together, then the next two most similar (which might now include the group you just made), and continuing until everything is in one big pile, writing down every merge as you go, in order. That written record is a dendrogram. Afterwards, you can decide how finely you want to have grouped things by picking any point in your record and stopping there, rather than having decided in advance exactly how many piles you wanted. K-means makes you commit to the number of piles before you start; hierarchical clustering lets you decide once you have seen the whole family tree of possible groupings.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture pairs with lecture 1's k-means as the two canonical clustering families, distinguished by whether the number of clusters is fixed in advance (k-means) or read off a tree afterwards (hierarchical). It also sets up the next lecture's K-medoids, which shares k-means' fixed-$K$, flat-partition structure but replaces the mean with a genuine observation as the cluster centre, useful for exactly the non-Euclidean dissimilarity functions lecture 3 introduced.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons hierarchical clustering earns a place alongside k-means rather than being a niche alternative.</p>
+
+  <p>First, <strong>not knowing the right number of clusters in advance is the normal case, not the exception</strong>, in actuarial and credit applications: segmenting a portfolio into risk tiers, grouping policyholders for a representative-agent model-point exercise, or clustering claims narratives by theme are all tasks where the "right" number of groups is itself part of what needs discovering, and a dendrogram lets that discovery happen after the clustering runs rather than requiring a guess before it starts.</p>
+
+  <p>Second, <strong>the tree itself is a genuinely useful artefact, not just scaffolding for a flat cut</strong>: a dendrogram of vehicle models, say, shows not just which models end up together at a chosen cut but the entire nested structure of similarity, sports models merging with each other before merging with the wider family-car cluster, which is exactly the kind of qualitative structure an actuary building intuition about a portfolio wants to see directly rather than infer from a single flat partition.</p>
+
+  <p>Third, <strong>the choice of linkage rule is a genuine, consequential modelling decision that a default setting can silently make for you</strong>: single linkage and complete linkage produce systematically different cluster shapes from the identical data and the identical dissimilarity function, and knowing which one a piece of software defaults to, and why that default may be wrong for the problem at hand, is a real due-diligence question.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    An actuary building a model-point exercise for a large annuity book used agglomerative clustering with the software default (single linkage) to group policies into representative clusters, expecting compact, well-separated groups. The resulting clusters were highly uneven: one enormous cluster contained the large majority of policies, chained together through a sequence of near-identical near-neighbours, while several tiny clusters of two or three outlier policies sat apart. This is the textbook single-linkage "chaining" failure mode, not a data problem. Switching to complete linkage produced compact, roughly balanced clusters much better suited to the model-point exercise's requirement that each cluster be represented by a single, genuinely typical policy.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a dendrogram, built bottom-up by successive merges, with the height of each join showing the dissimilarity at which that merge happened, and a horizontal cut line giving a flat partition at any chosen number of clusters.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A dendrogram built by agglomerative clustering, with a horizontal cut giving three clusters">
+      <defs>
+        <marker id="dendArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A dendrogram: height = dissimilarity at which the merge happened</text>
+
+      <line x1="60" y1="270" x2="800" y2="270" stroke="#a1a1aa" stroke-width="1"/>
+      <line x1="60" y1="270" x2="60" y2="60" stroke="#a1a1aa" stroke-width="1"/>
+      <text x="40" y="65" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">height</text>
+
+      <g stroke="#0d9488" stroke-width="2" fill="none">
+        <line x1="100" y1="270" x2="100" y2="220"/>
+        <line x1="140" y1="270" x2="140" y2="220"/>
+        <line x1="100" y1="220" x2="140" y2="220"/>
+        <line x1="120" y1="220" x2="120" y2="180"/>
+
+        <line x1="200" y1="270" x2="200" y2="150"/>
+        <line x1="120" y1="180" x2="200" y2="180"/>
+        <line x1="160" y1="180" x2="160" y2="150"/>
+        <line x1="160" y1="150" x2="200" y2="150"/>
+
+        <line x1="280" y1="270" x2="280" y2="240"/>
+        <line x1="320" y1="270" x2="320" y2="240"/>
+        <line x1="280" y1="240" x2="320" y2="240"/>
+        <line x1="300" y1="240" x2="300" y2="150"/>
+        <line x1="180" y1="150" x2="300" y2="150"/>
+        <line x1="240" y1="150" x2="240" y2="105"/>
+      </g>
+
+      <g stroke="#b45309" stroke-width="2" fill="none">
+        <line x1="420" y1="270" x2="420" y2="210"/>
+        <line x1="460" y1="270" x2="460" y2="210"/>
+        <line x1="420" y1="210" x2="460" y2="210"/>
+        <line x1="440" y1="210" x2="440" y2="105"/>
+      </g>
+
+      <line x1="240" y1="105" x2="440" y2="105" stroke="#71717a" stroke-width="2"/>
+      <line x1="340" y1="105" x2="340" y2="70" stroke="#71717a" stroke-width="2"/>
+
+      <line x1="70" y1="140" x2="790" y2="140" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="795" y="136" font-family="Inter" font-size="10" font-weight="600" fill="#dc2626">cut here: 3 clusters</text>
+
+      <text x="120" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">cluster A</text>
+      <text x="300" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">cluster B</text>
+      <text x="440" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">cluster C</text>
+    </svg>
+    <figcaption>Every leaf starts as its own cluster; agglomerative merging joins the two closest clusters at each step, with the join drawn at a height equal to the dissimilarity between them. A horizontal cut at any height reads off a flat partition: cutting low (near the leaves) gives many small clusters, cutting high (near the root) gives few large ones. The cut shown here, at the dashed red line, gives three clusters, but any other height was available in the identical tree without re-running the algorithm.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>The tree is computed once; the number of clusters is chosen afterwards.</strong> Unlike k-means, which must be re-run from scratch for every candidate $K$, a single dendrogram supports reading off a partition at any $K$ by cutting at a different height. <strong>Linkage defines what "close" means between groups, not just between points.</strong> Once clusters contain more than one point, comparing two clusters requires a rule, and different rules produce systematically different cluster shapes from the identical underlying data.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Divisive clustering: DIANA</h3>
+
+  <p>Divisive clustering builds the tree top-down. Initialise with a single cluster containing every observation. At each step, given the current partition $(\mathcal{X}_k)_{k \in K}$, compute each cluster's <strong>diameter</strong>, the largest dissimilarity between any two of its members,</p>
+  $$\delta_k = \max_{i, i' \in \mathcal{X}_k} L(X_i, X_{i'}),$$
+  <p>and select the cluster with the largest diameter to split. Within that cluster, find the single most dissimilar member (the one with the largest average dissimilarity to every other member of the cluster) and use it to seed a new splinter cluster, then iteratively migrate any remaining member into the splinter group whenever doing so reduces the average dissimilarity within the original cluster more than it costs within the splinter, stopping when no further migration helps. Repeat the outer step (split the highest-diameter cluster) until every observation is its own cluster, or until a stopping rule halts earlier. This is the <strong>DIANA</strong> (divisive analysis) algorithm; it is more computationally expensive than agglomerative clustering (each split step itself requires an iterative sub-procedure) and is therefore used less often in practice, but it is the natural top-down counterpart worth knowing conceptually.</p>
+
+  <h3>Agglomerative clustering: AGNES</h3>
+
+  <p>Agglomerative clustering builds the identical kind of tree bottom-up, and is the far more commonly implemented direction. Initialise with every observation as its own cluster. At each step, compute the dissimilarity between every pair of current clusters (using a linkage rule, developed next) and merge the two closest clusters into one, reducing the number of clusters by one. Repeat until a single cluster remains. This is <strong>AGNES</strong> (agglomerative nesting), and the record of which clusters merged at which dissimilarity, kept across every step, is exactly the dendrogram.</p>
+
+  <h3>Linkage: what "close" means between clusters</h3>
+
+  <p>Once a cluster contains more than one observation, "the dissimilarity between two clusters" needs its own definition, called the <strong>linkage</strong>. Three standard choices, for clusters $\mathcal{X}_k$ and $\mathcal{X}_l$:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Linkage</th><th>Formula</th><th>Typical cluster shape</th></tr></thead>
+      <tbody>
+        <tr><td>Average (UPGMA)</td><td>$\delta_{k,l} = \dfrac{1}{|\mathcal{X}_k||\mathcal{X}_l|}\sum_{i \in \mathcal{X}_k}\sum_{i' \in \mathcal{X}_l} L(X_i, X_{i'})$</td><td>Moderate, balanced</td></tr>
+        <tr><td>Complete</td><td>$\delta_{k,l} = \max_{i \in \mathcal{X}_k, i' \in \mathcal{X}_l} L(X_i, X_{i'})$</td><td>Compact, roughly spherical</td></tr>
+        <tr><td>Single</td><td>$\delta_{k,l} = \min_{i \in \mathcal{X}_k, i' \in \mathcal{X}_l} L(X_i, X_{i'})$</td><td>Elongated, chained</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Complete linkage</strong> considers the two most distant members of the two clusters, and, because it is a worst-case (maximum) measure, it penalises merging clusters that would create any very distant pair, producing compact, roughly balanced clusters. <strong>Single linkage</strong> considers the two closest members, and, being a best-case (minimum) measure, it merges two clusters as soon as any single close pair exists between them, which is exactly the mechanism behind the "chaining" failure the vignette illustrates: a sequence of near-neighbours can string together a long, elongated cluster with no natural boundary, because each link in the chain only ever needs its immediate neighbour to be close, not the cluster as a whole to be compact. <strong>Average linkage</strong> (UPGMA, unweighted pair-group method with arithmetic mean) sits between the two, averaging over every cross-pair rather than taking an extreme, and is a reasonable default when neither compact nor elongated shape is specifically expected.</p>
+
+  <h3>Reading and cutting a dendrogram</h3>
+
+  <p>The dendrogram's vertical axis, height, is the dissimilarity at which each merge occurred, so a merge drawn low on the tree happened between very similar clusters and one drawn high happened between already-quite-different clusters. Cutting the tree horizontally at any height $h$ partitions the data into however many clusters were still separate at that height; scanning across candidate heights and looking for a height at which a small change produces a large jump in cluster count (a long vertical gap in the tree with no merges) is the dendrogram analogue of a scree plot's "elbow", and is the standard way to choose a number of clusters after the fact, rather than before running the algorithm at all.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Accepting a software default linkage without checking it suits the task</span>
+    As the vignette shows, single linkage's chaining behaviour and complete linkage's compact behaviour are systematically different, and a library's default (frequently single or average linkage) may not match what a specific application needs, a model-point exercise wanting compact, well-separated groups being a clear case for complete linkage over the default.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating the dendrogram's shape as evidence about the data alone</span>
+    A dendrogram's shape is a joint product of the data, the dissimilarity function, and the linkage rule; a chained, elongated dendrogram is not necessarily evidence of a genuinely elongated cluster structure in the data, it may simply be single linkage's characteristic behaviour on data that would look compact under a different linkage. Comparing dendrograms under at least two linkage choices before drawing a conclusion about the data's shape is standard due diligence.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing the cut height without a principled criterion</span>
+    Eyeballing a dendrogram and picking a cut height that "looks right" is a common and largely unavoidable practice, but reporting the resulting number of clusters as if it were an objective property of the data, rather than a subjective choice of where to cut, overstates the rigour of the exercise; the "longest vertical gap" heuristic is the closest this lecture offers to a principled rule, and even that should be checked against the substantive purpose the clustering serves.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Running hierarchical clustering on a very large dataset without checking the computational cost</span>
+    Both DIANA and AGNES require computing (or repeatedly updating) pairwise dissimilarities across the dataset, an $O(n^2)$ or worse cost in the number of observations; on datasets running into the hundreds of thousands of rows, hierarchical clustering can become impractical, and k-means (lecture 1) or a scalable approximation is the standard fallback at that scale.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Hierarchical clustering builds a full nested tree of groupings, divisively (DIANA, top-down, splitting the least homogeneous cluster) or agglomeratively (AGNES, bottom-up, merging the closest pair of clusters), recording every split or merge and its dissimilarity as a dendrogram. Cutting the dendrogram at any height gives a flat partition at whatever number of clusters that height implies, letting the number of clusters be chosen after seeing the whole tree rather than fixed in advance the way k-means requires. The linkage rule, average, complete, or single, determines how cluster-to-cluster dissimilarity is measured once clusters contain more than one point, and the choice materially changes the resulting cluster shapes, compact under complete linkage, potentially chained and elongated under single linkage.</p>
+
+  <p>The next lecture returns to flat, fixed-$K$ partitioning, developing K-medoids as a variant of k-means that replaces the cluster mean with an actual observation, the natural choice whenever the dissimilarity function is not the squared Euclidean distance k-means is specifically built around, and Gaussian mixture models as a soft-boundary alternative to both.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Distinguish divisive from agglomerative clustering: which direction does each build the tree, and which is more commonly implemented in practice?</li>
+      <li>Define a dendrogram and explain what the height of a merge represents.</li>
+      <li>State the formulas for average, complete, and single linkage, and describe the characteristic cluster shape each tends to produce.</li>
+      <li>Explain the "chaining" failure mode associated with single linkage, using the annuity-book vignette as a concrete example.</li>
+      <li>Describe how to choose a number of clusters from a dendrogram after the fact, and name the heuristic this lecture offers for doing so.</li>
+      <li>Why does hierarchical clustering become impractical on very large datasets, and what is the standard fallback?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 3 (<a href="03-autoencoders.html">autoencoders</a>) introduced the dissimilarity-function framework this lecture's linkage rules build directly on.</li>
+      <li><strong>Next:</strong> Lecture 5 (<a href="05-medoids_and_mixtures.html">medoids and mixtures</a>) returns to flat, fixed-$K$ clustering with K-medoids and Gaussian mixture models.</li>
+      <li><strong>Paired with:</strong> Lecture 1's <a href="01-k_means_clustering.html">k-means clustering</a> is the other canonical clustering method; the two differ precisely in whether the number of clusters is fixed in advance or read off a tree afterwards.</li>
+      <li><strong>Outside this course:</strong> Dendrograms are a standard exploratory tool for portfolio segmentation, model-point construction in life insurance valuation, and taxonomic grouping of claims or product types, wherever the natural number of groups is itself part of the analytical question.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Unsupervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 17 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

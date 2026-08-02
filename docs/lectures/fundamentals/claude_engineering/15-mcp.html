@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 15: MCP, the integration layer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>MCP: the integration layer, and code execution over it</h1>
+  <p class="subtitle">The Model Context Protocol turns "the agent can edit files" into "the agent can reach anything you have". That is a large increase in capability and a proportional increase in three costs that are easy to miss: context, blast radius, and the amount of untrusted content flowing into a system that cannot reliably tell data from instruction.</p>
+  <div class="meta">
+    <span>Lecture 15 of 22</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part IV: the wider stack</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>MCP</strong> is an open standard for connecting agents to external tools and data. A server exposes tools, and once connected the agent can call them as it calls any built-in tool. The documented trigger for adding one is a good one: connect a server when you find yourself copying data into chat from another system. Once connected, the agent reads and acts on that system directly rather than working from what you paste.</p>
+
+  <p>Servers arrive over four transports, HTTP, SSE, stdio, and WebSocket, and are configured at three scopes with different sharing properties. <strong>Local</strong> scope is the default and is private to you in one project. <strong>Project</strong> scope lives in a <code>.mcp.json</code> at the repository root and is shared through version control, which is how a team standardises its integrations. <strong>User</strong> scope applies across all your projects. Project-scoped servers from a cloned repository sit at pending approval until you trust the workspace, which is the right default given what a server can do.</p>
+
+  <p>The cost that catches people is context. Every connected server's tool schemas occupy the window on every turn, whether or not a tool is ever called, which is the point Lecture 2 made and which becomes concrete here. The engineering answer is now well developed: defer tool loading so schemas are fetched on demand rather than presented upfront, and where a task chains many calls or returns large intermediate results, have the agent write code that calls the tools rather than calling them one at a time through its own context.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A connected server is a standing cost and a standing risk, both paid whether or not you use it. Before adding one, ask what it saves you and how often. A server you use daily earns both. A server connected because it might be handy is renting space in every window and widening the surface through which hostile content can arrive, in exchange for a capability you have not needed yet.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    MCP is a bet that integration should be a protocol rather than a product, and the historical rhyme is exact: LSP did this for editors and language tooling, turning an M by N problem into an M plus N one. Before LSP, every editor implemented support for every language; after it, every editor spoke one protocol and every language shipped one server. The same arithmetic applies here, and it explains why the ecosystem grew as fast as it did. It also inherits LSP's weakness: a protocol standardises the wire format and not the quality, so the ceiling on what an integration can do is still set by whoever wrote the server.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that most real work is not confined to a repository. The ticket is in a tracker, the design is in a design tool, the data is in a warehouse, the decision is in a document. An agent that can only see source code is an agent you spend your time briefing, and the briefing is the part you were trying to avoid. MCP is what closes that gap, and it is the difference between a coding assistant and something that can carry a task end to end.</p>
+
+  <p>The second reason is that it is where the security model stops being theoretical. A file-editing agent can damage your working copy, which git protects you from. An agent with a mail server, an issue tracker, and a cloud storage connector can send things, publish things, and read things that belong to other people, and none of those are recoverable by <code>git checkout</code>. Lecture 20 handles this properly, but the exposure begins here, at the moment a server is added.</p>
+
+  <p>The third reason is that it is the largest silent consumer of context most people have. Instruction files get audited because they are visible and someone wrote them. Tool schemas are invisible, arrive by the dozen when a connector is enabled, and are never reviewed. A machine with twenty connectors is carrying a substantial permanent load that nobody chose, and the symptom, a session that feels duller than it should, gets attributed to the model.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Scopes, and what each is for</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Scope</th><th>Stored in</th><th>Available in</th><th>Shared</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Local (default)</td><td><code>~/.claude.json</code>, under the project path</td><td>This project, for you</td><td>No</td></tr>
+      <tr><td>Project</td><td><code>.mcp.json</code> at the repository root</td><td>This project, for everyone</td><td>Yes, via git</td></tr>
+      <tr><td>User</td><td><code>~/.claude.json</code></td><td>All your projects</td><td>No</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code class="language-bash"># Private to you, this project only
+claude mcp add --transport http stripe https://mcp.stripe.com
+
+# Shared with the team through version control
+claude mcp add --transport http sentry --scope project https://mcp.sentry.dev/mcp
+
+# Everywhere you work
+claude mcp add --transport http linear --scope user https://mcp.linear.app/mcp</code></pre>
+
+  <p>The scope decision is the same one Lecture 5 made about instruction files, and the same mistake is available. A connector put at user scope because it was convenient once is now loaded in every project on the machine forever. Default to local, promote to project when the team genuinely shares the dependency, and reserve user scope for the two or three you truly use everywhere.</p>
+
+  <h3>The context arithmetic</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tool schema cost with and without deferred loading">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">What eighteen connected servers cost, before you call anything</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <text x="52" y="66" font-weight="600" fill="#52525b">Upfront</text>
+        <rect x="140" y="50" width="500" height="26" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="390" y="68" text-anchor="middle" fill="#C76B2A">every tool schema from every server, on every turn</text>
+        <text x="654" y="68" font-size="10.5" fill="#C76B2A">large</text>
+
+        <text x="52" y="126" font-weight="600" fill="#52525b">Deferred</text>
+        <rect x="140" y="110" width="110" height="26" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="195" y="128" text-anchor="middle" font-size="10.5" fill="#1E9D54">names only</text>
+        <rect x="252" y="110" width="388" height="26" fill="#fafafa" stroke="#d4d4d8" stroke-dasharray="4,3"/>
+        <text x="446" y="128" text-anchor="middle" font-size="10.5" fill="#a1a1aa">schemas fetched on demand, for the few you actually use</text>
+        <text x="654" y="128" font-size="10.5" fill="#1E9D54">small</text>
+
+        <text x="140" y="176" font-size="11" font-style="italic" fill="#71717a">Deferring converts a permanent cost into a per-task one, which is the same</text>
+        <text x="140" y="196" font-size="11" font-style="italic" fill="#71717a">move as path-scoped rules for instructions and progressive disclosure for skills.</text>
+        <text x="140" y="216" font-size="11" font-style="italic" fill="#71717a">Three mechanisms, one principle: pay for what the turn needs.</text>
+      </g>
+    </svg>
+    <figcaption>Deferred loading does not reduce what a server can do; it changes when you pay for knowing about it. The pattern recurs throughout this course because the constraint it addresses is the one constant.</figcaption>
+  </figure>
+
+  <h3>Code execution over MCP</h3>
+
+  <p>The second efficiency idea is more interesting and less known. In the ordinary pattern, each tool call is a round trip: the agent calls, the full result lands in its context, it reasons, it calls again. Three chained lookups mean three round trips and three sets of intermediate data, most of which is never needed again.</p>
+
+  <p>The alternative is to have the agent write a short program that calls the tools, run it in a sandbox, and return only the program's output. Intermediate results are processed by ordinary control flow, loops, filters, joins, and never enter the model's context at all. Anthropic's framing of the benefit is precise: load tools on demand, filter data before it reaches the model, and execute complex logic in a single step. The token cost then scales with the size of the final answer rather than with the size of everything the task had to look at.</p>
+
+  <p>The decision rule follows the read-to-conclusion criterion from Lecture 10 again. Where a task calls many tools and discards most of what comes back, write code. Where it calls one tool and needs the whole result, call it directly.</p>
+
+  <div class="defcard">
+    <strong>Tool schema cost.</strong> The per-turn context occupied by the definitions of connected tools, independent of use. The reason connector count, not connector activity, is what to audit.
+  </div>
+
+  <div class="defcard">
+    <strong>Deferred tool loading.</strong> Presenting tool names without their full schemas and fetching a schema only when a tool is about to be used. Turns a standing charge into a per-task one.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Permissions and naming</h3>
+
+  <p>MCP tools follow the pattern <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>, which is what you write in permission rules and hook matchers. That naming is what makes server-level policy possible: <code>mcp__github__.*</code> matches everything from one server, so a deny rule or a <code>PreToolUse</code> hook can govern an entire integration in one line. Where an organisation has set a connector's tools to require asking, that setting survives even permissive modes, and tools marked as requiring user interaction always prompt rather than being auto-approved on the author's behalf.</p>
+
+  <p>The general policy worth adopting is asymmetric, because the risk is. Read tools from a connector can usually be allowlisted; write and send tools should not be, and the confirmation you get before an outbound action is the last checkpoint before something leaves your control. Lecture 18 develops this where it matters most.</p>
+
+  <h3>Every MCP result is untrusted content</h3>
+
+  <p>This is the point most worth carrying out of this lecture. A tool result is data, and data can contain text shaped like instructions. An issue description, a page body, a file comment, a web page: any of these can carry a sentence addressed to the agent, and the agent has no reliable way to distinguish a genuine instruction from one that arrived inside a result.</p>
+
+  <p>The architectural response is to assume detection will fail and constrain the consequences instead. That means read-heavy connectors are much safer than write-capable ones, that the combination of a connector reading untrusted content and another connector able to send things is the dangerous configuration rather than either alone, and that outbound actions want a human in the path regardless of how confident the session feels. Lecture 20 makes this the whole subject.</p>
+
+  <h3>Practical hygiene</h3>
+
+  <p>Four habits, none of them expensive. <strong>Audit by count.</strong> If a connector has not been used in your last ten sessions, disconnect it; it can be added back in one command. <strong>Prefer project scope for team dependencies</strong> so the integration is reviewable in a pull request rather than configured differently on every machine. <strong>Prefer a CLI where one exists.</strong> The documented advice is that command-line tools are the most context-efficient way to reach an external service, and a well-known CLI such as <code>gh</code> costs no schema at all because the agent already knows how to drive it. <strong>Treat large tool outputs as a smell</strong>, since a tool returning thousands of lines is one that should be filtered before its result reaches the window.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Enabling every available connector during setup, on the reasonable-sounding theory that unused ones are harmless. They are not harmless in either currency. Each contributes schemas to every turn, and each expands the set of systems a successful prompt injection could reach. The configuration to aim for is the smallest set that covers what you actually do, extended deliberately when a real need appears, rather than the largest set that might one day be convenient.
+  </div>
+
+  <h3>Worked example: eighteen servers, and what they are contributing</h3>
+
+  <div class="worked">
+    <strong>Worked example: the connector list attached to this session</strong>
+    <p>This session has eighteen MCP servers connected. Three are authenticated and carry real capability: Notion with around nineteen tools, a Microsoft 365 connector with roughly forty covering Outlook, SharePoint, and Teams, and a CRM connector with fifteen. A browser-automation server adds a further two dozen. Together those account for nearly every tool that could actually do something.</p>
+    <p><strong>The other fourteen are stubs.</strong> Asana, Atlassian, Box, Canva, DocuSign, Figma, Fireflies, Gmail, HubSpot, Intercom, Linear, Mermaid Chart, Miro, and monday.com are each present with exactly two tools: <code>authenticate</code> and <code>complete_authentication</code>. None is signed in. Their entire current capability is to begin an OAuth flow. They are twenty-eight tool definitions that cannot read, write, or fetch anything at all.</p>
+    <p><strong>What that would cost without mitigation.</strong> Under upfront loading, all eighteen servers' schemas would sit in every window on every turn of every session, and the fourteen unauthenticated ones would contribute a permanent charge for a capability that is definitionally zero until someone signs in. That is the pure form of the pitfall above: the cost is real, the benefit is not yet, and nothing in the interface surfaces the trade.</p>
+    <p><strong>What actually happened.</strong> The session ran with deferred loading: tool names were listed, schemas were not, and each schema was fetched only when a tool was about to be used. Over roughly fifteen lectures this session has fetched five, the two scheduling tools, the task tools, web search and fetch, and the browser set. Thirteen of the eighteen servers have contributed nothing beyond their names, which is exactly the intended outcome and a good demonstration that the mechanism works.</p>
+    <p><strong>What deferring does not fix.</strong> It addresses the context cost and leaves the security surface untouched. Fourteen dormant OAuth stubs are fourteen integrations one consent screen away from being live, and a live Gmail connector next to a live document connector is precisely the read-untrusted-then-send-outbound pairing that Lecture 20 is about. The honest recommendation is the boring one: disconnect the ones you are not using. Deferred loading made the cost invisible, and an invisible cost is one nobody ever gets round to removing.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>MCP connects the agent to systems outside the repository, over four transports and at three scopes with different sharing properties. Connect a server when you are copying data into chat from somewhere else; default to local scope and promote deliberately. Watch the context arithmetic, because schemas are charged per turn regardless of use, and prefer deferred loading and code execution over MCP where a task calls many tools or discards most of what returns. Govern by the <code>mcp__server__tool</code> naming, allowlist reads and never writes, prefer a CLI where one exists, and treat every result as untrusted content rather than as data you can act on.</p>
+
+  <p>That is the protocol layer. The next three lectures are about what sits on the other end of it, and they are ordered by how much the agent has to go through to reach them. The most agent-native substrate turns out to need no protocol at all, because it is already plain files on disk, and it is the one this repository has been sitting in since before the course began.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What is the documented trigger for connecting a server?</li>
+      <li>Name the three scopes and say which is shared through version control.</li>
+      <li>Why does connector count matter more than connector activity?</li>
+      <li>Explain code execution over MCP. When does it beat calling tools directly?</li>
+      <li>What does the <code>mcp__server__tool</code> naming enable that a flat namespace would not?</li>
+      <li>Why should read tools and write tools be treated asymmetrically in permission rules?</li>
+      <li>Deferred loading solves one of the two costs of an unused connector. Which one remains?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="14-anti_sycophancy.html">Lecture 14 (anti-sycophancy)</a> closed the verification part; Part IV widens beyond the repository.</li>
+      <li><strong>Next:</strong> Lecture 16 (Obsidian) covers the substrate that needs no protocol.</li>
+      <li><strong>Cross-link:</strong> <a href="02-context_engineering.html">Lecture 2 (context engineering)</a> introduced tool-schema cost as a category of context spend.</li>
+      <li><strong>Cross-link:</strong> <a href="03-the_harness.html">Lecture 3 (the harness)</a> covers the permission rules that govern MCP tools.</li>
+      <li><strong>Cross-link:</strong> Lecture 20 (security and confidentiality) develops the untrusted-content threat this lecture introduces.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "Connect Claude Code to tools via MCP", code.claude.com/docs/en/mcp (transports, scopes, authentication, naming); Anthropic, "Code execution with MCP: building more efficient AI agents", anthropic.com/engineering; the Model Context Protocol specification at modelcontextprotocol.io.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 15 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

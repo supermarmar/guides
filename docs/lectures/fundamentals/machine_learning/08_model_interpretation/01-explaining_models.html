@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 39: explaining models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Model interpretation</a></div>
+  <h1>Explaining models</h1>
+  <p class="subtitle">Predictive performance and interpretability are two different questions, and credit risk practice is increasingly required to answer both. White-box and black-box, model-specific and model-agnostic, global and local: three distinctions that organise the rest of this sub-module.</p>
+  <div class="meta">
+    <span>Lecture 39 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part VI: interpretation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Model interpretation</strong> is the practice of producing a human-readable account of why a model predicted what it predicted, either across the whole population or for a single row. Three distinctions organise the field. The <strong>white-box versus black-box</strong> distinction asks whether the model's parameters are themselves the explanation: a linear regression's coefficients, a shallow decision tree's splits, and a generalised additive model's shape functions are all directly inspectable, while a deep neural network or a 10,000-tree gradient-boosted ensemble carries no human-readable logic in its weights. The <strong>model-specific versus model-agnostic</strong> distinction asks whether the explanation exploits the model's internal structure (linear coefficients, Gini importance, attention weights) or treats the model as an opaque function and probes its behaviour from outside (permutation importance, partial dependence, SHAP, LIME). The <strong>global versus local</strong> distinction asks whether the explanation describes average behaviour across the population or the reasons behind one particular prediction. The interpretability-accuracy trade-off, often invoked to justify reaching for a black box, is overstated on tabular data: well-tuned linear and additive models with engineered features routinely match or beat ensembles on bank portfolios, and the price of a small AUC gain is rarely worth the loss of auditability when SR 11-7, SS3-24, or an adverse-action notice is in scope.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A model that scores a loan application as a decline cannot be put into production in a regulated bank until someone can explain why. The explanation has to satisfy three audiences. The customer, who is entitled under ECOA in the US (and equivalent rules in the EU and UK) to a list of the reasons the application was declined. The validator, who under SR 11-7 has to be able to reproduce the model's logic from documentation alone. And the supervisor, who under SS3-24 wants to see that the bank understands what its model is doing rather than trusting the AUC blindly. Model interpretation is the toolbox that turns a fitted model object into the three explanations these three audiences need.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The textbook framing treats interpretability as a property of the model class. The practitioner framing treats it as a property of the pipeline. A logistic regression on 800 raw features with PCA in front of it is no more interpretable than a random forest, because the coefficients live in a rotated space no one can describe in business language. A gradient-boosted model on 20 carefully engineered features with monotonic constraints and SHAP outputs is more interpretable than the PCA-logistic, because every feature has an economic meaning and every prediction has a defensible decomposition. The question to ask is not "is this model class interpretable" but "can I produce, for any prediction, a one-page explanation that a customer, a validator, and a supervisor would each accept".
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 6 of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a> and the final sub-module of this course. The two lectures that follow develop the methods this lecture frames. Lecture 40 on <a href="02-model_specific_methods.html">model-specific methods</a> covers coefficient inspection, Gini importance, tree visualisation, and attention weights. Lecture 41 on <a href="03-model_agnostic_methods.html">model-agnostic methods</a> covers permutation importance, partial dependence plots, SHAP, and LIME. This lecture sets the frame; the next two fill in the techniques.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Four reasons interpretability is more than a courtesy. First, <strong>regulatory defensibility</strong>. SR 11-7 (the US Federal Reserve's model risk management guidance) requires every model in production to be documented in enough detail that an independent validator can reproduce its logic, identify its limitations, and challenge its assumptions. SS3-24 (the PRA's 2024 supervisory statement on model risk) sets the same expectations for UK banks. The ECB's Targeted Review of Internal Models (TRIM) imposes equivalent requirements for European IRB models. None of these regimes outright forbid black-box models, but all of them demand a level of explanation that pure accuracy cannot supply. A model that cannot be explained cannot be validated, and a model that cannot be validated cannot be used for regulatory capital.</p>
+
+  <p>Second, <strong>debugging</strong>. A model with disappointing performance is almost always wrong for a reason the developer has not yet identified. Interpretability turns the diagnosis from guesswork into evidence: a feature with implausibly high importance is likely a leak from the future, a feature with zero importance after careful engineering is a candidate for removal, a partial dependence plot with a sharp discontinuity at a round-number threshold is a hint of an upstream data-cleaning rule that the developer did not know about. The fastest route from a 0.72 AUC to a 0.78 AUC is rarely a new model class; it is usually a SHAP plot that reveals a feature behaving in a way no one expected.</p>
+
+  <p>Third, <strong>fairness audits</strong>. Once a model is in production, the bank is responsible for whether it discriminates against protected groups, whether intentionally or as a side-effect of correlated features. The detection methodology runs on interpretability: compute SHAP values per prediction, aggregate by group, and look for systematic differences in which features drive the decline rate. A black-box model with no per-prediction decomposition cannot be audited for fairness in any meaningful sense; the bank can only inspect the input and output and infer disparate impact from the joint distribution, which is a much weaker diagnostic than a feature-level attribution.</p>
+
+  <p>Fourth, <strong>trust with non-modellers</strong>. The model's outputs have to be acted on by relationship managers, underwriters, collections agents, and risk committees, most of whom will never see a confusion matrix. A model that produces a score with no explanation is treated as a magic number, and a magic number is overridden whenever it conflicts with intuition, regardless of whether the intuition is correct. A model that produces a score with a short, business-language explanation ("this application scores low because the applicant's debt-to-income ratio is above the segment median and their employment tenure is below it") is trusted, used, and improved over time. The technical work of producing the explanation is the cheapest part of getting a model adopted.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A wholesale credit risk team replaced a logistic regression PD model with a gradient-boosted ensemble. Out-of-time AUC rose from 0.78 to 0.83. The model was rejected at validation. The validator's report cited three issues: no feature-level explanation for individual borrower predictions, no documented behaviour of the model on the long tail of obligor segments with thin training data, and no monotonicity guarantees on features the credit policy team considered economically directional (a higher leverage ratio should never reduce the predicted PD). The team's response was not to retrain a logistic regression but to keep the ensemble and add monotonic constraints, SHAP-based local explanations, and a documented sensitivity analysis on thin segments. The model passed re-validation. The lesson is that the trade-off is not between performance and interpretability as model properties; it is between performance and the engineering effort required to make the same model auditable.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Any interpretability method sits at a known position on two axes: how much of the model's internal structure it uses (model-specific to model-agnostic), and how broad a question it answers (global to local). The two axes give a 2x2 grid into which every method in the sub-module can be placed, and the choice of method for a given task reduces to identifying which cell the task lives in.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="2x2 grid of interpretability methods by global vs local and model-specific vs model-agnostic">
+      <defs>
+        <marker id="emArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two axes, four cells: where each method sits</text>
+
+      <!-- Y-axis label (vertical) -->
+      <text x="22" y="240" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b" transform="rotate(-90 22 240)">scope of question</text>
+
+      <!-- X-axis label -->
+      <text x="380" y="442" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b">use of internal structure</text>
+
+      <!-- Top row label -->
+      <text x="70" y="120" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">GLOBAL</text>
+      <text x="70" y="134" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">average behaviour</text>
+      <text x="70" y="146" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">across population</text>
+
+      <!-- Bottom row label -->
+      <text x="70" y="300" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">LOCAL</text>
+      <text x="70" y="314" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">reasons for one</text>
+      <text x="70" y="326" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">particular prediction</text>
+
+      <!-- Top axis labels -->
+      <text x="280" y="62" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">MODEL-SPECIFIC</text>
+      <text x="280" y="76" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">uses internal parameters</text>
+
+      <text x="540" y="62" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">MODEL-AGNOSTIC</text>
+      <text x="540" y="76" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">probes the function</text>
+
+      <!-- Top-left cell: global + model-specific -->
+      <g>
+        <rect x="150" y="90" width="260" height="150" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="280" y="115" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">GLOBAL, MODEL-SPECIFIC</text>
+        <text x="280" y="140" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">linear regression coefficients</text>
+        <text x="280" y="158" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">logistic regression weights</text>
+        <text x="280" y="176" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">tree feature importance</text>
+        <text x="280" y="194" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">GAM shape functions</text>
+        <text x="280" y="220" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#0d9488">cheap, exact, model-class-bound</text>
+      </g>
+
+      <!-- Top-right cell: global + model-agnostic -->
+      <g>
+        <rect x="410" y="90" width="260" height="150" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="540" y="115" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">GLOBAL, MODEL-AGNOSTIC</text>
+        <text x="540" y="140" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">permutation importance</text>
+        <text x="540" y="158" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">partial dependence plot</text>
+        <text x="540" y="176" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">accumulated local effects</text>
+        <text x="540" y="194" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">global SHAP summary</text>
+        <text x="540" y="220" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#7c3aed">works on anything, costs compute</text>
+      </g>
+
+      <!-- Bottom-left cell: local + model-specific -->
+      <g>
+        <rect x="150" y="250" width="260" height="150" rx="10" fill="#FFF7ED" stroke="#c2410c" stroke-width="1.5"/>
+        <text x="280" y="275" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#9a3412">LOCAL, MODEL-SPECIFIC</text>
+        <text x="280" y="300" text-anchor="middle" font-family="Inter" font-size="10" fill="#9a3412">decision path through a tree</text>
+        <text x="280" y="318" text-anchor="middle" font-family="Inter" font-size="10" fill="#9a3412">attention weights</text>
+        <text x="280" y="336" text-anchor="middle" font-family="Inter" font-size="10" fill="#9a3412">integrated gradients (NNs)</text>
+        <text x="280" y="354" text-anchor="middle" font-family="Inter" font-size="10" fill="#9a3412">per-row coefficient times x</text>
+        <text x="280" y="380" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#c2410c">exact for the row, class-bound</text>
+      </g>
+
+      <!-- Bottom-right cell: local + model-agnostic -->
+      <g>
+        <rect x="410" y="250" width="260" height="150" rx="10" fill="#FEF2F2" stroke="#b91c1c" stroke-width="1.5"/>
+        <text x="540" y="275" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">LOCAL, MODEL-AGNOSTIC</text>
+        <text x="540" y="300" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">SHAP per prediction</text>
+        <text x="540" y="318" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">LIME local surrogate</text>
+        <text x="540" y="336" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">counterfactual explanations</text>
+        <text x="540" y="354" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">anchors</text>
+        <text x="540" y="380" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#b91c1c">the toolkit for adverse-action</text>
+      </g>
+    </svg>
+    <figcaption>The 2x2 grid spans every method in the sub-module. The bottom-right cell is the one that does the regulatory heavy lifting: SHAP per prediction and counterfactuals are how a black-box model is turned into a defensible decision with a specific, row-level reason code.</figcaption>
+  </figure>
+
+  <p>Three things to read off the grid. The two axes are independent: a method's position on one tells you nothing about its position on the other. A SHAP value, for instance, has both a global aggregation (mean absolute SHAP per feature, top-right cell) and a local decomposition (SHAP per feature for one row, bottom-right cell), so SHAP appears in two cells under one name. The model-specific column is cheaper to compute because the explanation falls out of the fitted parameters at no extra cost, but it does not transfer to other model classes; the model-agnostic column transfers across everything at a higher computational cost (typically thousands of perturbed predictions per explanation). The local row is what regulatory reason-coding requires; the global row is what model validation and feature engineering need.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>White-box and black-box models</h3>
+
+  <p>A <strong>white-box model</strong> is one whose fitted parameters are themselves a human-readable description of its logic. Linear regression sits at one end: the coefficient on each feature is the marginal effect of that feature on the prediction, and the sign and magnitude of the coefficient is the entire story. Logistic regression inherits the same property on a log-odds scale, with the coefficient interpretable as the change in log-odds of the positive class per unit increase in the feature. A decision tree of moderate depth (six to ten levels, perhaps a few hundred leaves at most) is also white-box: the path from root to leaf is a series of human-readable conditions, and any prediction can be traced through the tree in a single page of text. Generalised additive models (GAMs) sit between the two: each feature contributes an independent shape function $f_j(x_j)$ to the prediction, and the shape function can be plotted and inspected; the additive structure means the contribution of each feature does not depend on the values of the others, which is what makes them auditable.</p>
+
+  <p>A <strong>black-box model</strong> is one whose parameters carry no useful summary of its logic. A deep neural network with millions of weights and dozens of layers has an exact mathematical specification but no human-readable account of why it produces a given output; the weights interact through non-linear activations in ways that no single coefficient can summarise. Kernel SVMs with non-trivial kernels (RBF, polynomial of degree four or more) are similar: the model is fully specified by the support vectors and their dual coefficients, but the mapping from input to output does not factor into interpretable per-feature contributions. Large tree ensembles (random forests with hundreds of trees, gradient-boosted ensembles with thousands) are black-box not because any single tree is opaque but because the ensemble's prediction is an average across many trees whose individual splits cannot be aggregated into a single readable logic.</p>
+
+  <p>The distinction is not binary. A 10,000-tree XGBoost is darker than a single decision tree but lighter than a transformer because per-feature monotonicity constraints can be enforced, per-feature partial dependences can be plotted, and SHAP values give exact additive decompositions per prediction. The relevant question is rarely "is this model white-box" and more usefully "what fraction of the model's logic can be exposed to a human reader, and at what computational cost". The line between white and black is a continuum, and the location of any particular model on that continuum depends as much on the engineering effort invested in explaining it as on the model class itself.</p>
+
+  <h3>Model-specific versus model-agnostic methods</h3>
+
+  <p><strong>Model-specific methods</strong> exploit the internal structure of a particular model class. The coefficient vector of a linear or logistic regression is the canonical example: the model's parameters are the explanation, and no extra work is required beyond reading them off the fitted object (with appropriate scaling so coefficients on differently-scaled features are comparable). Gini importance in a decision tree or random forest is similar: each split's contribution to the impurity reduction is recorded at training time, and the per-feature sum is a direct read of the model's internal structure. Attention weights in a transformer-based model are another example: each attention head produces a matrix of weights that can be visualised to show which input tokens the model attended to when producing each output token. The advantage of model-specific methods is that they are exact, cheap, and computed at training time as a by-product of fitting. The disadvantage is that they only work for the model class they are designed for, and the explanation they produce is sometimes misleading on its own terms (Gini importance is biased toward high-cardinality features regardless of predictive value; attention weights have been shown to correlate weakly with the model's actual reliance on specific tokens).</p>
+
+  <p><strong>Model-agnostic methods</strong> treat the model as a function $f(x)$ that takes an input vector and returns a prediction, and probe its behaviour by perturbing the input and observing the output. Permutation importance shuffles one feature at a time across the dataset and measures the drop in model performance; the resulting drop is the feature's contribution to the model's predictive power. Partial dependence plots vary one feature across its observed range, average the model's prediction over the other features, and plot the result; the curve shows how the model's expected output depends on that one feature. SHAP values decompose each prediction into per-feature additive contributions that satisfy a list of axioms (efficiency, symmetry, additivity, dummy) borrowed from cooperative game theory. LIME fits a local linear surrogate around the point of interest and uses the surrogate's coefficients as the local explanation. The advantage of model-agnostic methods is that they work on anything: a logistic regression, a gradient boosted ensemble, a deep neural network, and a kernel SVM can all be explained with the same tooling and compared on equal footing. The disadvantage is the cost: each explanation typically requires hundreds to thousands of model evaluations, and the methods can be unstable in regions of the input space where the model behaves erratically.</p>
+
+  <h3>Global versus local explanations</h3>
+
+  <p>The third axis asks how broad a question the explanation answers. A <strong>global explanation</strong> describes the model's average behaviour across the population: "on this portfolio, debt-to-income ratio is the most important driver of the model's prediction, followed by time at employer and previous credit utilisation". A global explanation is what feature engineering, model documentation, and management reporting need. The same SHAP framework that produces local explanations also produces global ones (mean absolute SHAP value per feature is the standard global summary), and permutation importance and partial dependence are global by construction.</p>
+
+  <p>A <strong>local explanation</strong> describes the reasons behind one particular prediction: "this application was declined because the applicant's debt-to-income ratio of 0.55 contributed +0.18 to the predicted PD, and their employment tenure of three months contributed +0.09, partially offset by a clean payment history at -0.04". A local explanation is what an adverse-action notice requires, what a customer-facing relationship manager needs to explain a decision, and what a fairness audit aggregates across protected groups. SHAP per prediction and LIME are the canonical methods. Counterfactual explanations are a related approach that produces the explanation in a different form: "the smallest change to the application that would have flipped the decision is an increase in declared income from 28,000 to 41,000". Counterfactuals are particularly useful in adverse-action contexts where the customer wants to know what they could do differently.</p>
+
+  <h3>The interpretability-accuracy trade-off</h3>
+
+  <p>The standard framing of the trade-off is that more flexible models (deep networks, large ensembles, kernel methods) achieve higher predictive accuracy at the cost of interpretability, and that the modeller chooses a point on this Pareto frontier based on the use case. The framing is true for some problems and overstated for the problems banks actually face. On image and natural-language tasks the gap between a deep network and any white-box alternative is enormous, and the trade-off is genuine. On tabular credit data the gap is typically one or two AUC points after careful engineering, and sometimes nil. A well-tuned logistic regression with WoE-encoded features, monotonic constraints, and interaction terms identified through SHAP analysis of a black-box benchmark routinely reaches within 0.01 AUC of the black-box model. The choice is therefore rarely as binary as it appears: the bank can usually have most of the accuracy with most of the interpretability, provided the engineering effort goes in.</p>
+
+  <p>The deeper point is that interpretability is not free even for white-box models. A logistic regression with 800 features is not interpretable in any operational sense, even though every coefficient is a number on the page. The discipline that makes a white-box model genuinely interpretable (constrained feature count, economic monotonicity, business-language naming, segment-level documentation) is the same discipline that, applied to a black-box model with SHAP and monotonic constraints, makes it auditable as well. The supposed trade-off collapses into a question of engineering effort and tooling choices rather than a fundamental property of the model class.</p>
+
+  <h3>Three regulatory contexts where interpretability is mandatory</h3>
+
+  <p><strong>Credit scoring</strong> under IRB. PD, LGD, and EAD models under the Basel A-IRB framework are subject to model risk management oversight under SR 11-7 (US), SS3-24 (UK), and the ECB's TRIM guidance (EU). Every feature has to be defensible: a feature that is predictive but has no economic interpretation, or that exhibits a non-monotonic relationship the credit policy team cannot justify, will not pass validation regardless of its contribution to AUC. Monotonic constraints (PD increases monotonically with leverage, decreases monotonically with credit score) are commonly mandated, and the model has to be able to demonstrate that the constraint is satisfied. The interpretability work happens at three levels: global (which features matter and how), local (per-application reason codes), and counterfactual (what would have to change for the decision to flip).</p>
+
+  <p><strong>Adverse-action notices</strong>. Under ECOA in the United States, a creditor who denies an application is required to provide the applicant with a list of the specific principal reasons for the decline. The equivalent requirement in the EU sits across GDPR (the right to an explanation of automated decisions) and consumer-credit legislation. Operationally, the bank generates the reason list by taking the SHAP decomposition of the prediction, ranking features by their positive contribution to the decline (or their distance from a threshold), and translating the top three or four into business language. A model with no local explanation cannot produce a defensible reason list; the bank then either retains a parallel white-box model for the reason-coding step (which introduces consistency risk) or rejects the model entirely.</p>
+
+  <p><strong>Model risk management</strong> under SR 11-7 and SS3-24. Every model in production at a bank is documented in a model risk inventory, validated independently by a team separate from development, monitored on an ongoing basis, and re-validated periodically. The documentation requirement is the binding constraint for interpretability: the validator has to be able to reproduce the model's logic from the documentation alone, identify the assumptions on which the model depends, and challenge those assumptions. A model whose logic cannot be captured in documentation cannot be validated; a model that cannot be validated cannot be promoted to production. SS3-24 adds an explicit expectation that the firm's senior management understands the models on which capital, pricing, and risk decisions depend, which raises the interpretability bar above what is strictly required for the validator alone.</p>
+
+  <h3>What this lecture does not do</h3>
+
+  <p>This lecture is short by design. It frames the field around the three distinctions (white versus black, specific versus agnostic, global versus local), establishes why the field matters (four reasons in section 2, three regulatory contexts in section 4), and locates the methods in a 2x2 grid that the next two lectures fill in. It does not derive any single method. The coefficient inspection, Gini importance, tree visualisation, and attention-weight analysis that constitute the model-specific column are covered in <a href="02-model_specific_methods.html">lecture 40</a>. The permutation importance, partial dependence, SHAP, LIME, and counterfactual methods that constitute the model-agnostic column are covered in <a href="03-model_agnostic_methods.html">lecture 41</a>. The reader who wants to know how SHAP is computed, or why permutation importance can be misleading under feature correlation, or how counterfactuals are searched for, will find those answers in the next two lectures.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes recur in the framing of interpretability work before any specific method is chosen. Each is a mistake of category, not of technique, and each survives the choice of method.</p>
+
+  <div class="callout warn">
+    <span class="tag">Conflating interpretability with model class</span>
+    The assumption that a linear model is interpretable and an ensemble is not is true only on the most trivial pipelines. A logistic regression on 500 features after a PCA rotation is opaque: the coefficients live in a rotated space no one can describe, and the original-feature contribution to any prediction requires un-rotating through the loading matrix, which most consumers of the model will never do. Conversely, a gradient-boosted ensemble on 20 carefully engineered features with monotonic constraints and per-prediction SHAP values is auditable. Interpretability is a property of the pipeline, not the model class. The right diagnostic is "can I produce a one-page explanation per prediction that a customer, a validator, and a supervisor would each accept" rather than "what algorithm did I fit".
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Global explanations used to defend local decisions</span>
+    A common error in adverse-action notices is to use the model's global feature importance (debt-to-income ranks first, employment tenure second, credit utilisation third) as the explanation for any particular decline. The global ranking describes average behaviour across the population; it does not describe the reasons for one specific row. A given applicant might have been declined because of a feature that ranks fifteenth globally but had an extreme value for this applicant. Substituting the global ranking for a genuine local decomposition violates ECOA in spirit if not in letter and breaks down quickly under audit. Reason codes have to be derived from the per-prediction SHAP value or an equivalent local method, not from the global summary.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Feature importance as a substitute for causal reasoning</span>
+    A feature with high SHAP or Gini importance is a feature the model relies on, not a feature that causes the outcome. A model may rely heavily on postcode as a proxy for income, which the regulator may treat as discriminatory because postcode correlates with protected characteristics. The interpretability output identifies the reliance; it does not justify it. Treating high importance as evidence of causal effect leads to over-claiming in model documentation ("our model has discovered that postcode drives default risk") that will not survive a critical reading. The discipline is to report importance as importance and reserve causal language for analyses designed to identify causal effects (see <a href="../03_supervised_learning/06-causal_models.html">causal models</a> in sub-module 03).
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Explaining the wrong quantity</span>
+    A classifier outputs a probability and a class. Most interpretation methods (SHAP, LIME, partial dependence) operate on the probability, the log-odds, or the raw score; the class is a thresholded output that is not differentiable and rarely admits a useful decomposition. A team that asks "why did the model classify this application as a decline" and computes SHAP on the binary output will get a degenerate explanation. The correct question is "why did the model produce this probability of default", followed by "and where does that probability sit relative to the decision threshold". The threshold itself is a separate object with its own justification, and confusing the two leads to explanations that mix model logic with policy logic (see <a href="../07_model_evaluation/03-classification_metrics.html">classification metrics</a>).
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Interpretation is stage 6 of the pipeline and the gate every regulated bank model has to pass before promotion to production. Three distinctions organise the field. White-box versus black-box asks whether the fitted parameters are themselves the explanation, but the line between them is a continuum that depends as much on engineering effort as on model class. Model-specific versus model-agnostic asks whether the explanation exploits internal structure (cheap, exact, class-bound) or probes the model from outside (universal, expensive, sometimes unstable). Global versus local asks whether the explanation describes average behaviour or the reasons for one prediction; both are needed, for different audiences and different purposes. Four reasons interpretability matters: regulatory defensibility under SR 11-7, SS3-24, and TRIM; debugging that turns vague performance complaints into actionable findings; fairness audits that aggregate local explanations by protected group; and trust with non-modellers without which a model is overridden into irrelevance. Three regulatory contexts where the requirement bites particularly hard: credit scoring, adverse-action notices, and model risk management. And the deeper point that the interpretability-accuracy trade-off is overstated on tabular data and largely dissolves into a question of how much engineering effort is invested in making the model auditable.</p>
+
+  <p>What this lecture deliberately did not do. It did not derive coefficient interpretation for linear and logistic regression, the construction of feature importance in trees and ensembles, or the use of attention weights in deep learning architectures; that is <a href="02-model_specific_methods.html">lecture 40</a>. It did not derive permutation importance, partial dependence plots, SHAP values, LIME, or counterfactual explanations; that is <a href="03-model_agnostic_methods.html">lecture 41</a>. It set the frame the next two lectures fill in.</p>
+
+  <p>Lecture 40, <a href="02-model_specific_methods.html">model-specific methods</a>, opens the model-specific column of the 2x2 grid. Coefficient inspection in linear and logistic regression with scaling caveats; Gini and permutation-based importance in trees and random forests with the bias toward high-cardinality features; per-prediction decision paths in single trees; attention weights in transformers with the caveat that they are not always faithful to the model's actual reliance. The lecture closes with the limits of the model-specific column and the cases that force the modeller into the model-agnostic toolkit.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the three distinctions that organise the field of model interpretation, and give one example method in each combination.</li>
+      <li>A team has built a gradient-boosted PD model with 0.83 AUC and wants to put it into production. The validator rejects the model for lacking local explanations. Name two model-agnostic methods that produce per-prediction explanations suitable for adverse-action notices.</li>
+      <li>Explain why the interpretability-accuracy trade-off is often overstated on tabular bank data, and identify the engineering choices that close the gap between a black-box and a white-box pipeline.</li>
+      <li>Under SR 11-7, what is the binding interpretability requirement on a model in production, and which of the three distinctions (global, local, or both) does that requirement most directly invoke?</li>
+      <li>A logistic regression with 500 PCA-rotated features and a gradient-boosted model with 20 economically meaningful features. Which is more interpretable in any operational sense, and why does the answer not depend on model class alone?</li>
+      <li>A practitioner uses global feature importance to draft adverse-action reason codes for every declined application. Identify the pitfall and state the correct method.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 40 (<a href="02-model_specific_methods.html">model-specific methods</a>) develops the model-specific column of the grid: coefficient inspection, Gini importance, tree visualisation, attention weights.</li>
+      <li><strong>And then:</strong> Lecture 41 (<a href="03-model_agnostic_methods.html">model-agnostic methods</a>) develops the model-agnostic column: permutation importance, partial dependence, SHAP, LIME, counterfactuals.</li>
+      <li><strong>Prerequisite:</strong> Lecture 1 of this course (<a href="../01_feature_engineering/01-the_ml_landscape.html">the machine learning landscape</a>) introduced the six-stage pipeline; this lecture is the framing of the final stage.</li>
+      <li><strong>Pairs with:</strong> Lecture 35 (<a href="../07_model_evaluation/03-classification_metrics.html">classification metrics</a>) on the distinction between the probability the model produces and the class the policy threshold produces; lecture 30 (<a href="../05_deep_learning/01-neural_networks.html">neural networks</a>) on the canonical black-box class; lecture 13 (<a href="../03_supervised_learning/06-causal_models.html">causal models</a>) on the distinction between predictive reliance and causal effect.</li>
+      <li><strong>Outside this course:</strong> The A-IRB capital track at <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/index.html">application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/</a> develops the regulatory documentation that interpretability work feeds, including the model risk inventory, validation reports, and use-test evidence that SS3-24 and SR 11-7 require.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Model interpretation course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 39 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

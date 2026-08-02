@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 2: context engineering</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Context engineering: the window is the program</h1>
+  <p class="subtitle">Everything the model knows on a given turn is the token sequence in front of it. That sequence is finite, it degrades as it fills, and every file you paste competes with every tool schema and every previous turn for the same budget. Curating it is not a preliminary to the work. It is the work.</p>
+  <div class="meta">
+    <span>Lecture 2 of 22</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Context engineering</strong> is the practice of curating the set of tokens the model sees at inference time. Anthropic draws the distinction against prompt engineering sharply: prompt engineering is about writing good instructions, while context engineering covers the whole evolving universe of information that might land in the window, instructions, tool definitions, retrieved files, tool results, and the conversation so far, and the question of which subset of it should be there on this turn. The governing principle they state is worth memorising: find the smallest possible set of high-signal tokens that maximise the likelihood of the outcome you want.</p>
+
+  <p>The reason this is a discipline rather than a preference is that context is finite <em>and</em> lossy. A transformer lets every token attend to every other token, which means $n$ tokens create $n^2$ pairwise relationships, and models are trained on distributions weighted towards shorter sequences. The consequence, which Anthropic calls <strong>context rot</strong>, is that as the window fills, the model's ability to recall any particular thing in it falls. You are not working with a container that holds a fixed number of facts equally well. You are working with an <strong>attention budget</strong> that thins as you spend it.</p>
+
+  <p>Karpathy's version of the same idea is the more memorable one: in this new mode of programming, the context window is the RAM and the model is the CPU. You are writing a program whose source is a paragraph, and the window is the working memory it executes in. Nobody would load a 400-megabyte file into memory to read one field from it. That is nonetheless what most people do the first time they hand a repository to an agent, and it is why their sessions get slow, expensive, and vague at exactly the point where the task gets interesting.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Ask, of any token in the window: what decision does this token help the model make? If the answer is "none, but it seemed relevant", it is costing you twice, once in money and once in the attention it draws away from the tokens that do matter. Good context is not comprehensive. It is the briefing you would give a competent colleague who has one hour: the goal, the constraints, the two files that matter, and where to look for the rest.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The quadratic attention cost is a property of the architecture, not a bug awaiting a patch, and the engineering responses to it, sparse attention, sliding windows, linear-attention variants, state-space models, are among the most active areas of the field. But note what does <em>not</em> follow. Even with an arbitrarily long window and perfect recall, curation would still pay, because the model must locate the relevant signal among the noise you supplied. A larger window changes the cost of a mistake, not the value of precision. This is the same reason a bigger disk never fixed a badly organised filing system.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that context is the one resource every other technique competes for. A skill you load is tokens. A tool you connect is tokens, because its schema sits in the window whether or not it is ever called. An instruction file is tokens on every single turn of the session. A subagent exists chiefly to keep tokens out of your window. Almost every design decision in the rest of this course is a decision about what to spend the budget on, and it is impossible to reason about those decisions well without holding the budget in mind.</p>
+
+  <p>The second reason is that the symptom of a badly managed window looks like a model failure, which sends people to the wrong remedy. A session that started sharp and became vague, an agent that forgets a constraint you gave it forty minutes ago, an agent that re-reads a file it already read, an agent that contradicts a decision made earlier in the same conversation: none of these are the model being unreliable. They are context rot, and the fix is to reset and re-brief rather than to argue with the model or to escalate to a larger one. Recognising the signature saves both money and an hour of increasingly frustrated prompting.</p>
+
+  <p>The third reason is economic and it compounds. Tokens are billed, and in a long agentic session the conversation history is re-sent on every turn, so a wasteful early decision is paid for repeatedly for the rest of the session. Pasting a 3,000-line file at turn three does not cost you 3,000 lines once; it costs you 3,000 lines on every subsequent turn until the context is compacted or cleared. The habit of retrieving the twenty lines that matter is worth an order of magnitude over a long session, and the discipline it builds happens also to be the discipline that produces better answers.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>What is actually in the window</h3>
+
+  <p>Five categories of token compete for the budget, and it is worth knowing their relative weights because people's intuitions are usually wrong about which one dominates.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Category</th><th>Who controls it</th><th>Persistence</th><th>Typical share</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>System prompt and harness rules</td><td>The harness vendor</td><td>Every turn</td><td>Fixed, unavoidable</td></tr>
+      <tr><td>Instruction files (CLAUDE.md and friends)</td><td>You</td><td>Every turn</td><td>Small if disciplined, large if not</td></tr>
+      <tr><td>Tool definitions and schemas</td><td>You, via which servers you connect</td><td>Every turn</td><td>Grows silently with each MCP server</td></tr>
+      <tr><td>Retrieved content (files, search results, web pages)</td><td>You and the agent jointly</td><td>Until compaction</td><td>Usually the largest single share</td></tr>
+      <tr><td>Conversation and tool results</td><td>Accumulates by itself</td><td>Until compaction</td><td>Dominates in long sessions</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The two lines to watch are the last two, because they are the ones that grow without anyone deciding that they should. A single unlucky command whose output runs to thousands of lines, a search that returned forty files, a stack trace pasted in full: each is a permanent deduction from the budget for the remainder of the session. This is the practical argument for tools that return summaries rather than dumps, and for the habit of piping noisy commands through something that trims them before the agent ever sees the output.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How the context budget is consumed over a session">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same budget, early and late in a session</text>
+
+      <g font-family="Inter" font-size="11">
+        <text x="40" y="62" font-weight="600" fill="#52525b">Turn 3</text>
+        <rect x="100" y="48" width="70"  height="22" fill="#E4ECFB" stroke="#4A6BD1"/>
+        <rect x="170" y="48" width="60"  height="22" fill="#EAE6FA" stroke="#7B61FF"/>
+        <rect x="230" y="48" width="90"  height="22" fill="#FBF1D4" stroke="#C76B2A"/>
+        <rect x="320" y="48" width="120" height="22" fill="#DDF1E5" stroke="#1E9D54"/>
+        <rect x="440" y="48" width="270" height="22" fill="#fafafa" stroke="#d4d4d8" stroke-dasharray="4,3"/>
+        <text x="575" y="63" text-anchor="middle" font-size="10" fill="#a1a1aa">headroom</text>
+
+        <text x="40" y="122" font-weight="600" fill="#52525b">Turn 40</text>
+        <rect x="100" y="108" width="70"  height="22" fill="#E4ECFB" stroke="#4A6BD1"/>
+        <rect x="170" y="108" width="60"  height="22" fill="#EAE6FA" stroke="#7B61FF"/>
+        <rect x="230" y="108" width="90"  height="22" fill="#FBF1D4" stroke="#C76B2A"/>
+        <rect x="320" y="108" width="390" height="22" fill="#DDF1E5" stroke="#1E9D54"/>
+        <text x="515" y="123" text-anchor="middle" font-size="10" fill="#1E9D54">conversation and tool results</text>
+
+        <rect x="100" y="170" width="12" height="12" fill="#E4ECFB" stroke="#4A6BD1"/><text x="118" y="180" fill="#52525b">system</text>
+        <rect x="178" y="170" width="12" height="12" fill="#EAE6FA" stroke="#7B61FF"/><text x="196" y="180" fill="#52525b">instruction files</text>
+        <rect x="298" y="170" width="12" height="12" fill="#FBF1D4" stroke="#C76B2A"/><text x="316" y="180" fill="#52525b">tool schemas</text>
+        <rect x="416" y="170" width="12" height="12" fill="#DDF1E5" stroke="#1E9D54"/><text x="434" y="180" fill="#52525b">conversation and retrieved content</text>
+
+        <text x="100" y="215" font-size="11" font-style="italic" fill="#71717a">The first three bands are chosen once. The fourth chooses itself unless you intervene.</text>
+      </g>
+    </svg>
+    <figcaption>Recall quality falls as total occupancy rises, so the same instruction that was obeyed at turn three may be ignored at turn forty. The remedy is compaction or a clean restart, not repetition.</figcaption>
+  </figure>
+
+  <h3>Altitude: the Goldilocks problem</h3>
+
+  <p>Anthropic frames instruction-writing as a problem of <strong>altitude</strong>, and it is the most useful single idea for anyone writing a CLAUDE.md. Fly too low and you hardcode brittle logic: a long if-this-then-that script that covers the cases you thought of and breaks on the first case you did not. Fly too high and you write vague encouragement, "write clean code", "follow best practices", which gives the model no concrete signal at all and consumes budget doing it. The target is the middle: specific enough to guide behaviour, general enough to function as a heuristic in situations you never anticipated.</p>
+
+  <p>The test for altitude is whether a competent new colleague could act on the instruction without asking a follow-up question, and whether it would still make sense in a part of the codebase you were not thinking about when you wrote it. "Use double quotes for strings" passes both. "Write good docstrings" fails the first. "In <code>src/pricing/loan.py</code>, always call <code>_validate_term()</code> before <code>_discount()</code>" passes the first and fails the second, which means it belongs in the code as an assertion rather than in an instruction file.</p>
+
+  <div class="defcard">
+    <strong>Context rot.</strong> The observed decline in a model's ability to recall any given item from its context as the total number of tokens in that context grows. It follows from quadratic attention and from training distributions weighted towards shorter sequences, so it is a property of the architecture rather than a defect to be waited out.
+  </div>
+
+  <div class="defcard">
+    <strong>Attention budget.</strong> The finite pool of effective attention available across a context window. Spending it on low-signal tokens does not merely waste money; it measurably degrades recall of the high-signal ones.
+  </div>
+
+  <div class="defcard">
+    <strong>Just-in-time retrieval.</strong> Holding lightweight identifiers (file paths, queries, links) in context and loading the underlying content only at the moment it is needed. The opposite of preloading everything that might conceivably be relevant.
+  </div>
+
+  <h3>Two retrieval strategies, and the hybrid that wins</h3>
+
+  <p>There are two ways to get information into a window. <strong>Upfront loading</strong> puts everything the agent might need into context before it starts: whole files, a full directory listing, an entire schema. It is simple, and it is correct when the material is small and certainly needed. <strong>Just-in-time retrieval</strong> keeps only references in context, file paths and search commands, and lets the agent pull content in as it discovers it needs it. It scales, because the window only ever holds what turned out to matter, and it mirrors what a human does when they navigate a codebase with grep rather than by reading it end to end.</p>
+
+  <p>Claude Code is deliberately a hybrid, and understanding the split explains a great deal about how to configure it. Instruction files are loaded upfront, because they apply to everything and are meant to be small. Everything else is just-in-time: the agent has glob, grep, and file reading, and uses them to discover the codebase as it goes. The design implication is direct. Your instruction files should be small and general, because they are paying rent on every turn. Your repository should be navigable, because navigability is what makes just-in-time retrieval work: clear names, predictable layout, and a structural map that lets an agent find the right file in one search instead of five.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Three techniques for work that outlasts a window</h3>
+
+  <p>Any task worth using an agent for will eventually exceed one context window. Anthropic identifies three techniques for surviving that, and they compose rather than compete.</p>
+
+  <p><strong>Compaction</strong> takes a conversation approaching the limit, summarises it, and restarts the window from the summary. The engineering question is what the summary keeps. The right answer preserves architectural decisions, unresolved problems, and constraints that were established by argument, and discards tool outputs, superseded drafts, and file contents that can be re-read on demand. A compaction that keeps the last twenty messages verbatim and drops the decision made at message four has optimised the wrong quantity. When a harness compacts automatically, the useful habit is to state durable constraints explicitly at the point of compaction rather than trusting them to survive.</p>
+
+  <p><strong>Structured note-taking</strong> has the agent write to a file outside the window and read it back later. This is the cheapest form of persistent memory there is: a progress file, a decision log, a plan on disk. The pattern's virtue is that it inverts the persistence problem. Rather than trying to keep everything in a window that forgets, you keep almost nothing in the window and one path to a file that does not. The plan file this course was written from is exactly this pattern; so is the memory directory that survives between sessions.</p>
+
+  <p><strong>Subagent architectures</strong> delegate a bounded piece of work to a separate agent with its own clean window, which returns a distilled summary, typically a thousand or two thousand tokens, rather than everything it read. A search across forty files might consume a hundred thousand tokens in the doing and return two hundred words of conclusion. The parent window pays only for the conclusion. This is why "explore the codebase and tell me where X is handled" is a natural subagent task and "write the patch" usually is not: the first has a large read-to-conclusion ratio and the second does not.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Technique</th><th>What it saves</th><th>What it costs</th><th>Reach for it when</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Compaction</td><td>Accumulated history</td><td>Fidelity of what was dropped</td><td>A long session must continue as one thread</td></tr>
+      <tr><td>Note-taking</td><td>Everything, indefinitely</td><td>A write step and a read step</td><td>Work spans sessions or needs an audit trail</td></tr>
+      <tr><td>Subagents</td><td>The read-to-conclusion gap</td><td>The subagent's own tokens, and lost nuance</td><td>A task reads far more than it concludes</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Progressive disclosure, and why skills are folders</h3>
+
+  <p>The same principle explains the design of Agent Skills, which Lecture 8 covers properly. A skill is a folder containing a <code>SKILL.md</code> plus whatever scripts and reference files it needs. Only the name and the one-line description sit in context by default; the body loads when the agent judges the skill relevant, and the deeper reference files load only if the body points at them. This is <strong>progressive disclosure</strong>: three tiers, each paid for only when reached. It is the reason a machine can have fifty skills installed without fifty skills' worth of tokens in every window, and it is a pattern worth copying in your own documentation. A directory of one-line summaries with paths beneath it will beat a single long document, because the agent can pay for the paragraph it needs rather than the chapter it does not.</p>
+
+  <h3>Practical habits</h3>
+
+  <p>Six habits do most of the work, and none of them require any configuration.</p>
+
+  <p>Start a fresh session for a new task rather than continuing a stale one, because a session carrying an hour of unrelated history begins already impaired. Point at files by path instead of pasting them, and let the agent read the parts it needs. Constrain noisy commands before their output reaches the window, so <code>pytest -q --tb=line</code> rather than a full verbose run, and <code>git log --oneline -20</code> rather than the whole history. Ask for the conclusion rather than the workings when the workings are not the point. Put durable facts into files, not into chat messages, because chat is the only part of the window guaranteed not to survive. And when a session has gone vague, reset it and re-brief from the notes rather than repeating yourself, because repetition inside a rotting window is the least effective intervention available.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Connecting every available MCP server "so it's there if I need it" is the most common self-inflicted context wound, and the most invisible, because tool schemas are charged on every turn before a single tool is called. Twenty servers can occupy a substantial share of the window permanently, in exchange for capability you use once a week. The remedies are to connect servers per project rather than globally, and to prefer harnesses that defer tool schemas until a tool is actually needed. If a tool has not been called in your last ten sessions, it is not free to keep connected; it is charged rent on every turn of every one of them.
+  </div>
+
+  <h3>Worked example: an instruction file as a context artefact</h3>
+
+  <div class="worked">
+    <strong>Worked example: the coverage map in this repository's CLAUDE.md</strong>
+    <p>The root <code>CLAUDE.md</code> in this repository contains a table mapping each F107 syllabus area to the folders that cover it, with a status of present, partial, or absent for each. It is a few hundred tokens, it is loaded on every turn of every session, and it is worth examining as a piece of context engineering rather than as documentation.</p>
+    <p><strong>What it replaces.</strong> Without it, an agent asked to file a note on liquidity coverage must discover the layout: list directories, guess at conventions, read three or four index files, and infer where the material belongs. That is five or six tool calls, several thousand tokens of directory listings and file heads, and a decent chance of a wrong guess that only surfaces at review. With it, the routing decision is a lookup.</p>
+    <p><strong>Why the altitude is right.</strong> The table gives coverage status and folder paths, and stops. It does not attempt to describe the contents of each file, which would be both enormous and immediately stale. It gives the agent enough to navigate, and delegates everything below that to just-in-time retrieval. That split, a map upfront and the territory on demand, is the hybrid pattern applied at the level of a single artefact.</p>
+    <p><strong>What it costs, honestly.</strong> It is paid for on every turn, including the many turns that have nothing to do with routing. It is also the part of the file most likely to drift out of date, because folders change and tables do not update themselves. The break-even is easy to state: an upfront artefact earns its rent when the sessions that use it outnumber the sessions that do not, and when the discovery it replaces would have cost more than the artefact costs to carry. A routing map in a repository with twenty top-level areas clears that bar comfortably. The same map in a five-file project would not.</p>
+    <p><strong>The generalisation.</strong> Before adding anything to an instruction file, ask what discovery it saves and how often that discovery would otherwise happen. If the answer is "rarely", the material belongs in a file the agent can find, not in the context it carries everywhere.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The context window is the program, and it is both finite and lossy, so curation beats accumulation at every scale. Five categories compete for the budget, and the two that grow on their own, conversation and retrieved content, are the ones to watch. Instructions should be written at the middle altitude: concrete enough to act on, general enough to survive a situation you did not foresee. Retrieval should be a hybrid, with a small navigable map loaded upfront and the territory pulled in just in time. When work outgrows a window, compaction, note-taking, and subagents extend it in different directions, and they combine well.</p>
+
+  <p>The wider point is that context engineering is the discipline that makes every later technique legible. Skills, hooks, subagents, MCP servers, and memory files are all, underneath, answers to the same question: what should be in the window right now, and what should merely be reachable from it? That question is why the next lecture opens up the harness itself. Having established what the agent can see, the natural next question is what it can do, and who gets to decide.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Distinguish context engineering from prompt engineering. Why does the distinction matter more for agents than for chat?</li>
+      <li>What is context rot, and what architectural fact produces it? Why does a larger window not eliminate the need for curation?</li>
+      <li>List the five categories of token competing for the window. Which two grow without a decision being made, and what follows?</li>
+      <li>Explain the altitude problem. Give an instruction that is too low, one that is too high, and one that is right.</li>
+      <li>Contrast upfront loading with just-in-time retrieval. Which does Claude Code use for instruction files, and why that choice?</li>
+      <li>Describe compaction, structured note-taking, and subagent architectures, and give a task suited to each.</li>
+      <li>A colleague connects twelve MCP servers globally and reports that the agent has become slower and less precise. Explain the mechanism.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="01-agentic_coding.html">Lecture 1 (what agentic coding is)</a> established the loop whose every pass consumes the budget described here.</li>
+      <li><strong>Next:</strong> Lecture 3 (anatomy of a harness) covers the machinery that assembles the window and gates what the agent may do with it.</li>
+      <li><strong>Cross-link:</strong> <a href="../machine_learning/11_large_language_models/01-from_decoders_to_llms.html">Machine learning, LLM module, Lecture 1 (from decoders to LLMs)</a> derives the quadratic attention cost that context rot follows from.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/08-markdown_and_docs.html">Software engineering, Lecture 8 (markdown and docs)</a> is the craft side of writing the navigable structure that just-in-time retrieval depends on.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "Effective context engineering for AI agents", anthropic.com/engineering (the source for context rot, attention budget, altitude, and the three long-horizon techniques); Anthropic, "Equipping agents for the real world with Agent Skills" (progressive disclosure); Anthropic, "Code execution with MCP: building more efficient AI agents" (tool-schema cost); Andrej Karpathy, "Software Is Changing (Again)", June 2025 (the context window as RAM).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 2 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

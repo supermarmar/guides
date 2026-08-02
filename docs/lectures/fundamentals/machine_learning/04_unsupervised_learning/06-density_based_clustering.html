@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 19: density-based clustering</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Unsupervised learning</a></div>
+  <h1>Density-based clustering</h1>
+  <p class="subtitle">Every clustering method so far in this sub-module needs the number of clusters chosen, either up front (k-means, K-medoids, Gaussian mixtures) or after inspecting a dendrogram (hierarchical clustering). DBSCAN needs neither: it discovers the number of clusters directly from how densely the data itself is packed, finds clusters of any shape, and, as a genuine side effect rather than a failure mode, correctly identifies isolated points as noise rather than forcing them into whichever cluster happens to be nearest.</p>
+  <div class="meta">
+    <span>Lecture 19 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part III: unsupervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>DBSCAN</strong> (density-based spatial clustering of applications with noise) defines clusters directly in terms of local density rather than distance to a centre. Fix a neighbourhood radius $\varepsilon &gt; 0$ and a minimum-density threshold $M \in \mathbb{N}$. An observation $X_i$ is a <strong>core instance</strong> if at least $M$ other observations lie within dissimilarity $\varepsilon$ of it, $m_i = \sum_{i' \ne i} \mathbb{1}\{L(X_i, X_{i'}) \le \varepsilon\} \ge M$. Build a graph on the core instances, connecting two core instances by an edge whenever they lie within $\varepsilon$ of each other; the <strong>clusters</strong> are the connected components of this graph. Non-core observations lying within $\varepsilon$ of at least one core instance are attached to that cluster as <strong>satellites</strong>; every remaining observation, too far from any dense region, is labelled an <strong>outlier</strong> and assigned to no cluster at all. The number of clusters is never chosen by the modeller; it falls out of the graph's connected-component structure once $\varepsilon$ and $M$ are set, and clusters can take any shape at all, unlike the roughly convex regions k-means, K-medoids, and Gaussian mixtures all tend to produce.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine standing at every point in a crowd and counting how many other people are within arm's reach. If enough people are close enough to you, you are standing in the thick of a crowd, a "core" position; if you and another core person are within arm's reach of each other, you are part of the same crowd, and crowds connected this way, even through a long chain of tightly packed people, count as one crowd no matter how it winds around. Anyone standing near the edge of a crowd but not themselves in a dense spot is still counted as belonging to that crowd, tagging along; anyone standing alone, far from any dense spot, is just a person standing alone, not a crowd of one. DBSCAN counts crowds exactly this way, and never has to be told in advance how many crowds there are.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture closes the clustering arc of this sub-module by relaxing the one assumption every previous method shared, a fixed number of clusters chosen (or read off a tree) by the modeller. It is also the first method in this sub-module to treat "does not belong to any cluster" as a genuine, first-class output rather than a modelling failure, a property the next, closing lecture's visualisation methods do not share but that recurs directly in fraud and anomaly detection practice.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons DBSCAN earns a place alongside the fixed-$K$ methods rather than being a niche technique.</p>
+
+  <p>First, <strong>forcing every observation into some cluster, as k-means, K-medoids, and GMMs all do, actively distorts a dataset that genuinely contains outliers or noise</strong>: a handful of atypical policies dragged into the nearest cluster contaminate that cluster's summary statistics and any model-point representative drawn from it, whereas DBSCAN labels those observations as outliers directly and leaves the remaining clusters undisturbed by them.</p>
+
+  <p>Second, <strong>genuine cluster shapes in real data are frequently not the roughly convex blobs the previous methods assume</strong>: a fixed-$K$, centre-based method fundamentally cannot represent an elongated, curved, or ring-shaped cluster well, because every such method measures membership by distance to a single point or a small number of points, while DBSCAN's connected-component construction can trace an arbitrarily shaped dense region correctly.</p>
+
+  <p>Third, <strong>not needing to choose $K$ in advance is a genuine, not merely convenient, advantage whenever the true number of natural groupings is itself unknown and variable</strong>, a fraud-detection or claims-anomaly context where the number of genuinely distinct fraud patterns present in a given period is exactly the kind of thing nobody knows in advance and that DBSCAN can surface directly from the data's own density structure.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A claims-anomaly team ran k-means with $K = 5$ on a set of claims-behaviour features, hoping the smallest cluster would correspond to a fraud-adjacent pattern the fraud investigation team had described anecdotally. Every one of the five clusters absorbed a mix of genuinely suspicious and entirely ordinary claims, because k-means, forced to produce exactly five roughly-equal-sized, roughly-convex partitions, had no way to represent a small, sparse, irregularly shaped group of genuinely unusual claims as anything other than noise scattered across the five forced clusters. Running DBSCAN on the identical features, with $\varepsilon$ and $M$ tuned via the k-distance heuristic developed below, isolated a single, small, dense cluster of 23 claims that the investigation team independently confirmed shared the exact anecdotal pattern, alongside a larger set of claims correctly labelled as outliers (unusual but not part of any dense fraud-adjacent pattern) rather than forced into an arbitrary nearby group.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a dense, curved band of points forming one connected cluster via overlapping $\varepsilon$-neighbourhoods, with a handful of isolated points nearby correctly labelled as outliers rather than absorbed into it.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DBSCAN tracing a curved dense region while leaving isolated points as outliers">
+      <defs>
+        <marker id="dbArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">DBSCAN: connected dense regions of any shape, plus outliers</text>
+
+      <rect x="60" y="50" width="740" height="240" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+
+      <g fill="#0d9488" opacity="0.85">
+        <circle cx="140" cy="220" r="4"/><circle cx="160" cy="200" r="4"/><circle cx="185" cy="185" r="4"/>
+        <circle cx="215" cy="175" r="4"/><circle cx="250" cy="170" r="4"/><circle cx="290" cy="170" r="4"/>
+        <circle cx="325" cy="180" r="4"/><circle cx="355" cy="200" r="4"/><circle cx="375" cy="225" r="4"/>
+        <circle cx="150" cy="235" r="4"/><circle cx="180" cy="205" r="4"/><circle cx="230" cy="185" r="4"/>
+        <circle cx="270" cy="175" r="4"/><circle cx="310" cy="172" r="4"/><circle cx="345" cy="190" r="4"/>
+        <circle cx="365" cy="212" r="4"/><circle cx="395" cy="235" r="4"/>
+      </g>
+      <path d="M 140 220 Q 250 140 375 225" fill="none" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2" opacity="0.4"/>
+
+      <g fill="#78716c">
+        <circle cx="550" cy="100" r="4"/>
+        <circle cx="620" cy="240" r="4"/>
+        <circle cx="700" cy="150" r="4"/>
+      </g>
+      <circle cx="550" cy="100" r="16" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <text x="550" y="80" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">ε-neighbourhood, too sparse</text>
+
+      <text x="260" y="270" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">one connected cluster (curved shape, traced correctly)</text>
+      <text x="620" y="270" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#57534e">isolated points: labelled outliers, no cluster</text>
+    </svg>
+    <figcaption>The curved band of teal points on the left is dense enough, and connected enough through overlapping $\varepsilon$-neighbourhoods, to form a single cluster, traced along its true curved shape rather than approximated by a convex region. The three grey points on the right each have too few neighbours within $\varepsilon$ to be core instances, and are too far from the dense region to be satellites of it; DBSCAN labels them outliers rather than forcing each into whichever cluster happens to be nearest.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Density defines the cluster; distance to a centre never enters the definition.</strong> A DBSCAN cluster can be any shape at all, because nothing in its construction ever asks "how far is this point from a centre", only "how many neighbours does this point have within $\varepsilon$". <strong>Not every point has to belong somewhere.</strong> Labelling a point as an outlier is a genuine, first-class outcome, not a failure of the algorithm to find a home for it.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Core instances, satellites, and outliers</h3>
+
+  <p>Fix a neighbourhood radius $\varepsilon &gt; 0$ and a minimum-density threshold $M \in \mathbb{N}$, both hyperparameters chosen by the modeller (developed further below). For each observation $X_i$, count its neighbours within $\varepsilon$ under the chosen dissimilarity function $L$ (lecture 3),</p>
+  $$m_i = \sum_{i' \ne i} \mathbb{1}\{L(X_i, X_{i'}) \le \varepsilon\}.$$
+  <p>An observation is a <strong>core instance</strong> if $m_i \ge M$; the set of core instances is $C = \{i : m_i \ge M\}$. Every core instance anchors a locally dense region; the algorithm's remaining task is to decide which core instances belong to the identical dense region as each other, and how to handle everything that is not itself a core instance.</p>
+
+  <h3>The DBSCAN construction</h3>
+
+  <p>Build a graph whose vertices are the core instances $C$, adding an edge between two core instances whenever they lie within $\varepsilon$ of each other, $L(X_i, X_{i'}) \le \varepsilon$. The <strong>clusters</strong> are defined as the <strong>connected components</strong> of this graph: two core instances belong to the same cluster if there is a path of overlapping $\varepsilon$-neighbourhoods connecting them, however long and winding that path is, which is precisely the mechanism that lets DBSCAN trace a curved or elongated dense region as a single cluster (the mental-model figure's curved band) rather than requiring it to be well-approximated by a single centre.</p>
+
+  <p>Every observation not itself a core instance is handled in one of two remaining ways. If a non-core observation $X_l$ lies within $\varepsilon$ of at least one core instance, it is attached to that core instance's cluster as a <strong>satellite</strong> (assigned at random to one such cluster if it happens to lie within $\varepsilon$ of core instances from more than one cluster, an edge case that arises rarely in practice); satellites are leaves of the connectivity graph, contributing to a cluster's membership but not to its further growth. Any observation that is neither a core instance nor within $\varepsilon$ of one is an <strong>outlier</strong>, assigned to no cluster at all, treated as noise.</p>
+
+  <h3>Choosing $\varepsilon$ and $M$</h3>
+
+  <p>Unlike k-means' $K$, which is chosen by inspecting an elbow curve, or hierarchical clustering's cut height, chosen by inspecting a dendrogram, DBSCAN's two hyperparameters are chosen by a distinct diagnostic: the <strong>k-distance plot</strong>. For a fixed $M$, compute, for every observation, the dissimilarity to its $M$-th nearest neighbour, sort these values in increasing order, and plot them against their rank. The plot typically shows a sharp "knee", a point at which the sorted $M$-th-nearest-neighbour distance jumps from small, relatively flat values to rapidly increasing ones; the flat region corresponds to observations embedded in dense regions (small $M$-th-nearest-neighbour distance) and the rapidly rising tail corresponds to increasingly isolated observations. Setting $\varepsilon$ at the height of this knee is the standard heuristic, with $M$ itself commonly set to a small multiple of the data's dimensionality (a frequent rule of thumb is $M \approx 2q$ for $q$-dimensional data, though this is a starting point for the k-distance diagnostic, not a substitute for it).</p>
+
+  <h3>Comparison with the other clustering families in this sub-module</h3>
+
+  <p>Four properties distinguish DBSCAN cleanly from every method covered so far in this sub-module.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>Number of clusters</th><th>Cluster shape</th><th>Handles outliers</th></tr></thead>
+      <tbody>
+        <tr><td>K-means / K-medoids</td><td>Fixed by modeller</td><td>Roughly convex</td><td>No; every point assigned</td></tr>
+        <tr><td>Hierarchical</td><td>Chosen after the fact (cut height)</td><td>Depends on linkage</td><td>No; every point assigned</td></tr>
+        <tr><td>Gaussian mixture</td><td>Fixed by modeller</td><td>Elliptical (per component covariance)</td><td>Low-probability points still assigned</td></tr>
+        <tr><td>DBSCAN</td><td>Determined by density, not chosen</td><td>Arbitrary</td><td>Yes, natively</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>None of these four properties makes DBSCAN unconditionally superior; a genuinely convex, well-separated cluster structure is often better and more robustly recovered by k-means or a GMM, and DBSCAN's dependence on a single global $\varepsilon$ struggles specifically when different genuine clusters in the data have very different densities, a limitation developed in the pitfalls below.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Applying a single global $\varepsilon$ to clusters of very different densities</span>
+    DBSCAN's single, dataset-wide $\varepsilon$ assumes every genuine cluster has a roughly comparable internal density; a dataset containing one tightly packed cluster and one genuinely sparser (but still real) cluster forces a choice between an $\varepsilon$ small enough to resolve the tight cluster (which then shatters the sparse cluster into many small fragments or outliers) or large enough to keep the sparse cluster intact (which then merges the tight cluster with anything nearby). Variable-density variants (HDBSCAN, in particular) relax this specific limitation and are worth reaching for when densities genuinely differ.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing $\varepsilon$ and $M$ without the k-distance diagnostic</span>
+    Guessing $\varepsilon$ directly, without the k-distance plot's knee to anchor the choice, routinely produces either one giant cluster absorbing almost everything (too large an $\varepsilon$) or almost every point labelled an outlier (too small an $\varepsilon$); the k-distance heuristic is not an optional refinement, it is close to the only principled way to set the parameter at all.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating "outlier" as synonymous with "anomalous" without further checking</span>
+    A DBSCAN outlier is, precisely, a point that is not part of any sufficiently dense region under the chosen $\varepsilon$ and $M$; this is a useful signal but is not automatically the identical thing as "fraudulent" or "erroneous", and, as the vignette shows, the fraud team's genuine confirmation still required independent investigation of the flagged cluster rather than treating DBSCAN's output as a final verdict.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Applying DBSCAN in very high dimensions without checking neighbour counts remain meaningful</span>
+    The curse of dimensionality (already flagged in the PCA lecture) erodes the contrast between "near" and "far" as dimensionality grows, and DBSCAN's entire construction depends on that contrast remaining meaningful; on very high-dimensional data, reducing dimensionality first (this sub-module's autoencoder or PCA lectures) before applying DBSCAN is standard, sensible practice rather than an admission of defeat.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>DBSCAN defines clusters as connected components of a graph built from core instances, observations with at least $M$ neighbours within radius $\varepsilon$, with non-core observations near a core instance attached as satellites and everything else labelled an outlier. The number of clusters is never chosen by the modeller; it emerges from the data's own density structure once $\varepsilon$ and $M$ are set, typically via the k-distance plot's knee. Clusters can take any shape, and outliers are a genuine, first-class output rather than a forced misassignment, at the cost of a single global density threshold that struggles when genuine clusters in the data have materially different densities.</p>
+
+  <p>This closes the clustering half of this sub-module, four genuinely distinct answers (k-means, hierarchical, K-medoids and Gaussian mixtures, and DBSCAN) to the question "does this data have groups, and how many". The final, closing lecture turns from clustering to visualisation, developing t-SNE and UMAP as the standard tools for compressing high-dimensional structure down to a two-dimensional picture a human can actually look at, and closing with the categorical-covariate problem that has quietly limited every unsupervised method in this sub-module to data that is, at heart, continuous.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Define a core instance, and state how clusters are constructed from the set of core instances.</li>
+      <li>Explain the distinction between a satellite observation and an outlier in DBSCAN's output.</li>
+      <li>Describe the k-distance plot and how its "knee" is used to choose $\varepsilon$.</li>
+      <li>Name two properties that distinguish DBSCAN from every fixed-$K$ method earlier in this sub-module, and one genuine limitation DBSCAN has that those methods do not.</li>
+      <li>Explain why a single global $\varepsilon$ struggles on data containing clusters of genuinely different densities.</li>
+      <li>The claims-anomaly vignette found a small, dense cluster of 23 claims sharing a suspected fraud pattern. Explain why k-means, run with a fixed $K$, could not have found this cluster in the same way.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 5 (<a href="05-medoids_and_mixtures.html">medoids and mixtures</a>) relaxed k-means' dissimilarity and hard-boundary assumptions; this lecture relaxes the fixed-$K$ assumption all four previous clustering methods shared.</li>
+      <li><strong>Next:</strong> Lecture 7 (<a href="07-low_dimensional_visualisation.html">low-dimensional visualisation</a>) closes the sub-module with t-SNE, UMAP, and the categorical-covariate problem.</li>
+      <li><strong>Built on:</strong> Lecture 3's <a href="03-autoencoders.html">dissimilarity-function framework</a> is the notion of "near" and "far" DBSCAN's core-instance definition depends on directly.</li>
+      <li><strong>Outside this course:</strong> DBSCAN and its variable-density successor HDBSCAN are standard tools in fraud and anomaly detection, geospatial clustering (identifying genuine hotspots rather than forcing a fixed grid), and any application where the number of genuine clusters is itself unknown and expected to vary over time.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Unsupervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 19 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

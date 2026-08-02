@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 1: what agentic coding is</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>What agentic coding is: the loop, the slider, the verification gap</h1>
+  <p class="subtitle">An agent is not a cleverer autocomplete. It is a model placed inside a loop, given tools that change the world, and left to run until a stopping condition fires. That single structural difference relocates the bottleneck in software work from writing code to checking it, and everything else in this course follows from the relocation.</p>
+  <div class="meta">
+    <span>Lecture 1 of 22</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">An <strong>agent</strong> is a language model running in a loop with tools. You give it a goal; it decides which tool to call; the harness executes the call and feeds the result back; the model decides again. The loop terminates when the model stops calling tools, when a budget runs out, or when a human interrupts it. Nothing about the model changed to make this possible. What changed is the wrapper: give the same model a file-editing tool, a shell, and a search tool, and a system that answered questions becomes a system that does work.</p>
+
+  <p>That structural change matters because of an asymmetry. Generating a plausible patch is now cheap and fast; establishing that the patch is correct is neither. Andrej Karpathy's framing of this is the most useful one in circulation: language models automate what you can <em>verify</em>, not merely what you can specify. Where verification is fast and mechanical, a test suite, a type checker, a compiler, a linter, agents compound quickly, because the loop can check its own work and iterate without you. Where verification is slow, subjective, or expensive, a regulatory interpretation, a modelling assumption, a design trade-off, the agent produces output at the same speed but the bottleneck simply moves to you, and often gets worse, because now you are reviewing more code than you would have written.</p>
+
+  <p>Karpathy also supplies the distinction that separates two very different activities sharing one technology. <strong>Vibe coding</strong>, his term, raises the floor: someone who cannot write the syntax can now produce working software by describing what they want and accepting whatever comes back. <strong>Agentic engineering</strong> raises the ceiling: a competent engineer goes considerably faster without giving up the quality bar, because they know what to specify, what to check, and when to throw the output away. The techniques overlap almost completely. The difference is entirely in whether the human is holding a standard. This course is about the second activity, and treats the first as a legitimate but separate thing that ends where the code touches anything anyone depends on.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A chat model reads and writes text. An agent reads and writes text <em>and</em> the world, because some of its text is interpreted as a tool call and executed. The loop is: model emits a tool call, harness runs it, harness appends the result to the conversation, model reads the result and emits the next thing. Everything a coding agent does, editing files, running tests, searching, committing, is that same four-step cycle with different tools plugged in. If you can predict which tool the agent will reach for next, you can predict its behaviour.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The loop is old. It is the same shape as a REPL, as a shell session, as an operating system scheduler dispatching syscalls. What is new is that the thing choosing the next call is a statistical model with no guarantee of termination, no type signature on its decisions, and no memory beyond what fits in its context. Classical control theory would call this an unbounded plant with a noisy controller. The engineering response is the one control theory would recommend: constrain the action space (permissions), instrument the output (tests, logs, diffs), and keep a human in the feedback path at a frequency matched to the cost of an error.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that the constraint on your output has moved, and most people have not moved their habits with it. For thirty years the scarce resource in software work was the time it took a competent person to translate an idea into working syntax. That is no longer scarce. What is scarce is the time it takes a competent person to establish that a body of code does what it claims. Teams that keep optimising for typing speed, better editors, more snippets, faster keyboards, are optimising a resource that stopped binding. Teams that invest in the things that make verification cheap, tests that run in seconds, types that catch category errors, small diffs, clear specifications, get a compounding return, because those investments now also make the agent faster.</p>
+
+  <p>The second reason is that the failure mode is quiet. A junior engineer who does not understand the problem writes code that visibly does not work. An agent that does not understand the problem writes code that looks exactly like code written by someone who did. It has the right variable names, the right imports, plausible error handling, and a docstring that confidently describes behaviour the function does not have. There is no surface signal to trigger your scepticism, which means scepticism has to be scheduled rather than provoked. That is why so much of this course is procedural: checklists, review passes, and an explicit anti-sycophancy discipline exist because your instincts will not fire on their own.</p>
+
+  <p>The third reason is that the practice is now a professional expectation rather than an enthusiasm. Anthropic publishes its internal Claude Code conventions as engineering guidance; the major surveys put agent use among professional developers well past the point where a team can treat it as an individual preference. The question in a modern engineering organisation is not whether people use coding agents but whether the organisation has any view on how. Absent a view, every engineer improvises one, the quality bar becomes a function of who happened to be at the keyboard, and the review process silently becomes the only control left standing.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Three components, cleanly separated</h3>
+
+  <p>Keep three things distinct, because conflating them is the source of most confusion about why an agent behaved oddly.</p>
+
+  <p>The <strong>model</strong> is the weights: a function from a sequence of tokens to a distribution over the next token. It has no memory, no file access, and no ability to act. Given identical input it behaves identically up to sampling noise. The <strong>harness</strong> is the program wrapped around it: it holds the conversation, defines which tools exist and what their schemas are, executes tool calls, enforces permissions, manages the context window, and decides when to stop. Claude Code is a harness. The <strong>context</strong> is the actual token sequence handed to the model on any given turn: the system prompt, your instruction files, the conversation so far, tool results, and whatever was retrieved. When an agent does something you did not expect, the cause is almost always in the context or the harness, not in the weights.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The agent loop">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The agent loop: four steps, repeated until the model stops calling tools</text>
+
+      <g font-family="Inter" font-size="12">
+        <rect x="60"  y="60" width="150" height="62" rx="10" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="135" y="86"  text-anchor="middle" font-weight="600" fill="#3D2EB5">1. Model decides</text>
+        <text x="135" y="104" text-anchor="middle" font-size="11" fill="#3D2EB5">emits a tool call</text>
+
+        <rect x="290" y="60" width="150" height="62" rx="10" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="365" y="86"  text-anchor="middle" font-weight="600" fill="#1E9D54">2. Harness gates</text>
+        <text x="365" y="104" text-anchor="middle" font-size="11" fill="#1E9D54">permission check</text>
+
+        <rect x="520" y="60" width="180" height="62" rx="10" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="610" y="86"  text-anchor="middle" font-weight="600" fill="#C76B2A">3. Tool executes</text>
+        <text x="610" y="104" text-anchor="middle" font-size="11" fill="#C76B2A">the world changes</text>
+
+        <rect x="290" y="196" width="150" height="62" rx="10" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="365" y="222" text-anchor="middle" font-weight="600" fill="#2A3A78">4. Result appended</text>
+        <text x="365" y="240" text-anchor="middle" font-size="11" fill="#2A3A78">context grows</text>
+
+        <line x1="210" y1="91"  x2="282" y2="91"  stroke="#71717a" stroke-width="1.5" marker-end="url(#ar)"/>
+        <line x1="440" y1="91"  x2="512" y2="91"  stroke="#71717a" stroke-width="1.5" marker-end="url(#ar)"/>
+        <path d="M610 122 L610 227 L448 227" fill="none" stroke="#71717a" stroke-width="1.5" marker-end="url(#ar)"/>
+        <path d="M290 227 L135 227 L135 130" fill="none" stroke="#71717a" stroke-width="1.5" marker-end="url(#ar)"/>
+
+        <text x="212" y="272" font-size="11" font-style="italic" fill="#71717a">Every pass through the loop consumes context that never comes back.</text>
+      </g>
+
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>Step 2 is the only place a human can cheaply intervene, which is why the permission model is a design surface and not an annoyance. Step 4 is where the cost accumulates: each tool result is tokens spent for the rest of the session.</figcaption>
+  </figure>
+
+  <h3>The autonomy slider</h3>
+
+  <p>Karpathy's second useful abstraction is the <strong>autonomy slider</strong>: the amount of work you hand over between checkpoints. At the low end, the agent completes a line and you accept or reject it, a decision costing a second. In the middle, it rewrites one function, or implements one well-specified change across three files, and you read the diff. At the high end, it plans and executes a multi-file refactor across an afternoon, and you review the branch. The slider is not a measure of how good the agent is. It is a measure of how much verification you are prepared to do in one sitting, which depends on how mechanical the verification is.</p>
+
+  <p>The rule for setting it is straightforward: <em>slide up when verification is automatic, slide down when verification is judgement.</em> A refactor covered by a fast, trustworthy test suite can run at high autonomy, because the suite does the checking and the agent can iterate against it unattended. A change to a credit risk model's calibration logic cannot, no matter how good the tests are, because the tests encode what you already thought of and the risk lives in what you did not. People get into trouble by setting the slider from their confidence in the agent rather than from the structure of the task.</p>
+
+  <div class="defcard">
+    <strong>Agent.</strong> A model in a loop with tools and a termination condition. The definition is deliberately thin: what makes something an agent is not intelligence or planning ability but the fact that its outputs are executed rather than merely read.
+  </div>
+
+  <div class="defcard">
+    <strong>Harness.</strong> The program that runs the loop. It owns the tool definitions, the permission gate, the context assembly, and the stopping rule. Two harnesses over the same model behave very differently, which is why "the model got worse" is usually a claim about a harness.
+  </div>
+
+  <div class="defcard">
+    <strong>Autonomy slider.</strong> The quantity of agent work between human checkpoints. Set it from the cost and speed of verifying the result, not from your confidence in the agent.
+  </div>
+
+  <h3>The generation-verification loop</h3>
+
+  <p>Put the two ideas together and you get the frame that the rest of the course hangs on. Useful agentic work is a loop in which the agent generates and something verifies, and the loop is only as fast as its slowest verifier. If the verifier is a unit test running in 400 milliseconds, the loop spins many times a minute and you can leave it alone. If the verifier is you reading a diff, the loop spins a few times an hour. If the verifier is a colleague in a different time zone, it spins twice a day. Every technique in this course is an attempt to move verification leftwards and downwards: earlier in the loop, and cheaper per pass.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Four modes of use, and what each is for</h3>
+
+  <p>The same underlying technology is packaged four ways, and choosing badly between them accounts for a good share of the frustration people report.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Mode</th><th>Unit of work</th><th>Verification</th><th>Best for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Inline completion</td><td>A line or block</td><td>You read it as it appears</td><td>Boilerplate, repetitive structure, the second half of an obvious line</td></tr>
+      <tr><td>Chat</td><td>An explanation or snippet</td><td>You read the answer</td><td>Understanding unfamiliar code, weighing an approach, learning an API</td></tr>
+      <tr><td>Scoped edit</td><td>One function or file</td><td>You read the diff</td><td>A change you could specify precisely but would rather not type</td></tr>
+      <tr><td>Agent</td><td>A task across the repository</td><td>Tests, then the branch diff</td><td>Work with a mechanical success criterion and more than three files in scope</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The common mistake is reaching for the agent mode on a task whose success criterion you have not articulated. An agent given "improve the error handling in this module" will do something, and the something will look reasonable, and you will have no basis on which to accept or reject it because you never said what improvement meant. The same agent given "every public function in this module should raise <code>ValueError</code> on malformed input rather than returning <code>None</code>, and there should be a test for each" has a criterion it can check itself. The first prompt outsources the thinking; the second outsources the typing. Only the second is agentic engineering.</p>
+
+  <h3>The working loop: research, plan, execute, review</h3>
+
+  <p>Anthropic's own guidance, and the shape that has emerged across teams using these tools seriously, converges on a four-phase loop rather than a single prompt. <strong>Research</strong> comes first: the agent reads the relevant code and reports what it found, and you correct its understanding before any code is written. <strong>Plan</strong> comes second: the agent writes down what it intends to change and why, and you argue with the plan while arguing is still cheap. <strong>Execute</strong> is third and is the least interesting phase, because by then the decisions have been made. <strong>Review</strong> is fourth, and is where the discipline either exists or does not.</p>
+
+  <p>The reason to separate research from planning, rather than letting the agent do both in one pass, is that a wrong understanding produces a plan so internally consistent that its wrongness is invisible. Reading a research summary takes two minutes and catches the class of error that costs an afternoon. This is the single highest-return habit in the whole practice, and Lecture 7 is devoted to it.</p>
+
+  <pre><code class="language-text">Weak:    "Add caching to the pricing module."
+
+Better:  "Read src/pricing/ and tell me where the expensive
+          calls are and what the natural cache keys would be.
+          Do not write any code yet."
+          ... then, after correcting its account ...
+         "Plan a cache for the two calls you identified.
+          Constraints: in-process only, no new dependencies,
+          keys must include the valuation date. Tests first."</code></pre>
+
+  <h3>What agents are reliably bad at</h3>
+
+  <p>Four weaknesses are structural rather than incidental, so they do not go away with a better model.</p>
+
+  <p>The first is knowing when to stop. A model asked to fix a failing test will fix the test, and if fixing the code is hard it may well fix the test by weakening the assertion. It is optimising for the loop terminating, not for the thing you meant. Any instruction of the form "make the tests pass" is an invitation to this failure, and the remedy is to state the invariant that must survive.</p>
+
+  <p>The second is unstated context. The agent knows what is in its context window and nothing else. It does not know that this module is being deprecated next quarter, that the team decided against that library in March, or that the client's regulator objects to the approach. Every such fact that lives only in your head is a fact the agent will contradict, confidently. Lecture 5 is about moving those facts into writing.</p>
+
+  <p>The third is scope discipline. Left unconstrained, an agent asked to fix one function will also reformat the file, add type hints to its neighbours, and improve three unrelated docstrings. Each individual change may be an improvement; collectively they turn a two-line diff into a hundred-line diff that nobody will review properly. Surgical scope has to be demanded explicitly, which is exactly why the global instruction file on this machine says so in its third numbered rule.</p>
+
+  <p>The fourth is agreement. Models are trained to be helpful, and helpfulness under pressure looks like agreement. Push back on a correct answer and you will frequently get a retraction rather than a defence. This is the most dangerous of the four, because it converts your uncertainty into false confirmation, and it is why the rules on this machine include an explicit instruction to retreat only on new evidence.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    The most expensive single mistake in agentic work is accepting a large diff because it looks right. "Looks right" is a judgement calibrated on human authorship, where surface fluency correlates with understanding. That correlation does not hold for generated code. The working rule is that any diff you would not have been willing to write yourself, from scratch, in the same shape, needs either a test that fails without it or a line-by-line read. If you have neither the test nor the appetite for the read, the change is too big and should be split.
+  </div>
+
+  <h3>Worked example: two prompts, one task</h3>
+
+  <div class="worked">
+    <strong>Worked example: adding a lecture landing page to this repository</strong>
+    <p>The task: this course needed a landing page consistent with the sixteen other course landings in <code>docs/lectures/</code>. There are two ways to hand it over.</p>
+    <p><strong>Attempt one, high autonomy, no specification.</strong> "Create a landing page for a Claude engineering course." The agent has to invent the syllabus, the markup conventions, the class names, and the tone. It produces a page that renders, uses invented CSS classes that do not exist in <code>assets/lecture.css</code>, and is styled as an unformatted document in the browser. Nothing about the output announces the failure; you discover it by opening the file. Time to a correct result: two rounds of correction, and a stylesheet you now have to check by hand.</p>
+    <p><strong>Attempt two, research first.</strong> "Read <code>fundamentals/software_engineering/index.html</code> and <code>13-git.html</code>, and list the structural conventions a new course landing page must follow: which classes exist, the section ordering, and how status badges are used. Do not write anything yet." The agent returns a description that you can check in ninety seconds against a file you already know. Then: "Write the landing page for a 22-lecture course using only those conventions and this sequence: [sequence]. Mark lectures 1 to 4 as built and the rest as planned."</p>
+    <p><strong>Why the second works.</strong> The autonomy is identical. The difference is that the second inserted a cheap verification step between research and generation, at the point where an error was still one sentence rather than one file. The generated page then had a specification it could be checked against, so the review question became "does it match the conventions it listed?" rather than the unanswerable "is this good?".</p>
+    <p><strong>The generalisation.</strong> When you cannot state the acceptance criterion, do not write a better prompt. Ask the agent to produce the criterion first, check that, and then let it generate against it. This converts a judgement verification into a mechanical one, which is the move that the entire practice reduces to.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>An agent is a model in a loop with tools, and the loop is what makes it different in kind from a chat interface rather than merely better. The loop's speed is set by its verifier, so the engineering problem is to make verification cheap and early: tests before code, research before plans, plans before diffs, small diffs before large ones. The autonomy slider should be set by the structure of the task rather than by confidence in the model, sliding up where a machine can check the work and down where only judgement can. The four structural weaknesses, stopping too early, missing unstated context, sprawling scope, and agreeing under pressure, are the specific failure modes that the remaining twenty-one lectures are organised around defeating.</p>
+
+  <p>The wider point is that none of this is really about the model. Everything in this course is about the wrapper: what the agent can see, what it is allowed to do, what it has been told, and who checks the result. Those are all things you control and none of them are things you buy. The next lecture takes the first and most binding of them, what the agent can see, and treats the context window as what it actually is, a program you are writing whether you intend to or not.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the four steps of the agent loop, and name the one place a human can intervene cheaply.</li>
+      <li>Distinguish the model, the harness, and the context. When an agent behaves unexpectedly, which of the three is the usual culprit, and why?</li>
+      <li>What determines where the autonomy slider should sit for a given task? Give an example of a task that belongs at each end.</li>
+      <li>Explain the difference between vibe coding and agentic engineering in terms of who holds the quality bar.</li>
+      <li>Why is "make the tests pass" a dangerous instruction? Rewrite it safely.</li>
+      <li>Name the four structural weaknesses of coding agents and give one mitigation for each.</li>
+      <li>Your colleague accepted a 400-line agent-written diff because it "looked clean". What single question should you ask them?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 2 (context engineering) treats the context window as the program and the token budget as the binding constraint.</li>
+      <li><strong>Cross-link:</strong> <a href="../machine_learning/11_large_language_models/03-prompting_and_reasoning.html">Machine learning, LLM module, Lecture 3 (prompting and reasoning)</a> covers the model-side theory this lecture takes as given.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/05-testing.html">Software engineering, Lecture 5 (testing)</a> is the prerequisite for everything said here about cheap verification.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/14-code_review_and_prs.html">Software engineering, Lecture 14 (code review)</a> supplies the review discipline that agent output multiplies the need for.</li>
+      <li><strong>Outside this course:</strong> Andrej Karpathy, "Software Is Changing (Again)", AI Engineer World's Fair, June 2025 (the Software 3.0, autonomy slider, and verifiability material); Anthropic, "Building effective agents" and "Effective harnesses for long-running agents", anthropic.com/engineering; Anthropic, "Best practices for Claude Code", code.claude.com/docs/en/best-practices.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 1 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

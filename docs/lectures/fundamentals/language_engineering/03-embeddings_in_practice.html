@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 3: embeddings in practice</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Embeddings in practice</h1>
+  <p class="subtitle">The word "embedding" is used for at least three different objects that live at three different points in the pipeline, have different dimensions, and are good for completely different jobs. Conflating them is the most common structural error in building a search or classification system, and it produces results that are plausible enough to ship and bad enough to matter. This lecture separates them, shows where each one comes from, and then goes somewhere less obvious: the training trick behind the oldest of the three turns out to work on anything you can arrange in a sequence, including things that are not language at all.</p>
+  <div class="meta">
+    <span>Lecture 3 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part I: what is under the bonnet</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">An <strong>embedding</strong> is a dense vector standing in for something, positioned so that similar things sit near each other. Three distinct kinds appear in this track. <strong>Static token embeddings</strong> live in the model's <strong>embedding matrix</strong>, one row per vocabulary entry, looked up by the token ID the tokenizer produced; they're randomly initialised and learned during pretraining, and every occurrence of a token gets the same row regardless of context. <strong>Contextualised token embeddings</strong> are what comes out the other end of the model, one vector per position, each one shaped by every other token in the input, so "bank" genuinely differs between two sentences; these drive named-entity recognition and extractive summarisation. <strong>Text embeddings</strong> collapse a whole sentence, paragraph or document into one vector, and they are what semantic search, clustering and retrieval-augmented generation all run on. A fourth object, the standalone <strong>word2vec</strong> embedding, predates all of this and is still worth understanding, because the way it was trained, <strong>skip-gram</strong> sampling with <strong>negative sampling</strong>, is the ancestor of the contrastive training that produces modern text embedding models, modern image-text models, and, applied to sequences that aren't sentences at all, a working recommender system.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Think of a dictionary in which each headword has a fixed pronunciation printed beside it. That printed pronunciation is the static token embedding: you look it up by the word, and it's the same every time. Now think of a person reading a sentence aloud. The way they say "bank" changes with the sentence, because they read the whole clause before deciding on their intonation; what they actually produce depends on the surroundings. That is a contextualised embedding. Finally, think of asking that person for a one-sentence summary of the whole paragraph they just read. That single summary, standing for the entire passage, is a text embedding. All three are called embeddings, all three are vectors, and using the wrong one for the job is like handing someone a dictionary entry when they asked what the paragraph was about.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the track</span>
+    Lecture 2 turned text into integers. This lecture turns integers into vectors, and follows the vectors far enough to see what comes out of the model. Lecture 4 fills in the machinery between the two. Everything in Part II and Part III runs on the third kind of embedding, and Part V is about training your own, so getting the distinction firmly in place now saves a great deal of confusion later.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons, in rising order of how much money they cost when got wrong.</p>
+
+  <p>First, <strong>the wrong kind of embedding gives you a working system that is quietly mediocre</strong>. The characteristic failure is building semantic search by averaging the contextualised token embeddings of an off-the-shelf BERT. It runs, it returns results, and the results are noticeably worse than a dedicated text embedding model would give, often worse than keyword search. Nothing errors, no test fails, and the deficiency is only visible if you measure retrieval quality properly, which lecture 12 shows how to do. This is the most common structural mistake in the field and it comes directly from not distinguishing the second kind of embedding from the third.</p>
+
+  <p>Second, <strong>text embeddings are the substrate for most of the useful things in this track</strong>. Classification by similarity to a label description, clustering into topics, semantic search, the retrieval half of retrieval-augmented generation, deduplication, and the whole of lectures 14 and 15 are all operations on text embeddings. Getting a clear picture of what one is and how it is produced buys you the next nine lectures.</p>
+
+  <p>Third, <strong>the training procedure generalises far beyond text, and recognising it is worth real money</strong>. Word2vec's insight is that if you can arrange your items into sequences where proximity means relatedness, you can learn embeddings for them by training a model to distinguish genuine neighbours from randomly paired ones. Playlists give you song embeddings. Purchase baskets give you product embeddings. Browsing sessions give you page embeddings. Sequences of claims events give you event embeddings. Each yields a similarity metric over items with no labels, no feature engineering, and no domain expertise.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team building an internal semantic search over five years of committee papers took a sensible-looking route: load <code>bert-base-uncased</code>, run each document through it, average the output token vectors into one 768-dimensional document vector, and rank by cosine similarity. It worked in the sense that it returned documents. It also ranked a paper on operational resilience above a paper on liquidity coverage for the query "LCR shortfall action plan", and nobody could explain why. The diagnosis is structural rather than mysterious. A plain pretrained BERT was optimised to predict masked tokens, and nothing in that objective ever asked it to place similar <em>sentences</em> near each other; averaging its token vectors produces something dominated by shared common words, which is why documents of similar register and length score similarly regardless of subject. Swapping the two lines that produced the vectors for a <code>sentence-transformers</code> model trained explicitly on sentence similarity fixed the ranking without changing anything else in the system. The team had built the right architecture around the wrong object.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a single pipeline from text to vector, with the three kinds of embedding tapped off at three different points.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A pipeline from text through token IDs, static embeddings, contextualised embeddings and a text embedding, showing where each kind is produced">
+      <defs>
+        <marker id="embArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">One pipeline, three things called an embedding</text>
+
+      <!-- text -->
+      <rect x="15" y="40" width="120" height="46" rx="8" fill="#FFFFFF" stroke="#a1a1aa" stroke-width="1.5"/>
+      <text x="75" y="60" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">text</text>
+      <text x="75" y="76" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#52525b">"the bank lent"</text>
+
+      <!-- ids -->
+      <rect x="165" y="40" width="120" height="46" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="1.5"/>
+      <text x="225" y="60" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#713f12">token IDs</text>
+      <text x="225" y="76" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#a16207">[278, 9124, 301]</text>
+
+      <line x1="135" y1="63" x2="165" y2="63" stroke="#71717a" stroke-width="1.8" marker-end="url(#embArrow)"/>
+      <text x="150" y="103" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">lecture 2</text>
+
+      <!-- static -->
+      <rect x="315" y="40" width="150" height="46" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="390" y="60" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">1. STATIC TOKEN</text>
+      <text x="390" y="76" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">one row per vocab entry</text>
+      <line x1="285" y1="63" x2="315" y2="63" stroke="#71717a" stroke-width="1.8" marker-end="url(#embArrow)"/>
+
+      <!-- transformer -->
+      <rect x="495" y="40" width="120" height="46" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="555" y="60" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">the model</text>
+      <text x="555" y="76" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">N stacked blocks</text>
+      <line x1="465" y1="63" x2="495" y2="63" stroke="#71717a" stroke-width="1.8" marker-end="url(#embArrow)"/>
+
+      <!-- contextual -->
+      <rect x="645" y="40" width="150" height="46" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="720" y="60" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">2. CONTEXTUALISED</text>
+      <text x="720" y="76" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">one per input position</text>
+      <line x1="615" y1="63" x2="645" y2="63" stroke="#71717a" stroke-width="1.8" marker-end="url(#embArrow)"/>
+
+      <!-- text embedding -->
+      <path d="M 720 86 L 720 146" stroke="#71717a" stroke-width="1.8" marker-end="url(#embArrow)"/>
+      <rect x="620" y="150" width="200" height="52" rx="8" fill="#DEEAFB" stroke="#2A3A78" stroke-width="2"/>
+      <text x="720" y="170" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#2A3A78">3. TEXT EMBEDDING</text>
+      <text x="720" y="186" text-anchor="middle" font-family="Inter" font-size="9" fill="#2A3A78">one vector for the whole passage</text>
+      <text x="835" y="176" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#2A3A78">pool +</text>
+      <text x="835" y="188" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#2A3A78">training</text>
+
+      <!-- descriptions -->
+      <rect x="315" y="228" width="150" height="130" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="390" y="248" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">a lookup table</text>
+      <text x="325" y="266" font-family="Inter" font-size="8.5" fill="#0d9488">shape: vocab &#215; d</text>
+      <text x="325" y="280" font-family="Inter" font-size="8.5" fill="#0d9488">e.g. 32,000 &#215; 3,072</text>
+      <text x="325" y="298" font-family="Inter" font-size="8.5" fill="#3f3f46">same vector for</text>
+      <text x="325" y="311" font-family="Inter" font-size="8.5" fill="#3f3f46">every occurrence</text>
+      <text x="325" y="330" font-family="Inter" font-size="8.5" font-style="italic" fill="#9f1239">"bank" is one vector</text>
+      <text x="325" y="343" font-family="Inter" font-size="8.5" font-style="italic" fill="#9f1239">for both meanings</text>
+
+      <rect x="645" y="228" width="150" height="130" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="720" y="248" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">the model's output</text>
+      <text x="655" y="266" font-family="Inter" font-size="8.5" fill="#0d9488">shape: n_tokens &#215; d</text>
+      <text x="655" y="280" font-family="Inter" font-size="8.5" fill="#0d9488">e.g. 4 &#215; 384</text>
+      <text x="655" y="298" font-family="Inter" font-size="8.5" fill="#3f3f46">shaped by every</text>
+      <text x="655" y="311" font-family="Inter" font-size="8.5" fill="#3f3f46">other token present</text>
+      <text x="655" y="330" font-family="Inter" font-size="8.5" font-style="italic" fill="#115e59">"bank" differs by</text>
+      <text x="655" y="343" font-family="Inter" font-size="8.5" font-style="italic" fill="#115e59">sentence: NER, tagging</text>
+
+      <rect x="15" y="228" width="270" height="130" rx="8" fill="#FBF7F0" stroke="#8C6A47" stroke-width="1.5"/>
+      <text x="150" y="248" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#8C6A47">4. STANDALONE WORD EMBEDDINGS</text>
+      <text x="150" y="264" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#8C6A47">word2vec, GloVe, fastText</text>
+      <text x="28" y="284" font-family="Inter" font-size="8.5" fill="#3f3f46">Not part of this pipeline at all. A separate,</text>
+      <text x="28" y="297" font-family="Inter" font-size="8.5" fill="#3f3f46">downloadable table trained by contrastive</text>
+      <text x="28" y="310" font-family="Inter" font-size="8.5" fill="#3f3f46">learning, largely superseded for text.</text>
+      <text x="28" y="330" font-family="Inter" font-size="8.5" font-weight="600" fill="#8C6A47">Still the right tool the moment your "words"</text>
+      <text x="28" y="343" font-family="Inter" font-size="8.5" font-weight="600" fill="#8C6A47">are songs, products, or clicks.</text>
+
+      <text x="440" y="374" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">Lectures 5, 6, 11, 12, 14 and 15 all operate on the third kind. Almost nothing you build will touch the first kind directly.</text>
+    </svg>
+    <figcaption>Static token embeddings are a lookup table inside the model, indexed by token ID, identical for every occurrence of a token. Contextualised token embeddings come out of the model, one per input position, each shaped by the whole input. A text embedding compresses the entire passage into one vector, and the pooling step alone is not enough to produce a good one: the model has to have been trained for it. Standalone word embeddings sit outside the pipeline entirely and remain the right answer whenever your items are not words.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Static in, contextual out.</strong> The embedding matrix is the model's front door, not its output; whenever someone says "the embeddings from the model" they almost always mean what came out, not what went in. <strong>Pooling is not training.</strong> Averaging token vectors produces a single vector of the right shape, and shape is the only thing it gets right unless the model was trained with sentence similarity as its objective.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The embedding matrix: what a token ID actually indexes</h3>
+
+  <p>When you download a pretrained model, a substantial fraction of the file you're downloading is one matrix with as many rows as the tokenizer has vocabulary entries and as many columns as the model's hidden dimension. Phi-3-mini's tokenizer has 32,000 entries and the model's hidden dimension is 3,072, so that matrix alone holds roughly 98 million numbers before any transformer block exists. The first operation of the forward pass is a lookup: take each token ID and fetch the corresponding row.</p>
+
+  <p>These rows begin as random noise, exactly like every other weight in the model, and acquire their values through pretraining. This is the mechanical reason a model cannot be given a different tokenizer without retraining: row 5281 means "izing" only because the model spent its entire training run seeing that row in positions where "izing" appeared. Swap in a tokenizer that assigns 5281 to something else and every lookup returns a vector learned for a different symbol.</p>
+
+  <p>You'll rarely touch this matrix directly. It matters for two practical reasons: it explains why vocabulary size is a memory decision as well as a context-efficiency one, since every extra vocabulary entry costs a full row of parameters; and it's the thing being resized when you add new special tokens to a model before fine-tuning, which lecture 17 covers.</p>
+
+  <h3>Contextualised token embeddings: the model's actual output</h3>
+
+  <p>Running text through a representation model and taking the raw output gives you one vector per input position, each computed with reference to the whole input.</p>
+
+  <pre><code>from transformers import AutoModel, AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-xsmall")
+model = AutoModel.from_pretrained("microsoft/deberta-v3-xsmall")
+
+tokens = tokenizer("Hello world", return_tensors="pt")
+output = model(**tokens)[0]
+
+output.shape
+# torch.Size([1, 4, 384])</code></pre>
+
+  <p>Three numbers, and each is worth naming. The 1 is the batch dimension, present so you can push many sequences through at once; you'll usually be ignoring it and occasionally cursing it. The 384 is the model's hidden dimension, a property of this particular model. The 4 is the surprise: "Hello world" is two words. Decoding the token IDs explains it.</p>
+
+  <div class="worked">
+    <h4>Four positions, not two</h4>
+[CLS]     &#8592; prepended by the tokenizer; its output vector is the sequence summary
+Hello
+world
+[SEP]     &#8592; appended by the tokenizer
+  </div>
+
+  <p>The tokenizer added the structural tokens from lecture 2 automatically, and each of them occupies a position and gets an output vector like any other. This trips people up constantly when they try to align model outputs back to their original words, and it becomes a genuine problem in lecture 16, where labelling every sub-token correctly for named-entity recognition is the part most implementations get wrong.</p>
+
+  <p>These vectors are what per-token tasks consume. Named-entity recognition classifies each position's vector into an entity type. Extractive summarisation scores each position to decide what to keep. They are also the input to the text-to-image systems of the diffusion family, which condition on the contextual vectors of a caption rather than on any single summary vector.</p>
+
+  <h3>Text embeddings: one vector for a passage</h3>
+
+  <p>A great many applications need a single vector for a whole sentence or document, so that two passages can be compared with one distance computation. Producing one is mechanically easy and doing it well is not.</p>
+
+  <p>The mechanically easy part is <strong>pooling</strong>: average the token vectors, or take the <code>[CLS]</code> vector, and you have a single vector of the right dimension. The part that matters is that the model needs to have been trained so that this vector is meaningful for comparison. Masked language modelling, which is how a plain BERT is pretrained, never once asks the model to place two similar sentences near each other; it only asks it to reconstruct hidden tokens. Pooling the output of such a model gives you a vector dominated by surface features, which is exactly the failure in the vignette.</p>
+
+  <p>Models trained specifically for the job are what you want, and the <code>sentence-transformers</code> library is the standard way to reach them.</p>
+
+  <pre><code>from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+vector = model.encode("Best movie ever!")
+
+vector.shape
+# (768,)</code></pre>
+
+  <p>One call, one vector, 768 numbers standing for the whole sentence. Dimensionality varies by model, commonly 384 for the small fast ones and 768 or 1,024 for the larger ones, and it is a real trade: larger vectors capture more but cost more to store and compare, which matters once you are holding a few million of them. Lecture 5 covers how to choose a model; lecture 14 covers how these models are trained, which is where the contrastive idea introduced below returns at full strength.</p>
+
+  <div class="callout warn">
+    <span class="tag">Three things to get right when you first use text embeddings</span>
+    Compare with cosine similarity rather than Euclidean distance unless you have a specific reason, because these vectors carry meaning in their direction and not their magnitude. Check whether your model normalises its output already, since computing cosine similarity on already-normalised vectors is just a dot product and doing it twice wastes nothing but doing it zero times gives wrong answers. And check the model's maximum sequence length before you feed it documents: many embedding models truncate silently at 256 or 512 tokens, so a long document produces an embedding of its opening paragraph and nothing warns you. That last one is the reason chunking is a first-class concern in lecture 11.
+  </div>
+
+  <h3>Word2vec, and the idea worth stealing</h3>
+
+  <p>Standalone word embeddings predate all of the above and are still downloadable in a couple of lines.</p>
+
+  <pre><code>import gensim.downloader as api
+
+model = api.load("glove-wiki-gigaword-50")   # 66 MB, 50-dimensional
+model.most_similar([model["king"]], topn=5)
+# [('king', 1.000), ('prince', 0.824), ('queen', 0.784), ('ii', 0.775), ('emperor', 0.774)]</code></pre>
+
+  <p>For representing English text these have been superseded by contextual models, for the reason lecture 1 gave: one vector per word cannot handle polysemy. What has not been superseded is <em>how they were trained</em>, and that procedure is the most transferable idea in this lecture.</p>
+
+  <p>Word2vec turns a corpus into a binary classification problem. Slide a window along the text; for each centre word, pair it with each neighbour inside the window and label that pair 1, meaning "these genuinely co-occur". This neighbour-sampling scheme is <strong>skip-gram</strong>. A dataset of nothing but 1s is useless, because a model can score perfectly by always answering 1, so pair each centre word with a handful of words drawn at random from the vocabulary and label those 0. That is <strong>negative sampling</strong>, and it works despite being almost embarrassingly crude: random words are nearly always genuinely unrelated, so the negatives are good enough. Then initialise a vector per vocabulary entry at random, train a small network to predict the 1s and 0s from pairs of vectors, and throw the network away at the end. The vectors are the product.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Skip-gram window generating positive pairs and negative sampling generating negative pairs from a sentence">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Turning running text into a labelled classification problem, with no labels</text>
+
+      <!-- the sentence -->
+      <text x="20" y="52" font-family="Inter" font-size="9" font-weight="600" fill="#52525b">THE CORPUS</text>
+      <g font-family="JetBrains Mono" font-size="10">
+        <rect x="120" y="38" width="46" height="24" rx="4" fill="#F4F4F2" stroke="#a1a1aa"/><text x="143" y="55" text-anchor="middle" fill="#52525b">Thou</text>
+        <rect x="170" y="38" width="50" height="24" rx="4" fill="#DEEAFB" stroke="#2A3A78"/><text x="195" y="55" text-anchor="middle" fill="#2A3A78">shalt</text>
+        <rect x="224" y="38" width="38" height="24" rx="4" fill="#DEEAFB" stroke="#2A3A78"/><text x="243" y="55" text-anchor="middle" fill="#2A3A78">not</text>
+        <rect x="266" y="38" width="54" height="24" rx="4" fill="#FCE7F3" stroke="#be185d" stroke-width="2"/><text x="293" y="55" text-anchor="middle" font-weight="600" fill="#831843">make</text>
+        <rect x="324" y="38" width="26" height="24" rx="4" fill="#DEEAFB" stroke="#2A3A78"/><text x="337" y="55" text-anchor="middle" fill="#2A3A78">a</text>
+        <rect x="354" y="38" width="66" height="24" rx="4" fill="#DEEAFB" stroke="#2A3A78"/><text x="387" y="55" text-anchor="middle" fill="#2A3A78">machine</text>
+        <rect x="424" y="38" width="26" height="24" rx="4" fill="#F4F4F2" stroke="#a1a1aa"/><text x="437" y="55" text-anchor="middle" fill="#52525b">in</text>
+        <rect x="454" y="38" width="34" height="24" rx="4" fill="#F4F4F2" stroke="#a1a1aa"/><text x="471" y="55" text-anchor="middle" fill="#52525b">the</text>
+      </g>
+      <text x="293" y="82" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#831843">centre word</text>
+      <text x="620" y="49" font-family="Inter" font-size="9" fill="#2A3A78">window of 2 either side</text>
+      <text x="620" y="62" font-family="Inter" font-size="9" fill="#831843">the word being embedded</text>
+
+      <line x1="15" y1="96" x2="865" y2="96" stroke="#d4d4d8" stroke-width="1"/>
+
+      <!-- positives -->
+      <text x="20" y="122" font-family="Inter" font-size="9" font-weight="700" fill="#115e59">SKIP-GRAM</text>
+      <text x="20" y="135" font-family="Inter" font-size="8.5" fill="#0d9488">positives, label 1</text>
+      <text x="20" y="148" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">real neighbours</text>
+
+      <g font-family="JetBrains Mono" font-size="9">
+        <rect x="150" y="108" width="170" height="22" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="160" y="123" fill="#115e59">(make, shalt)</text><text x="305" y="123" text-anchor="end" font-weight="600" fill="#115e59">1</text>
+        <rect x="150" y="134" width="170" height="22" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="160" y="149" fill="#115e59">(make, not)</text><text x="305" y="149" text-anchor="end" font-weight="600" fill="#115e59">1</text>
+        <rect x="150" y="160" width="170" height="22" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="160" y="175" fill="#115e59">(make, a)</text><text x="305" y="175" text-anchor="end" font-weight="600" fill="#115e59">1</text>
+        <rect x="150" y="186" width="170" height="22" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="160" y="201" fill="#115e59">(make, machine)</text><text x="305" y="201" text-anchor="end" font-weight="600" fill="#115e59">1</text>
+      </g>
+
+      <!-- negatives -->
+      <text x="360" y="122" font-family="Inter" font-size="9" font-weight="700" fill="#92400e">NEGATIVE SAMPLING</text>
+      <text x="360" y="135" font-family="Inter" font-size="8.5" fill="#b45309">negatives, label 0</text>
+      <text x="360" y="148" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">drawn at random</text>
+
+      <g font-family="JetBrains Mono" font-size="9">
+        <rect x="500" y="108" width="180" height="22" rx="4" fill="#FFF7ED" stroke="#b45309"/><text x="510" y="123" fill="#92400e">(make, aardvark)</text><text x="665" y="123" text-anchor="end" font-weight="600" fill="#92400e">0</text>
+        <rect x="500" y="134" width="180" height="22" rx="4" fill="#FFF7ED" stroke="#b45309"/><text x="510" y="149" fill="#92400e">(make, oxygen)</text><text x="665" y="149" text-anchor="end" font-weight="600" fill="#92400e">0</text>
+        <rect x="500" y="160" width="180" height="22" rx="4" fill="#FFF7ED" stroke="#b45309"/><text x="510" y="175" fill="#92400e">(make, tuesday)</text><text x="665" y="175" text-anchor="end" font-weight="600" fill="#92400e">0</text>
+        <rect x="500" y="186" width="180" height="22" rx="4" fill="#FFF7ED" stroke="#b45309"/><text x="510" y="201" fill="#92400e">(make, harbour)</text><text x="665" y="201" text-anchor="end" font-weight="600" fill="#92400e">0</text>
+      </g>
+      <text x="700" y="160" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">without these the model</text>
+      <text x="700" y="173" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">scores 100% by always</text>
+      <text x="700" y="186" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">answering 1</text>
+
+      <line x1="15" y1="224" x2="865" y2="224" stroke="#d4d4d8" stroke-width="1"/>
+
+      <!-- training -->
+      <rect x="150" y="240" width="200" height="52" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="250" y="260" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">a small network</text>
+      <text x="250" y="278" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">two vectors in, 1 or 0 out</text>
+
+      <path d="M 350 266 L 410 266" stroke="#71717a" stroke-width="1.8" marker-end="url(#embArrow)"/>
+
+      <rect x="415" y="240" width="200" height="52" rx="8" fill="#FBF7F0" stroke="#8C6A47" stroke-width="2"/>
+      <text x="515" y="260" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#8C6A47">the embeddings</text>
+      <text x="515" y="278" text-anchor="middle" font-family="Inter" font-size="9" fill="#8C6A47">updated at every step; kept</text>
+
+      <text x="700" y="262" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">The network is discarded.</text>
+      <text x="700" y="277" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">The by-product was the point.</text>
+    </svg>
+    <figcaption>A sliding window over ordinary text produces positive pairs for free: any two words that occurred near each other are labelled as genuine neighbours. Randomly drawn pairs supply the negatives, which are needed because a dataset of only positives can be solved by a model that always answers yes. Training a small network to tell the two apart pushes the vectors of genuine neighbours together and everything else apart. The network is thrown away; the vectors it was updating along the way are the artefact you wanted.</figcaption>
+  </figure>
+
+  <p>Notice what this procedure needs: sequences in which proximity implies relatedness, and nothing else. No labels, no human judgement, no feature engineering. That "take two things, predict whether they belong together" formulation is <strong>contrastive learning</strong>, and it recurs three more times in this track. Lecture 13 trains an image-text model by asking whether a caption describes an image. Lecture 14 trains a sentence embedding model by asking whether two sentences mean the same thing. Lecture 15 constructs the pairs when nobody has labelled any.</p>
+
+  <h3>Embeddings for things that are not words</h3>
+
+  <p>Here is where the generalisation pays. Take a collection of human-curated playlists, treat each playlist as a sentence and each song as a word, and run word2vec unchanged. Songs that keep appearing in the same playlists get pushed together, and the resulting vector space is a similarity metric over songs derived entirely from listener behaviour.</p>
+
+  <pre><code>from gensim.models import Word2Vec
+
+# playlists is a list of lists of song IDs. That is the entire input.
+model = Word2Vec(playlists, vector_size=32, window=20, negative=50, min_count=1)
+
+model.wv.most_similar(positive="2172")   # 2172 is Metallica, "Fade To Black"</code></pre>
+
+  <p>The nearest neighbours come back as Van Halen, Dio, Guns N' Roses and Judas Priest. Query with Michael Jackson's "Billie Jean" instead and you get Prince, Madonna and more Michael Jackson. The model has recovered genre and era without being told that genre exists, without any audio, and without anyone labelling a single track.</p>
+
+  <p>The parameters are worth reading, because they show how the text defaults get adapted. A window of 20 is far wider than the two or five you would use on prose, because a playlist has no meaningful word order and everything in it is arguably a neighbour of everything else. Setting <code>negative=50</code> draws fifty random songs as negatives per positive pair, which is generous and reflects a catalogue where two randomly chosen songs really are unrelated. A vector size of 32 is small, which is appropriate given the item count and the fact that you only need enough dimensions to separate genres and moods.</p>
+
+  <div class="callout insight">
+    <span class="tag">Recognising the pattern in your own domain</span>
+    The question to ask is: what are my sequences, and does proximity within them mean anything? Baskets of products bought together give product embeddings that support "customers who bought this". Sequences of pages in a browsing session give page embeddings. A claimant's ordered sequence of treatment or intervention codes gives code embeddings in which clinically related procedures cluster. In each case you get a dense similarity metric over items from raw behavioural logs, with no labelling exercise, and it will usually be a stronger starting point than any hand-built taxonomy. The caveat is the same as for every behavioural model: the embeddings encode what people did, including whatever bias produced that behaviour, so the machine learning track's <a href="../machine_learning/11_large_language_models/04-responsible_use.html">responsible use</a> lecture applies in full before any of this touches a decision about a person.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Three objects share the name. The embedding matrix is a lookup table at the model's front door, one row per vocabulary entry, learned during pretraining and the reason a tokenizer cannot be swapped. Contextualised token embeddings come out of the model, one per position, each shaped by the entire input, and they drive per-token tasks such as entity recognition. Text embeddings compress a whole passage into one vector and are what nearly everything in Parts II and III consumes; pooling alone does not produce a good one, because the model must have been trained with sentence similarity as an objective, and reaching for <code>sentence-transformers</code> rather than a raw BERT is the single highest-value habit in this lecture. Word2vec sits outside the pipeline, superseded for text and thoroughly alive elsewhere, and its skip-gram-plus-negative-sampling recipe is the ancestor of every contrastive method in this track and a complete recommender system in its own right.</p>
+
+  <p>Lecture 4 closes Part I by opening the box between the two kinds of token embedding. It covers the parts that only become visible when you actually run a model: how a distribution over the next token is produced and sampled from, why the key-value cache exists and what it costs in memory, and the attention variants and positional schemes that made hundred-thousand-token contexts economically possible.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the three kinds of embedding in the pipeline, give the shape of each, and state one task that consumes each.</li>
+      <li>Explain, in terms of the embedding matrix, why a pretrained model cannot be given a different tokenizer.</li>
+      <li>Explain why "Hello world" produces four output vectors from a BERT-family model rather than two.</li>
+      <li>State why mean-pooling the token outputs of a plain pretrained BERT produces a poor sentence embedding, referring to the objective it was trained on.</li>
+      <li>Define skip-gram and negative sampling, and explain precisely what goes wrong if you omit the negatives.</li>
+      <li>Explain what happens to the neural network at the end of word2vec training, and why.</li>
+      <li>Given a dataset of customer purchase baskets, describe how you would obtain product embeddings, and say what the window parameter should reflect.</li>
+      <li>In the committee-papers vignette, explain why the ranking failure was structural rather than a tuning problem.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 2 (<a href="02-tokenisation.html">tokenisation</a>) produced the token IDs that index the embedding matrix.</li>
+      <li><strong>Next:</strong> Lecture 4 (<a href="04-inside_the_forward_pass.html">inside the forward pass</a>) fills in the machinery that turns static embeddings into contextual ones.</li>
+      <li><strong>Assumed:</strong> The machine learning track's <a href="../machine_learning/05_deep_learning/05-word_embeddings.html">word embeddings</a> lecture derives word2vec's skip-gram and CBOW objectives and negative sampling in full, along with GloVe; and its <a href="../machine_learning/05_deep_learning/04-tensors_and_embeddings.html">tensors and embeddings</a> lecture covers entity embeddings for categorical variables, which is the same idea applied to tabular data.</li>
+      <li><strong>Forward:</strong> Text embeddings are the working substrate of lectures 5, 6, 11 and 12; contrastive learning returns properly in lecture 14 (<a href="14-contrastive_learning_and_sbert.html">contrastive learning and SBERT</a>) and across modalities in lecture 13 (<a href="13-multimodal_models.html">multimodal models</a>).</li>
+      <li><strong>Silent truncation:</strong> The maximum sequence length problem noted above is why chunking gets its own treatment in lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 3 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

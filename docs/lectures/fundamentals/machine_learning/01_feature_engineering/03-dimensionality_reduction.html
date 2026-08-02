@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 3: dimensionality reduction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Feature engineering</a></div>
+  <h1>Dimensionality reduction</h1>
+  <p class="subtitle">When you have more columns than you can think about, compress. Three methods, three philosophies: PCA preserves variance, LDA preserves class separability, t-SNE preserves neighbourhood structure for visualisation.</p>
+  <div class="meta">
+    <span>Lecture 3 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Dimensionality reduction</strong> takes a feature matrix with $p$ columns and produces a new matrix with $k < p$ columns, where each new column is a function (linear or non-linear) of the original ones. The motivation is the <strong>curse of dimensionality</strong>: as $p$ grows, the volume of feature space grows exponentially, the same number of training samples becomes sparser, distance metrics lose their ability to discriminate close from far, and any model that depends on local structure (k-nearest neighbours, kernel methods, mixture models) degrades. Three workhorse methods cover almost every practical case. <strong>Principal component analysis (PCA)</strong> is unsupervised: it finds the orthogonal directions of maximum variance in the data and projects onto the top $k$ of them. <strong>Linear discriminant analysis (LDA)</strong> is supervised: it finds the directions that maximise the ratio of between-class to within-class variance, producing at most $C - 1$ components for $C$ classes. <strong>t-SNE</strong> is non-linear and unsupervised: it preserves the neighbourhood structure of high-dimensional points in a 2D or 3D embedding by matching pairwise similarity distributions. PCA and LDA produce features you can feed downstream; t-SNE produces a picture, not a feature matrix. The one rule that ties them together: scale the columns first, because every one of these methods measures variance or distance in the raw units of the input.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Suppose you have a hundred columns describing each customer and you want to plot them. You cannot draw a hundred-dimensional scatter. PCA picks two new axes (combinations of the original hundred) along which the customers spread out the most, and you draw on those. LDA does the same but picks axes where customers of different classes (defaulters and non-defaulters, say) end up as far apart as possible. t-SNE does not pick axes at all; it places each customer somewhere on the page so that customers who were close in the original space stay close in the picture, and customers who were far stay far. PCA preserves spread, LDA preserves class separation, t-SNE preserves neighbourhoods.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    In credit risk the temptation is to throw PCA at a wide application form (income, debts, employment fields, bureau attributes) to compress before fitting. In practice this almost never reaches a production scorecard. Principal components are linear combinations of the original features with weights that have no economic meaning, and a regulator's first question (what does this score react to) becomes unanswerable. PCA earns its keep in the modelling sandbox (collinearity diagnostics, exploratory visualisation, residual analysis) and in problem domains where the original features are themselves anonymous (image pixels, gene expression, sensor channels). The deeper mathematical treatment lives in <a href="../04_unsupervised_learning/02-pca.html">unsupervised learning lecture 2</a>; this lecture covers PCA at the level needed to choose between it and the alternatives.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 1c of the pipeline from <a href="01-the_ml_landscape.html">lecture 1</a>. <a href="02-feature_transformation.html">Lecture 2</a> rewrote each column individually; this lecture rewrites the matrix as a whole. <a href="04-feature_selection.html">Lecture 4</a> on feature selection is the sibling alternative: rather than build new combined features, throw away the columns that do not pull their weight. Reduction and selection answer the same problem (too many columns) with opposite philosophies, and a serious pipeline often uses both.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three concrete pressures push you toward reducing dimensions. First, <strong>the curse of dimensionality is a real geometric phenomenon, not a slogan.</strong> In a unit hypercube of dimension $p$, the volume of a ball of radius $r$ centred at the origin shrinks rapidly relative to the cube as $p$ grows; almost all of the volume of a high-dimensional cube concentrates in its corners. Two consequences follow. Sample density collapses: with $n$ training points in $p$ dimensions, the expected number of neighbours within a fixed radius falls exponentially in $p$, so k-nearest neighbours becomes a method that has to reach across most of the space to find any neighbours at all. Distance metrics degrade: the ratio of the maximum to the minimum pairwise Euclidean distance among $n$ random points converges to one as $p$ grows, so "nearest" and "farthest" become indistinguishable. Any algorithm whose decisions rest on relative distances (kNN, k-means, RBF SVM, mixture models, Mahalanobis-distance anomaly detection) is in trouble.</p>
+
+  <p>Second, <strong>features are usually correlated, and the effective dimensionality is much smaller than $p$.</strong> A retail credit application with thirty fields will typically contain a handful of latent factors (broadly, income capacity, debt burden, behavioural stability, demographic profile) and the thirty observed features are noisy linear combinations of those. A method that finds the latent factors and discards the rest gets you back to a problem of the size the data actually has. PCA does this directly: each principal component is a linear combination of the original features, ordered by how much variance it captures. The explained-variance ratio tells you, for each component, the fraction of total variance it accounts for. The cumulative ratio reaches 95 per cent on a moderately correlated dataset with a small fraction of the original components.</p>
+
+  <p>Third, <strong>supervised reduction lets you bake the label into the geometry.</strong> PCA is blind to the target: it will happily preserve directions of high variance that are irrelevant to classification and discard directions of low variance that are exactly aligned with the class boundary. LDA fixes this by optimising for class separability directly. If the goal is to compress a feature matrix as a pre-processing step for a classifier, LDA is the principled choice and PCA is the convenient fallback. For visualisation of clusters in a complex dataset (single-cell genomics, customer segmentation, embeddings from a neural network) neither linear method is enough; the manifold the data sits on is non-linear, and only t-SNE or UMAP can flatten it without losing the local structure that defines the clusters.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A behavioural model was built on 80 transaction-aggregate features. The modeller ran PCA, retained the first 20 components capturing 95 per cent of variance, and fit a logistic regression on the reduced matrix. The validation AUC was indistinguishable from the raw-feature model. The model was rejected: the supervisor asked for the economic interpretation of "principal component 7" and there was none to give. The rebuilt model used the original features with L1 regularisation, achieved the same AUC, and provided coefficient-by-coefficient interpretability. The lesson is not that PCA is wrong; it is that compression that destroys interpretability has to earn its keep with a meaningful gain in predictive power, not just convenience.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. The same cloud of points in feature space can be summarised by three different new axes depending on what you want to preserve. PCA points its first axis along the direction of greatest spread, ignoring any labels. LDA points its first axis along the direction that pulls the class means furthest apart relative to the within-class scatter, using the labels. t-SNE does not draw axes at all; it places each point on a page so that the pattern of who-is-near-whom looks the same as it did in high dimensions.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PCA, LDA and t-SNE on the same toy dataset">
+      <defs>
+        <marker id="drArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three reductions of the same two-class cloud: each preserves a different property</text>
+
+      <!-- Panel 1: PCA -->
+      <g>
+        <rect x="20" y="50" width="240" height="220" rx="10" fill="#FFFFFF" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="140" y="72" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">PCA: maximum variance</text>
+
+        <!-- scatter cloud (elongated NE-SW), two classes interleaved -->
+        <circle cx="60" cy="230" r="3" fill="#0d9488"/>
+        <circle cx="75" cy="215" r="3" fill="#0d9488"/>
+        <circle cx="90" cy="205" r="3" fill="#7c3aed"/>
+        <circle cx="105" cy="195" r="3" fill="#0d9488"/>
+        <circle cx="115" cy="185" r="3" fill="#7c3aed"/>
+        <circle cx="130" cy="170" r="3" fill="#0d9488"/>
+        <circle cx="145" cy="160" r="3" fill="#7c3aed"/>
+        <circle cx="160" cy="150" r="3" fill="#0d9488"/>
+        <circle cx="175" cy="135" r="3" fill="#7c3aed"/>
+        <circle cx="190" cy="120" r="3" fill="#0d9488"/>
+        <circle cx="205" cy="110" r="3" fill="#7c3aed"/>
+        <circle cx="220" cy="95" r="3" fill="#7c3aed"/>
+
+        <!-- PC1 axis along the long direction -->
+        <line x1="55" y1="235" x2="225" y2="92" stroke="#b45309" stroke-width="2" marker-end="url(#drArrow)"/>
+        <text x="200" y="80" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">PC1</text>
+
+        <text x="140" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">axis of maximum variance, ignores labels</text>
+      </g>
+
+      <!-- Panel 2: LDA -->
+      <g>
+        <rect x="290" y="50" width="240" height="220" rx="10" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="410" y="72" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">LDA: class separation</text>
+
+        <!-- class 1 cluster (teal) lower left, class 2 cluster (purple) upper right -->
+        <circle cx="330" cy="220" r="3" fill="#0d9488"/>
+        <circle cx="345" cy="210" r="3" fill="#0d9488"/>
+        <circle cx="335" cy="200" r="3" fill="#0d9488"/>
+        <circle cx="355" cy="225" r="3" fill="#0d9488"/>
+        <circle cx="360" cy="200" r="3" fill="#0d9488"/>
+        <circle cx="370" cy="215" r="3" fill="#0d9488"/>
+
+        <circle cx="450" cy="120" r="3" fill="#7c3aed"/>
+        <circle cx="465" cy="135" r="3" fill="#7c3aed"/>
+        <circle cx="475" cy="115" r="3" fill="#7c3aed"/>
+        <circle cx="480" cy="130" r="3" fill="#7c3aed"/>
+        <circle cx="490" cy="105" r="3" fill="#7c3aed"/>
+        <circle cx="495" cy="125" r="3" fill="#7c3aed"/>
+
+        <!-- LD1 axis from class 1 centroid to class 2 centroid -->
+        <line x1="320" y1="230" x2="505" y2="100" stroke="#b45309" stroke-width="2" marker-end="url(#drArrow)"/>
+        <text x="470" y="90" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">LD1</text>
+
+        <text x="410" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">axis maximising between/within scatter ratio</text>
+      </g>
+
+      <!-- Panel 3: t-SNE -->
+      <g>
+        <rect x="560" y="50" width="240" height="220" rx="10" fill="#FFFFFF" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="680" y="72" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">t-SNE: local neighbourhoods</text>
+
+        <!-- two tight clusters preserved -->
+        <circle cx="610" cy="130" r="3" fill="#0d9488"/>
+        <circle cx="620" cy="125" r="3" fill="#0d9488"/>
+        <circle cx="615" cy="140" r="3" fill="#0d9488"/>
+        <circle cx="625" cy="135" r="3" fill="#0d9488"/>
+        <circle cx="608" cy="120" r="3" fill="#0d9488"/>
+        <circle cx="618" cy="148" r="3" fill="#0d9488"/>
+
+        <circle cx="730" cy="200" r="3" fill="#7c3aed"/>
+        <circle cx="740" cy="210" r="3" fill="#7c3aed"/>
+        <circle cx="735" cy="195" r="3" fill="#7c3aed"/>
+        <circle cx="745" cy="205" r="3" fill="#7c3aed"/>
+        <circle cx="725" cy="215" r="3" fill="#7c3aed"/>
+        <circle cx="748" cy="190" r="3" fill="#7c3aed"/>
+
+        <text x="680" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">no axes; positions preserve pairwise similarity</text>
+      </g>
+    </svg>
+    <figcaption>Same dataset, three reductions. PCA's first principal component traces the long axis of the cloud and is indifferent to the colour of the points. LDA's first linear discriminant passes between the two class centroids in the direction that best separates them. t-SNE produces a layout, not axes: distances on the page approximate the pairwise similarities in high dimensions, so the two clusters appear as compact blobs but their relative position carries no quantitative meaning.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. PCA's principal component is not aligned with the class boundary in this example; if you used PC1 alone as a classifier feature you would project the two classes onto the same line and lose all separability, because the within-class variance is large in the same direction as the between-class variance. LDA fixes this by construction: it points its axis at the class separation directly. t-SNE preserves the cluster structure (two compact blobs) but the distance between the blobs in the picture has no quantitative meaning; you cannot read off "class 1 is twice as far from class 2 as it was". Every t-SNE plot is qualitative.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The curse of dimensionality, made concrete</h3>
+
+  <p>Let $X_1, \ldots, X_n$ be $n$ independent uniform random points in the unit hypercube $[0,1]^p$. The expected Euclidean distance between two such points grows like $\sqrt{p/6}$ as $p$ increases, but the standard deviation of that distance grows only like $\sqrt{1/p}$ (constant order or slower). The ratio of the standard deviation to the mean shrinks, so all pairwise distances concentrate around the same value. Formally, for any norm and a wide class of distributions,</p>
+  $$\frac{\max_{i,j} \lVert X_i - X_j \rVert - \min_{i,j} \lVert X_i - X_j \rVert}{\min_{i,j} \lVert X_i - X_j \rVert} \to 0 \text{ in probability as } p \to \infty.$$
+  <p>"Nearest" and "farthest" become indistinguishable. Any method whose decision rule depends on relative distances (kNN, kernel density estimation, RBF SVMs, k-means, Gaussian mixture models) loses discriminating power; for fixed $n$, performance degrades monotonically in $p$ past a certain threshold. The threshold depends on the geometry of the true data manifold: data that lies on a low-dimensional manifold embedded in a high-dimensional space is much better-behaved than data uniformly distributed in the full $p$-dimensional space. This is why dimensionality reduction works at all: real datasets have lower effective dimensionality than their ambient $p$.</p>
+
+  <p>Sample density tells the same story from another angle. To maintain a fixed local density of, say, 10 points within a hypercube of side 0.1 (a tenth of each dimension), you need $10 \cdot 10^p$ points. At $p = 10$ that is $10^{11}$ points. Past about ten dimensions, no reasonable dataset is dense in its feature space, and any local method is extrapolating rather than interpolating most of the time.</p>
+
+  <h3>Principal component analysis (PCA)</h3>
+
+  <p>PCA is the canonical unsupervised linear dimensionality reduction. Let $X$ be the $n \times p$ centred data matrix (each column has mean zero). The sample covariance matrix is</p>
+  $$\Sigma = \frac{1}{n - 1} X^{\top} X,$$
+  <p>a $p \times p$ symmetric positive semi-definite matrix. PCA finds the unit vector $w \in \mathbb{R}^p$ that maximises the variance of the projection $Xw$, that is</p>
+  $$w_1 = \arg\max_{\lVert w \rVert = 1} \operatorname{Var}(Xw) = \arg\max_{\lVert w \rVert = 1} w^{\top} \Sigma w.$$
+  <p>Form the Lagrangian with constraint $w^{\top} w = 1$,</p>
+  $$\mathcal{L}(w, \lambda) = w^{\top} \Sigma w - \lambda (w^{\top} w - 1),$$
+  <p>and differentiate with respect to $w$,</p>
+  $$\frac{\partial \mathcal{L}}{\partial w} = 2 \Sigma w - 2 \lambda w = 0 \implies \Sigma w = \lambda w.$$
+  <p>The optimum is an eigenvector of $\Sigma$ with eigenvalue $\lambda$, and the value of the objective at that optimum is $w^{\top} \Sigma w = w^{\top} \lambda w = \lambda$. So the first principal component is the eigenvector with the largest eigenvalue, and that eigenvalue is the variance captured along that direction. The second principal component is the eigenvector with the second-largest eigenvalue (constrained orthogonal to the first), and so on. The full eigendecomposition</p>
+  $$\Sigma = V \Lambda V^{\top}, \quad \Lambda = \operatorname{diag}(\lambda_1, \ldots, \lambda_p), \quad \lambda_1 \ge \lambda_2 \ge \cdots \ge \lambda_p \ge 0,$$
+  <p>gives the principal axes as the columns of $V$ and the variance along each axis as the diagonal of $\Lambda$. The <strong>explained variance ratio</strong> of component $k$ is</p>
+  $$r_k = \frac{\lambda_k}{\sum_{j=1}^{p} \lambda_j},$$
+  <p>and the cumulative ratio $\sum_{j=1}^{k} r_j$ is the standard quantity for choosing the number of components to retain (often the smallest $k$ such that the cumulative ratio exceeds a threshold like 0.95). The transformed feature matrix is $Z = X V_k$, where $V_k$ is the first $k$ columns of $V$, giving an $n \times k$ matrix whose columns are uncorrelated by construction.</p>
+
+  <p>In practice, PCA is computed via the singular value decomposition of $X$ rather than the eigendecomposition of $\Sigma$, because the SVD is numerically more stable on near-rank-deficient data and avoids forming $X^{\top} X$ explicitly. If $X = U S V^{\top}$ is the thin SVD, then $\Sigma = V (S^2 / (n-1)) V^{\top}$, so the right singular vectors $V$ are the principal axes and $S^2 / (n-1)$ are the eigenvalues. Scikit-learn's <code>PCA</code> uses SVD by default.</p>
+
+  <p><strong>Scaling before PCA is non-negotiable.</strong> PCA maximises variance in the input units. A feature measured in pounds has variance in pounds squared; a feature measured in years has variance in years squared. Without standardisation the first principal component is dominated by whichever column happens to be measured in the largest units, regardless of whether that column is informative. Standardise to mean zero and unit variance first (lecture 2), so each column contributes on a common axis, then run PCA on the standardised matrix. Equivalently, PCA on the correlation matrix is the same as PCA on the standardised data's covariance matrix.</p>
+
+  <p>The full derivation, the SVD route in detail, the connection to least-squares reconstruction error (PCA minimises the squared reconstruction error among all rank-$k$ linear projections), and the probabilistic interpretation live in <a href="../04_unsupervised_learning/02-pca.html">unsupervised learning lecture 2</a>. The point to carry forward from this lecture is that PCA gives you an ordered, orthogonal basis ranked by variance, that you choose $k$ from the cumulative explained variance, and that the components have no intrinsic interpretability.</p>
+
+  <h3>Linear discriminant analysis (LDA)</h3>
+
+  <p>LDA is the supervised counterpart to PCA. Given $n$ observations across $C$ classes, with class $c$ containing $n_c$ observations, define the class mean $\mu_c$, the overall mean $\mu$, the within-class scatter matrix</p>
+  $$S_W = \sum_{c=1}^{C} \sum_{i \in c} (x_i - \mu_c)(x_i - \mu_c)^{\top},$$
+  <p>and the between-class scatter matrix</p>
+  $$S_B = \sum_{c=1}^{C} n_c (\mu_c - \mu)(\mu_c - \mu)^{\top}.$$
+  <p>LDA seeks the direction $w$ that maximises the ratio of between-class to within-class scatter when the data is projected onto $w$, the <strong>Fisher discriminant criterion</strong>,</p>
+  $$w^* = \arg\max_w \frac{w^{\top} S_B w}{w^{\top} S_W w}.$$
+  <p>This is a generalised eigenvalue problem: $w^*$ satisfies $S_B w = \lambda S_W w$, or equivalently $S_W^{-1} S_B w = \lambda w$ when $S_W$ is invertible. The solutions are the eigenvectors of $S_W^{-1} S_B$ with the largest eigenvalues. Because $S_B$ has rank at most $C - 1$ (the class means lie in a $C-1$ dimensional affine subspace), LDA produces at most $C - 1$ usable components: for binary classification, one. This is a fundamental limitation versus PCA, which produces up to $p$ components regardless of the number of classes.</p>
+
+  <p>LDA's geometric meaning is direct: the projection direction pulls the class means as far apart as possible relative to the spread of each class around its own mean. If the classes are spherical and well-separated, LDA recovers the direction connecting the centroids. If the classes are elongated in the same direction the centroid connection runs, $S_W$ is large in that direction and LDA pulls the projection axis off-centroid to find a direction where the within-class spread is smaller. Two assumptions sit underneath the method: each class is approximately Gaussian, and all classes share a common covariance matrix. Violating the equal-covariance assumption pushes you toward <strong>quadratic discriminant analysis (QDA)</strong>, which estimates a separate covariance per class but uses many more parameters and overfits on small samples.</p>
+
+  <p>LDA can be used as a classifier in its own right (projecting onto the discriminant axes and applying a simple threshold), or purely as a dimensionality-reduction pre-processor whose output is fed into a downstream classifier. Either way, the supervised criterion means the resulting features are explicitly aligned with the task, which is the key advantage over PCA when a labelled target is available.</p>
+
+  <h3>t-distributed stochastic neighbour embedding (t-SNE)</h3>
+
+  <p>t-SNE is a non-linear dimensionality reduction designed for visualisation. The construction has two halves: a pairwise similarity distribution in the original high-dimensional space, and a pairwise similarity distribution in the low-dimensional embedded space, with the embedded positions chosen to make those distributions as close as possible.</p>
+
+  <p>In the original space, the similarity between points $x_i$ and $x_j$ is defined as a conditional probability,</p>
+  $$p_{j \mid i} = \frac{\exp(-\lVert x_i - x_j \rVert^2 / 2 \sigma_i^2)}{\sum_{k \ne i} \exp(-\lVert x_i - x_k \rVert^2 / 2 \sigma_i^2)},$$
+  <p>the probability that $x_i$ would pick $x_j$ as its neighbour under a Gaussian centred at $x_i$ with bandwidth $\sigma_i$. The bandwidth $\sigma_i$ is chosen per point so that the entropy of the conditional distribution equals a user-set value parameterised as <strong>perplexity</strong>, a smooth proxy for "effective number of neighbours" each point pays attention to (typical values 5 to 50). The symmetric pairwise probability is $p_{ij} = (p_{j \mid i} + p_{i \mid j}) / (2n)$.</p>
+
+  <p>In the embedded space, the similarity uses a Student t-distribution with one degree of freedom (a Cauchy distribution), which has heavier tails than a Gaussian,</p>
+  $$q_{ij} = \frac{(1 + \lVert y_i - y_j \rVert^2)^{-1}}{\sum_{k \ne l} (1 + \lVert y_k - y_l \rVert^2)^{-1}}.$$
+  <p>The heavier tails are the key design choice: they allow moderately distant high-dimensional points to be placed far apart in the embedding without paying a large cost in the similarity, which prevents the "crowding problem" that afflicts a Gaussian similarity in low dimensions. t-SNE then minimises the <strong>Kullback-Leibler divergence</strong> between $P$ and $Q$,</p>
+  $$\operatorname{KL}(P \mid\mid Q) = \sum_{i \ne j} p_{ij} \log \frac{p_{ij}}{q_{ij}},$$
+  <p>by gradient descent over the embedded positions $y_i$. The KL divergence is asymmetric: it pays a large cost when $p_{ij}$ is large (a true neighbour pair) and $q_{ij}$ is small (the embedded points are placed far apart), but pays only a small cost when $p_{ij}$ is small (a non-neighbour pair) and $q_{ij}$ is large. The consequence is that t-SNE preserves local structure (true neighbours land close in the embedding) and is permissive about global structure (the relative position of well-separated clusters in the embedding can be largely arbitrary).</p>
+
+  <p>This is why t-SNE is for visualisation only and not for feature engineering. Three properties make it unsuitable as a downstream feature pipeline. First, the embedding is non-deterministic: different random initialisations produce different embeddings, and there is no canonical orientation. Second, distances and densities in the embedding do not faithfully represent the high-dimensional geometry: cluster sizes and inter-cluster distances are not reliable. Third, t-SNE does not produce a projection function that can be applied to new data; adding a point requires re-running the optimisation. <strong>UMAP</strong> (uniform manifold approximation and projection) is t-SNE's faster successor: it uses a similar similarity-preservation idea but a different objective (cross-entropy on a fuzzy simplicial set) and supports out-of-sample projection in some implementations. UMAP typically preserves more global structure than t-SNE and scales to larger datasets, but the same caveats apply: it is a visualisation tool, not a feature extractor.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes catch most dimensionality-reduction work. Each is easy to commit and hard to spot in retrospective validation.</p>
+
+  <div class="callout warn">
+    <span class="tag">PCA on unscaled data</span>
+    The first principal component of an unscaled matrix is whichever column has the largest variance in its native units. If income is measured in pounds and age in years, PC1 is almost exactly the income column with a tiny age contribution, regardless of whether income is more informative than age. The fix is structural: standardise every numeric column to mean zero and unit variance before running PCA, or equivalently run PCA on the correlation matrix rather than the covariance matrix. The same warning applies to LDA (which depends on within-class scatter in input units) and to any distance-based dimensionality reduction.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating principal components as interpretable features</span>
+    PC1 is a weighted sum of every original feature; the weights have no economic meaning. Reporting "the model relies on PC1 and PC3" tells a regulator nothing actionable. PCA is appropriate as a modelling shortcut where the original features themselves lack interpretability (pixel intensities, sensor channels, anonymous embeddings); it is rarely appropriate as the production representation for a regulated retail or wholesale credit model. The fix is to use PCA in the diagnostic phase (collinearity inspection, exploratory visualisation) and to revert to original features (with regularisation or selection) for the deployed model. When PCA must remain in production, document the loading matrix and the data preprocessing that produced it as part of the model artefact.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Reading distance off a t-SNE plot</span>
+    Two clusters that appear far apart in a t-SNE embedding are not necessarily far apart in the original space, and a cluster that appears large is not necessarily of high variance. t-SNE preserves which points are neighbours, not how far things are. Interpretations like "the defaulter cluster is twice as far from the prime cluster as the near-prime cluster is" are invalid and have been used to justify bad segmentations. The fix is to treat t-SNE outputs as qualitative exploratory tools: confirm that clusters exist, inspect what unifies them, then validate using quantitative methods (silhouette scores in the original space, supervised metrics on the discovered segments) before drawing conclusions.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Fitting reduction on the full dataset before splitting</span>
+    The same leakage failure mode as in <a href="02-feature_transformation.html">lecture 2</a> applies here, slightly more subtly. Fit the PCA loading matrix (or the LDA scatter matrices, or the t-SNE embedding) on the full dataset and then split into train and test; the loadings have absorbed information from the test set and the test evaluation is biased upward. The fix is the same: fit the reduction transformer inside a scikit-learn pipeline using the training fold only, apply (without re-fitting) to validation and test. For t-SNE this is impossible by design (the algorithm has no projection function for new data), which is another reason it cannot serve as a production feature transformer.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Dimensionality reduction takes a wide feature matrix and produces a narrower one whose columns are functions of the originals. Three methods cover the practical cases, distinguished by what they preserve. PCA is the unsupervised default: it finds orthogonal directions of maximum variance via eigendecomposition of the covariance matrix (or SVD of the centred data), orders them by explained variance, and lets you retain a small $k$ that captures most of the spread. LDA is the supervised counterpart for classification problems: it maximises the ratio of between-class to within-class scatter and produces at most $C - 1$ components, each explicitly aligned with the class separation the downstream model needs. t-SNE is a non-linear visualisation tool that preserves local neighbourhood structure by matching pairwise similarity distributions in high and low dimensions, minimising KL divergence. UMAP is its faster and more global-structure-preserving successor. None of these methods is appropriate without scaling first, and none produces interpretable features in the original-variable sense.</p>
+
+  <p>The choice between reduction and selection is the next decision in the pipeline. Reduction (this lecture) builds new combined features from all of the originals, losing interpretability but capturing combined signal. Selection (<a href="04-feature_selection.html">lecture 4</a>) keeps a subset of the original features unchanged, preserving interpretability but discarding any information that lived only in combinations. In regulated modelling, selection usually wins by default; reduction earns its place when the feature space is large and anonymous (text embeddings, image features, gene expression) or when reduction is being used purely diagnostically (collinearity inspection, exploratory visualisation) rather than as the production representation.</p>
+
+  <p>The deep mathematical treatment of PCA, including the SVD route, the least-squares reconstruction-error formulation, and the probabilistic PCA model, lives in <a href="../04_unsupervised_learning/02-pca.html">unsupervised learning lecture 2</a>. The current lecture gave the working understanding needed to choose between PCA, LDA, and t-SNE in the feature engineering stage; the unsupervised learning track returns to the topic in its own right.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State two distinct consequences of high dimensionality for distance-based methods, and name one model class that is unaffected.</li>
+      <li>You compute the eigenvalues of a standardised data covariance matrix and obtain $\lambda = (4.2, 2.1, 1.3, 0.8, 0.4, 0.2)$. What fraction of variance is captured by the first three components? Report to three decimal places.</li>
+      <li>Explain why PCA on raw (unscaled) data produces principal components dominated by whichever feature has the largest native variance, and state the standard remedy.</li>
+      <li>A binary classification problem has $p = 20$ features and $C = 2$ classes. State the maximum number of LDA components that can be extracted, and explain why.</li>
+      <li>Why is t-SNE unsuitable as a feature transformer for a downstream classifier? Give two specific reasons drawn from how the algorithm is constructed.</li>
+      <li>Derive the optimisation problem solved by PCA's first principal component from $w_1 = \arg\max_{\lVert w \rVert = 1} w^{\top} \Sigma w$ to the eigenvalue equation $\Sigma w = \lambda w$, showing the Lagrangian step.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 4 (<a href="04-feature_selection.html">feature selection</a>) is the alternative philosophy: rather than build new combined features, keep a subset of the original ones. Reduction and selection answer the same problem (too many columns) with opposite trade-offs on interpretability versus combined signal.</li>
+      <li><strong>Previous:</strong> Lecture 2 (<a href="02-feature_transformation.html">feature transformation</a>) rewrote each column individually. This lecture rewrote the matrix as a whole, and inherits its scaling assumption from the previous lecture's standardisation step.</li>
+      <li><strong>Deep dive:</strong> Unsupervised learning lecture 2 (<a href="../04_unsupervised_learning/02-pca.html">PCA</a>) treats PCA in its own right, including the SVD derivation, the least-squares reconstruction view, and the probabilistic PCA generative model. This lecture covered PCA only enough to choose between it and LDA, t-SNE, or UMAP at the feature-engineering stage.</li>
+      <li><strong>Prerequisite:</strong> The statistics track on linear algebra and covariance (eigendecomposition, positive semi-definite matrices, the spectral theorem) is the mathematical foundation underneath PCA and LDA; LDA's Fisher criterion is a generalised eigenvalue problem and reading it requires comfort with simultaneous diagonalisation of two symmetric matrices.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Feature engineering course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 3 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

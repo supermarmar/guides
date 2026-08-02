@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 10: agents and ReAct</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Agents and ReAct</h1>
+  <p class="subtitle">An agent is the chain from lecture 9 with two additions: it can call something that is not a model, and it decides for itself when to stop. Those two changes are what make it able to do things a chain cannot, and they are also the entire source of its expense, because a loop whose length the system chooses inherits a quadratic cost curve with no upper bound written anywhere.</p>
+  <div class="meta">
+    <span>Lecture 10 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part III: building systems</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The <strong>ReAct</strong> pattern, from Yao and colleagues in 2022, interleaves two things the previous lectures kept separate: <em>reasoning</em>, which is the chain-of-thought from lecture 8, and <em>acting</em>, which is calling a tool and reading what comes back. The loop is thought, action, observation, repeated until the model emits a final answer instead of another action.</p>
+
+  <p>Everything difficult follows from the model choosing the number of iterations. Reliability compounds: at 95 per cent per step, a ten-step trajectory succeeds <strong>59.9 per cent</strong> of the time and a twenty-step one <strong>35.8 per cent</strong>, and the agent picks which of those you get.</p>
+
+  <p>Cost compounds harder, because each step re-sends the whole scratchpad. With a 600-token system prompt and steps of 150 tokens of thought and action plus 800 of observation, a five-step task consumes <strong>12,500 tokens</strong> and a ten-step task <strong>48,750</strong>. Doubling the steps multiplies the cost by <strong>3.9</strong>, not by two.</p>
+
+  <p>Which produces the result worth carrying out of this lecture. Since cost grows with the square of the step count, expected cost depends on $\mathbb{E}[k^2] = \text{Var}(k) + \mathbb{E}[k]^2$, so <strong>the variance in how many steps an agent takes is itself a cost</strong>. At a mean of eight steps with a standard deviation of six, the true expected cost is <strong>56 per cent above</strong> the figure you get from budgeting on the average. That term is almost always omitted.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Let the model think out loud, then let it ask for something: a search, a calculator, a database. Show it the answer, let it think again. Repeat until it says it is done. The only hard question is what stops it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that tool use removes the two limits that everything so far has run into. A model cannot know a fact that postdates its training and cannot reliably do arithmetic, and both are solved by letting it ask something that can. For tasks with either property the comparison against a single call is not cost against cost, it is possible against impossible.</p>
+
+  <p>The second reason is that the same mechanism removes the guarantees. A chain has a step count you fixed, so you can test it, price it and reason about its failure rate. An agent has a step count it chooses at runtime from information you have not seen, so none of the three is available in advance.</p>
+
+  <p>The third reason is that the failure modes are specific and predictable rather than mysterious, which means they can be designed against. Loops, tool misuse, malformed calls, and observations that overflow the context are the four that matter, and step 4 handles each.</p>
+
+  <p>And a fourth reason about where agents are actually appropriate. The decision rule in step 5 is short and unfashionable: if the task can be decomposed in advance, write a chain, because fixed steps are cheaper and testable. Reach for an agent only when the sequence genuinely depends on what is discovered along the way. The expensive mistake is using an agent for work whose shape was already known.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>One loop, three token types, and a scratchpad that grows with every pass.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The ReAct loop: a model produces a thought and an action, the runtime executes the tool and returns an observation, the observation is appended to a scratchpad, and the whole scratchpad is resent on the next pass until the model emits a final answer.">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Thought, action, observation, repeat. The scratchpad carries everything, every time.</text>
+
+      <rect x="30" y="44" width="180" height="86" rx="10" fill="#EDE9FE" stroke="#5B47E0" stroke-width="2"/>
+      <text x="120" y="66" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#4c1d95">1 THOUGHT</text>
+      <text x="120" y="86" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#4c1d95">the model states what it</text>
+      <text x="120" y="100" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#4c1d95">needs and why</text>
+      <text x="120" y="120" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">chain-of-thought, lecture 8</text>
+
+      <rect x="245" y="44" width="180" height="86" rx="10" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="335" y="66" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#713f12">2 ACTION</text>
+      <text x="335" y="86" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#713f12">search("...")</text>
+      <text x="335" y="100" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#713f12">a tool name and arguments</text>
+      <text x="335" y="120" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#a16207">must parse, hence lecture 8's grammar</text>
+
+      <rect x="460" y="44" width="180" height="86" rx="10" fill="#DCFCE7" stroke="#3E7A45" stroke-width="2"/>
+      <text x="550" y="66" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#14532d">3 OBSERVATION</text>
+      <text x="550" y="86" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#14532d">whatever the tool returned</text>
+      <text x="550" y="100" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#14532d">the runtime, not the model, ran it</text>
+      <text x="550" y="120" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#3E7A45">size is outside your control</text>
+
+      <rect x="675" y="44" width="175" height="86" rx="10" fill="#FFE4E6" stroke="#be185d" stroke-width="2"/>
+      <text x="762" y="66" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#831843">4 STOP?</text>
+      <text x="762" y="86" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">final answer, or another</text>
+      <text x="762" y="100" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">thought</text>
+      <text x="762" y="120" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#be185d">THE MODEL DECIDES</text>
+
+      <line x1="210" y1="87" x2="238" y2="87" stroke="#71717a" stroke-width="2"/><polygon points="245,87 235,82 235,92" fill="#71717a"/>
+      <line x1="425" y1="87" x2="453" y2="87" stroke="#71717a" stroke-width="2"/><polygon points="460,87 450,82 450,92" fill="#71717a"/>
+      <line x1="640" y1="87" x2="668" y2="87" stroke="#71717a" stroke-width="2"/><polygon points="675,87 665,82 665,92" fill="#71717a"/>
+      <path d="M 762 130 L 762 156 L 120 156 L 120 134" fill="none" stroke="#be185d" stroke-width="2" stroke-dasharray="5 3"/>
+      <polygon points="120,130 115,140 125,140" fill="#be185d"/>
+      <text x="440" y="150" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#831843">loop, with the scratchpad one step longer</text>
+
+      <rect x="30" y="182" width="820" height="72" rx="9" fill="#F4F4F5" stroke="#a1a1aa" stroke-width="1.6"/>
+      <text x="44" y="202" font-family="Inter" font-size="10.5" font-weight="700" fill="#3f3f46">WHAT IS SENT ON STEP k</text>
+      <text x="44" y="222" font-family="JetBrains Mono" font-size="9.5" fill="#18181b">system prompt + tool schemas (600)  +  every prior thought, action and observation ((k-1) x 950)</text>
+      <text x="44" y="242" font-family="Inter" font-size="9" fill="#be185d" font-weight="600">so tokens sent grow LINEARLY with the step, and the cumulative cost of a trajectory grows QUADRATICALLY</text>
+
+      <rect x="30" y="272" width="400" height="76" rx="9" fill="#FFFFFF" stroke="#0F62FE" stroke-width="1.8"/>
+      <text x="44" y="292" font-family="Inter" font-size="10" font-weight="700" fill="#0b4bbd">A CHAIN</text>
+      <text x="44" y="310" font-family="Inter" font-size="8.5" fill="#3f3f46">you fix the steps. cost known, failure rate known,</text>
+      <text x="44" y="324" font-family="Inter" font-size="8.5" fill="#3f3f46">testable before deployment.</text>
+      <text x="44" y="341" font-family="Inter" font-size="8.5" font-weight="600" fill="#0F62FE">use when the shape of the task is known in advance</text>
+
+      <rect x="450" y="272" width="400" height="76" rx="9" fill="#FFFFFF" stroke="#be185d" stroke-width="1.8"/>
+      <text x="464" y="292" font-family="Inter" font-size="10" font-weight="700" fill="#831843">AN AGENT</text>
+      <text x="464" y="310" font-family="Inter" font-size="8.5" fill="#3f3f46">the model fixes the steps, at runtime, from</text>
+      <text x="464" y="324" font-family="Inter" font-size="8.5" fill="#3f3f46">information you have not seen.</text>
+      <text x="464" y="341" font-family="Inter" font-size="8.5" font-weight="600" fill="#be185d">use only when the sequence depends on what is found</text>
+    </svg>
+    <figcaption>The dashed return arrow is the whole difference from lecture 9. A chain's arrow goes forward only; an agent's comes back, an unknown number of times, carrying a scratchpad that is longer on each pass.</figcaption>
+  </figure>
+
+  <div class="defcard">
+    <div class="term">ReAct</div>
+    <div class="def">Reasoning and acting interleaved in one loop, from Yao and colleagues (2022). The reasoning step decides what is needed; the acting step gets it. Neither alone is sufficient: reasoning without acting cannot obtain facts, and acting without reasoning cannot decide what to obtain.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Tool</div>
+    <div class="def">Any function the runtime can execute on the model's behalf, described to the model by name, purpose and argument schema. Search, calculator, database query, code execution, an HTTP call. The model never runs anything; it emits a request and your code decides whether to honour it.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Scratchpad</div>
+    <div class="def">The accumulated transcript of thoughts, actions and observations, resent in full on every pass because the model is stateless. It is lecture 9's full-buffer memory strategy, applied by default, to content the model did not write and whose size you do not control.</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Reliability compounds and the agent sets the exponent</h3>
+
+  <div class="worked">SUCCESS PROBABILITY OVER A TRAJECTORY
+
+   per-step      probability the whole trajectory succeeds
+  reliability     k=3     k=5    k=10    k=15    k=20
+     0.99        97.0%   95.1%   90.4%   86.0%   81.8%
+     0.97        91.3%   85.9%   73.7%   63.3%   54.4%
+     0.95        85.7%   77.4%   59.9%   46.3%   35.8%
+     0.90        72.9%   59.0%   34.9%   20.6%   12.2%
+     0.85        61.4%   44.4%   19.7%    8.7%    3.9%
+
+  READ ALONG THE 0.95 ROW
+    a per-step reliability of 95% sounds respectable and
+    gives a 59.9% chance of completing ten steps and 35.8%
+    of completing twenty.
+
+  AND READ DOWN THE k=10 COLUMN
+    the difference between 99% and 95% per step is the
+    difference between 90.4% and 59.9% over ten steps. Small
+    improvements in step reliability are worth far more than
+    they look, because the exponent magnifies them.
+
+  THE STRUCTURAL POINT
+    in a chain, k is a number you chose and can test against.
+    in an agent, k is chosen at runtime by the model, from
+    observations you have not seen, so the row you land on is
+    not knowable in advance.
+
+  WHICH MAKES PER-STEP RELIABILITY THE LEVER
+    constrained decoding from lecture 8 on every action,
+    schema validation on every tool call, and a retry policy
+    that changes something rather than repeating the same
+    request are the three cheapest ways to move 0.90 to 0.97,
+    and over ten steps that is 34.9% to 73.7%.</div>
+
+  <h3>The scratchpad makes the cost quadratic</h3>
+
+  <p>Lecture 9's full-buffer strategy is the default here and it is applied to material the model did not write. A search result or a page of documentation can be an order of magnitude larger than the thought that requested it, and its size is set by the tool rather than by you.</p>
+
+  <div class="worked">TOKENS THROUGH A TRAJECTORY
+
+  ASSUMPTIONS
+    system prompt and tool schemas   600 tokens, resent every step
+    thought and action               150 tokens per step
+    observation                      800 tokens per step
+
+    step   scratchpad   sent this step   cumulative
+      1            0            600             600
+      3        1,900          2,500           4,650
+      5        3,800          4,400          12,500
+     10        8,550          9,150          48,750
+     15       13,300         13,900         108,750
+     20       18,050         18,650         192,500
+
+  TOTAL FOR A TRAJECTORY OF k STEPS
+    k x 600 + 950 x k(k-1)/2
+
+     5 steps      12,500 tokens
+    10 steps      48,750
+    15 steps     108,750
+    20 steps     192,500
+
+  DOUBLING THE STEPS MULTIPLIES THE COST BY ABOUT FOUR
+    5 to 10 steps   x3.90
+    10 to 20 steps  x3.95
+
+    which is the quadratic showing itself. an agent that
+    takes twice as long as expected does not cost twice as
+    much, it costs about four times as much.
+
+  AND THE OBSERVATION IS THE DOMINANT TERM
+    at 800 tokens against 150, observations are 84% of what
+    each step adds. Truncating or summarising tool output
+    before it enters the scratchpad is therefore the single
+    highest-value optimisation available, and it is a change
+    to your runtime rather than to the model.</div>
+
+  <h3>Four failure modes, and what each needs</h3>
+
+  <div class="defcard">
+    <div class="term">The loop</div>
+    <div class="def">The agent repeats an action that failed, or oscillates between two, because nothing in the pattern penalises repetition. Needs a hard iteration cap and a check for repeated action signatures.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">The malformed call</div>
+    <div class="def">The action does not parse, or names a tool that does not exist, or omits a required argument. This is lecture 8's problem exactly, and constrained decoding against the tool schema makes it structurally impossible rather than merely rare.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">The oversized observation</div>
+    <div class="def">A tool returns a whole document and the scratchpad jumps by thousands of tokens. Needs truncation, extraction or summarisation at the runtime boundary, before the observation is appended.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">The confident wrong action</div>
+    <div class="def">A well-formed call to the right tool with plausible but incorrect arguments, whose result the agent then reasons from. Nothing in the loop detects it, which is why write actions need confirmation and read actions need provenance.</div>
+  </div>
+
+  <div class="worked">WHAT A RUNAWAY COSTS, AND WHAT STOPS IT
+
+  AN AGENT RETRYING A FAILING CALL, PRICED AT &#36;3 PER MILLION
+
+    10 iterations before a cap stops it        48,750 tokens   &#36;0.15
+    25 iterations                             300,000 tokens   &#36;0.90
+    50 iterations                           1,193,750 tokens   &#36;3.58
+
+  WITHOUT A CAP, THE ONLY LIMIT IS THE CONTEXT WINDOW
+
+    context   8,192 -> the scratchpad fills at step   8
+    context  32,768 -> fills at step  34
+    context 128,000 -> fills at step 135
+
+    and at that point the call does not degrade, it fails,
+    which is lecture 9's hard wall arriving through a
+    different door.
+
+  SO THE LARGER CONTEXT IS NOT THE FIX
+    moving from 8k to 128k raises the runaway ceiling from 8
+    steps to 135, and a 135-step runaway costs about 280
+    times what an 8-step one does. A longer context makes an
+    unbounded agent MORE expensive to get wrong, not less.
+
+  THE CAP IS THE FIX, AND IT SHOULD BE LOW
+    most successful trajectories are short. A cap set near
+    the 90th percentile of observed successful lengths costs
+    almost nothing in completed tasks and truncates the tail
+    that produces the bills.</div>
+
+  <h3>Tools: description is the interface</h3>
+
+  <p>The model chooses a tool by reading its description, so the description is not documentation, it is the interface. Three properties make the difference between a tool that is called correctly and one that is not: a name that says what it does rather than what it is implemented with, a one-line purpose that includes when <em>not</em> to use it, and an argument schema tight enough to constrain generation.</p>
+
+  <pre><code>{
+  "name": "lookup_policy_document",
+  "description": "Retrieve the current text of an internal policy by its "
+                 "reference code. Use for questions about what a policy says. "
+                 "Do NOT use for questions about how a policy is applied in "
+                 "practice; use search_case_notes for those.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "code": {"type": "string", "pattern": "^POL-[0-9]{4}&#36;"}
+    },
+    "required": ["code"]
+  }
+}</code></pre>
+
+  <p>The negative instruction in that description does more work than the positive one. Most tool-selection errors are a plausible tool chosen for an adjacent purpose, and the fix is to say in each description which neighbouring cases belong elsewhere. The pattern on the argument then makes a malformed code impossible under constrained decoding rather than merely unlikely.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>An agent is a chain with a loop and a tool call, and both additions come from the model rather than from you. Reasoning without acting cannot obtain a fact it does not hold; acting without reasoning cannot decide what to obtain; ReAct interleaves them and lets the model decide when it is finished. Reliability then compounds over a step count you did not choose, so 95 per cent per step gives 59.9 per cent over ten steps and 35.8 over twenty, and improving the per-step figure is worth more than it looks because the exponent magnifies it. Cost compounds harder still, because the scratchpad is resent in full and observations are 84 per cent of what each step adds: doubling the steps multiplies the bill by about four.</p>
+
+  <div class="callout insight">
+    <span class="tag">The result to carry out of this lecture</span>
+    Cost is roughly proportional to the square of the step count, so expected cost depends on $\mathbb{E}[k^2] = \text{Var}(k) + \mathbb{E}[k]^2$. At a mean of eight steps with a standard deviation of six, the expected cost is <strong>56 per cent above</strong> what the average step count implies, and at a standard deviation of ten it is <strong>156 per cent above</strong>. Budgeting an agent on its average trajectory length omits the variance term, and the variance term is frequently the larger one. The practical consequence is that <em>reducing the spread</em> of trajectory lengths, through caps, better tool descriptions and constrained actions, saves more money than reducing the mean.
+  </div>
+
+  <p>The decision rule is short. If the task can be decomposed in advance, write a chain: fixed steps, fixed cost, testable before deployment. If the sequence genuinely depends on what is discovered along the way, use an agent, cap it near the 90th percentile of successful lengths, constrain every action against its schema, and truncate observations at the runtime boundary. The expensive mistake is reaching for an agent for work whose shape you already knew.</p>
+
+  <p>Lecture 11 takes the most common reason agents are reached for, which is that the model does not hold some fact, and solves it without a loop. Retrieval fetches the relevant passage and puts it in the prompt, which is the fourth memory strategy from lecture 9: instead of re-sending a transcript, fetch a small part of a large store. It is cheaper than an agent, bounded in steps, and it is the right answer whenever the task is really a lookup wearing a loop.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the three parts of the ReAct loop and say what decides when it ends.</li>
+      <li>Explain why neither reasoning alone nor acting alone is sufficient.</li>
+      <li>What does a tool call actually do, and who executes it?</li>
+      <li>State the two ways an agent differs from a chain, and what each removes.</li>
+      <li><strong>Do the arithmetic.</strong> At 95 per cent per-step reliability, what is the success probability over ten and twenty steps?</li>
+      <li>Why is improving per-step reliability from 0.90 to 0.97 worth more than it appears?</li>
+      <li>Write the total token cost of a k-step trajectory under the stated assumptions.</li>
+      <li><strong>Do the arithmetic.</strong> By what factor does the cost rise when the step count doubles from five to ten, and why is it not two?</li>
+      <li>Which component dominates what each step adds, and what optimisation does that imply?</li>
+      <li>Name the four failure modes and the control each needs.</li>
+      <li>Why does a larger context window make an unbounded agent worse rather than better?</li>
+      <li>Where should an iteration cap be set, and why does that cost little?</li>
+      <li>Give the three properties of a good tool description, and say which kind of instruction prevents the most common selection error.</li>
+      <li><strong>Do the arithmetic.</strong> With a mean of eight steps and a standard deviation of six, by how much does average-case budgeting understate the expected cost?</li>
+      <li>What follows from that about whether to reduce the mean or the spread of trajectory lengths?</li>
+      <li>State the rule for choosing between a chain and an agent.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 9 (<a href="09-chains_memory_and_state.html">chains, memory and state</a>) supplied the statelessness, the templates and the full-buffer cost curve that the scratchpad inherits by default.</li>
+      <li><strong>Depends on:</strong> Lecture 8 (<a href="08-reasoning_and_output_control.html">reasoning and output control</a>) twice over: chain-of-thought is the reasoning half of ReAct, and constrained decoding is what makes an action parse.</li>
+      <li><strong>Next:</strong> Lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>) removes the loop for the commonest case, replacing an agent's search tool with a single retrieval step.</li>
+      <li><strong>Forward:</strong> Retrieval quality, which determines whether that replacement works, is measured in lecture 12 (<a href="12-retrieval_quality_and_evaluation.html">retrieval quality and evaluation</a>).</li>
+      <li><strong>Theory companion:</strong> The machine learning track's <a href="../machine_learning/11_large_language_models/index.html">large language models</a> module covers the training that makes models follow a ReAct format reliably in the first place.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 10 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

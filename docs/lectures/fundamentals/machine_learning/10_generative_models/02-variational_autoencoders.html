@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 49: variational autoencoders</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Generative modelling</a></div>
+  <h1>Variational autoencoders</h1>
+  <p class="subtitle">The plain autoencoder from the unsupervised-learning sub-module compresses each observation to a single point in latent space and reconstructs it, with no notion of a distribution over latent codes and no way to sample a genuinely new observation. The variational autoencoder repairs both gaps: it makes the latent code a distribution rather than a point, and it does so by directly attacking the intractable-density problem from the previous lecture with a tractable lower bound.</p>
+  <div class="meta">
+    <span>Lecture 49 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part VIII: generative AI and language models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>variational autoencoder (VAE)</strong> pairs a stochastic <strong>encoder</strong> $q_\phi(Z \mid X)$, which maps an observation $X$ to a distribution over a latent variable $Z$ (typically a Gaussian with a learned mean and variance), with a stochastic <strong>decoder</strong> $p_\theta(X \mid Z)$, which maps a sampled latent code back to a distribution over reconstructions. The exact log-likelihood $\log p_\theta(X)$ is intractable (the previous lecture's problem), so the VAE instead maximises a tractable lower bound on it, the <strong>evidence lower bound (ELBO)</strong>, derived via Jensen's inequality, $\log p_\theta(X) \ge \mathbb{E}_{q_\phi(Z\mid X)}[\log p_\theta(X \mid Z)] - \mathrm{KL}(q_\phi(Z\mid X) \,\|\, p(Z))$. The first term rewards accurate reconstruction; the second penalises the encoder's distribution for drifting from a simple prior, which is what keeps the latent space smooth and sample-able. Because sampling $Z$ from the encoder's distribution is not itself differentiable, gradients cannot flow through it directly; the <strong>reparameterisation trick</strong> rewrites the sample as a deterministic, differentiable function of the encoder's outputs and an independent noise variable, restoring ordinary backpropagation.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine compressing a paragraph of text down to a short summary, then asking a different person to reconstruct the original paragraph from the summary alone. A plain autoencoder writes one fixed summary and expects one fixed reconstruction. A VAE instead writes a summary that admits some genuine, quantified uncertainty, a fuzzy summary rather than an exact one, and requires the reconstruction to work reasonably well even when the fuzziness is sampled slightly differently each time. Because the summaries are forced to stay fuzzy and clustered near a common, simple reference point rather than each writer inventing an idiosyncratic private code, a stranger can later write a brand new plausible fuzzy summary from scratch and expect a sensible reconstruction, which is exactly how the VAE generates novel samples it never saw during training.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the direct probabilistic generalisation of the plain autoencoder from the unsupervised-learning sub-module: same encoder-decoder skeleton, but the deterministic bottleneck becomes a genuine distribution, and the reconstruction-only objective becomes the ELBO. It is also the gentlest introduction in this sub-module to the recurring theme of the next two lectures, an intractable exact objective replaced by a tractable, principled approximation.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the VAE earns its place as the standard first generative architecture taught, ahead of the GAN or diffusion model covered next.</p>
+
+  <p>First, <strong>the objective is a genuine, principled bound on a genuine quantity</strong>, the log-likelihood, unlike the GAN's adversarial game (next lecture), which has no interpretation as optimising any single well-defined objective function throughout training; this makes the VAE's training dynamics considerably more stable and easier to diagnose when something goes wrong.</p>
+
+  <p>Second, <strong>the learned latent space is continuous, structured, and directly interpretable</strong>: because the KL term in the ELBO actively penalises the encoder for producing latent distributions that drift from the shared prior, nearby points in latent space decode to visually or statistically similar observations, which is precisely why linear interpolation between two encoded policies in latent space, or simple arithmetic on latent codes, tends to produce sensible intermediate synthetic observations rather than nonsense.</p>
+
+  <p>Third, <strong>the encoder itself is a reusable, standalone dimensionality-reduction tool</strong>, directly comparable to the PCA and kernel-PCA methods from the unsupervised-learning sub-module, but capable of capturing non-linear structure those linear methods cannot; a trained VAE's encoder can be used purely as a feature-extraction step ahead of a downstream supervised model, entirely independent of whether the decoder or sampling capability is ever used.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    Continuing the synthetic-portfolio exercise from the previous lecture, the model development team wanted to generate synthetic policies specifically resembling a rare, high-value commercial-lines segment that was under-represented in the training data. Sampling directly from the VAE's shared Gaussian prior produced mostly ordinary, high-frequency policy types, because the prior gives equal weight to every region of latent space regardless of how rare the corresponding real segment was. Encoding a handful of real examples from the rare segment, taking the mean of their resulting latent codes, and sampling in a small neighbourhood around that mean (rather than from the prior directly) produced a batch of synthetic policies that were recognisably variations on the rare commercial-lines theme, a direct, practical use of the latent space's local smoothness that a plain autoencoder's ungoverned bottleneck could not have supported nearly as reliably.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: an observation mapped to a small, fuzzy Gaussian cloud in latent space rather than a single point, a sample drawn from that cloud via the reparameterisation trick, and a decoder mapping the sample back to a reconstruction, with a KL penalty continuously pulling every encoded cloud back towards a shared, standard-normal reference point.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="VAE encoder-decoder with a stochastic latent bottleneck and a KL penalty pulling toward a shared prior">
+      <defs>
+        <marker id="vaeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Encoder, stochastic latent bottleneck, decoder</text>
+
+      <rect x="30" y="90" width="90" height="130" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="75" y="160" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">X</text>
+      <text x="75" y="235" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">input</text>
+
+      <path d="M 122 155 L 175 155" stroke="#71717a" stroke-width="2" marker-end="url(#vaeArrow)"/>
+      <text x="148" y="140" text-anchor="middle" font-family="Inter" font-size="9" fill="#52525b">encoder</text>
+
+      <rect x="180" y="90" width="150" height="130" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="255" y="130" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">$q_\phi(Z\mid X)$</text>
+      <ellipse cx="255" cy="175" rx="45" ry="30" fill="#c4b5fd" opacity="0.6"/>
+      <circle cx="255" cy="175" r="4" fill="#5b21b6"/>
+      <text x="255" y="215" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">$\mu(X), \sigma(X)$</text>
+
+      <path d="M 332 155 L 385 155" stroke="#71717a" stroke-width="2" marker-end="url(#vaeArrow)"/>
+      <text x="358" y="140" text-anchor="middle" font-family="Inter" font-size="9" fill="#52525b">sample</text>
+      <text x="358" y="182" text-anchor="middle" font-family="Inter" font-size="8" fill="#52525b">(reparam. trick)</text>
+
+      <rect x="390" y="120" width="60" height="70" rx="6" fill="#DEEAFB" stroke="#2A3A78" stroke-width="1.5"/>
+      <text x="420" y="160" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#2A3A78">Z</text>
+
+      <path d="M 452 155 L 505 155" stroke="#71717a" stroke-width="2" marker-end="url(#vaeArrow)"/>
+      <text x="478" y="140" text-anchor="middle" font-family="Inter" font-size="9" fill="#52525b">decoder</text>
+
+      <rect x="510" y="90" width="150" height="130" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="585" y="130" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">$p_\theta(X\mid Z)$</text>
+      <ellipse cx="585" cy="175" rx="45" ry="25" fill="#ddd6fe" opacity="0.6"/>
+      <text x="585" y="215" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">reconstruction dist.</text>
+
+      <path d="M 662 155 L 715 155" stroke="#71717a" stroke-width="2" marker-end="url(#vaeArrow)"/>
+
+      <rect x="720" y="90" width="90" height="130" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="765" y="160" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">$\hat{X}$</text>
+      <text x="765" y="235" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">reconstruction</text>
+
+      <path d="M 255 220 Q 255 270 420 270 Q 585 270 585 220" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 2" fill="none"/>
+      <text x="420" y="290" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">KL term pulls every encoded cloud toward the shared prior $p(Z) = \mathcal{N}(0, I)$</text>
+    </svg>
+    <figcaption>The encoder maps input $X$ to the parameters of a Gaussian distribution over the latent variable $Z$, a sample is drawn via the reparameterisation trick (keeping the whole pipeline differentiable), and the decoder maps that sample to a reconstruction distribution over $\hat{X}$. The KL term of the ELBO continuously discourages the encoder's distribution from drifting away from a shared, simple prior, which is what keeps the latent space smooth enough to sample from directly once training is complete.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Reconstruction accuracy and latent-space regularity are in permanent tension, and the ELBO is the trade-off.</strong> A model that only optimised reconstruction would collapse back to the plain autoencoder's ungoverned, unsample-able bottleneck; the KL term is what forces a usable latent space to exist at all. <strong>Sampling is not differentiable, so it has to be moved outside the computation graph.</strong> The reparameterisation trick is not a cosmetic convenience, it is the specific device that makes training by ordinary gradient descent possible at all.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Deriving the ELBO via Jensen's inequality</h3>
+
+  <p>Start from the log-likelihood of a single observation, and introduce the encoder's approximate posterior $q_\phi(Z \mid X)$ by multiplying and dividing inside the integral,</p>
+  $$\log p_\theta(X) = \log \int p_\theta(X, Z)\, dZ = \log \mathbb{E}_{q_\phi(Z\mid X)}\left[\frac{p_\theta(X, Z)}{q_\phi(Z\mid X)}\right].$$
+  <p>Jensen's inequality, applied to the concave logarithm, moves the log inside the expectation and only ever decreases the value, giving a lower bound,</p>
+  $$\log p_\theta(X) \ge \mathbb{E}_{q_\phi(Z\mid X)}\left[\log \frac{p_\theta(X, Z)}{q_\phi(Z\mid X)}\right] = \mathbb{E}_{q_\phi(Z\mid X)}\left[\log p_\theta(X \mid Z)\right] - \mathrm{KL}\big(q_\phi(Z\mid X) \,\|\, p(Z)\big).$$
+  <p>This is the <strong>evidence lower bound (ELBO)</strong>. It splits cleanly into a <strong>reconstruction term</strong> (the expected log-likelihood of the data given a sampled latent code, maximised by an accurate decoder) and a <strong>regularisation term</strong> (the KL divergence between the encoder's approximate posterior and the prior, minimised by keeping the encoder's output close to the shared prior). Maximising the ELBO is a well-defined, tractable proxy for maximising the intractable true log-likelihood, and the gap between the two is exactly $\mathrm{KL}(q_\phi(Z\mid X) \,\|\, p_\theta(Z\mid X))$, the divergence between the encoder's approximation and the true (also intractable) posterior; the better the encoder approximates the true posterior, the tighter the bound.</p>
+
+  <h3>The Gaussian closed form</h3>
+
+  <p>In the standard VAE, the prior is taken to be a standard multivariate Gaussian, $p(Z) = \mathcal{N}(0, I)$, and the encoder outputs the parameters of a diagonal Gaussian, $q_\phi(Z\mid X) = \mathcal{N}(\mu_\phi(X), \mathrm{diag}(\sigma_\phi(X)^2))$. This particular choice is not incidental: the KL divergence between two Gaussians has a closed-form expression,</p>
+  $$\mathrm{KL}\big(\mathcal{N}(\mu, \sigma^2) \,\|\, \mathcal{N}(0, 1)\big) = \tfrac{1}{2}\left(\mu^2 + \sigma^2 - \log \sigma^2 - 1\right)$$
+  <p>per latent dimension, summed across dimensions for the full penalty. This closed form is exactly what makes the regularisation term computable and differentiable without any further approximation, and is the specific reason the Gaussian is the default choice of prior and posterior family rather than an arbitrary convenience.</p>
+
+  <h3>The reparameterisation trick</h3>
+
+  <p>Sampling $Z \sim \mathcal{N}(\mu_\phi(X), \sigma_\phi(X)^2)$ directly treats the randomness as an operation on the encoder's own output parameters, and gradients cannot be backpropagated through a random sampling step in the ordinary way. The trick rewrites the sample as</p>
+  $$Z = \mu_\phi(X) + \sigma_\phi(X) \odot \epsilon, \qquad \epsilon \sim \mathcal{N}(0, I),$$
+  <p>where $\epsilon$ is drawn independently of the network's parameters and treated as a fixed input, not something to differentiate through. $Z$ is now a deterministic, differentiable function of $\mu_\phi(X)$, $\sigma_\phi(X)$, and the externally-sampled noise $\epsilon$, so ordinary backpropagation flows through $\mu_\phi$ and $\sigma_\phi$ exactly as it would through any other network layer. This is the single device that converts an intractable stochastic-optimisation problem into an ordinary, differentiable one.</p>
+
+  <h3>Training and generation</h3>
+
+  <p>Training alternates, for each mini-batch, encoding each observation to $(\mu_\phi(X), \sigma_\phi(X))$, sampling $Z$ via the reparameterisation trick, decoding $Z$ to a reconstruction distribution, and taking a gradient step to maximise the ELBO (reconstruction log-likelihood minus the KL penalty, often with a tunable weight, $\beta$, on the KL term, giving the well-known $\beta$-VAE variant that trades reconstruction fidelity for a more disentangled, more strongly regularised latent space). <strong>Generation</strong>, once training is complete, discards the encoder entirely: sample $Z$ directly from the prior $p(Z) = \mathcal{N}(0, I)$ and pass it through the decoder alone to obtain a fresh synthetic observation, exactly the capability the plain autoencoder's ungoverned bottleneck does not support, because nothing in a plain autoencoder's training ever encourages its bottleneck codes to resemble draws from any particular, sample-able distribution.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Confusing the ELBO with the true log-likelihood</span>
+    The ELBO is a lower bound, not the quantity itself; two VAEs with different encoder architectures can report different ELBO values purely because one has a tighter bound (a better approximate posterior), not because one has genuinely modelled the data better. Comparing ELBO values across architecturally different models without checking the tightness of the bound is a common and misleading error.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Posterior collapse</span>
+    If the decoder is powerful enough to reconstruct $X$ well on its own (ignoring $Z$ almost entirely), the KL term can drive the encoder's posterior all the way to the prior, making $Z$ nearly uninformative, a failure mode called <strong>posterior collapse</strong>. The generated samples remain plausible in isolation but the latent space stops encoding any meaningful structure, defeating the purpose of the encoder; annealing the KL weight upward gradually during training, or capping decoder capacity, are the standard mitigations.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Blurry reconstructions from the Gaussian likelihood assumption</span>
+    A Gaussian decoder likelihood implicitly optimises a squared-error reconstruction loss, which, exactly as in ordinary regression, rewards the average of plausible reconstructions rather than a single sharp one; VAE samples are consequently often visibly blurrier or more averaged-looking than samples from a GAN, which optimises no such averaging objective. This is a structural property of the Gaussian likelihood choice, not a bug to be tuned away.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Sampling from the prior when the real target is a specific sub-population</span>
+    Developed directly in the vignette: sampling from the shared prior gives every region of latent space equal weight, which is the wrong tool whenever the modelling goal is to generate more examples resembling a specific, under-represented segment rather than the population as a whole.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The variational autoencoder pairs a stochastic encoder and decoder trained to jointly maximise the ELBO, a tractable lower bound on the intractable log-likelihood derived via Jensen's inequality, splitting cleanly into a reconstruction term and a KL regularisation term that keeps the latent space smooth and sample-able. The reparameterisation trick rewrites the stochastic sampling step as a deterministic function of the network's outputs and external noise, restoring ordinary backpropagation. The Gaussian prior-and-posterior choice is not incidental: it is exactly what gives the KL term a closed form. Once trained, generation discards the encoder and samples directly from the shared prior through the decoder alone.</p>
+
+  <p>The next lecture develops two architectures that abandon the tractable-bound approach entirely in favour of an adversarial game (the GAN) or an iterative denoising process (the diffusion model), each solving the identical intractable-density problem this lecture opened with via a genuinely different mathematical route, and each with materially different training stability and sample-quality trade-offs from the VAE developed here.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Derive the ELBO from the log-likelihood via Jensen's inequality, and name the two terms it splits into.</li>
+      <li>State the closed-form KL divergence between two Gaussians, and explain why the Gaussian is the default choice of prior and posterior family for this reason specifically.</li>
+      <li>Explain the reparameterisation trick, and why ordinary backpropagation cannot flow through a direct sampling step without it.</li>
+      <li>Define posterior collapse, and explain the role the decoder's capacity plays in causing it.</li>
+      <li>Explain why VAE reconstructions are often blurrier than GAN samples, in terms of the Gaussian likelihood's implicit loss function.</li>
+      <li>In the rare-segment vignette, explain why sampling around the mean of a handful of encoded real examples produced better-targeted synthetic policies than sampling from the shared prior.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 1 (<a href="01-generative_modelling_overview.html">generative modelling overview</a>) set out why the exact density is intractable; this lecture is the first concrete answer.</li>
+      <li><strong>Next:</strong> Lecture 3 (<a href="03-gans_and_diffusion.html">GANs and diffusion</a>) develops two implicit-density alternatives to the ELBO approach.</li>
+      <li><strong>Built on:</strong> The <a href="../04_unsupervised_learning/03-autoencoders.html">autoencoder</a> lecture is the deterministic special case this lecture generalises.</li>
+      <li><strong>Outside this course:</strong> The Kalman filter's forward-backward recursion, from the statistics track's time-series material, solves an analogous latent-inference problem in a temporal rather than a static setting.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Generative modelling course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 49 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

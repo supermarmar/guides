@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 14: k-means clustering</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Unsupervised learning</a></div>
+  <h1>k-means clustering</h1>
+  <p class="subtitle">Cluster the data with no labels by alternating two steps: assign every point to its nearest centroid, move every centroid to the mean of its points. The algorithm is one of the oldest in machine learning and still the right answer when the clusters are roughly round.</p>
+  <div class="meta">
+    <span>Lecture 14 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part III: unsupervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>k-means</strong> is the workhorse partitional clustering algorithm. Given a feature matrix and a chosen number of clusters $k$, it partitions the rows into $k$ disjoint groups so that the total squared distance from each point to its assigned cluster centre is as small as possible. The objective is the <strong>within-cluster sum of squares</strong> (also called inertia),</p>
+  $$J = \sum_{k=1}^{K} \sum_{x_i \in C_k} \lVert x_i - \mu_k \rVert^2,$$
+  <p>where $C_k$ is the set of points in cluster $k$ and $\mu_k$ is the centroid of that cluster. The function is non-convex in the joint space of centroids and assignments, so finding the global minimum is NP-hard. <strong>Lloyd's algorithm</strong> sidesteps the combinatorics with a four-step iterative heuristic: place $k$ centroids at random, assign every point to its nearest centroid, recompute each centroid as the mean of its points, repeat until assignments stop changing. The inertia decreases monotonically at every step and the configuration space is finite, so convergence is guaranteed in finitely many iterations, but only to a local minimum that depends on the random start. Two practical refinements turn the toy algorithm into the production default: <strong>k-means++</strong> chooses smarter initial centroids by sampling each new centre proportional to its squared distance from the existing ones, giving an $O(\log k)$ expected approximation guarantee, and <strong>multiple restarts</strong> (scikit-learn's <code>n_init</code>) repeat the whole procedure with different seeds and keep the lowest-inertia outcome.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine dropping $k$ pins onto a scatter plot at random. Walk through every data point and stick a flag in it with the colour of the nearest pin. Now move each pin to the centre of mass of its same-coloured flags. Some flags will now be closer to a different pin, so recolour them. Move the pins again. After a few rounds nothing changes any more: every flag is closer to its own pin than to any other, and every pin sits in the middle of its flags. That equilibrium is the cluster solution. The only catch is that the equilibrium you reach depends on where the pins started; drop them somewhere else and you may end up with a tidier or messier partition for exactly the same data.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The textbook treatment ends at "use the elbow method to pick $k$". In credit risk practice the choice of $k$ is rarely free. A behavioural scorecard segmentation has to produce a number of segments the business can actually staff, document, and monitor (typically between three and eight), so the elbow at $k = 17$ that minimises inertia is irrelevant. The right $k$ is the one where the silhouette score is acceptable, the segments are economically interpretable, and the segment sizes are large enough to fit a separate sub-model on each without overfitting. The algorithm is one input into that decision, not the decision itself.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    First lecture of <a href="index.html">sub-module 04 (unsupervised learning)</a> and the first time the course works without a target variable. Everything in supervised learning (sub-module 03) measured success by comparing predictions to labels. Here there are no labels; success is measured indirectly by the geometry of the partition (compactness, separation, stability) and ultimately by whether the clusters are useful downstream. The next lecture, <a href="02-pca.html">principal component analysis</a>, is the other half of the unsupervised toolkit: PCA finds new axes that compress variance, k-means finds groups along whatever axes you give it. The two are often used together, with PCA reducing dimensionality before k-means is applied.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons k-means is the first clustering algorithm anyone learns and still the one most often used in production. First, <strong>the objective is interpretable and the output is operational</strong>. Inertia has units of squared distance in feature space; lower inertia means tighter clusters; the centroids are points in the same space as the data and can be described in plain terms ("cluster three is the segment with high revolving utilisation, low income, and short tenure"). Compare this to spectral clustering or DBSCAN, whose outputs are partitions without natural centres and whose internal objectives are harder to translate into business language.</p>
+
+  <p>Second, <strong>it scales</strong>. Each iteration of Lloyd's algorithm is $O(nkd)$ in the number of points $n$, clusters $k$, and feature dimension $d$. The number of iterations needed to converge is typically small (tens, occasionally hundreds), and the mini-batch variant brings the per-iteration cost down further by computing centroid updates on random subsamples. A million-row customer base with twenty features and ten clusters fits comfortably on a laptop; the same job is impractical for hierarchical clustering, whose memory requirement grows quadratically in $n$.</p>
+
+  <p>Third, <strong>it composes with the rest of the pipeline</strong>. In credit risk, k-means is the standard pre-processing step before a segmented model: cluster the application population into behavioural segments, fit a separate scorecard per segment, and the per-segment models capture local relationships that a single global model would average away. The cluster assignment is also a feature in its own right and can be one-hot encoded into a downstream supervised model. The same pattern shows up in marketing analytics (cluster customers, fit a propensity model per segment), portfolio analysis (cluster exposures by risk profile for stress testing), and recommender systems (cluster items by feature similarity before nearest-neighbour search). When the question is "what segments are in this data", k-means is usually the right place to start.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail bank ran k-means on unscaled application data with income (in pounds, ranging zero to two hundred thousand) and tenure (in years, ranging zero to forty). The resulting "behavioural segments" were essentially income bands; tenure was invisible because its variance was four orders of magnitude smaller. The team had skipped the scaling step from <a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a>, assuming clustering would discover structure regardless of units. Re-running on z-scored inputs produced four segments that actually reflected joint behaviour in both dimensions and the downstream scorecard improvement was visible at the next review. Distance-based methods inherit every assumption the feature engineering stage makes, and scale is the most expensive of them.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Three random centroids drop onto a scatter plot. Every point is coloured by its nearest centroid, then each centroid jumps to the middle of its newly coloured points. The boundaries move, some points switch colour, the centroids move again. After a few rounds nothing is moving, and the final partition is what you keep.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four-step illustration of Lloyd's algorithm progressing from random centroids to a stable partition">
+      <defs>
+        <marker id="kmArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Lloyd's algorithm: four steps from random initialisation to convergence</text>
+
+      <!-- Panel 1: random initialisation -->
+      <g>
+        <rect x="20" y="40" width="190" height="280" rx="8" fill="#FAFAF9" stroke="#d4d4d8" stroke-width="1"/>
+        <text x="115" y="60" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">1. Place k centroids</text>
+        <text x="115" y="74" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">random positions</text>
+        <!-- data points (greyed) -->
+        <circle cx="55" cy="120" r="3" fill="#a1a1aa"/>
+        <circle cx="70" cy="135" r="3" fill="#a1a1aa"/>
+        <circle cx="60" cy="150" r="3" fill="#a1a1aa"/>
+        <circle cx="80" cy="125" r="3" fill="#a1a1aa"/>
+        <circle cx="75" cy="160" r="3" fill="#a1a1aa"/>
+        <circle cx="160" cy="130" r="3" fill="#a1a1aa"/>
+        <circle cx="175" cy="145" r="3" fill="#a1a1aa"/>
+        <circle cx="155" cy="155" r="3" fill="#a1a1aa"/>
+        <circle cx="170" cy="165" r="3" fill="#a1a1aa"/>
+        <circle cx="180" cy="125" r="3" fill="#a1a1aa"/>
+        <circle cx="100" cy="240" r="3" fill="#a1a1aa"/>
+        <circle cx="115" cy="255" r="3" fill="#a1a1aa"/>
+        <circle cx="125" cy="245" r="3" fill="#a1a1aa"/>
+        <circle cx="110" cy="265" r="3" fill="#a1a1aa"/>
+        <circle cx="135" cy="260" r="3" fill="#a1a1aa"/>
+        <!-- centroids placed randomly -->
+        <path d="M 45 200 l 8 0 m -4 -4 l 0 8" stroke="#dc2626" stroke-width="2"/>
+        <path d="M 130 95 l 8 0 m -4 -4 l 0 8" stroke="#16a34a" stroke-width="2"/>
+        <path d="M 180 280 l 8 0 m -4 -4 l 0 8" stroke="#2563eb" stroke-width="2"/>
+        <text x="115" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">points not yet assigned</text>
+      </g>
+
+      <!-- Panel 2: assignment -->
+      <g>
+        <rect x="220" y="40" width="190" height="280" rx="8" fill="#FAFAF9" stroke="#d4d4d8" stroke-width="1"/>
+        <text x="315" y="60" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">2. Assign to nearest</text>
+        <text x="315" y="74" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">colour by closest centroid</text>
+        <!-- points coloured by closest centroid -->
+        <circle cx="255" cy="120" r="3" fill="#16a34a"/>
+        <circle cx="270" cy="135" r="3" fill="#16a34a"/>
+        <circle cx="260" cy="150" r="3" fill="#dc2626"/>
+        <circle cx="280" cy="125" r="3" fill="#16a34a"/>
+        <circle cx="275" cy="160" r="3" fill="#dc2626"/>
+        <circle cx="360" cy="130" r="3" fill="#16a34a"/>
+        <circle cx="375" cy="145" r="3" fill="#16a34a"/>
+        <circle cx="355" cy="155" r="3" fill="#2563eb"/>
+        <circle cx="370" cy="165" r="3" fill="#2563eb"/>
+        <circle cx="380" cy="125" r="3" fill="#16a34a"/>
+        <circle cx="300" cy="240" r="3" fill="#2563eb"/>
+        <circle cx="315" cy="255" r="3" fill="#2563eb"/>
+        <circle cx="325" cy="245" r="3" fill="#2563eb"/>
+        <circle cx="310" cy="265" r="3" fill="#2563eb"/>
+        <circle cx="335" cy="260" r="3" fill="#2563eb"/>
+        <!-- centroids unchanged from panel 1 -->
+        <path d="M 245 200 l 8 0 m -4 -4 l 0 8" stroke="#dc2626" stroke-width="2"/>
+        <path d="M 330 95 l 8 0 m -4 -4 l 0 8" stroke="#16a34a" stroke-width="2"/>
+        <path d="M 380 280 l 8 0 m -4 -4 l 0 8" stroke="#2563eb" stroke-width="2"/>
+        <text x="315" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">centroids unmoved</text>
+      </g>
+
+      <!-- Panel 3: update centroids -->
+      <g>
+        <rect x="420" y="40" width="190" height="280" rx="8" fill="#FAFAF9" stroke="#d4d4d8" stroke-width="1"/>
+        <text x="515" y="60" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">3. Update centroids</text>
+        <text x="515" y="74" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">move to mean of assigned</text>
+        <!-- points same as panel 2 (with shifted assignments after centroid moved) -->
+        <circle cx="455" cy="120" r="3" fill="#16a34a"/>
+        <circle cx="470" cy="135" r="3" fill="#16a34a"/>
+        <circle cx="460" cy="150" r="3" fill="#16a34a"/>
+        <circle cx="480" cy="125" r="3" fill="#16a34a"/>
+        <circle cx="475" cy="160" r="3" fill="#16a34a"/>
+        <circle cx="560" cy="130" r="3" fill="#dc2626"/>
+        <circle cx="575" cy="145" r="3" fill="#dc2626"/>
+        <circle cx="555" cy="155" r="3" fill="#dc2626"/>
+        <circle cx="570" cy="165" r="3" fill="#dc2626"/>
+        <circle cx="580" cy="125" r="3" fill="#dc2626"/>
+        <circle cx="500" cy="240" r="3" fill="#2563eb"/>
+        <circle cx="515" cy="255" r="3" fill="#2563eb"/>
+        <circle cx="525" cy="245" r="3" fill="#2563eb"/>
+        <circle cx="510" cy="265" r="3" fill="#2563eb"/>
+        <circle cx="535" cy="260" r="3" fill="#2563eb"/>
+        <!-- centroids moved -->
+        <path d="M 565 140 l 8 0 m -4 -4 l 0 8" stroke="#dc2626" stroke-width="2.5"/>
+        <path d="M 465 135 l 8 0 m -4 -4 l 0 8" stroke="#16a34a" stroke-width="2.5"/>
+        <path d="M 513 252 l 8 0 m -4 -4 l 0 8" stroke="#2563eb" stroke-width="2.5"/>
+        <text x="515" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">centroids at cluster means</text>
+      </g>
+
+      <!-- Panel 4: converged -->
+      <g>
+        <rect x="620" y="40" width="180" height="280" rx="8" fill="#FAFAF9" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="710" y="60" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">4. Converged</text>
+        <text x="710" y="74" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">no point changes colour</text>
+        <circle cx="650" cy="120" r="3" fill="#16a34a"/>
+        <circle cx="665" cy="135" r="3" fill="#16a34a"/>
+        <circle cx="655" cy="150" r="3" fill="#16a34a"/>
+        <circle cx="675" cy="125" r="3" fill="#16a34a"/>
+        <circle cx="670" cy="160" r="3" fill="#16a34a"/>
+        <circle cx="750" cy="130" r="3" fill="#dc2626"/>
+        <circle cx="765" cy="145" r="3" fill="#dc2626"/>
+        <circle cx="745" cy="155" r="3" fill="#dc2626"/>
+        <circle cx="760" cy="165" r="3" fill="#dc2626"/>
+        <circle cx="770" cy="125" r="3" fill="#dc2626"/>
+        <circle cx="690" cy="240" r="3" fill="#2563eb"/>
+        <circle cx="705" cy="255" r="3" fill="#2563eb"/>
+        <circle cx="715" cy="245" r="3" fill="#2563eb"/>
+        <circle cx="700" cy="265" r="3" fill="#2563eb"/>
+        <circle cx="725" cy="260" r="3" fill="#2563eb"/>
+        <path d="M 755 140 l 8 0 m -4 -4 l 0 8" stroke="#dc2626" stroke-width="2.5"/>
+        <path d="M 660 135 l 8 0 m -4 -4 l 0 8" stroke="#16a34a" stroke-width="2.5"/>
+        <path d="M 703 252 l 8 0 m -4 -4 l 0 8" stroke="#2563eb" stroke-width="2.5"/>
+        <text x="710" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">inertia minimised locally</text>
+      </g>
+
+      <!-- arrows between panels -->
+      <line x1="210" y1="180" x2="220" y2="180" stroke="#71717a" stroke-width="1.5" marker-end="url(#kmArrow)"/>
+      <line x1="410" y1="180" x2="420" y2="180" stroke="#71717a" stroke-width="1.5" marker-end="url(#kmArrow)"/>
+      <line x1="610" y1="180" x2="620" y2="180" stroke="#71717a" stroke-width="1.5" marker-end="url(#kmArrow)"/>
+
+      <text x="410" y="355" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">Steps 2 and 3 alternate until no point switches centroid; the local minimum reached depends on the random start in step 1.</text>
+    </svg>
+    <figcaption>Lloyd's algorithm in four panels on a toy two-dimensional example. The crosses are centroids, the dots are data points, and the colours record current cluster assignments. The procedure alternates assignment (step 2) with centroid update (step 3) until consecutive iterations produce identical assignments.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The algorithm never increases inertia, so the trajectory through configuration space is strictly downhill in the objective. The number of possible assignment vectors is finite ($k^n$, ignoring symmetries), so the descent has to stop somewhere. The somewhere it stops is a local minimum determined by the initialisation in panel 1, not the global minimum; if the initial centroids in panel 1 had landed badly, the algorithm could converge to a partition that splits a natural cluster down the middle or merges two genuine groups into one. This is why a single run of k-means is never trusted on its own, and why scikit-learn defaults to ten random restarts and keeps the lowest-inertia outcome.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The objective and why it is hard</h3>
+
+  <p>The k-means objective partitions $n$ data points into $k$ disjoint clusters $C_1, \ldots, C_k$ to minimise the within-cluster sum of squares,</p>
+  $$J(C_1, \ldots, C_k, \mu_1, \ldots, \mu_k) = \sum_{k=1}^{K} \sum_{x_i \in C_k} \lVert x_i - \mu_k \rVert^2.$$
+  <p>If the centroids $\mu_k$ are held fixed, the optimal assignment is trivially to send each point to the nearest centroid, and the objective is linear in the assignment indicators. If the assignments are held fixed, the optimal centroid for cluster $k$ is the mean of its points (the value that minimises sum of squared deviations is the arithmetic mean), and the objective is quadratic and convex in each $\mu_k$. The joint problem over both centroids and assignments is neither: it is a combinatorial optimisation with $k^n / k!$ distinct partitions, and Aloise and colleagues proved in 2009 that finding the global minimum is NP-hard even for $k = 2$ in arbitrary dimension.</p>
+
+  <p>Lloyd's algorithm exploits the partial structure by alternating exact minimisation in each block. Step 2 minimises $J$ over assignments with centroids fixed. Step 3 minimises $J$ over centroids with assignments fixed. Each step weakly decreases $J$ (strict decrease unless nothing changes), so $J$ converges monotonically. The configuration space is finite, so the sequence of $J$ values stabilises after a finite number of iterations and the algorithm terminates. The local minimum it reaches need not be the global one, and is sensitive to the initialisation chosen in step 1.</p>
+
+  <h3>The four-step algorithm</h3>
+
+  <p>Lloyd's algorithm in full, working in $\mathbb{R}^d$ with the squared Euclidean distance:</p>
+
+  <p><strong>Step 1, initialisation.</strong> Choose $k$ initial centroids $\mu_1^{(0)}, \ldots, \mu_k^{(0)}$. The naive choice is uniform random sampling without replacement from the data points, which is what the textbook description usually assumes. In practice k-means++ (below) is the default.</p>
+
+  <p><strong>Step 2, assignment.</strong> For each data point $x_i$, assign it to the cluster whose centroid is nearest in squared Euclidean distance,</p>
+  $$c_i^{(t)} = \arg\min_{k \in \{1, \ldots, K\}} \lVert x_i - \mu_k^{(t)} \rVert^2.$$
+  <p>Ties are broken arbitrarily (in practice by lowest index).</p>
+
+  <p><strong>Step 3, update.</strong> For each cluster $k$, recompute the centroid as the mean of the points currently assigned to it,</p>
+  $$\mu_k^{(t+1)} = \frac{1}{|C_k^{(t)}|} \sum_{i : c_i^{(t)} = k} x_i.$$
+  <p>An empty cluster (no points assigned) is a degenerate case; the standard remedy is to reinitialise the empty centroid at the data point furthest from any existing centroid.</p>
+
+  <p><strong>Step 4, convergence check.</strong> If the assignments did not change between iteration $t$ and $t+1$, the algorithm has converged and the current partition is the output. Otherwise return to step 2.</p>
+
+  <p>The check is genuinely about assignments, not centroids: in floating-point arithmetic the centroids will keep drifting by tiny amounts even after the partition is stable, so a "centroids unchanged" test needs a tolerance, while an "assignments unchanged" test is exact.</p>
+
+  <h3>Distance metrics and the scaling requirement</h3>
+
+  <p>Squared Euclidean distance is the canonical metric for k-means because its minimiser over a fixed cluster is the arithmetic mean, which is what step 3 computes. Other metrics break this correspondence. <strong>Manhattan distance</strong> (the taxicab metric, $\lVert x - \mu \rVert_1 = \sum_j |x_j - \mu_j|$) has the median as its minimiser, not the mean; the resulting algorithm is <strong>k-medians</strong>, which is more robust to outliers and is what you want when the features are on a scale where additive distance makes more sense than squared distance. <strong>Cosine distance</strong> is appropriate when only the direction of the feature vector matters (text data, word embeddings); the corresponding centroid update is the normalised mean, and the algorithm is sometimes called <strong>spherical k-means</strong>. <strong>Mahalanobis distance</strong> weights features by the inverse of their covariance, which is what you would use if you wanted the algorithm to be scale-invariant and account for between-feature correlation; it is rarely used in practice because the covariance has to be estimated and the algorithm loses the clean $O(nkd)$ cost.</p>
+
+  <p>Whichever metric is chosen, the algorithm treats every feature equally in the distance calculation, so features with larger numerical ranges dominate. Scaling is therefore mandatory before k-means is run on heterogeneous numeric features, in the same way and for the same reason it is mandatory before a k-nearest-neighbour classifier (see <a href="../01_feature_engineering/02-feature_transformation.html">feature transformation, section on scaling</a>). The standard choice is z-score standardisation: subtract the mean and divide by the standard deviation column by column. Min-max scaling is acceptable but more sensitive to outliers because a single extreme value determines the range. Tree-based methods are scale-invariant; k-means is not, and the difference between a useful clustering and noise is often nothing more than whether the inputs were scaled.</p>
+
+  <h3>Convergence: monotone descent to a local minimum</h3>
+
+  <p>Two facts together guarantee that Lloyd's algorithm terminates. First, every iteration weakly decreases $J$, because step 2 minimises $J$ over assignments at fixed centroids (an assignment to a non-nearest centroid would by construction increase the sum of squared distances) and step 3 minimises $J$ over centroids at fixed assignments (the mean is the unique minimiser of sum of squared deviations from a point). Second, the configuration space is finite: there are at most $k^n$ distinct assignment vectors, and a strictly decreasing sequence in a finite set cannot continue forever. Lloyd's algorithm therefore reaches a state where $J$ no longer changes between iterations, which is precisely the convergence condition.</p>
+
+  <p>The fixed point is not unique. Different initialisations lead to different local minima, and the gap between the local minimum reached and the true global minimum can be arbitrarily large in pathological cases. The standard mitigation is to run k-means many times from different random starts and keep the run with the lowest final inertia. Scikit-learn's <code>n_init</code> parameter controls this and defaults to ten for the classic random initialisation, one for k-means++ on the assumption that k-means++ already disperses the initial centroids enough.</p>
+
+  <h3>k-means++: smarter initialisation</h3>
+
+  <p>The k-means++ procedure of Arthur and Vassilvitskii (2007) replaces uniform random initialisation in step 1 with a $D^2$-weighted sampling scheme that spreads the initial centroids across the data. Concretely, the first centroid is sampled uniformly at random from the data points. Each subsequent centroid is sampled with probability proportional to the squared distance from the already-chosen centroids,</p>
+  $$\Pr(x_i \text{ is chosen as the next centroid}) = \frac{D(x_i)^2}{\sum_{j=1}^{n} D(x_j)^2},$$
+  <p>where $D(x_i)$ is the distance from $x_i$ to the nearest already-chosen centroid. Points far from existing centroids are favoured, but the randomness prevents the procedure from being trapped by single outliers. Arthur and Vassilvitskii proved that the expected inertia of the k-means++ initialisation (before any Lloyd iterations) is within a factor of $O(\log k)$ of the global optimum, which then improves further as Lloyd's algorithm refines the partition. Empirically the difference is large: on benchmark datasets, k-means++ followed by Lloyd's algorithm typically reaches a lower-inertia solution than the best of ten random restarts of pure Lloyd. This is why <code>init='k-means++'</code> is the scikit-learn default.</p>
+
+  <h3>Choosing $k$</h3>
+
+  <p>The number of clusters is a hyperparameter, not a learned quantity, and no purely internal criterion can pick it without some external judgement. Three diagnostics are standard. The <strong>elbow method</strong> plots inertia against $k$; as $k$ increases, inertia must decrease (more centroids fit the data better), but the rate of decrease typically slows past a "natural" $k$, producing a kink or elbow in the curve. The elbow is read off by eye and is most useful when it is sharp; on noisy real-world data the elbow can be vague or absent.</p>
+
+  <p>The <strong>silhouette score</strong> evaluates how well each point fits its cluster. For point $i$, let $a(i)$ be the mean distance to other points in the same cluster and $b(i)$ the mean distance to points in the nearest other cluster. The silhouette of point $i$ is</p>
+  $$s(i) = \frac{b(i) - a(i)}{\max(a(i), b(i))} \in [-1, 1],$$
+  <p>and the silhouette score of the clustering is the average $s(i)$ over all points. Values near one indicate tight, well-separated clusters; values near zero indicate overlapping clusters; negative values indicate points closer to a neighbouring cluster than to their own. The optimal $k$ is the one that maximises the average silhouette, and unlike the elbow method this gives a quantitative comparison across candidate $k$ values.</p>
+
+  <p>The <strong>gap statistic</strong> of Tibshirani, Walther, and Hastie (2001) compares the observed inertia to the inertia expected under a null distribution of uniform random data with the same range. The gap is the log-difference between expected and observed inertia, and the chosen $k$ is the smallest value for which the gap at $k$ is at least the gap at $k + 1$ minus its standard error. The gap statistic is more theoretically motivated than the elbow and is particularly useful when the data does not in fact have any clusters (a flat gap curve signals $k = 1$ is the right answer). It is also computationally expensive: each candidate $k$ requires fitting k-means to multiple bootstrap samples from the null distribution.</p>
+
+  <h3>Limitations</h3>
+
+  <p>k-means makes strong implicit assumptions about the cluster geometry. The use of squared Euclidean distance with mean centroids amounts to assuming each cluster is roughly <strong>spherical and of similar size</strong>: the algorithm draws Voronoi cells around the centroids, and these cells are isotropic. Elongated clusters, crescent-shaped clusters, and clusters of very different sizes are systematically misclustered. The standard counter-example is two concentric rings of points: k-means splits each ring in half along a diameter rather than separating ring from ring, because the means of the two halves of a ring are closer to each other than to the means of the other ring's halves.</p>
+
+  <p>k-means is also <strong>sensitive to outliers</strong>. A single extreme point pulls its assigned centroid towards itself and distorts the partition around it. The squared distance in the objective amplifies the effect: a point ten units away contributes a hundred to inertia, a point one unit away contributes one. The robust alternatives are k-medians (Manhattan distance, median centroids), k-medoids or PAM (the centroid must itself be a data point), and DBSCAN (which treats low-density outliers as noise rather than forcing them into a cluster). The <strong>sensitivity to initialisation</strong> discussed above is the third limitation and is partially addressed by k-means++ and multiple restarts but not eliminated.</p>
+
+  <p>Finally, k-means is a <strong>hard clustering</strong> method: each point belongs to exactly one cluster with no notion of uncertainty. When the boundaries between clusters are themselves fuzzy and assigning marginal points definitively is misleading, a soft method such as a Gaussian mixture model fit by expectation-maximisation is preferable; it produces a posterior probability of membership in each cluster rather than a single hard assignment.</p>
+
+  <h3>scikit-learn</h3>
+
+  <p>The reference implementation lives in <code>sklearn.cluster.KMeans</code>. The key arguments are <code>n_clusters</code> (the $k$), <code>init</code> (default <code>'k-means++'</code>; the alternative <code>'random'</code> gives the classic uniform sampling), <code>n_init</code> (the number of restarts with different initialisations, default ten; the run with lowest inertia is kept), <code>max_iter</code> (cap on Lloyd iterations per restart, default three hundred), and <code>tol</code> (tolerance on the relative change in inertia for early stopping). After fitting, the model exposes <code>.cluster_centers_</code> (the final centroids, an array of shape $k \times d$), <code>.labels_</code> (the cluster assignment for each training point), and <code>.inertia_</code> (the final value of $J$). The <code>.predict()</code> method assigns a new point to the nearest centroid without re-fitting, and is what makes the trained clusterer usable at inference time.</p>
+
+  <p>The <code>MiniBatchKMeans</code> variant updates centroids using small random subsamples rather than the full dataset at each iteration. It trades a small amount of solution quality for a large reduction in per-iteration cost, and is the right choice on datasets too large to hold all squared distances in memory simultaneously.</p>
+
+  <h3>Credit risk applications</h3>
+
+  <p>Two patterns recur in regulated credit modelling. The first is <strong>customer segmentation for behavioural scorecards</strong>. A behavioural scorecard predicts default risk from observed account behaviour (utilisation, payment history, balance trajectory) rather than application-time information, and the relationship between behaviour and default risk differs sharply across customer segments. The standard pipeline runs k-means on a small set of behavioural features to identify three to six segments, then fits a separate scorecard on each. The clustering improves predictive power (each per-segment model captures the local relationship without averaging across segments) and improves interpretability (the segments themselves can be described in business language to the validation team and regulator).</p>
+
+  <p>The second is <strong>portfolio clustering for stress testing</strong>. A bank's exposures are heterogeneous in size, sector, geography, and contractual structure, and running a granular stress test on every exposure is computationally prohibitive. k-means on exposure-level features (PD, LGD, exposure size, sector code one-hot, geography one-hot, maturity bucket) groups exposures into archetypes; the stress scenario is then applied at the archetype level, with the per-archetype loss multiplied by the cluster size to get the portfolio aggregate. The procedure is fast, auditable, and produces a hierarchy of granularity that can be reported at any level of aggregation. The choice of $k$ in this setting is governed by what the stress-testing process can actually consume, not by the inertia curve.</p>
+
+  <div class="callout insight">
+    <span class="tag">k-means is not a classifier</span>
+    The clusters that come out of k-means are unlabelled groups, not categories with predefined meaning. Two runs on the same data with different random seeds can produce clusters in different orders ("cluster 0" might be the high-utilisation segment in one run and the low-utilisation segment in the next), which is harmless mathematically but breaks any downstream code that hard-codes cluster indices. Stabilise the labelling by matching clusters across runs via centroid similarity (e.g. the Hungarian algorithm) or by re-labelling clusters in a deterministic order such as increasing first-feature centroid value. The same point applies whenever cluster output is used as a feature for a downstream supervised model: the cluster identifier is nominal, not ordinal, and should be one-hot encoded rather than passed in as an integer.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Five failure modes account for almost every disappointing k-means result in practice. Each is invisible if you only look at the final inertia and obvious once you look at the cluster shapes.</p>
+
+  <div class="callout warn">
+    <span class="tag">Unscaled features</span>
+    Running k-means on mixed-unit raw data produces "clusters" that are essentially partitions along the highest-variance feature, because the squared Euclidean distance is dominated by that feature. The fix is structural: z-score every numeric feature before clustering, and one-hot encode categoricals so they participate on a controlled scale. Tree-based methods do not have this problem and tempt practitioners into skipping the scaling step; k-means is not a tree.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Single random start</span>
+    A single run of Lloyd's algorithm with a random initialisation converges to a local minimum that depends entirely on the seed. The reported inertia is not a property of the data; it is a property of the data and the seed. Always use <code>n_init</code> of at least ten (and combined with k-means++) and report the best of those runs. If two restarts produce very different inertias, the problem is multimodal and a single answer is misleading; report the distribution of solutions or move to a model that produces uncertainty.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Picking $k$ from inertia alone</span>
+    Inertia is monotonically decreasing in $k$ and reaches zero when $k = n$. Choosing $k$ by minimising inertia is therefore meaningless. The elbow method, silhouette score, and gap statistic exist precisely because the raw inertia number on its own cannot tell you what $k$ to use. In regulated settings the more important constraint is interpretability: a segmentation must be small enough to staff and document, and the right $k$ is the one that meets that constraint while still passing the silhouette diagnostic.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Non-spherical clusters</span>
+    Two concentric rings, elongated clusters, and clusters of very different sizes are systematically misclustered by k-means. The diagnostic is to plot the clusters in two or three principal components and visually check whether the partition makes sense; if the centroids are clearly inside one cluster but the algorithm has assigned points from another shape-mismatched cluster to it, k-means is the wrong tool. DBSCAN, hierarchical clustering with single linkage, or a Gaussian mixture model with full covariance matrices are the standard alternatives.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Cluster labels treated as ordinal</span>
+    The integer labels produced by <code>.labels_</code> are nominal; the cluster numbered "two" is not in any sense larger, smaller, or more anything than the cluster numbered "one". Feeding these integers as a feature into a linear model implicitly asserts an ordering that does not exist and corrupts the downstream estimate. One-hot encode them, or describe the clusters by a meaningful centroid statistic (e.g. the segment's mean utilisation) and use that statistic as the feature instead.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>k-means is the canonical partitional clustering algorithm. It minimises the within-cluster sum of squares by alternating two steps: assign every point to its nearest centroid, then move every centroid to the mean of its assigned points. The objective is non-convex and the procedure converges only to a local minimum, but k-means++ initialisation and multiple restarts make the local minima good enough for practical use in almost every case where the cluster geometry is roughly spherical. Scaling is mandatory, picking $k$ is a judgement call that the elbow, silhouette, and gap statistic inform but do not settle, and the cluster labels themselves are nominal. The algorithm scales to large datasets, integrates cleanly into downstream supervised pipelines, and provides centroids that can be described in plain business language; that combination is what keeps it dominant despite its limitations.</p>
+
+  <p>What this lecture deliberately did not do. It did not cover <a href="04-hierarchical_clustering.html">hierarchical clustering</a> (agglomerative or divisive), which produces a tree of nested partitions rather than a single flat one; that is the next clustering family to learn after k-means and shows up routinely in genomics, taxonomy, and any setting where the analyst wants to inspect the merge sequence. It did not cover <a href="06-density_based_clustering.html">density-based methods</a> (DBSCAN, OPTICS, HDBSCAN), which find arbitrarily shaped clusters and treat low-density points as noise; these are the right answer when the spherical-cluster assumption fails. It did not cover <a href="05-medoids_and_mixtures.html">model-based clustering</a> (K-medoids, and Gaussian mixtures fit by expectation-maximisation), which gives soft probabilistic assignments and handles elliptical clusters of unequal covariance. Each of these has its place in the unsupervised toolbox, and a working practitioner needs to recognise when k-means is the wrong choice as well as when it is the right one.</p>
+
+  <p>Lecture 15, <a href="02-pca.html">principal component analysis</a>, picks up the other half of the unsupervised toolkit. Where k-means finds groups among observations, PCA finds new axes along which the variance is concentrated. The two are often used together in the same pipeline: PCA reduces a high-dimensional feature space to a handful of components that explain most of the variance, and k-means then clusters in that reduced space, both for computational reasons and because the noise dimensions are projected away. The conceptual contrast (groups versus directions, observations versus features) is the cleanest dichotomy in unsupervised learning and is worth holding firmly in mind.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Write down the k-means objective function $J$ and explain in one sentence why minimising it globally is NP-hard.</li>
+      <li>State the four steps of Lloyd's algorithm in order, including the convergence check, and explain why convergence is guaranteed in finitely many iterations.</li>
+      <li>k-means is run on a behavioural dataset where balance is measured in pounds (range zero to fifty thousand) and number of missed payments is measured as an integer (range zero to twelve). Without scaling, which feature will dominate the clustering and why?</li>
+      <li>Describe the k-means++ initialisation in two sentences. State the expected approximation guarantee.</li>
+      <li>You compare three values of $k$ using the elbow method and the silhouette score. The elbow plot is ambiguous (no clear kink) but the silhouette score is highest at $k = 4$. The business can only operationalise three segments. What do you do?</li>
+      <li>A clustering of two concentric rings of points produces two "clusters" that each contain half of each ring. Explain why k-means fails on this geometry and name two algorithms that would handle it correctly.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 15 (<a href="02-pca.html">principal component analysis</a>) is the variance-direction counterpart to k-means and is often run first to denoise the feature space before clustering.</li>
+      <li><strong>Prerequisite:</strong> Lecture 2 (<a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a>) covers the scaling and encoding steps that make any distance-based method, including k-means, work.</li>
+      <li><strong>Context:</strong> Lecture 1 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the machine learning landscape</a>) positions clustering within the broader supervised-unsupervised-reinforcement taxonomy and explains why unsupervised methods need different evaluation criteria.</li>
+      <li><strong>Related:</strong> Lecture 13 (<a href="../03_supervised_learning/07-conformal_prediction.html">conformal prediction</a>) is the supervised counterpart to the question this lecture raises about uncertainty: where k-means refuses to express it (hard assignments), conformal methods quantify it explicitly via calibrated prediction sets.</li>
+      <li><strong>Outside this course:</strong> Customer segmentation for behavioural scorecards and portfolio clustering for stress testing are two of the most common k-means applications in regulated banking. The application-scoring track in the wiki develops segment-based scorecards end-to-end and is the natural next read for a credit risk modeller.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Unsupervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 14 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

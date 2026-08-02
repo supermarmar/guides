@@ -1,0 +1,363 @@
+﻿<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 11: Jupyter notebooks and the reproducibility problem</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Jupyter notebooks and the reproducibility problem</h1>
+  <p class="subtitle">A notebook interleaves prose, code, and output in a single file. It is the medium in which most modern data analysis is actually done, and it is also the medium most likely to produce a result no one can reproduce a year later. This lecture covers what a notebook is, why reproducibility is so brittle, and the discipline plus tooling (jupytext, papermill, nbstripout, Quarto, Marimo) that puts the artefact back on a defensible footing.</p>
+  <div class="meta">
+    <span>Lecture 11 of 16</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part III: documentation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>Jupyter notebook</strong> (Fernando Pérez and Brian Granger, 2014; descended from IPython, 2001) is a JSON file containing an ordered list of cells. A cell is either Markdown prose or executable code; running a code cell produces output (text, tables, plots), which is stored back in the file alongside the source. The file extension is <code>.ipynb</code>. The notebook is opened in a kernel (a Python or R or Julia process), and cells are executed in any order the author chooses. The combination of prose, code, and rendered output in one file is what makes the notebook so useful for exploratory analysis and so hard to treat as a repeatable artefact.</p>
+
+  <p>The pathology that makes notebooks problematic is <strong>hidden state</strong>. A cell that defines <code>x = 1</code>, then <code>x = 2</code>, then is deleted, leaves <code>x</code> bound to <code>2</code> in the running kernel; the notebook file no longer mentions <code>x</code> at all, but every later cell that uses <code>x</code> still works. A reader who restarts the kernel and runs the cells top-to-bottom gets a <code>NameError</code> on a line that, by inspection, looks fine. Pimentel et al.'s (2019) survey of 1.16 million GitHub notebooks found that only 24% executed end-to-end without error and only 4% produced the same output as the committed version. The artefact is unreliable by default.</p>
+
+  <p>The response is a layer of discipline and a layer of tooling. The discipline is <strong>restart-and-run-all</strong>: a notebook earns the right to be shared only after it has been re-executed from a clean kernel and shown to produce the same outputs. The tooling layer has four parts: <strong>jupytext</strong> pairs the <code>.ipynb</code> with a plain <code>.py</code> that diffs cleanly in git; <strong>nbstripout</strong> removes outputs before commit so the merge history is reviewable; <strong>papermill</strong> parametrises a notebook for batch execution; <strong>nbconvert</strong> renders the notebook to HTML, PDF, or slides for sharing. The two modern alternatives are <strong>Quarto</strong> (Posit, 2022), which treats notebooks as one input among many, and <strong>Marimo</strong> (2023), which rebuilds the notebook from first principles so hidden state cannot exist.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A notebook is a JSON file whose order of cells, on disk, is not the order of execution, in the kernel. The kernel remembers everything that was run; the file remembers everything that was saved. Anyone, including a future version of you, who opens the file and presses "run all" is running the cells in <em>file order on a fresh kernel</em>, which is rarely the order in which the author originally produced the outputs they see. If you can hold that gap in mind, you understand the entire reproducibility problem.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The deep tension behind notebooks is Knuth's idea of <em>literate programming</em> (Lecture 1), in which prose and code are interleaved deliberately, against the reality of <em>exploratory programming</em>, in which the cells get reordered, mutated, and abandoned as the author's understanding evolves. The notebook format does literate programming well and exploratory programming badly, but it is mostly used for the latter. Donoho (2017) describes the field this is producing as <em>data science 2.0</em>: a generation of analysts whose primary tool is a literate-programming environment used in an anti-literate way. The reproducibility crisis is the symptom; the cure is to admit that exploration and publication are different artefacts and tool them differently.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that notebooks are how data science actually happens. The Stack Overflow Developer Survey, the GitHub Octoverse, and the Kaggle State of ML reports all converge on the same finding: a majority of professional data scientists use notebooks as their primary working surface. Pandas dataframes, matplotlib plots, scikit-learn pipelines, and PyTorch experiments are all built and inspected in cells. Whatever the engineering objection is to notebooks, the format is not going away, and the only useful posture is to learn its failure modes and the tools that mitigate them.</p>
+
+  <p>The second reason is that risk modelling, regulatory work, and audit live or die on reproducibility. A credit-risk model whose calibration sits in a notebook that "ran last December" but does not run today is a model that cannot be defended. The CRR's IRB conditions on Article 174 require that the rating process be "consistent", a word the EBA's RTS interprets to mean "re-executable with the same inputs". A notebook that depends on the cells being run out of order, on a variable defined in a deleted cell, or on a kernel state from yesterday, fails that test silently. The auditor opens it, presses "restart and run all", and the model fails to fit. The remediation is not a methodology paper; it is engineering discipline.</p>
+
+  <p>The third reason is that the gap between notebooks and the engineering practices in the rest of this course is the principal source of bugs in data-science pipelines. The 2016 Sculley et al. paper "Hidden technical debt in machine learning systems" identified glue code and notebook-to-production translation as among the biggest contributors to ML-system fragility, and the situation has not changed since. Tests do not run on notebooks. Code review is hard on JSON. Continuous integration cannot tell whether a notebook works. The whole apparatus the previous lectures have built sits on top of <code>.py</code> files, not <code>.ipynb</code> files. Closing the gap is a measurable productivity win.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>What a notebook actually is</h3>
+
+  <p>A <code>.ipynb</code> file is JSON. The top-level structure is a dictionary with a list of cells, a kernel specification, and some metadata. Each cell has a type (<code>code</code> or <code>markdown</code>), a source string, an execution count (or <code>null</code> if never run), and, for code cells, a list of outputs. The outputs include text streams, error tracebacks, and rich representations (HTML for a dataframe, PNG bytes for a plot, LaTeX for a sympy expression). When you "open the notebook in Jupyter", you are opening the file in an editor that renders this JSON as cells and connects each code cell to a long-running kernel process.</p>
+
+  <pre><code class="language-json">{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "source": "# Calibrating PD on the consumer book"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 3,
+      "source": "import pandas as pd\ndf = pd.read_parquet('book.parquet')",
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 7,
+      "source": "df.head()",
+      "outputs": [ { "output_type": "execute_result", "data": { "text/html": "..." } } ]
+    }
+  ],
+  "metadata": { "kernelspec": { "name": "python3" } },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
+</code></pre>
+
+  <p>Two consequences fall out of that file format. First, the file is a record of execution as well as source. The outputs are part of the artefact, which is why diff in git is unreadable for a notebook with changing plots: the binary-encoded PNG image is rewritten on every run. Second, the <code>execution_count</code> field records the order in which the cells were last run; out-of-order execution is encoded directly in the file (cell 1 has count 3, cell 2 has count 7) and is invisible in the rendered view unless you look at the small bracket in front of each cell.</p>
+
+  <h3>The three failure modes</h3>
+
+  <p>Almost every reproducibility incident with notebooks is one of three failure modes.</p>
+
+  <p><strong>Hidden state.</strong> A name in the kernel that no longer appears in any cell. The classic origin is a cell defined a variable, the cell was deleted (or its contents replaced), but the kernel still holds the binding. Later cells use the binding, look correct, and produce output. On a fresh kernel, the same notebook fails.</p>
+
+  <p><strong>Out-of-order execution.</strong> The cells were run in a different order than they appear. Imagine cell 5 was run before cell 3, perhaps because the author was experimenting. The output of cell 5 reflects an earlier state of cell 3; the rendered notebook shows cell 5's output, but a reader running top-to-bottom gets a different result. The <code>execution_count</code> brackets show the order, but few readers notice.</p>
+
+  <p><strong>Environment drift.</strong> The notebook was run a year ago against pandas 1.3 and scikit-learn 0.24. The repository today resolves to pandas 2.2 and scikit-learn 1.4. Some API has changed, some default has shifted, and the notebook either errors or produces a subtly different result. The fix lives in Lecture 12 (project setup and dependency management); the notebook itself cannot defend against it.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The three failure modes">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three ways a notebook stops being reproducible</text>
+
+      <g font-family="Inter" font-size="12">
+        <rect x="40"  y="60" width="220" height="180" fill="#FBEDE4" stroke="#F08C42" stroke-width="2" rx="6"/>
+        <text x="150" y="90"  text-anchor="middle" font-size="14" font-weight="700" fill="#C76B2A">Hidden state</text>
+        <text x="150" y="115" text-anchor="middle" fill="#37352F">Kernel remembers</text>
+        <text x="150" y="133" text-anchor="middle" fill="#37352F">what the file forgot</text>
+        <text x="150" y="170" text-anchor="middle" font-size="11" fill="#71717a">Cell that defined x</text>
+        <text x="150" y="186" text-anchor="middle" font-size="11" fill="#71717a">was deleted; x lives on</text>
+        <text x="150" y="215" text-anchor="middle" font-size="11" fill="#71717a">Diagnostic: kernel restart</text>
+
+        <rect x="280" y="60" width="220" height="180" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2" rx="6"/>
+        <text x="390" y="90"  text-anchor="middle" font-size="14" font-weight="700" fill="#C76B2A">Out-of-order execution</text>
+        <text x="390" y="115" text-anchor="middle" fill="#37352F">Cells ran in one order,</text>
+        <text x="390" y="133" text-anchor="middle" fill="#37352F">appear in another</text>
+        <text x="390" y="170" text-anchor="middle" font-size="11" fill="#71717a">execution_count = 7, 3, 5</text>
+        <text x="390" y="186" text-anchor="middle" font-size="11" fill="#71717a">in display order 1, 2, 3</text>
+        <text x="390" y="215" text-anchor="middle" font-size="11" fill="#71717a">Diagnostic: read the brackets</text>
+
+        <rect x="520" y="60" width="220" height="180" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2" rx="6"/>
+        <text x="630" y="90"  text-anchor="middle" font-size="14" font-weight="700" fill="#3D2EB5">Environment drift</text>
+        <text x="630" y="115" text-anchor="middle" fill="#37352F">Today's libraries differ</text>
+        <text x="630" y="133" text-anchor="middle" fill="#37352F">from yesterday's</text>
+        <text x="630" y="170" text-anchor="middle" font-size="11" fill="#71717a">pandas 1.3 → 2.2</text>
+        <text x="630" y="186" text-anchor="middle" font-size="11" fill="#71717a">behaviour change</text>
+        <text x="630" y="215" text-anchor="middle" font-size="11" fill="#71717a">Diagnostic: pin the env</text>
+      </g>
+    </svg>
+    <figcaption>Any reproducibility failure in a notebook fits one of three shapes. The remediation in each case is different: discipline for hidden state, attention for execution order, dependency management for environment drift.</figcaption>
+  </figure>
+
+  <h3>The four-stage maturity ladder</h3>
+
+  <p>Where a team sits on the notebook-reproducibility question can usually be placed on a four-rung ladder. <strong>Rung 1, anarchic:</strong> notebooks committed with stale outputs, no environment file, last-run-by-someone state. <strong>Rung 2, hygienic:</strong> outputs stripped before commit, kernel restart enforced before sharing. <strong>Rung 3, paired:</strong> every notebook has a parallel <code>.py</code> twin via jupytext, so git diff is readable. <strong>Rung 4, executable:</strong> notebooks run end-to-end in CI on every push, producing the same outputs as the committed version (or failing the build). Most teams sit on Rung 1; the engineering work in this lecture is the move to at least Rung 3.</p>
+
+  <div class="defcard">
+    <strong>Reproducibility.</strong> The property that the same inputs, in the same environment, produce the same outputs every time. A notebook is reproducible if a fresh kernel, running the cells in file order, on the pinned environment, lands on the committed outputs.
+  </div>
+
+  <div class="defcard">
+    <strong>Restart-and-run-all.</strong> The standard hygiene check before sharing a notebook: kill the kernel, restart it, and execute every cell in order. If the result differs from the committed version, the notebook is not reproducible and is not ready to share.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>jupytext: pairing with a plain .py file</h3>
+
+  <p><strong>Jupytext</strong> (Marc Wouts, 2018) is a Jupyter plugin that pairs every <code>.ipynb</code> with a "twin" plain-text file: a <code>.py</code> script with special cell-delimiter comments, or a Markdown file with code-fence cells. Saving the notebook saves both files; opening either re-syncs the pair. The <code>.py</code> twin is what gets reviewed in pull requests, because it diffs as a normal Python file; the <code>.ipynb</code> can be excluded from git or kept with outputs stripped.</p>
+
+  <pre><code class="language-bash">pip install jupytext
+
+# pair an existing notebook on disk
+jupytext --set-formats ipynb,py:percent analysis.ipynb
+
+# convert in either direction at any time
+jupytext --sync analysis.ipynb
+</code></pre>
+
+  <p>The <code>py:percent</code> format produces a file in which each cell is delimited by a <code># %%</code> comment. VS Code recognises these as runnable cells in its Python extension; PyCharm has a similar interactive cell mode. The result is that the same artefact is a notebook in Jupyter and a script in the IDE; the team picks whichever is right for the task. For credit-risk modelling work, the <code>.py</code> twin is the artefact that ships into production; the <code>.ipynb</code> is the exploration log.</p>
+
+  <pre><code class="language-python"># %% [markdown]
+# # Calibrating PD on the consumer book
+
+# %%
+import pandas as pd
+df = pd.read_parquet('book.parquet')
+
+# %%
+df.head()
+</code></pre>
+
+  <h3>nbstripout: stripping outputs before commit</h3>
+
+  <p><strong>nbstripout</strong> (Florian Rathgeber, 2014) is a git filter that strips the <code>outputs</code> field from every <code>.ipynb</code> on its way into a commit. The notebook on disk keeps its outputs; the version in git does not. The benefit is that the diff between two commits of a notebook reflects changes in source, not changes in PNG bytes; the cost is that a reviewer cannot see the rendered output without opening the notebook locally.</p>
+
+  <pre><code class="language-bash">pip install nbstripout
+nbstripout --install --attributes .gitattributes
+</code></pre>
+
+  <p>The combination of jupytext (so the diff is on the <code>.py</code> twin) and nbstripout (so the <code>.ipynb</code> diff is at least small) is the standard hygiene baseline. For teams that want output preserved for review, the alternative is to commit a rendered HTML version of the notebook alongside the source, generated by nbconvert on every push.</p>
+
+  <h3>papermill: parametrised execution</h3>
+
+  <p><strong>Papermill</strong> (Netflix, 2017) treats a notebook as a parametrisable function. The author marks one cell as the "parameters" cell (a tagged metadata flag); papermill replaces that cell's contents with caller-supplied values, executes the notebook from scratch, and writes a new <code>.ipynb</code> with the resulting outputs. This is the pattern Netflix's data platform uses to run thousands of notebooks per day in production, each parametrised by date, region, or model version.</p>
+
+  <pre><code class="language-bash">papermill calibrate_pd.ipynb \
+          output/calibrate_pd_2026Q1.ipynb \
+          -p portfolio "consumer" \
+          -p as_of_date "2026-03-31" \
+          -p macro_scenario "central"
+</code></pre>
+
+  <p>Papermill's promise is that a notebook can become a reproducible batch job without being rewritten as a script. In practice, the notebooks that papermill executes well are the ones that were written defensively in the first place: top-to-bottom executable, no hidden state, parameters at the top. A messy exploratory notebook is not made reproducible by adding papermill; papermill exposes the messiness.</p>
+
+  <h3>nbconvert: rendering to HTML, PDF, slides</h3>
+
+  <p><strong>nbconvert</strong> (Jupyter project, 2015) is the rendering pipeline that turns a <code>.ipynb</code> into another format. The classic uses are HTML for sharing on a web page, PDF for inclusion in a model document, and reveal.js slides for presentation. nbconvert is the engine behind the GitHub notebook viewer and behind every "render this notebook as a webpage" feature in MkDocs Material.</p>
+
+  <pre><code class="language-bash">jupyter nbconvert --to html      analysis.ipynb
+jupyter nbconvert --to pdf       analysis.ipynb
+jupyter nbconvert --to slides    analysis.ipynb --post serve
+</code></pre>
+
+  <p>The HTML output is self-contained: the page can be opened locally or hosted on any static site. The PDF output requires a LaTeX installation (or Pandoc, as in Lecture 7), because PDF is produced via TeX intermediate. The slides output uses reveal.js; each Markdown heading becomes a slide.</p>
+
+  <h3>Quarto: the modern alternative</h3>
+
+  <p><strong>Quarto</strong> (J. J. Allaire and Posit, 2022; quarto.org) is the descendant of R Markdown, generalised to Python, R, Julia, and Observable. A Quarto document is a <code>.qmd</code> file, which is Markdown with executable code chunks. The Quarto CLI executes the chunks (against a Jupyter kernel under the hood, in the Python case), substitutes the outputs, and renders to HTML, PDF, EPUB, Word, slides, or a website. Unlike Jupyter, the source is plain-text Markdown by design; unlike RMarkdown, the language is not tied to R.</p>
+
+  <pre><code class="language-md">---
+title: "Calibrating PD on the consumer book"
+author: "Risk modelling team"
+format:
+  html:
+    toc: true
+    theme: cosmo
+jupyter: python3
+---
+
+## Loading the data
+
+```{python}
+import pandas as pd
+df = pd.read_parquet('book.parquet')
+df.head()
+```
+</code></pre>
+
+  <p>Quarto's appeal is that the source is the same Markdown that the rest of the documentation site uses. There is no JSON file. Diff and review work normally. The CLI is a single binary. For teams whose Jupyter use is mostly "literate documentation around a calculation", Quarto is the cleaner answer than the jupytext-plus-nbstripout combination. The cost is that interactive exploration is less smooth than in JupyterLab; Quarto is better for finished artefacts than for the discovery phase.</p>
+
+  <h3>Marimo: rebuilding the notebook from scratch</h3>
+
+  <p><strong>Marimo</strong> (Akshay Agrawal, 2023; marimo.io) is the most aggressive response to the hidden-state problem. A Marimo notebook is a <code>.py</code> file containing decorated cell functions. The runtime tracks the dependency graph between cells: when cell A is edited, every cell that reads a name A defined is automatically re-executed; cells that no longer reference a name are released. By construction, the kernel state matches the file. Out-of-order execution and hidden state are unrepresentable.</p>
+
+  <pre><code class="language-python">import marimo as mo
+
+@mo.cell
+def __():
+    import pandas as pd
+    return pd
+
+@mo.cell
+def __(pd):
+    df = pd.read_parquet('book.parquet')
+    return df
+
+@mo.cell
+def __(df):
+    df.head()
+</code></pre>
+
+  <p>The trade-off Marimo makes is that the per-cell ergonomics of "set a variable, then mutate it three times" no longer work; every cell's outputs are a pure function of its inputs. For teams used to Jupyter, this feels restrictive at first and liberating afterwards. The format is also new (2023), so the ecosystem of extensions, kernels, and integrations is still shallow.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    The biggest mistake when adopting any of these tools is to try to add them to an existing messy notebook. jupytext on a notebook with twenty out-of-order cells produces a <code>.py</code> that is just as confusing, only now in script form. papermill on a notebook with hidden state simply re-executes the file and produces a broken output. The order of operations is: first restart-and-run-all, fix the failures, get the notebook clean; then add the tooling. Tooling exposes mess; it does not clean it up.
+  </div>
+
+  <h3>Notebooks in continuous integration</h3>
+
+  <p>The discipline of "notebooks must execute end-to-end in CI" is the move from Rung 3 to Rung 4 on the maturity ladder. The pattern is the same as for tests: a GitHub Actions job, on every push, runs <code>jupyter nbconvert --execute</code> on every notebook in the repo and fails the build if any cell errors. For notebooks that take longer than a CI step's tolerance, papermill produces the same effect with parametrised, shorter-running inputs.</p>
+
+  <pre><code class="language-yaml"># .github/workflows/notebooks.yml
+name: Execute notebooks
+on:
+  pull_request:
+    paths: ['notebooks/**/*.ipynb', 'notebooks/**/*.py']
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r requirements.txt jupyter nbconvert
+      - run: |
+          for f in notebooks/*.ipynb; do
+            jupyter nbconvert --to notebook --execute "$f" \
+                              --output "/tmp/$(basename $f)"
+          done
+</code></pre>
+
+  <p>The job does not commit the executed outputs back to the repo; its purpose is the binary check "did every cell succeed". A team that runs this on every PR has a guarantee no team without it can offer: every notebook in the repo, on the trunk, is reproducible at the moment of merge.</p>
+
+  <h3>Worked example: turning an exploratory notebook into a reproducible artefact</h3>
+
+  <div class="worked">
+    <strong>Worked example: cleaning up <code>pd_calibration.ipynb</code></strong>
+    <p>The notebook in question is two months old. It calibrates a PD model on the consumer book. The author (you, two months ago) ran the cells in roughly the right order, then went back and tweaked a feature engineering cell, never re-ran the cells below it, and committed the file with stale outputs. The new validator wants to reproduce the result. The remediation has five steps.</p>
+    <p>Step 1 (kernel restart and run all). Open the notebook, "Kernel → Restart and Run All". Three cells fail: one because of a name from a cell that was deleted last week (hidden state); one because the data file path has moved (environment drift); one because a pandas method was deprecated in 2.2 (environment drift). Note each failure.</p>
+    <p>Step 2 (fix the hidden state). Search the notebook for the orphaned name. Either restore the cell that defined it or remove the references. In this case, a feature called <code>balance_log</code> was computed in a deleted cell; restoring the one-line computation as cell 4 fixes the four cells below it.</p>
+    <p>Step 3 (pin the environment). Add a <code>requirements.txt</code> (or <code>pyproject.toml</code>, Lecture 11) listing pandas, scikit-learn, matplotlib, and statsmodels at the versions the notebook actually works against. Run <code>pip install -r requirements.txt</code> in a clean virtualenv to confirm.</p>
+    <p>Step 4 (pair with jupytext). Run <code>jupytext --set-formats ipynb,py:percent pd_calibration.ipynb</code>. The new <code>pd_calibration.py</code> is the file that will be reviewed; the <code>.ipynb</code> is for exploration. Add a <code>.gitignore</code> entry, or use nbstripout, to keep the JSON tidy.</p>
+    <p>Step 5 (CI). Add a one-job GitHub Actions workflow that runs <code>jupyter nbconvert --execute pd_calibration.ipynb</code> on every PR. The PR template now includes a line "All notebooks execute cleanly from a fresh kernel", which the CI job enforces automatically. The next time someone tweaks a feature engineering cell without re-running the rest, the build fails and the author is told.</p>
+    <p>The notebook is now reproducible, reviewable, and defensible. The investment was three hours; the gain is that the validator can re-run the calibration in the audit pack without phoning the original author.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The Jupyter notebook is the medium in which most modern data analysis is done and the medium in which most reproducibility incidents happen. The mismatch is intrinsic: the file format records source and outputs in a way that does not enforce execution order or kernel cleanliness, and most authors do not work top-to-bottom by habit. The remediation is half discipline (restart-and-run-all before sharing) and half tooling (jupytext for diffs, nbstripout for hygiene, papermill for batch, nbconvert for rendering). The two newer alternatives, Quarto and Marimo, attack different parts of the problem: Quarto by treating the notebook as Markdown-with-code, Marimo by rebuilding the runtime so hidden state cannot exist.</p>
+
+  <p>For risk modelling work specifically, the rule that wins audits is unromantic: every notebook in the repository must execute end-to-end in CI, against a pinned environment, on every pull request. A team that enforces that rule has a documentation surface that survives validation, regulatory scrutiny, and the inevitable departure of the original author. The next lecture starts Part IV by taking the broader question seriously: how the project is set up so the environment, dependencies, and Python version are themselves reproducible. Notebook reproducibility, in that frame, is one application of a discipline that applies to the whole project.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What is the file format of a Jupyter notebook on disk? Name three fields stored in each code cell.</li>
+      <li>State the three failure modes of notebook reproducibility. For each, give one diagnostic that detects it.</li>
+      <li>What does "restart and run all" prove? What does it not prove?</li>
+      <li>What does jupytext add to a Jupyter workflow that nbstripout does not, and vice versa?</li>
+      <li>What is the role of a parameters cell in papermill? How does papermill use it?</li>
+      <li>Quarto and Marimo both attack the reproducibility problem differently. Describe each strategy in one sentence.</li>
+      <li>Write the shape of a GitHub Actions job that executes every notebook in <code>notebooks/</code> on every pull request and fails on any cell error.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="10-html_and_css.html">Lecture 10 (HTML, CSS, and the visual layer)</a> covered the rendering target for nbconvert and Quarto outputs; this lecture covers the source they read.</li>
+      <li><strong>Next:</strong> <a href="12-project_setup.html">Lecture 12 (project setup and dependency management)</a> closes the environment-drift failure mode by pinning Python and library versions.</li>
+      <li><strong>Cross-link:</strong> <a href="05-testing.html">Lecture 5 (testing)</a> covered the discipline of "run on every commit", which extends here to notebook execution as a CI check.</li>
+      <li><strong>Cross-link:</strong> <a href="08-markdown_and_docs.html">Lecture 8 (markdown and the documentation toolchain)</a> covered the prose layer that Quarto and rendered notebooks slot into.</li>
+      <li><strong>Outside this course:</strong> Pimentel, Murta, Braganholo, and Freire, "A large-scale study about quality and reproducibility of Jupyter notebooks" (MSR 2019); Joel Grus, "I don't like notebooks" (JupyterCon 2018); David Donoho, "50 years of data science" (JCGS 2017); Sculley et al., "Hidden technical debt in machine learning systems" (NIPS 2015); Quarto documentation (quarto.org); Marimo documentation (docs.marimo.io); jupytext documentation (jupytext.readthedocs.io); papermill documentation (papermill.readthedocs.io).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 11 of 16</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

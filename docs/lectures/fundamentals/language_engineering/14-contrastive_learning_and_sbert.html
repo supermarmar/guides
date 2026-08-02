@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 14: contrastive learning and SBERT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Contrastive learning and SBERT</h1>
+  <p class="subtitle">Lecture 12 left a question open. A cross-encoder is markedly more accurate than a bi-encoder, so why can it not simply be the search engine? The answer is architectural and it costs 5.8 days per query pass over a corpus a bi-encoder handles in 100 seconds. What replaces it is a Siamese arrangement trained contrastively, and the choice of loss function moves the resulting model from 0.5982 to 0.8094 on the same data with the same encoder.</p>
+  <div class="meta">
+    <span>Lecture 14 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part V: training your own</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>cross-encoder</strong> concatenates two sentences with a separator token, runs them through one encoder together, and emits a similarity score from a classification head. It produces no vector, so nothing can be precomputed and every comparison is a forward pass. Finding the most similar pair among 10,000 sentences needs <em>n</em>(<em>n</em>−1)/2 = <strong>49,995,000</strong> passes.</p>
+
+  <p><strong>SBERT</strong> (Reimers and Gurevych, 2019) drops the classification head, mean-pools the token outputs into one fixed vector, and trains two copies of the encoder that share weights, a <strong>Siamese</strong> arrangement also called a <strong>bi-encoder</strong>. The same 10,000 sentences now cost <strong>10,000</strong> passes, because each sentence is encoded once and comparison becomes a dot product. That is a factor of <strong>4,999.5</strong>.</p>
+
+  <p>Pooling alone is not enough, and this is the point lecture 3 flagged: mean-pooling an untrained BERT produces sentence embeddings worse than averaging GloVe vectors. The model has to be trained with a contrastive objective, and the objective needs pairs. <strong>Natural language inference</strong> data supplies them free, because entailment is a positive pair and contradiction is a negative one.</p>
+
+  <p>The loss then does most of the remaining work. On 50,000 MNLI pairs with <code>bert-base-uncased</code>, <strong>softmax loss</strong> reaches 0.5982 Pearson cosine on STSB, <strong>cosine similarity loss</strong> reaches 0.7222, and <strong>multiple negatives ranking loss</strong> reaches 0.8094. Same encoder, same data, <strong>+35.3 per cent</strong> from the loss function alone.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    To find which two of ten thousand documents match, you could read every possible pair, which is fifty million readings. Or you could read each document once, write a summary card, and then just compare cards. The cards are worse than reading both documents together. They are five thousand times cheaper, and you can write them before anyone asks a question.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that this lecture explains a constraint the whole of Part III was built around. Lectures 11 and 12 assumed embeddings could be computed in advance and that search was therefore a nearest-neighbour lookup rather than a model run. That assumption is precisely what the bi-encoder architecture buys, and precisely what the more accurate architecture cannot offer. Two-stage retrieval exists because neither architecture is adequate alone.</p>
+
+  <p>The second reason is that the loss function is the largest single lever available and the one most often left at a default. Going from softmax to multiple negatives ranking loss is a two-line change that moves the score more than switching to a bigger base model typically would. Anyone training an embedding model who has not deliberately chosen the loss has left a third of the achievable quality unclaimed.</p>
+
+  <p>The third reason is that the pairs are usually already in your data. Question and accepted answer, ticket and resolution, paper title and abstract, product and its reviews, query log and clicked result: each is a hard positive pair that somebody has already labelled implicitly by behaviour. The expensive-looking part of training an embedding model, obtaining supervision, is frequently free.</p>
+
+  <p>And a fourth reason about continuity. The objective here is the one lecture 13 met in its image-and-text form, and the batch-size argument carries over exactly: in-batch negatives mean the batch size is the difficulty, so it is a property of the objective and not a throughput setting.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>One architectural choice that trades accuracy for precomputation, and one loss function that recovers most of what the trade gave away.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A cross-encoder concatenates two sentences and emits a score with no reusable vector, while a bi-encoder encodes each sentence separately through weight-shared encoders and mean pooling to produce comparable embeddings. Below, the cost arithmetic and the three loss functions with their STSB scores.">
+      <rect x="0" y="0" width="880" height="430" fill="#FFFFFF"/>
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same encoder, wired two ways</text>
+
+      <!-- CROSS-ENCODER -->
+      <rect x="24" y="34" width="400" height="196" rx="9" fill="#FFFFFF" stroke="#DC2855" stroke-width="2"/>
+      <text x="224" y="54" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#9f1239">CROSS-ENCODER</text>
+      <text x="224" y="68" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#DC2855">more accurate, and useless as a search engine</text>
+
+      <rect x="54" y="80" width="340" height="24" rx="4" fill="#FFE4E6" stroke="#DC2855" stroke-width="1.5"/>
+      <text x="224" y="96" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#9f1239">sentence A  [SEP]  sentence B</text>
+      <line x1="224" y1="104" x2="224" y2="114" stroke="#71717a" stroke-width="1.6"/><polygon points="224,118 219,110 229,110" fill="#71717a"/>
+
+      <rect x="124" y="118" width="200" height="30" rx="6" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="224" y="137" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#3f3f46">ONE ENCODER, BOTH SENTENCES</text>
+      <line x1="224" y1="148" x2="224" y2="158" stroke="#71717a" stroke-width="1.6"/><polygon points="224,162 219,154 229,154" fill="#71717a"/>
+
+      <rect x="154" y="162" width="140" height="24" rx="4" fill="#FFE4E6" stroke="#DC2855" stroke-width="1.5"/>
+      <text x="224" y="178" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#9f1239">classification head</text>
+
+      <text x="224" y="202" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#18181b">output: 0.87</text>
+      <text x="224" y="220" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="700" fill="#DC2855">no vector exists. Nothing can be stored.</text>
+
+      <!-- BI-ENCODER -->
+      <rect x="456" y="34" width="400" height="196" rx="9" fill="#FFFFFF" stroke="#3E7A45" stroke-width="2"/>
+      <text x="656" y="54" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#14532d">BI-ENCODER (SBERT)</text>
+      <text x="656" y="68" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#3E7A45">slightly worse per comparison, and precomputable</text>
+
+      <rect x="480" y="80" width="160" height="24" rx="4" fill="#DCFCE7" stroke="#3E7A45" stroke-width="1.5"/>
+      <text x="560" y="96" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#14532d">sentence A</text>
+      <rect x="672" y="80" width="160" height="24" rx="4" fill="#DCFCE7" stroke="#3E7A45" stroke-width="1.5"/>
+      <text x="752" y="96" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#14532d">sentence B</text>
+      <line x1="560" y1="104" x2="560" y2="114" stroke="#71717a" stroke-width="1.6"/><polygon points="560,118 555,110 565,110" fill="#71717a"/>
+      <line x1="752" y1="104" x2="752" y2="114" stroke="#71717a" stroke-width="1.6"/><polygon points="752,118 747,110 757,110" fill="#71717a"/>
+
+      <rect x="480" y="118" width="160" height="30" rx="6" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="560" y="137" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#3f3f46">ENCODER</text>
+      <rect x="672" y="118" width="160" height="30" rx="6" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="752" y="137" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#3f3f46">ENCODER</text>
+      <line x1="640" y1="133" x2="672" y2="133" stroke="#5B47E0" stroke-width="1.4" stroke-dasharray="3 2"/>
+      <text x="656" y="127" text-anchor="middle" font-family="Inter" font-size="7" font-weight="700" fill="#5B47E0">SAME</text>
+      <text x="656" y="147" text-anchor="middle" font-family="Inter" font-size="7" font-weight="700" fill="#5B47E0">WEIGHTS</text>
+
+      <line x1="560" y1="148" x2="560" y2="158" stroke="#71717a" stroke-width="1.6"/><polygon points="560,162 555,154 565,154" fill="#71717a"/>
+      <line x1="752" y1="148" x2="752" y2="158" stroke="#71717a" stroke-width="1.6"/><polygon points="752,162 747,154 757,154" fill="#71717a"/>
+      <rect x="480" y="162" width="160" height="24" rx="4" fill="#DCFCE7" stroke="#3E7A45" stroke-width="1.5"/>
+      <text x="560" y="178" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#14532d">mean pooling</text>
+      <rect x="672" y="162" width="160" height="24" rx="4" fill="#DCFCE7" stroke="#3E7A45" stroke-width="1.5"/>
+      <text x="752" y="178" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#14532d">mean pooling</text>
+
+      <text x="656" y="202" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#18181b">cosine(vec_A, vec_B) = 0.84</text>
+      <text x="656" y="220" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="700" fill="#3E7A45">two reusable vectors. Encode once, compare forever.</text>
+
+      <!-- COST -->
+      <rect x="24" y="244" width="832" height="72" rx="9" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="440" y="264" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#18181b">ALL PAIRS AMONG 10,000 SENTENCES, AT 10 MS PER FORWARD PASS</text>
+      <text x="60" y="286" font-family="JetBrains Mono" font-size="9" fill="#9f1239">cross-encoder   n(n-1)/2 = 49,995,000 passes    499,950 s   =  5.79 DAYS</text>
+      <text x="60" y="304" font-family="JetBrains Mono" font-size="9" fill="#14532d">bi-encoder      n         =     10,000 passes        100 s   =  1.7 MINUTES</text>
+      <text x="700" y="295" font-family="Inter" font-size="11" font-weight="700" fill="#5B47E0">4,999.5x</text>
+
+      <!-- LOSSES -->
+      <rect x="24" y="330" width="832" height="86" rx="9" fill="#FFFFFF" stroke="#5B47E0" stroke-width="2"/>
+      <text x="440" y="350" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#4c1d95">SAME ENCODER, SAME 50,000 PAIRS: THE LOSS IS THE LEVER (Pearson cosine on STSB)</text>
+
+      <text x="60" y="373" font-family="Inter" font-size="9" fill="#3f3f46">softmax</text>
+      <rect x="150" y="365" width="299" height="11" rx="2" fill="#e4e4e7"/>
+      <text x="466" y="374" font-family="JetBrains Mono" font-size="9" fill="#3f3f46">0.5982</text>
+      <text x="540" y="374" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">the 2019 original; no longer advised</text>
+
+      <text x="60" y="391" font-family="Inter" font-size="9" fill="#3f3f46">cosine similarity</text>
+      <rect x="150" y="383" width="361" height="11" rx="2" fill="#C8BFFF"/>
+      <text x="528" y="392" font-family="JetBrains Mono" font-size="9" fill="#3f3f46">0.7222</text>
+      <text x="600" y="392" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">+20.7% &#183; needs graded labels</text>
+
+      <text x="60" y="409" font-family="Inter" font-size="9" font-weight="600" fill="#4c1d95">multiple negatives</text>
+      <rect x="150" y="401" width="405" height="11" rx="2" fill="#5B47E0"/>
+      <text x="572" y="410" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#4c1d95">0.8094</text>
+      <text x="640" y="410" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">+35.3% on softmax &#183; needs only positives</text>
+    </svg>
+    <figcaption>The two wirings differ in one respect: whether the sentences meet inside the encoder or only afterwards. Meeting inside is more accurate, because attention can compare the actual words of one against the actual words of the other, and it is exactly what makes the result unstorable. The bottom panel is the compensation: with the architecture fixed, the loss function recovers a third of the quality.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Why a cross-encoder cannot be a search engine</h3>
+
+  <p>The obstacle is not speed in any adjustable sense. It is that a cross-encoder produces no intermediate object worth keeping. Its input is a pair, its output is a scalar, and the score for (A, B) tells you nothing that helps with (A, C). Every question requires the model to be run again.</p>
+
+  <div class="worked">THE COST, THREE WAYS
+
+  1. ALL-PAIRS AMONG 10,000 SENTENCES
+       cross-encoder   n(n-1)/2 = 10,000 x 9,999 / 2 = 49,995,000 passes
+       bi-encoder      n                            =     10,000 passes
+                                                      ---------------
+       ratio           49,995,000 / 10,000          =      4,999.5x
+
+     at 10 ms per pass
+       cross-encoder   499,950 s = 138.9 hours = 5.79 days
+       bi-encoder          100 s = 1.7 minutes
+
+     and the bi-encoder's 49,995,000 cosine similarities are
+     dot products on cached vectors, microseconds apiece.
+
+  2. ONE QUERY AGAINST A CORPUS  (lecture 12's ten-million-token
+     corpus, 22,322 chunks)
+       cross-encoder   22,322 passes per query   = 223 s
+       bi-encoder           1 pass  per query    =  10 ms
+                            + 22,322 dot products against the index
+
+     223 seconds per query is not a latency problem to be
+     optimised. It is a different product.
+
+  3. WHAT CHANGES WHEN THE CORPUS GROWS
+       cross-encoder   cost per query is LINEAR in corpus size
+       bi-encoder      cost per query is CONSTANT; the index
+                       absorbs the growth, and approximate
+                       nearest-neighbour search makes even the
+                       comparison sublinear
+
+  WHICH IS WHY LECTURE 12 USED BOTH
+       bi-encoder shortlists 100 from 22,322      ~10 ms
+       cross-encoder reorders those 100            ~1 s
+       recall@6 rises from 60% to 85%
+
+     The two-stage design is not a compromise. It is the only
+     arrangement in which the accurate model is affordable.</div>
+
+  <h3>SBERT: what changed</h3>
+
+  <p>Two modifications turn BERT into something that emits comparable vectors. The classification head is removed, and the final layer's token outputs are averaged into one fixed-size vector by <strong>mean pooling</strong>. Training then uses two copies of the encoder that share every weight, so a pair of sentences produces a pair of embeddings from what is really one model applied twice. That weight-sharing arrangement is the <strong>Siamese</strong> network, and in this context the result is called a bi-encoder or SBERT.</p>
+
+  <p>Note what mean pooling is not. Lecture 3 made the point and it is worth repeating here because this is where it is resolved: mean-pooling a plain pretrained BERT gives sentence embeddings that are worse than averaging GloVe word vectors. Masked language modelling never asked the model to place similar sentences near each other, so nothing in the pretrained weights arranges them that way. Pooling supplies the right shape and none of the right geometry. The geometry comes from the contrastive training, which is the rest of this lecture.</p>
+
+  <h3>Where the pairs come from</h3>
+
+  <p>Contrastive training needs examples of similar and dissimilar text. <strong>Natural language inference</strong> datasets provide them as a by-product of a different task: given a premise and a hypothesis, annotators marked whether the premise <em>entails</em> the hypothesis, <em>contradicts</em> it, or neither.</p>
+
+  <div class="worked">NLI LABELS READ AS SIMILARITY
+
+  ENTAILMENT  ->  a positive pair
+    premise     "One of our number will carry out your
+                 instructions minutely."
+    hypothesis  "A member of my team will execute your orders
+                 with immense precision."
+    same meaning, different words. Exactly the pair type an
+    embedding model must learn to place together.
+
+  CONTRADICTION  ->  a negative pair
+    premise     "He is in the cinema watching Coco."
+    hypothesis  "He is watching Frozen at home."
+    overlapping vocabulary, incompatible meaning. A HARD
+    negative, and the reason NLI data is valuable: surface
+    similarity with semantic difference is the case that
+    separates a good embedding model from a bag of words.
+
+  NEUTRAL  ->  treated as negative for a binary loss, or as an
+               intermediate score for a graded one.
+
+  THE DATA USED HERE
+    MNLI, from the GLUE benchmark   392,702 annotated pairs
+    subset taken for the examples    50,000
+    filtered to entailment only      16,875   (33.75%)
+
+  A WARNING ABOUT SIZE
+    50,000 is a demonstration figure. Contrastive training is
+    unstable on small datasets, because the objective depends
+    on the distribution of negatives and a small sample gives
+    a poor one. Prefer more data where the quality holds.</div>
+
+  <p>Domain pairs work the same way and are usually better, because they match the distribution you will actually query. A question with its accepted answer, a paper title with its abstract, a support ticket with its resolution: all hard positives, all already in the logs, none requiring an annotation exercise.</p>
+
+  <h3>The three losses</h3>
+
+  <p>With the architecture and the data fixed, the loss decides how similarity is defined and optimised. All three results below use <code>bert-base-uncased</code>, the same 50,000 MNLI pairs, one epoch, batch size 32, and are scored by Pearson correlation of cosine similarity against the STSB benchmark's human judgements.</p>
+
+  <div class="worked">SOFTMAX LOSS                                     0.5982
+
+    Concatenate the two embeddings and their elementwise
+    difference, then classify the result into the three NLI
+    labels. This is what the 2019 SBERT paper used and it is
+    now mainly of historical interest: the objective is a
+    three-way classification, not a similarity, so the model
+    is optimised for something adjacent to what you want.
+
+  COSINE SIMILARITY LOSS                             0.7222
+                                                    (+20.7%)
+    Compute cosine(A, B) directly and regress it against a
+    target score in [0, 1]. The objective IS the quantity you
+    will use at inference, which is why it does so much
+    better.
+
+    Needs graded labels. Mapping NLI onto it is lossy:
+      entailment    (0) -> 1.0
+      neutral       (1) -> 0.0
+      contradiction (2) -> 0.0
+    which throws away the distinction between "unrelated" and
+    "opposite" that the annotators recorded.
+
+  MULTIPLE NEGATIVES RANKING LOSS                    0.8094
+    also called InfoNCE or NT-Xent                  (+12.1% on
+                                                     cosine,
+                                                     +35.3% on
+                                                     softmax)
+    Needs only POSITIVE pairs. The negatives are manufactured:
+    within a batch, every anchor is paired against every other
+    example's positive, which is almost certainly wrong for it.
+    These are IN-BATCH NEGATIVES.
+
+    batch of 32   ->  1 positive, 31 in-batch negatives
+                      random guess = 1/32 = 3.125%
+    batch of 64   ->  1 positive, 63 in-batch negatives
+                      random guess = 1/64 = 1.5625%
+
+    So the batch size is the difficulty, exactly as in
+    lecture 13's CLIP: the InfoNCE bound grows as log N, and a
+    bigger batch produces a better model rather than the same
+    model sooner.
+
+  THE PRACTICAL ORDERING
+    Only positives?  ->  MNR. It is also the default choice.
+    Graded scores?   ->  cosine similarity loss.
+    Softmax          ->  do not, unless reproducing 2019.</div>
+
+  <pre><code>from sentence_transformers import SentenceTransformer, losses
+
+embedding_model = SentenceTransformer("bert-base-uncased")
+train_loss = losses.MultipleNegativesRankingLoss(model=embedding_model)
+# swapping this one line is the +35.3%</code></pre>
+
+  <h3>Hard negatives</h3>
+
+  <p>In-batch negatives are cheap and, for the same reason, easy. Two randomly paired examples from a broad corpus are usually about entirely different subjects, so telling them apart teaches the model very little beyond topic. The gains come from negatives that are close to the positive and still wrong.</p>
+
+  <div class="worked">THREE GRADES OF NEGATIVE
+
+    query: "How many people live in Amsterdam?"
+    positive: "Almost a million people live in Amsterdam."
+
+  EASY  (random sampling; free)
+    "The tensile strength of carbon fibre exceeds that of steel."
+    Shares nothing. Rejecting it requires only topic detection.
+
+  SEMI-HARD  (nearest neighbours under an existing embedding
+              model; cheap)
+    "Amsterdam is the capital of the Netherlands."
+    Right topic, wrong question. Better, but a model that
+    matches on topic still passes.
+
+  HARD  (manual, or generated and filtered by a model; costly)
+    "More than a million people live in Utrecht, which is more
+     than Amsterdam."
+    Right topic, right entity, right quantity type, WRONG
+    ANSWER. Rejecting this requires the model to represent
+    what is being asserted, not merely what is being discussed.
+
+  WHY IT PAYS
+    a model trained on easy negatives learns "is this about
+    the same thing?"; a model trained on hard negatives learns
+    "is this the answer?". Retrieval needs the second, which
+    is why hard-negative mining is the standard step between a
+    working embedding model and a good one.
+
+  AND WHERE THEY COME FROM CHEAPLY
+    mine semi-hard negatives with the model you already have,
+    then have a cross-encoder or a generative model discard
+    the ones that are actually correct answers. That last
+    filter matters: an unfiltered "hard negative" that happens
+    to be a true positive teaches the model the opposite of
+    what you intend.</div>
+
+  <h3>Evaluating what you built</h3>
+
+  <p>The figures above are STSB, a single benchmark of human-scored sentence pairs graded 1 to 5 and rescaled to 0 to 1. It is a reasonable development signal and a poor final answer, because a model can be good at graded sentence similarity and mediocre at retrieval, clustering or classification.</p>
+
+  <p>The <strong>Massive Text Embedding Benchmark</strong> exists for that reason: 8 task types across 58 datasets and 112 languages, with a public leaderboard. Read it with two cautions. Evaluation time is reported alongside accuracy, and for anything that encodes a whole corpus the speed column often decides. And a leaderboard measures general capability, whereas you are usually choosing for one domain, so a mid-table model fine-tuned on your pairs will routinely beat a top-table model used off the shelf. That is lecture 15.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A cross-encoder reads two sentences together and is more accurate for exactly the reason it is unusable as a search engine: it produces a score rather than a vector, so nothing survives to be reused, and all-pairs over 10,000 sentences costs 49,995,000 forward passes against a bi-encoder's 10,000. SBERT makes the trade by removing the classification head, mean-pooling to a fixed vector, and training two weight-shared copies of the encoder. Pooling alone yields nothing useful, since masked language modelling never arranged sentences by similarity; the geometry comes from contrastive training on positive and negative pairs, which natural language inference data supplies for free by reading entailment as similar and contradiction as dissimilar.</p>
+
+  <p>With the architecture fixed, the loss is the lever: 0.5982 for softmax, 0.7222 for cosine similarity, 0.8094 for multiple negatives ranking, a 35.3 per cent span on identical data and encoder. MNR wins partly because it needs only positives and manufactures its negatives from the batch, which makes the batch size a property of the objective rather than of throughput. Its weakness is that in-batch negatives are easy, and mining hard negatives, ones sharing topic and entity while being wrong, is the standard step from a working model to a good one.</p>
+
+  <div class="callout insight">
+    <span class="tag">The pattern underneath</span>
+    Every contrastive method in this track is the same three decisions: what counts as a positive pair, where the negatives come from, and how hard they are. Word2vec in lecture 3 used neighbouring words and random words. CLIP in lecture 13 used captions and the rest of the batch. SBERT here uses entailment and, ideally, mined near-misses. Once the three decisions are visible, applying contrastive learning to a new domain is a data question rather than a modelling one.
+  </div>
+
+  <p>Lecture 15 stops training from scratch. Starting from a model somebody has already trained on hundreds of millions of pairs is both cheaper and better, and it opens the two cases this lecture could not address: adapting to a domain where the vocabulary differs from anything in the pretraining data, and training when you have documents but nobody has labelled a single pair.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Describe the structural difference between a cross-encoder and a bi-encoder, and state what each one outputs.</li>
+      <li><strong>Do the arithmetic.</strong> How many forward passes does a cross-encoder need for all pairs among 10,000 sentences, and how many does a bi-encoder need? What is the ratio?</li>
+      <li><strong>Do the arithmetic.</strong> At 10 ms per pass, convert both figures to wall-clock time.</li>
+      <li>Explain why the cross-encoder's advantage and its unusability have the same cause.</li>
+      <li>State how per-query cost scales with corpus size for each architecture, and why that settles the design.</li>
+      <li>Name the two modifications SBERT makes to BERT, and say what a Siamese arrangement means.</li>
+      <li>Why is mean-pooling an untrained BERT worse than averaging GloVe vectors, and what fixes it?</li>
+      <li>Explain how entailment and contradiction map onto positive and negative pairs, and why contradiction pairs are especially valuable.</li>
+      <li><strong>Do the arithmetic.</strong> Of 50,000 MNLI pairs, how many survive a filter to entailment only, and what proportion is that?</li>
+      <li>Give the three loss functions with their STSB scores, and compute the percentage gain of each over softmax.</li>
+      <li>Why does cosine similarity loss beat softmax loss, in terms of what each objective optimises?</li>
+      <li>Explain what an in-batch negative is, and why multiple negatives ranking loss needs only positive pairs.</li>
+      <li><strong>Do the arithmetic.</strong> At batch sizes 32 and 64, how many negatives does each anchor face and what is the chance of a correct random guess?</li>
+      <li>Explain why batch size is part of the objective in contrastive training rather than a throughput setting.</li>
+      <li>Distinguish easy, semi-hard and hard negatives with an example of each, and say what each teaches the model.</li>
+      <li>Why must mined hard negatives be filtered, and what goes wrong if they are not?</li>
+      <li>Give two reasons a top-of-leaderboard MTEB model may be the wrong choice for your application.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Answers:</strong> Lecture 12 (<a href="12-retrieval_quality_and_evaluation.html">retrieval quality and evaluation</a>) left open why a cross-encoder cannot search; lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>) left open why pooling a plain BERT gives poor sentence embeddings. Both are resolved here.</li>
+      <li><strong>Previous:</strong> Lecture 13 (<a href="13-multimodal_models.html">multimodal models</a>) introduced the contrastive objective in its image-and-text form; the batch-size argument is identical.</li>
+      <li><strong>Origins:</strong> Lecture 3 introduced skip-gram and negative sampling, which is this objective at word scale.</li>
+      <li><strong>Next:</strong> Lecture 15 (<a href="15-training_embedding_models.html">training embedding models</a>) fine-tunes rather than trains, and handles the no-labels case.</li>
+      <li><strong>Uses:</strong> The models trained here are the ones lecture 5 (<a href="05-text_classification.html">text classification</a>), lecture 6 (<a href="06-clustering_and_topic_modelling.html">clustering and topic modelling</a>) and lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>) all bought off the shelf.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 14 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

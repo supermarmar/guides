@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 14: open table formats and the lakehouse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Open table formats and the lakehouse</h1>
+  <p class="subtitle">A directory of Parquet files is a pile of paper. A table is a pile of paper plus a register saying which sheets are currently part of the table, added when, by whom, and superseding what. The files were never the hard part. The register is the invention, and it is the whole of what a table format adds.</p>
+  <div class="meta">
+    <span>Lecture 14 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part IV: transformation at scale</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">An <strong>open table format</strong> is a metadata layer over ordinary Parquet files in ordinary object storage that makes them behave like a database table. The three implementations are <strong>Delta Lake</strong>, <strong>Apache Iceberg</strong>, and <strong>Apache Hudi</strong>. They differ in detail and agree on the essentials.</p>
+
+  <p>What the register buys, and no directory of files can offer. <strong>Atomic commits</strong>: a reader sees the table before a write or after it, never halfway, which is the guarantee Lecture 06 needed for a safe publish. <strong>Time travel</strong>: because superseded files are retained and the register records versions, the table as it stood at any past commit is queryable. <strong>Schema evolution</strong>: columns can be added, renamed, or retyped with rules, tracked in metadata rather than by rewriting history. <strong>Partition evolution</strong> (in Iceberg): the partitioning scheme can change without rewriting existing data. And <strong>efficient row-level change</strong>: updates and deletes become tractable through file-level rewrites or delete markers rather than reprocessing everything.</p>
+
+  <p>The consequence is the <strong>lakehouse</strong>: warehouse guarantees on lake storage, with several engines able to read and write the same single copy of the data. That last property is the strategic argument, and it is about optionality rather than speed.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A clerk keeps records in a filing room. Anyone walking in and reading whatever is on the shelves gets whatever state the room happens to be in, including a half-finished refiling. Now add a bound register at the door: entry 4,412 says the table currently consists of these ninety sheets. The clerk refiles freely, then writes one new entry when finished, and every reader consults the register first. Readers now always see a coherent table, the old entries let you reconstruct last Tuesday's, and nothing about the sheets themselves changed. That register is the transaction log.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Why this was the missing piece</span>
+    Lecture 03 described the lake's failures as governance failures rather than technical ones: no transactions, no schema enforcement, and a tendency to become a swamp. Notice that all three are solved by metadata rather than by new storage. That is why the lakehouse could arrive as a layer rather than a migration: the Parquet files stay exactly as they were, and a log next to them supplies what the warehouse used to provide by owning the disks. It is one of the cleaner examples in this field of a hard problem yielding to better bookkeeping.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Reproducing a past report stops being a project.</strong> The worked example in Lecture 03 asked why the March default rate changed between April and June, and the best answer required immutable snapshots and careful archiving. With time travel, the query is a clause: read the table as at the version the April report used. That turns a forensic exercise into a diff, and in a regulated environment where "explain the movement" is a monthly conversation, it is the single most valuable feature in this lecture.</p>
+
+  <p><strong>Concurrent readers and writers stop corrupting each other.</strong> Without a table format, a monthly load that deletes and rewrites a partition is dangerous precisely while it runs: a consumer querying at that moment sees a partial table, and there is no mechanism to prevent it. With atomic commits, the consumer sees the previous version until the new one is complete. This is what makes the idempotent overwrite pattern of Lecture 06 safe in production rather than merely correct in principle.</p>
+
+  <p><strong>Schema and partition changes stop being rewrites.</strong> A source adds a field; a partitioning choice made three years ago turns out wrong. Without metadata-managed evolution, the first requires backfilling every historical file and the second requires rewriting the entire table. With it, the first is a metadata operation and the second, in Iceberg, applies to new data while old data remains readable under the old scheme. Both changes are common enough that the difference compounds.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A transaction log over Parquet files, and time travel">
+      <defs>
+        <marker id="ar-lh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The files are ordinary; the log is the table</text>
+
+      <!-- log -->
+      <text x="120" y="46" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#5b21b6">TRANSACTION LOG</text>
+      <g font-family="JetBrains Mono" font-size="8.5" fill="#5b21b6">
+        <rect x="30" y="54" width="180" height="30" rx="4" fill="#F5F3FF" stroke="#7c3aed"/>
+        <text x="40" y="68">v1  ADD f1, f2, f3</text>
+        <text x="40" y="79">    2026-04-01  march load</text>
+
+        <rect x="30" y="90" width="180" height="30" rx="4" fill="#F5F3FF" stroke="#7c3aed"/>
+        <text x="40" y="104">v2  ADD f4</text>
+        <text x="40" y="115">    2026-05-01  april load</text>
+
+        <rect x="30" y="126" width="180" height="42" rx="4" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="40" y="140">v3  REMOVE f2</text>
+        <text x="40" y="151">    ADD f5</text>
+        <text x="40" y="162">    2026-05-12  march restated</text>
+
+        <rect x="30" y="174" width="180" height="30" rx="4" fill="#EDE9FE" stroke="#7c3aed" stroke-dasharray="3 2"/>
+        <text x="40" y="188">v4  ADD f6</text>
+        <text x="40" y="199">    2026-06-01  may load</text>
+      </g>
+
+      <!-- files -->
+      <text x="420" y="46" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">PARQUET FILES IN OBJECT STORAGE</text>
+      <g font-family="JetBrains Mono" font-size="8.5" fill="#115e59">
+        <rect x="300" y="56" width="52" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="310" y="72">f1</text>
+        <rect x="360" y="56" width="52" height="24" rx="4" fill="#FEE2E2" stroke="#DC2855"/><text x="370" y="72">f2</text>
+        <rect x="420" y="56" width="52" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="430" y="72">f3</text>
+        <rect x="480" y="56" width="52" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="490" y="72">f4</text>
+        <rect x="540" y="56" width="52" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="550" y="72">f5</text>
+        <rect x="600" y="56" width="52" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="610" y="72">f6</text>
+      </g>
+      <text x="386" y="96" font-family="Inter" font-size="8.5" fill="#DC2855">f2 still exists on disk: removed from the table, not deleted</text>
+      <text x="386" y="110" font-family="Inter" font-size="8.5" fill="#0d9488">that is what makes time travel possible, and what VACUUM eventually reclaims</text>
+
+      <!-- what each version sees -->
+      <rect x="270" y="130" width="460" height="120" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="500" y="152" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#92400e">WHAT A READER SEES, BY VERSION</text>
+      <g font-family="JetBrains Mono" font-size="9" fill="#7c2d12">
+        <text x="290" y="174">v1  ->  f1, f2, f3            (March as first published: rate 1.42%)</text>
+        <text x="290" y="192">v2  ->  f1, f2, f3, f4        (April added; March unchanged)</text>
+        <text x="290" y="210">v3  ->  f1, f3, f4, f5        (March restated: rate 1.51%)</text>
+        <text x="290" y="228">v4  ->  f1, f3, f4, f5, f6    (current)</text>
+      </g>
+      <text x="500" y="244" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#b45309">"explain the movement" is now a diff between v2 and v3, not an investigation</text>
+
+      <!-- copy on write vs merge on read -->
+      <rect x="30" y="266" width="340" height="120" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="200" y="288" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">COPY ON WRITE</text>
+      <text x="46" y="308" font-family="Inter" font-size="9" fill="#0d9488">Update 100 rows: rewrite every file containing them,</text>
+      <text x="46" y="322" font-family="Inter" font-size="9" fill="#0d9488">commit new files, mark old ones removed.</text>
+      <text x="46" y="342" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">Slow writes, fastest reads.</text>
+      <text x="46" y="360" font-family="Inter" font-size="9" fill="#0d9488">Right for monthly batch publishes:</text>
+      <text x="46" y="374" font-family="Inter" font-size="9" fill="#0d9488">written once, read constantly.</text>
+
+      <rect x="390" y="266" width="340" height="120" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="560" y="288" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#5b21b6">MERGE ON READ</text>
+      <text x="406" y="308" font-family="Inter" font-size="9" fill="#7c3aed">Update 100 rows: write a small delete or delta file;</text>
+      <text x="406" y="322" font-family="Inter" font-size="9" fill="#7c3aed">readers reconcile it against the base at query time.</text>
+      <text x="406" y="342" font-family="Inter" font-size="9" font-weight="600" fill="#5b21b6">Fast writes, slower reads until compaction.</text>
+      <text x="406" y="360" font-family="Inter" font-size="9" fill="#7c3aed">Right for streaming upserts and frequent</text>
+      <text x="406" y="374" font-family="Inter" font-size="9" fill="#7c3aed">small changes. Compaction is mandatory.</text>
+    </svg>
+    <figcaption>The log records which files constitute the table at each version, so removing a file from the table and deleting it from storage become separate acts. The two update strategies at the bottom are the answer to Lecture 06's observation that columnar files cannot be edited in place: either rewrite the affected files now, or record the change and reconcile later.</figcaption>
+  </figure>
+
+  <h3>The mechanics, in one pass</h3>
+
+  <p>A write produces new Parquet files, then appends one entry to the log naming the files added and removed. The append must be atomic, and the mechanisms differ: Delta Lake writes numbered JSON entries and relies on the storage layer's conditional put or a coordinating service, while Iceberg writes a new metadata file and atomically swaps a pointer held in a catalogue. Both give <strong>optimistic concurrency</strong>: two writers proceed in parallel, and the second to commit either succeeds because they touched different files or fails and retries because they conflicted. Snapshot isolation for readers follows for free, since a reader resolves the file list once and then reads only those files.</p>
+
+  <p>Because the log lists files with their statistics, the engine prunes at the metadata level before touching storage: <strong>file skipping</strong> using per-file minimum and maximum values, which is Lecture 02's row group statistics promoted to table scope. This is why a well-clustered lakehouse table can answer a selective query by opening a handful of files out of a hundred thousand without any directory listing at all, and why Iceberg scales to table sizes where listing object storage would itself be the bottleneck.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The operations you will actually use</h3>
+
+  <pre><code>-- create a table in the format, not just a directory of files
+CREATE TABLE risk.fact_account_month (
+    account_id      VARCHAR,
+    reporting_date  DATE,
+    balance         DECIMAL(18,2),
+    arrears_months  INTEGER
+) USING DELTA                          -- or USING ICEBERG
+PARTITIONED BY (reporting_date);
+
+-- the idempotent publish from Lecture 06, now atomic and concurrent-safe
+INSERT OVERWRITE risk.fact_account_month
+SELECT * FROM staging WHERE reporting_date = DATE '2026-03-31';
+
+-- row-level change, which a plain Parquet directory cannot express
+MERGE INTO risk.fact_account_month AS t
+USING corrections AS s
+   ON t.account_id = s.account_id AND t.reporting_date = s.reporting_date
+WHEN MATCHED THEN UPDATE SET arrears_months = s.arrears_months
+WHEN NOT MATCHED THEN INSERT *;
+
+-- time travel: by version, or by timestamp
+SELECT * FROM risk.fact_account_month VERSION AS OF 2;
+SELECT * FROM risk.fact_account_month TIMESTAMP AS OF '2026-05-01 00:00:00';
+
+-- what happened to this table, and who did it
+DESCRIBE HISTORY risk.fact_account_month;
+
+-- maintenance: compact small files, then reclaim superseded ones
+OPTIMIZE risk.fact_account_month WHERE reporting_date &gt;= '2026-01-01';
+VACUUM  risk.fact_account_month RETAIN 720 HOURS;</code></pre>
+
+  <p>Two of these deserve emphasis. <code>DESCRIBE HISTORY</code> is an audit trail the platform maintains for you: operation, timestamp, user, and the predicates involved, which is a large fraction of what a lineage question asks for and costs nothing to keep. And <code>VACUUM</code> is the one destructive operation in the list: it deletes files that are no longer part of any retained version, and setting its retention shorter than your time travel requirement silently destroys your ability to reproduce past reports. Choose the retention from the reproducibility policy, not from a storage cost target.</p>
+
+  <h3>Compaction, clustering, and why they are not optional</h3>
+
+  <p>Frequent small writes produce many small files, and Lecture 02's small files problem applies with force because the metadata itself grows too. <strong>Compaction</strong> rewrites many small files into fewer large ones, and it is routine maintenance rather than an intervention: schedule it. <strong>Clustering</strong> is the ordering decision from Lecture 02 made a first-class operation: writing or rewriting the data sorted by the columns you filter on makes file skipping effective, since statistics only prune when values are physically grouped. Delta offers Z-ordering and, more recently, liquid clustering; Iceberg has sort orders. The practical guidance is unchanged from Lecture 04's closing note: on columnar analytical storage the sort order you write is worth more than any index you create.</p>
+
+  <h3>Choosing between the three formats</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th></th><th>Delta Lake</th><th>Apache Iceberg</th><th>Apache Hudi</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Origin</strong></td><td>Databricks, open sourced 2019</td><td>Netflix, then Apache</td><td>Uber, then Apache</td></tr>
+      <tr><td><strong>Metadata design</strong></td><td>Ordered log of JSON commits, with checkpoints</td><td>Metadata file tree with manifest lists, swapped via a catalogue pointer</td><td>Timeline of instants, with indexes over record keys</td></tr>
+      <tr><td><strong>Distinctive strength</strong></td><td>Deepest integration with Spark and the Databricks platform</td><td>Partition evolution and hidden partitioning; the broadest cross-engine adoption</td><td>Strong record-level upsert and incremental-pull semantics</td></tr>
+      <tr><td><strong>Watch out for</strong></td><td>Historically most at home inside one vendor's ecosystem</td><td>Requires a catalogue you must run or buy</td><td>More configuration surface to get right</td></tr>
+      <tr><td><strong>Pick it when</strong></td><td>You are on Databricks or Spark-centric</td><td>You want several engines on one copy and expect the layout to change</td><td>Your workload is dominated by streaming upserts keyed by record</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The honest summary is that the three have converged substantially, that Delta and Iceberg are the two you will meet, and that interoperability layers now let one physical dataset be read as more than one format. The decision matters less than it did in 2021, and it matters far less than deciding to use one at all. The genuine differentiator for a long-lived risk platform is Iceberg's partition evolution, because a partitioning choice made today will be wrong in five years and the alternative is rewriting a decade of history.</p>
+
+  <div class="callout warn">
+    <span class="tag">The catalogue is not optional either</span>
+    A table format needs something to record where tables live and who may read them: Unity Catalog, AWS Glue, a Hive Metastore, Iceberg's REST catalogue, or Polaris. Without it you have files with a log and no way for a second engine to find them, and no place to hang permissions. Treat the catalogue as part of the architecture from the start, because retrofitting one across an estate that grew by convention is considerably harder than choosing one on day one. This is also where Lecture 19's access control attaches.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: making the March restatement reproducible, end to end</strong>
+    <p>Return to the case from Lectures 03 and 06. March was published with a default rate of 1.42 per cent. On 12 May, corrected payments arrive and March is rebuilt, giving 1.51 per cent. An auditor asks three questions: what did we report, what do we now believe, and precisely which accounts moved. Show what the table format contributes.</p>
+    <p><em>1. The publish itself, made safe.</em> The March rebuild is an <code>INSERT OVERWRITE</code> restricted to the March partition, executed as one commit. Consumers querying during the rebuild see the pre-restatement version throughout and then the new one; nobody ever sees a partial March. Without the format, this window is a real exposure and the usual mitigation is scheduling the load when nobody is looking, which is not a control.</p>
+    <p><em>2. Identify the version the April report read.</em> <code>DESCRIBE HISTORY</code> lists commits with timestamps and operations. The April report ran on 3 May, so the relevant version is the latest commit at or before that instant, which the history makes explicit rather than inferential.</p>
+    <p><em>3. Answer all three questions with one query.</em></p>
+    <pre><code>WITH reported AS (
+    SELECT account_id, arrears_months, balance
+    FROM   risk.fact_account_month TIMESTAMP AS OF '2026-05-03 00:00:00'
+    WHERE  reporting_date = DATE '2026-03-31'
+),
+restated AS (
+    SELECT account_id, arrears_months, balance
+    FROM   risk.fact_account_month           -- current
+    WHERE  reporting_date = DATE '2026-03-31'
+)
+SELECT COALESCE(r.account_id, s.account_id)              AS account_id,
+       r.arrears_months                                   AS arrears_as_reported,
+       s.arrears_months                                   AS arrears_as_restated,
+       s.balance                                          AS balance,
+       CASE WHEN r.account_id IS NULL THEN 'added'
+            WHEN s.account_id IS NULL THEN 'removed'
+            ELSE 'changed' END                            AS movement
+FROM      reported  r
+FULL JOIN restated s USING (account_id)
+WHERE r.arrears_months IS DISTINCT FROM s.arrears_months
+   OR r.account_id IS NULL
+   OR s.account_id IS NULL;</code></pre>
+    <p>The result is the 214 accounts, each with its before and after position and whether it entered, left, or changed. The movement in the default rate is now attributable account by account, which is what "explain the variance" actually means and what a spreadsheet reconciliation spends a week approximating.</p>
+    <p><em>4. Protect the ability to do this.</em> The whole exercise depends on version at 3 May still existing, which depends on <code>VACUUM</code> retention. If the reproducibility policy is "any reported figure must be reproducible for seven years", then either the retention must be seven years, which is expensive in storage, or, more practically, each published figure's version identifier is recorded in a small reporting register and the underlying partition is additionally archived at publication. Decide this deliberately: the failure mode is discovering in year three that a routine maintenance job has been quietly destroying the evidence.</p>
+    <p><em>5. What this replaces.</em> Compare with the pre-lakehouse answer: archive a copy of every published partition, maintain a naming convention, hope nobody deleted anything, and write bespoke comparison scripts. The table format turns that discipline into a property of the storage layer, and it converts a BCBS 239 lineage requirement from a documentation exercise into a query. That is the strongest practical argument for adopting one in a bank, and it is worth more than the performance improvements that usually lead the sales pitch.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A table format is a transaction log over Parquet files, and it supplies atomic commits, snapshot isolation, time travel, schema and partition evolution, and workable row-level change. The files remain open and the storage remains cheap, so several engines can share one copy, which is the lakehouse. Copy on write suits batch publishes read many times; merge on read suits frequent small updates and makes compaction mandatory. Compaction and clustering are routine maintenance, not tuning. And <code>VACUUM</code> retention is a reproducibility policy wearing the costume of a storage setting, which in a regulated environment makes it one of the more consequential configuration values in the platform.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What exactly does a table format add to a directory of Parquet files? Name five capabilities.</li>
+      <li>Explain how atomic commits give a reader snapshot isolation, and which Lecture 06 pattern this makes safe in production.</li>
+      <li>Distinguish copy on write from merge on read, and say which suits a monthly batch publish and which suits streaming upserts.</li>
+      <li>Why does removing a file from a table differ from deleting it, and which command reclaims the difference?</li>
+      <li>What is file skipping, which Lecture 02 mechanism does it generalise, and what must be true of the data for it to work?</li>
+      <li>Why is <code>VACUUM</code> retention a reproducibility decision rather than a cost decision?</li>
+      <li>Give the strongest reason to prefer Iceberg for a platform expected to last a decade.</li>
+      <li>Why is a catalogue not optional, and what does it become the anchor for later in the course?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="13-spark.html">Lecture 13</a> is the engine that most often writes these tables; <a href="09-duckdb.html">Lecture 09</a> can read them through extensions.</li>
+      <li><strong>Next:</strong> <a href="15-dbt_analytics_engineering.html">Lecture 15</a> closes Part IV by putting the transformation logic that builds these tables under version control, with tests and documentation.</li>
+      <li><strong>Cross-link:</strong> <a href="03-databases_and_engines.html">Lecture 03</a> posed the lake's three failures that this lecture resolves; <a href="06-sql_manipulation.html">Lecture 06</a> supplied the merge and overwrite patterns; <a href="08-dimensional_modelling.html">Lecture 08</a> is what you store in these tables.</li>
+      <li><strong>Banking link:</strong> time travel plus commit history is the most direct technical answer to the BCBS 239 lineage and reproducibility expectations introduced in <a href="01-introduction.html">Lecture 01</a> and revisited in <a href="19-governance_and_privacy.html">Lecture 19</a>.</li>
+      <li><strong>Further reading:</strong> the Delta Lake and Apache Iceberg specifications are both readable and short on the parts that matter; Armbrust and colleagues' 2021 lakehouse paper for the architectural argument.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 14 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 54: prompting and reasoning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Large language models</a></div>
+  <h1>Prompting and reasoning</h1>
+  <p class="subtitle">A pretrained foundation model, left to its own devices, simply continues a piece of text in whatever way its training corpus suggests is most likely; it does not, by default, follow an instruction, answer a question helpfully, or show its working. This lecture develops the techniques, from a well-formed prompt through to reinforcement learning from human feedback, that turn a raw next-token predictor into something that behaves like a helpful assistant, and closes by returning properly to the competing explanations for in-context learning previewed two lectures ago.</p>
+  <div class="meta">
+    <span>Lecture 54 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part VIII: generative AI and language models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>prompt</strong> is the input text given to a language model at inference time, and can be formalised as fixing the observed prefix $X_{<i}$ in the conditional $p_\theta(X_i \mid X_{<i})$ the decoder-transformer lecture developed; prompt design is, quite literally, the act of choosing what to condition on. <strong>Zero-shot prompting</strong> asks for a task with an instruction alone; <strong>few-shot prompting</strong> additionally includes a handful of worked examples directly in the prompt, exploiting in-context learning. <strong>Chain-of-thought</strong> prompting asks the model to produce intermediate reasoning steps before its final answer, which measurably improves performance on multi-step problems, plausibly because it lets the autoregressive factorisation condition each step on an explicit, correct partial derivation rather than jumping straight to an answer with no intermediate structure to condition on. A raw pretrained model, however, is not yet an instruction-follower: <strong>reinforcement learning from human feedback (RLHF)</strong> is the standard pipeline that turns one into one, using human preference judgements to train a reward model and then fine-tuning the language model against that reward via reinforcement learning. <strong>Reasoning models</strong>, trained with an explicit further pipeline (the DeepSeek-R1 recipe of reinforcement learning, supervised fine-tuning, a further reinforcement learning stage, and distillation into smaller models), extend chain-of-thought into a deliberately trained, extended reasoning process rather than one merely elicited by a clever prompt.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine a brilliant but entirely untrained autocomplete engine that has read everything and will confidently continue any sentence in the most statistically likely way, including continuing a question with another question, or trailing off exactly the way real forum posts often do, because that is what its training data taught it real text looks like. Getting it to actually answer helpfully, rather than merely continue plausibly, requires two separate interventions: showing it, within its own input, the specific shape of a good answer (few-shot prompting, chain-of-thought), and separately, once and for all during its own training, teaching it that "answer helpfully and directly" is the behaviour humans actually reward, which is exactly the job RLHF does before the model is ever handed to an end user.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is where the two previous lectures' theory becomes practice: prompting techniques are the practical exploitation of the in-context learning previewed in lecture 1, and RLHF is the missing piece that explains why a raw pretrained foundation model (lecture 2) behaves so differently from the instruction-following assistant most practitioners actually interact with. The reasoning-model pipeline closing this lecture is the newest and most actively evolving material in this entire course.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons a working actuarial practitioner needs the mechanics here, not just the ability to type a question into a chat interface.</p>
+
+  <p>First, <strong>few-shot prompting is often the fastest, cheapest route to a working prototype for a genuinely new task</strong>: extracting a specific field from a claims narrative, classifying a free-text underwriting note, or drafting a first pass at a technical explanation can often be prototyped with a handful of well-chosen examples in a prompt, well before any decision is made about whether a fuller, fine-tuned or conventionally supervised pipeline is warranted.</p>
+
+  <p>Second, <strong>chain-of-thought is a genuine, measurable lever on accuracy for multi-step actuarial calculations</strong>, not a cosmetic verbosity setting: asking a model to show its working on a multi-step reserving or capital calculation measurably reduces arithmetic and logical errors compared with asking for the final number directly, a directly actionable prompting discipline.</p>
+
+  <p>Third, <strong>understanding that RLHF is a separate, deliberate training stage, not an emergent property of scale alone, is essential to correctly attributing model behaviour</strong>: a model's apparent helpfulness, refusal of certain requests, or stylistic tendencies are the product of specific human-preference training choices made by whoever built it, not a neutral, inevitable consequence of pretraining at scale, a distinction with direct governance implications developed further in the next lecture.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    An actuarial team asked a language model to compute a multi-step reserve estimate directly, providing the raw claims-development figures and asking only for the final answer; the model produced a plausible-looking but subtly wrong number, with an arithmetic slip buried inside an intermediate step nobody could see. Re-running the identical request but explicitly instructing the model to show each step of its working (a chain-of-thought prompt) produced a visibly different, correct final answer, and, just as importantly, made the earlier version's specific error locatable: the first version had silently mis-applied a development factor at one intermediate step, an error entirely invisible in a bare final-answer output but immediately visible and checkable once the full working was requested. The team adopted a standing rule that any multi-step numerical request to a language model must request explicit intermediate working, treated as a mandatory feature of the review process rather than an optional nicety.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: the same underlying model producing a fast, direct, and occasionally wrong answer when asked for a final number alone, versus a slower but checkable, more reliable answer when asked to show its intermediate reasoning first.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Direct prompting versus chain-of-thought prompting for a multi-step calculation">
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Direct answer versus chain-of-thought</text>
+
+      <rect x="30" y="55" width="380" height="220" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="220" y="80" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Direct prompt</text>
+      <text x="220" y="105" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">"What is the reserve estimate?"</text>
+      <rect x="60" y="125" width="320" height="50" rx="6" fill="#fed7aa" opacity="0.6"/>
+      <text x="220" y="155" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#7c2d12">"£1,842,000"</text>
+      <text x="220" y="200" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c2d12">no visible working;</text>
+      <text x="220" y="216" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c2d12">a wrong intermediate step</text>
+      <text x="220" y="232" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c2d12">is invisible and unlocatable</text>
+      <text x="220" y="255" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#7c2d12">fast, but unchecked</text>
+
+      <rect x="450" y="55" width="380" height="220" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="640" y="80" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Chain-of-thought prompt</text>
+      <text x="640" y="105" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">"...show each step of your working"</text>
+      <rect x="480" y="120" width="320" height="115" rx="6" fill="#99f6e4" opacity="0.4"/>
+      <text x="640" y="138" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#134e4a">step 1: development factors...</text>
+      <text x="640" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#134e4a">step 2: apply to each cohort...</text>
+      <text x="640" y="170" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#134e4a">step 3: sum across cohorts...</text>
+      <text x="640" y="186" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#134e4a">final: "£1,910,000"</text>
+      <text x="640" y="210" text-anchor="middle" font-family="Inter" font-size="10" fill="#134e4a">each step checkable;</text>
+      <text x="640" y="255" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">slower, but reviewable and, empirically, more accurate</text>
+    </svg>
+    <figcaption>The direct prompt (left) produces a fast, unchecked answer, with any intermediate error invisible and effectively unlocatable. The chain-of-thought prompt (right) produces a slower answer, but one whose intermediate steps are individually reviewable, which is exactly how the vignette's team located the direct version's hidden development-factor error.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A prompt is a choice of what to condition on, nothing more mystical than that.</strong> Every prompting technique in this lecture is, underneath, a specific, deliberate way of shaping the prefix $X_{<i}$ the decoder-transformer's conditional distribution is evaluated against. <strong>Reasoning that is shown is reasoning that can be checked.</strong> Chain-of-thought's accuracy benefit and its auditability benefit are the same mechanism viewed from two angles.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The conditional-probability formalisation of a prompt</h3>
+
+  <p>Recall the decoder transformer's core object, $p_\theta(X_i \mid X_{<i})$. A prompt is nothing more than a deliberate choice of the prefix $X_{<i}$ that will be conditioned on; prompt engineering is the practice of choosing that prefix to make the resulting conditional distribution over continuations as useful as possible for the task at hand. This formalisation is not a rhetorical flourish, it is a genuinely useful discipline: every prompting technique that follows can be understood as a specific strategy for constructing $X_{<i}$, not as an unrelated bag of separate tricks.</p>
+
+  <h3>Instruction, zero-shot, and few-shot prompting</h3>
+
+  <p>An <strong>instruction prompt</strong> states the task directly in natural language ("summarise the following claims narrative in two sentences"). <strong>Zero-shot prompting</strong> is an instruction with no worked examples at all, relying entirely on whatever the model's pretraining and any instruction-tuning (developed below) already equipped it to do. <strong>Few-shot prompting</strong> adds a small number of worked input-output pairs directly into the prompt before the actual query, directly exploiting the in-context learning capability developed in lecture 1; the choice, number, and ordering of these examples measurably affects performance, and is itself a design decision worth deliberate attention rather than an afterthought.</p>
+
+  <h3>Chain-of-thought prompting</h3>
+
+  <p><strong>Chain-of-thought</strong> prompting explicitly asks the model to produce intermediate reasoning steps before its final answer (often via an instruction as simple as "think step by step", or by including worked examples that themselves show intermediate steps). The empirical accuracy improvement on multi-step tasks is well documented and plausibly connects directly back to the autoregressive factorisation: because each token is generated conditional on everything before it, a model asked for a final answer with no intermediate structure must, in effect, produce a multi-step calculation's correct result in a single, unstructured step; a model asked to show its working instead conditions each subsequent step on an explicit, checkable partial derivation, giving the autoregressive process genuine intermediate structure to build on rather than requiring the entire calculation to be compressed into one token-generation step.</p>
+
+  <h3>The RLHF pipeline</h3>
+
+  <p>A raw, pretrained foundation model is not, by default, an instruction-follower; left alone, it simply continues text in whatever way its training corpus suggests is statistically likely, which is not the same behaviour as answering a question helpfully and directly. <strong>Reinforcement learning from human feedback (RLHF)</strong> is the standard pipeline used to close this gap, in three broad stages. First, <strong>supervised fine-tuning</strong> on a curated set of high-quality instruction-response pairs gives the model an initial sense of the target behaviour. Second, human annotators rank multiple model outputs for the same prompt by quality, and this preference data trains a separate <strong>reward model</strong> to predict human preference judgements. Third, the language model is further fine-tuned using reinforcement learning (commonly proximal policy optimisation, developed in the reinforcement-learning sub-module later in this course) to maximise the reward model's predicted score, subject to a penalty that keeps the fine-tuned model's outputs from drifting too far from its original pretrained distribution (avoiding a degenerate solution that games the reward model without producing genuinely good text).</p>
+
+  <h3>Reasoning models and the DeepSeek-R1 recipe</h3>
+
+  <p>A <strong>reasoning model</strong> extends chain-of-thought from a prompting technique elicited at inference time into a capability deliberately trained into the model itself, producing extended, structured intermediate reasoning by default rather than only when specifically prompted to. The publicly documented DeepSeek-R1 recipe illustrates the general shape of the pipelines used to produce such models: an initial <strong>reinforcement learning</strong> stage trains the base model directly against a reward signal for producing correct final answers on verifiable tasks (mathematics, coding), which alone induces the model to discover longer, more structured reasoning traces as an emergent strategy for improving its reward; a subsequent <strong>supervised fine-tuning</strong> stage on curated, high-quality reasoning traces (including some generated by the model's own earlier RL stage) improves the readability and reliability of the reasoning; a further <strong>reinforcement learning</strong> stage refines the result further, including on tasks beyond the original verifiable domains; and finally <strong>distillation</strong> transfers the resulting reasoning capability into smaller, cheaper models by fine-tuning them directly on reasoning traces generated by the larger, fully trained model, a genuinely useful engineering technique for deploying much of a large reasoning model's capability at a fraction of its inference cost.</p>
+
+  <h3>Returning to in-context learning</h3>
+
+  <p>Lecture 1 previewed three competing explanations for in-context learning: meta-learning, implicit Bayesian inference, and emergent structure. With pretraining's mechanics (lecture 2) and this lecture's prompting and RLHF machinery now in place, the honest summary is that all three remain active areas of study, and current evidence does not conclusively favour one over the others; what can be said with more confidence is that few-shot prompting's empirical effectiveness does not, on its own, distinguish between the three explanations, since all three predict that well-chosen examples in the prompt should improve performance, for different underlying reasons. Treating in-context learning's mechanism as settled science, in either direction, overstates the current state of the evidence.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Requesting a final numeric answer directly on a multi-step calculation</span>
+    Developed directly in the vignette: bypassing chain-of-thought on a genuinely multi-step numerical task trades away both accuracy and auditability at once, and the team's standing rule (always request explicit working on multi-step numerical requests) is a directly transferable practical discipline.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating a model's helpfulness or refusal behaviour as a neutral, inevitable property</span>
+    RLHF is a specific, deliberate training stage reflecting specific human-preference choices made by whoever built the model, not a neutral consequence of scale; two models of similar underlying capability can differ substantially in tone, willingness to answer certain requests, and default verbosity purely because of different RLHF choices, not different underlying competence.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming chain-of-thought reasoning is a faithful account of the model's actual computation</span>
+    A model's stated intermediate reasoning is itself generated token by token from the same underlying process as any other output, and is not guaranteed to be a transparent, literal record of whatever internal computation actually produced the final answer; treating a chain-of-thought trace as useful evidence for checking correctness (as the vignette's team did) is well supported, but treating it as a guaranteed, literal explanation of the model's internal mechanism is a stronger and less well supported claim.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Overstating certainty about why in-context learning works</span>
+    Developed directly above: presenting any one of the three competing explanations as settled, rather than as one of several live hypotheses, misrepresents the current state of the research and can lead to overconfident claims about how a model will generalise to a genuinely novel prompting scenario.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A prompt is a deliberate choice of what to condition on within the decoder transformer's autoregressive factorisation; zero-shot, few-shot, and chain-of-thought prompting are three specific, increasingly structured strategies for constructing that conditioning context, each exploiting a different aspect of the model's pretrained and, where applicable, RLHF-trained behaviour. RLHF itself, via supervised fine-tuning, a learned reward model, and reinforcement learning against that reward, is the deliberate training stage that turns a raw next-token predictor into an instruction-following assistant, and is not an automatic by-product of scale. Reasoning models extend chain-of-thought into a trained capability via pipelines such as DeepSeek-R1's alternating reinforcement learning and supervised fine-tuning stages, with distillation transferring the resulting capability into smaller, cheaper models.</p>
+
+  <p>This closes the practical, capability-building arc of the sub-module. The final lecture turns to the discipline a regulated actuarial user must apply on top of everything developed in this sub-module: forcing every one of these techniques to produce an output that can be validated by ordinary statistical means, monitoring for drift and bias, and being honest about the four hard limitations no amount of clever prompting or training removes.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Formalise a prompt in terms of the decoder transformer's conditional probability $p_\theta(X_i \mid X_{<i})$.</li>
+      <li>Distinguish zero-shot, few-shot, and chain-of-thought prompting.</li>
+      <li>Describe the three stages of the RLHF pipeline, and explain why a raw pretrained model is not, by default, an instruction-follower.</li>
+      <li>Describe the general shape of the DeepSeek-R1 reasoning-model recipe, and explain what distillation achieves within it.</li>
+      <li>Explain why few-shot prompting's empirical effectiveness does not, on its own, distinguish between the three competing explanations for in-context learning.</li>
+      <li>In the reserving vignette, explain precisely how chain-of-thought prompting made the direct-prompt version's hidden error locatable.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 2 (<a href="02-foundation_models_and_pretraining.html">foundation models and pretraining</a>) developed the pretraining mechanics this lecture's prompting techniques and RLHF pipeline build directly on.</li>
+      <li><strong>Next:</strong> Lecture 4 (<a href="04-responsible_use.html">responsible use</a>) develops the governance discipline that applies on top of every technique in this lecture.</li>
+      <li><strong>Forward:</strong> The reinforcement-learning sub-module develops proximal policy optimisation, the specific reinforcement-learning algorithm behind the RLHF pipeline's final stage, in full.</li>
+      <li><strong>Outside this course:</strong> The actuarial-applications sub-module develops in-context learning's parallel to Bühlmann credibility updating, and RLHF's parallel to shape constraints imposed on a pricing model, in full worked detail.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Large language models course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 54 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

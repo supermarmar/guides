@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LGD feature engineering: reduction and transformation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>LGD feature engineering: reduction and transformation</h1>
+  <p class="subtitle">Apply the two-pipeline pattern from PD feature engineering to the LGD context: reduce a few hundred candidate features to a model-ready set, then transform each survivor so it is well-behaved in the relevant link space. Three structural adjustments fall out of LGD's specific data shape: the sample is one to two orders of magnitude smaller, the model is a three-component mixture so feature engineering runs per component, and several feature families (collateral, workout-stage, cure indicators) have no analogue in PD.</p>
+  <div class="meta">
+    <span>A-IRB 19 of n &mdash; LGD 4 of 7</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Sources: (wiki gap) — drawn from <a href="12-pd_feature_engineering.html">lecture 12</a>, PRA SS4/24 §13 and §15, EBA/GL/2017/16 §96 to §153, plus best ML practice.</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">LGD feature engineering uses the same two pipelines from <a href="12-pd_feature_engineering.html">lecture 12</a>: a five-step <strong>reduction</strong> pipeline (data quality, predictive-power screen, correlation clustering, PCA clustering, collinearity assessment) followed by a five-step <strong>transformation</strong> pipeline (special-value treatment, missing-value imputation, outlier capping, scaling, monotonising transformation). The choice of methods is the same; the choice of thresholds and the order of operations is adapted for LGD's smaller sample and per-component structure.</p>
+
+  <p>Three structural adjustments matter. First, <strong>predictive-power screening</strong> uses different metrics per component: IV / Gini for the binary components (P(Zero), P(Full | not Zero)) match the PD treatment, while the continuous component (E[r(Partial)]) is screened on R-squared and Spearman rho (rank correlation), which handle the [0, 1]-bounded continuous target naturally. Second, <strong>collinearity thresholds tighten</strong> because the smaller sample amplifies the consequences of multicollinearity: typical retail-LGD builds use VIF below 2 (rather than below 3 for PD), and condition-index thresholds at 20 rather than 30. Third, <strong>three LGD-specific feature families</strong> enter the candidate set that PD did not have: <strong>collateral attributes</strong> (collateral type, valuation freshness, LTV at default, regional sub-segment), <strong>workout-stage variables</strong> (months since default, recovery channel, costs incurred to date; LGD2 only), and <strong>recovery-market macro</strong> (regional house-price index for secured, insolvency rate for unsecured; LGD2 only).</p>
+
+  <p>The output is a model-ready feature set of typically 15 to 30 features for each of the three components (the three sets overlap heavily but are not identical, because variables predict the three outcomes differently). The same monotonicity, sign-direction and use-test rules from PD apply. The whole pipeline is run per LGD segment (cure / no-cure, secured / unsecured, product type), at least in the larger banks; smaller portfolios pool across some of these dimensions and carry an MoC overlay for the pooling.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    PD feature engineering was a regularisation problem: from a thousand candidates, keep the few dozen that survive correlation, multicollinearity and overfit checks. LGD feature engineering is the same problem with the dial turned up: from a few hundred candidates, keep the dozen or two that survive on a sample one or two orders of magnitude smaller. The discipline is identical; the stakes are higher because every retained collinear variable risks destabilising the regression on a sample where each row has materially more leverage.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is sample-size sensitivity. On a million-row PD development sample, a collinear pair of variables produces noisy but estimable coefficients. On a ten-thousand-row LGD development sample, the same pair produces wildly unstable coefficients that swing on small changes in the random sample. The PD VIF threshold of 3 is enough to catch the worst cases on a large sample; the LGD VIF threshold tightens to 2 because the sample size cannot tolerate as much collinearity in the surviving variable set. Feature engineering is the place where this sample-size sensitivity is addressed, before the regression sees any of the surviving variables.</p>
+
+  <p>The second reason is per-component heterogeneity. A feature that strongly predicts P(Zero) (collateral type for secured loans, for instance, where uncollateralised loans are far more likely to be zero-payers) may not predict P(Full | not Zero) or E[r(Partial)] at all. The reduction pipeline run on a pooled target (combining the three components) would average these effects and retain a weaker overall feature than running the pipeline once per component. The PD model's single regression hides this issue; the LGD model's three regressions expose it.</p>
+
+  <p>The third reason is the introduction of post-default features for LGD2. The LGD1 model (applied to performing facilities) uses pre-default features only, mirroring PD's discipline. The LGD2 model (applied to facilities already in default) can use post-default workout features (recovery cash flows to date, time since default, costs incurred, recovery channel). These features are intensely predictive but require careful treatment: the supervisor's data-leakage challenge transfers from "future information at the snapshot" to "future cash flows beyond the observation date", and the modelling team has to be precise about which post-default observations are admissible at each prediction horizon.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The PD feature-engineering funnel runs once over a pooled feature set. The LGD funnel runs three times, once per component, with shared early steps and divergent later steps. The diagram traces the structure.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LGD feature-engineering funnel">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">LGD feature-engineering: shared upstream, per-component downstream</text>
+
+      <!-- Top: raw candidates -->
+      <rect x="280" y="50" width="340" height="40" fill="#fef9c3" stroke="#92400e"/>
+      <text x="450" y="68" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">~200 candidate features</text>
+      <text x="450" y="82" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">obligor + facility + behaviour + collateral + workout-stage + macro</text>
+
+      <!-- Shared reduction steps (1 - 3) -->
+      <rect x="240" y="110" width="420" height="80" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.3"/>
+      <text x="450" y="130" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Shared reduction: Steps 1 - 3</text>
+      <text x="450" y="146" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">1. Data quality (no-variance, &gt;20% missing, &gt;100 cats, dates)</text>
+      <text x="450" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">2. Predictive screen (component-specific metric; see below)</text>
+      <text x="450" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">3. Correlation clustering (Pearson + Spearman; same 3-iteration approach as PD)</text>
+
+      <!-- Per-component branching -->
+      <line x1="450" y1="190" x2="180" y2="220" stroke="#475569"/>
+      <line x1="450" y1="190" x2="450" y2="220" stroke="#475569"/>
+      <line x1="450" y1="190" x2="720" y2="220" stroke="#475569"/>
+
+      <!-- Three component branches -->
+      <g>
+        <!-- P(Zero) -->
+        <rect x="60" y="220" width="240" height="180" fill="#fee2e2" stroke="#991b1b" stroke-width="1.3"/>
+        <text x="180" y="240" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">Component A: P(Zero)</text>
+        <text x="180" y="254" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">binary target, 24m</text>
+
+        <rect x="80" y="270" width="200" height="22" fill="#fff" stroke="#7f1d1d"/>
+        <text x="180" y="285" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">screen: IV / Gini</text>
+
+        <rect x="80" y="298" width="200" height="22" fill="#fff" stroke="#7f1d1d"/>
+        <text x="180" y="313" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">4. PCA clustering</text>
+
+        <rect x="80" y="326" width="200" height="22" fill="#fff" stroke="#7f1d1d"/>
+        <text x="180" y="341" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">5. VIF &lt; 2; CI &lt; 20</text>
+
+        <rect x="80" y="354" width="200" height="32" fill="#fff" stroke="#7f1d1d"/>
+        <text x="180" y="370" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">transform: special / NA</text>
+        <text x="180" y="382" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">/ outliers / Tukey</text>
+      </g>
+
+      <g>
+        <!-- P(Full | not Zero) -->
+        <rect x="330" y="220" width="240" height="180" fill="#fee2e2" stroke="#991b1b" stroke-width="1.3"/>
+        <text x="450" y="240" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">Component B: P(Full | not Zero)</text>
+        <text x="450" y="254" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">binary target, 24m, conditional</text>
+
+        <rect x="350" y="270" width="200" height="22" fill="#fff" stroke="#7f1d1d"/>
+        <text x="450" y="285" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">screen: IV / Gini</text>
+
+        <rect x="350" y="298" width="200" height="22" fill="#fff" stroke="#7f1d1d"/>
+        <text x="450" y="313" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">4. PCA clustering</text>
+
+        <rect x="350" y="326" width="200" height="22" fill="#fff" stroke="#7f1d1d"/>
+        <text x="450" y="341" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">5. VIF &lt; 2; CI &lt; 20</text>
+
+        <rect x="350" y="354" width="200" height="32" fill="#fff" stroke="#7f1d1d"/>
+        <text x="450" y="370" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">transform: special / NA</text>
+        <text x="450" y="382" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">/ outliers / Tukey</text>
+      </g>
+
+      <g>
+        <!-- E[r(Partial)] -->
+        <rect x="600" y="220" width="240" height="180" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="720" y="240" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#134e4a">Component C: E[r(Partial)]</text>
+        <text x="720" y="254" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">continuous in [0, 1], 60m</text>
+
+        <rect x="620" y="270" width="200" height="22" fill="#fff" stroke="#0f766e"/>
+        <text x="720" y="285" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">screen: R&sup2; / Spearman</text>
+
+        <rect x="620" y="298" width="200" height="22" fill="#fff" stroke="#0f766e"/>
+        <text x="720" y="313" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">4. PCA clustering</text>
+
+        <rect x="620" y="326" width="200" height="22" fill="#fff" stroke="#0f766e"/>
+        <text x="720" y="341" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">5. VIF &lt; 2; CI &lt; 20</text>
+
+        <rect x="620" y="354" width="200" height="32" fill="#fff" stroke="#0f766e"/>
+        <text x="720" y="370" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">transform: GLM link space</text>
+        <text x="720" y="382" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">(logit or log)</text>
+      </g>
+
+      <!-- Output strip -->
+      <rect x="40" y="420" width="820" height="30" fill="#fef3c7" stroke="#92400e"/>
+      <text x="450" y="440" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">Output: 3 component-specific feature sets, ~15-30 features each, overlapping but not identical</text>
+    </svg>
+    <figcaption>LGD feature engineering branches by component. Steps 1 to 3 (data quality, predictive screen, correlation clustering) are shared across components and run once on the pooled feature pool, with predictive-screen metrics chosen per component. Steps 4 and 5 (PCA clustering, collinearity) plus the transformation pipeline run independently per component. The output is three overlapping but distinct feature sets feeding the mixture-model fit in lecture 20.</figcaption>
+  </figure>
+
+  <p>Three properties of the structure matter. First, <strong>the shared upstream steps</strong> use the broadest of the three component targets for predictive screening (typically the binary P(Zero) since most features show their predictive structure on the zero-payer dimension), then re-evaluate per component in Step 4 onwards. Second, the <strong>tighter collinearity thresholds</strong> in Step 5 (VIF below 2, condition index below 20) reflect the smaller sample; banks with larger LGD samples may relax to the PD thresholds. Third, the <strong>transformation pipeline diverges by component link function</strong>: the two binary components use the same Tukey + Bulging treatment as PD (linearise in logit space); the continuous component links via the GLM choice (logit for a Beta GLM, log for a Gamma GLM).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>LGD-specific candidate feature families</h3>
+
+  <p>On top of the four families from <a href="10-pd_target_and_data.html">lecture 10</a> (static obligor, behavioural, bureau, macro), LGD adds three families that PD does not have.</p>
+
+  <table>
+    <thead>
+      <tr><th>Family</th><th>Examples</th><th>Available for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Collateral attributes</strong></td><td>Collateral type (residential property, commercial property, vehicle, financial securities, none), original valuation, latest valuation date, valuation method, LTV at default, regional sub-segment</td><td>LGD1 and LGD2 (both)</td></tr>
+      <tr><td><strong>Workout-stage variables</strong></td><td>Months since default, recovery channel (internal collections, external agency, legal, debt sale, debt sale forward-flow), costs incurred to date, recoveries received to date, cure-eligibility flag, probation-status flag</td><td>LGD2 only (these only exist post-default)</td></tr>
+      <tr><td><strong>Recovery-market macro</strong></td><td>Regional house-price index (secured), commercial property index, insolvency rate, GDP growth, unemployment rate, interest rates</td><td>LGD2 only, where the workout is exposed to the recovery market</td></tr>
+    </tbody>
+  </table>
+
+  <p>The pre-default families from PD also enter, with two adjustments: behavioural features are computed at month t-12 to t-1 relative to default (rather than at the snapshot date as in PD), and "utilisation at default" becomes a single point-in-time feature rather than a time-series.</p>
+
+  <h3>Reduction Step 1: data quality (unchanged)</h3>
+
+  <p>Same as <a href="12-pd_feature_engineering.html">lecture 12</a>: drop no-variance, &gt;100 categories, dates, &gt;20% missing. Protected features (target, identifiers, default date, original loan amount, original collateral valuation) bypass reduction.</p>
+
+  <h3>Reduction Step 2: predictive-power screen (per-component metrics)</h3>
+
+  <p>Per-component metric choice:</p>
+
+  <ul>
+    <li><strong>Binary components (P(Zero), P(Full | not Zero))</strong>: same metrics as PD &mdash; IV (binned WoE-based), Gini (= 2 AUC - 1), univariate R-squared. Standard thresholds: drop features with metric below 50th percentile within the component.</li>
+    <li><strong>Continuous component (E[r(Partial)])</strong>: <strong>R-squared</strong> and <strong>Spearman rank correlation</strong>. IV is meaningful for continuous targets only with extensive binning (creating an effective categorical version of the continuous target); the binned IV is sometimes used but is a secondary metric. Spearman captures monotonic but non-linear relationships and is the workhorse for continuous-recovery-rate screening.</li>
+  </ul>
+
+  <p>A variable that screens strongly on one component and weakly on another is kept in the strong component's feature set and dropped from the weak component's. The two-versus-three-feature-set outcome is what makes the per-component split valuable.</p>
+
+  <h3>Reduction Step 3: correlation clustering (same approach, both Pearson and Spearman)</h3>
+
+  <p>Same three-iteration approach (99%, 85%, 70%) as PD. LGD adds Spearman alongside Pearson: many LGD features (LTV, valuation age, exposure size) have non-linear but monotonic relationships, so Spearman correlation catches redundancies Pearson would miss. The standard procedure: compute both matrices, take the maximum per pair, cluster at the chosen threshold, keep the highest-Gini (or highest-Spearman for the continuous component) variable per cluster.</p>
+
+  <h3>Reduction Step 4: PCA-based clustering (per-component, sample-size adjusted)</h3>
+
+  <p>Same approach as PD: PCA into clusters that maximise within-cluster correlation, retain top variable per cluster plus one dissimilar variable where the RS Own rank justifies it. LGD adjustment: cap the cluster count at <strong>15 to 20</strong> per component (rather than 35 for PD) to avoid over-fragmentation on the smaller sample.</p>
+
+  <h3>Reduction Step 5: collinearity (tighter thresholds)</h3>
+
+  <p>VIF below 2 (rather than below 3 for PD); condition index below 20 (rather than below 30 for PD). The same one-drop procedure: compute the variance-decomposition matrix, drop the variable contributing most to the largest condition index, refit, repeat. Tighter thresholds reflect the smaller sample's intolerance of coefficient instability.</p>
+
+  <h3>Transformation pipeline: same five steps, per-component link space</h3>
+
+  <p>Steps 1 to 4 (special values, missing-value imputation, outlier capping, scaling) are identical to PD: see <a href="12-pd_feature_engineering.html">lecture 12</a>. The only LGD-specific call-out is on <strong>LTV outliers for secured portfolios</strong>: an LTV exceeding 100% is operationally valid (negative equity at default) and should not be capped at the 99th percentile; the cap should be set well above 100% (typically 150% or based on the empirical distribution).</p>
+
+  <p>Step 5 (monotonising transformation) diverges by component link space.</p>
+
+  <ul>
+    <li><strong>Binary components</strong>: Tukey's Ladder + Bulging Rule applied in <em>logit space</em>, same as PD. Plot the ODR-equivalent (the per-bin proportion of zero-payers or full-payers) against the feature; pick the transformation that linearises in logit.</li>
+    <li><strong>Continuous component</strong>: link function depends on the chosen GLM. For a Beta GLM with logit link, the transformation linearises in logit(recovery_rate). For a Gamma GLM with log link, the transformation linearises in log(loss_rate). The Bulging Rule applies in the chosen link space, not in the original target space.</li>
+  </ul>
+
+  <h3>Sign-direction convention for LGD features</h3>
+
+  <p>The directionality table for LGD risk drivers (signs are expressed in terms of <em>loss-rate</em>; the recovery-rate signs are inverted):</p>
+
+  <table>
+    <thead>
+      <tr><th>Category</th><th>Sign (loss-rate)</th><th>Examples</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>LTV at default</td><td>+</td><td>Higher LTV &rarr; less collateral cushion &rarr; higher loss</td></tr>
+      <tr><td>Collateral valuation age</td><td>+</td><td>Older valuations &rarr; more uncertainty &rarr; higher loss</td></tr>
+      <tr><td>Unsecured exposure flag</td><td>+</td><td>No collateral &rarr; higher loss</td></tr>
+      <tr><td>Cure flag</td><td>&minus;</td><td>Cure &rarr; small loss</td></tr>
+      <tr><td>Recovery-channel quality (debt sale flag)</td><td>+</td><td>Debt sale &rarr; lower realised recovery rate</td></tr>
+      <tr><td>Months since default</td><td>+</td><td>Longer workout &rarr; discount drag &rarr; higher loss</td></tr>
+      <tr><td>Regional HPI at default (secured)</td><td>&minus;</td><td>Higher HPI &rarr; better collateral recovery</td></tr>
+      <tr><td>Insolvency rate at default (unsecured)</td><td>+</td><td>Higher insolvency environment &rarr; lower recovery</td></tr>
+      <tr><td>Exposure size at default</td><td>+/&minus;</td><td>Depends on portfolio; large defaults sometimes recover better (more collections effort) and sometimes worse (more complex obligor)</td></tr>
+    </tbody>
+  </table>
+
+  <p>Coefficients with opposite signs to the table are investigated as in PD: usually a multicollinearity artefact or a transformation issue. The exposure-size sign is genuinely ambiguous and the model is fit to the empirical sign with explicit documentation.</p>
+
+  <h3>Sub-population testing</h3>
+
+  <p>Once the candidate feature set is converged per component, sub-population performance is checked across:</p>
+
+  <ul>
+    <li>Collateral type (residential property, commercial property, vehicle, unsecured)</li>
+    <li>Cure-status subgroups (cure / no-cure)</li>
+    <li>Exposure-size bands</li>
+    <li>Origination cohort</li>
+    <li>Strategic partners or product lines</li>
+  </ul>
+
+  <p>Sub-populations with materially weaker performance trigger either segment-specific re-modelling, a partner / product flag in the feature set, or an MoC overlay.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the three feature sets are typically 60 to 80% overlap, not identical</strong>. Some features (LTV, collateral type, exposure size) are strong across all three components; some (recovery channel) are powerful for the partial-recovery component but irrelevant for the zero / full binaries; some (cure flag) flip sign across components (it predicts zero-payer status negatively but partial-recovery rate positively). Modelling teams that force a single feature set across the three components produce weaker overall fits than teams that let the three sets diverge where the data calls for it.</p>
+
+  <p>The second lesson is on <strong>collateral feature engineering</strong>. The collateral attribute that matters operationally is not the original valuation but the LTV at default. Constructing LTV requires a clean valuation series (collateral revaluations at known dates, with documented methodology). Banks whose collateral revaluation infrastructure is weak find their LGD models systematically miss the dominant secured-LGD risk driver. Investment in collateral-data infrastructure has a higher LGD-model return than investment in additional behavioural features.</p>
+
+  <p>The third lesson is on the <strong>workout-stage features for LGD2</strong>. These features (months since default, recoveries received to date, recovery channel) are intensely predictive but require careful definition: at LGD2's prediction horizon (the current month for a currently-defaulted facility), the bank knows the months-since-default and the cumulative-recoveries-to-date but does not know any future recovery cash flow. The feature engineering has to enforce this explicitly, with the same look-back-only discipline applied to PD's behavioural features.</p>
+
+  <p>The fourth lesson is on <strong>recovery-market macro</strong>. The supervisor's instinct, transferred from PD, is to keep macro out of the conditioning set to avoid procyclicality. For LGD this instinct is wrong: the recovery rate for secured exposures is fundamentally a function of collateral market value at the time of sale, which is a macroeconomic quantity. Excluding regional HPI or commercial property indices from a secured-LGD model produces a model that materially misses the dominant downturn dynamic. The right rule for LGD: include recovery-market macro in the LGD2 conditioning set; capture the downturn effect through the LGD reference value calibration (lecture 21) for LGD1.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>State the three structural adjustments LGD feature engineering makes versus PD feature engineering. For each, explain the underlying reason.</li>
+    <li>Name the three LGD-specific feature families that PD does not have. For each, state whether it is available to LGD1 only, LGD2 only or both.</li>
+    <li>Why is the predictive-power screen for the continuous component (E[r(Partial)]) based on R-squared and Spearman rather than IV / Gini?</li>
+    <li>The LGD VIF threshold is tighter than the PD threshold. State the typical numbers and explain why.</li>
+    <li>Outline the divergence between the three component feature sets. Why is forcing a single shared feature set across components operationally weaker?</li>
+    <li>Explain why LTV outliers are not capped at the 99th percentile for secured portfolios. What is the typical cap and why?</li>
+    <li>The Bulging Rule from PD applies in logit space. In what space does it apply for the continuous component, and how does the choice depend on the GLM?</li>
+    <li>The directionality table shows "cure flag" with a negative sign and "exposure size" with an ambiguous sign. Explain each.</li>
+    <li>For LGD2, post-default workout features are admissible. What is the look-back-only discipline that the modelling team must enforce, and why does it differ from the PD data-leakage rules?</li>
+    <li>The supervisor's instinct in PD is to exclude macro from the conditioning set. Why does this instinct reverse for LGD2 on secured portfolios, and how does the model still avoid procyclicality?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li>The LGD wiki has no dedicated feature-engineering file. This lecture is constructed from <a href="12-pd_feature_engineering.html">lecture 12</a>'s pipeline plus LGD-specific regulatory text and best practice.</li>
+      <li>PRA SS4/24, paragraphs 13 (economic loss components) and 15 (downturn LGD). Implicit guidance on feature scope.</li>
+      <li>EBA/GL/2017/16, paragraphs 96 to 153. The European authority's interpretation of the LGD modelling framework.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="12-pd_feature_engineering.html">PD feature engineering</a> &mdash; the two-pipeline pattern that this lecture adapts.</li>
+      <li><a href="16-lgd_concept.html">LGD concept</a> &mdash; the three-component mixture architecture that drives the per-component branching.</li>
+      <li><a href="17-lgd_target_and_data.html">LGD target and data</a> &mdash; the feature families and the LGD1 / LGD2 split.</li>
+      <li><a href="18-lgd_sampling_and_representativeness.html">LGD sampling and representativeness</a> &mdash; the development sample these pipelines run over.</li>
+    </ul>
+
+    <p><strong>Forward references inside the LGD sequence:</strong></p>
+    <ul>
+      <li>20-lgd_risk_differentiation (planned) &mdash; the mixture-model fit using the three component-specific feature sets.</li>
+      <li>21-lgd_risk_quantification (planned) &mdash; downturn LGD calibration that operates on the calibrated outputs.</li>
+      <li>22-lgd_testing (planned) &mdash; back-tests on OOS and OOT samples.</li>
+    </ul>
+
+    <p><strong>Cross-component:</strong></p>
+    <ul>
+      <li>26-ead_feature_engineering (planned) &mdash; uses R&sup2; / Lift rather than IV / Gini for the univariate screen; utilisation as a primary feature.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>EBA/GL/2017/16 paragraphs on workout LGD and risk-driver selection.</li>
+      <li>Schuermann (2004), "What do we know about loss given default?". The canonical academic survey.</li>
+      <li>Loterman et al. (2012), "Benchmarking regression algorithms for loss given default modeling". Empirical comparison of model classes and feature sets.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 19 of n &middot; LGD 4 of 7.</span>
+  <span><a href="18-lgd_sampling_and_representativeness.html">Previous: sampling and representativeness</a> &middot; <a href="20-lgd_risk_differentiation.html">Next: risk differentiation</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

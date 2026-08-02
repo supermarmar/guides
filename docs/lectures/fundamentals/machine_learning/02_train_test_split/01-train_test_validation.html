@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: train, validation, and test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Train and test split</a></div>
+  <h1>Train, validation, and test</h1>
+  <p class="subtitle">The split is where honest evaluation starts. Get this wrong and every metric downstream is fictional. Get it right and you have a defensible model with a generalisation error you can quote, a hyperparameter choice you can justify, and a retraining trigger that fires before the model goes off.</p>
+  <div class="meta">
+    <span>Lecture 5 of 62</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A model has three kinds of numbers attached to it and each is set on its own slice of the data. <strong>Parameters</strong> (the coefficients in a logistic regression, the split thresholds in a tree, the weights in a neural network) are fit on the <strong>training set</strong> by minimising a loss. <strong>Hyperparameters</strong> (the regularisation strength, the tree depth, the learning rate) are not learned by the optimiser; they are chosen by trying values and seeing which produces the best score on a separate <strong>validation set</strong>. The <strong>generalisation error</strong> (the number you quote to a regulator, a stakeholder, or yourself when you sign off the model) is estimated on a <strong>test set</strong> that has been kept untouched throughout. The discipline is one-way: information may flow from training into validation when tuning, and from validation into the model selection, but the test set is touched once at the end. Touching it more than once turns it into a second validation set and the next holdout you produce will overstate performance. For imbalanced classification (the typical PD modelling setting, where defaults are often less than five per cent of the sample) plain random splits are not enough; the split must be <strong>stratified</strong> so that each fold contains the same default rate as the full sample. For temporal data, random shuffling is worse than useless because it lets the model see the future when predicting the past; the split must respect time. And once a model is in production, the <strong>Population Stability Index</strong> measures whether the input distribution has drifted far enough from the training distribution to warrant retraining.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A model that scores perfectly on the data it was trained on tells you nothing useful. The question is how it behaves on data it has never seen. So you set some data aside, hide the labels, run the trained model on it, and compare predictions to the truth you set aside. That holdout is the test set. Before you get there, you need to choose between competing model configurations (which depth of tree, which learning rate), and you cannot do that on the training set because every configuration will memorise it, and you cannot do it on the test set without spoiling its one job. So you carve out a third slice, the validation set, for tuning. Three slices, three roles, three audiences for the numbers each one produces.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The textbook three-way split is the right answer when data is abundant. In credit risk it usually is not, because defaults are rare. With 200 defaults total, a 60 / 20 / 20 split leaves 40 defaults to validate on and 40 to test on, which is not enough to distinguish a good model from a slightly less good one. The practical move is to run K-fold cross-validation on the development sample for hyperparameter tuning, hold out a single time-based out-of-time sample for the final test, and reserve a second out-of-time window as the post-deployment monitoring sample. The split is then four-way (development train / development validate via CV / out-of-time test / monitoring), and each window is chosen to mimic the kind of distribution shift the model will face in production.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 2 of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>. The previous stage (<a href="../01_feature_engineering/04-feature_selection.html">feature selection</a>) ends with a feature matrix; this lecture decides which rows go where. The next lecture (<a href="02-pipelines.html">pipelines</a>) is the structural fix that makes the rules in this lecture actually hold: a scikit-learn pipeline fitted inside a cross-validation loop is what stops the leakage failure modes by construction. Hyperparameter tuning (<a href="../06_hyperparameter_tuning/01-tuning_principles.html">lecture 6.01</a>) consumes the validation framework set up here.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three failure modes make the split the single highest-leverage decision in the pipeline. First, <strong>overfitting is invisible without a holdout.</strong> Any sufficiently flexible model class (gradient-boosted trees, deep networks, even a high-degree polynomial regression) can drive training error to zero on the data it has seen. The training error is therefore not informative about how the model behaves on new data; it is a measure of capacity, not of fit. The only way to detect overfitting before deployment is to compute the metric on data the model was not allowed to see during training. The validation set serves that purpose during tuning; the test set serves it after tuning is finished. Without those holdouts, a model with perfect training accuracy is indistinguishable from a model that has genuinely learned the signal.</p>
+
+  <p>Second, <strong>hyperparameter selection is a form of training and inherits the same leakage rules.</strong> Choosing the regularisation strength that maximises a metric is fitting a parameter to the data the metric was computed on. If that data is the test set, the test set is now part of the training procedure and a second, independent test is required to estimate generalisation. The validation set exists precisely so that hyperparameter selection has its own arena and the test set remains untouched. The size of the gap between validation and test metrics at the end is itself diagnostic: a large gap means the tuning procedure has overfit the validation set, typically because the validation sample is small relative to the size of the hyperparameter search.</p>
+
+  <p>Third, <strong>distribution shift between training and production is the dominant failure mode of deployed models</strong>, and the only way to catch it is to monitor whether the input distribution has drifted. PSI is the workhorse metric for that monitoring in credit and banking applications. A model is built on data from one period, scored on data from another, and the population it was trained on may no longer resemble the population it is now seeing. PSI quantifies that drift on a single scalar so that retraining can be triggered automatically rather than waiting for performance metrics to deteriorate, which only become visible after default outcomes mature, twelve to twenty-four months later.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A wholesale PD model was tuned by grid search over learning rate, tree depth, and the number of trees in a gradient-boosting classifier. The development team ran the search on a single 80 / 20 split, reported the best validation AUC of 0.82, and recommended deployment. Validation pushed back and asked for a separate out-of-time test. The model achieved an AUC of 0.71 on that test. The 0.11 gap was the size of the optimism baked in by selecting hyperparameters on the same sample used to quote the headline metric. The deployment was paused, the validation set was rebuilt with proper K-fold cross-validation on the development window, and the final out-of-time AUC settled at 0.78. The 0.04 remaining gap was distribution shift, not tuning optimism, and was acceptable. The original 0.82 was fiction.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold two pictures. The first is the three-way partition of a single dataset into train, validation, and test slices, each with a defined role and a defined audience. The second is the rotation of a single validation fold across iterations in K-fold cross-validation, which is what you do when the dataset is too small to afford a fixed validation slice.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three-way split and K-fold cross-validation diagrams">
+      <defs>
+        <marker id="ttArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three-way split and 5-fold cross-validation</text>
+
+      <!-- Three-way split bar -->
+      <text x="40" y="58" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">Three-way split</text>
+      <g>
+        <rect x="40" y="68" width="480" height="32" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.2"/>
+        <text x="280" y="88" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#115e59">TRAIN (60%)</text>
+      </g>
+      <g>
+        <rect x="520" y="68" width="120" height="32" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.2"/>
+        <text x="580" y="88" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">VAL (20%)</text>
+      </g>
+      <g>
+        <rect x="640" y="68" width="120" height="32" fill="#FEF3F2" stroke="#b45309" stroke-width="1.2"/>
+        <text x="700" y="88" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">TEST (20%)</text>
+      </g>
+
+      <text x="280" y="118" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">fit parameters here</text>
+      <text x="580" y="118" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">pick hyperparameters here</text>
+      <text x="700" y="118" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">touch once at the end</text>
+
+      <!-- Separator -->
+      <line x1="40" y1="140" x2="780" y2="140" stroke="#e4e4e7" stroke-width="1"/>
+
+      <!-- K-fold -->
+      <text x="40" y="166" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">5-fold cross-validation on the train + val pool</text>
+      <text x="40" y="180" font-family="Inter" font-size="9" fill="#71717a">each row is one iteration; the dark cell is the held-out validation fold</text>
+
+      <!-- Iteration rows -->
+      <g font-family="Inter" font-size="10">
+        <!-- Iter 1 -->
+        <text x="50" y="210" fill="#71717a">i=1</text>
+        <rect x="80" y="198" width="100" height="18" fill="#7c3aed" stroke="#5b21b6" stroke-width="1"/>
+        <rect x="180" y="198" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="280" y="198" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="380" y="198" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="480" y="198" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <!-- Iter 2 -->
+        <text x="50" y="234" fill="#71717a">i=2</text>
+        <rect x="80" y="222" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="180" y="222" width="100" height="18" fill="#7c3aed" stroke="#5b21b6" stroke-width="1"/>
+        <rect x="280" y="222" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="380" y="222" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="480" y="222" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <!-- Iter 3 -->
+        <text x="50" y="258" fill="#71717a">i=3</text>
+        <rect x="80" y="246" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="180" y="246" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="280" y="246" width="100" height="18" fill="#7c3aed" stroke="#5b21b6" stroke-width="1"/>
+        <rect x="380" y="246" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="480" y="246" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <!-- Iter 4 -->
+        <text x="50" y="282" fill="#71717a">i=4</text>
+        <rect x="80" y="270" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="180" y="270" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="280" y="270" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="380" y="270" width="100" height="18" fill="#7c3aed" stroke="#5b21b6" stroke-width="1"/>
+        <rect x="480" y="270" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <!-- Iter 5 -->
+        <text x="50" y="306" fill="#71717a">i=5</text>
+        <rect x="80" y="294" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="180" y="294" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="280" y="294" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="380" y="294" width="100" height="18" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <rect x="480" y="294" width="100" height="18" fill="#7c3aed" stroke="#5b21b6" stroke-width="1"/>
+      </g>
+
+      <!-- Held-out test still untouched -->
+      <rect x="600" y="198" width="160" height="114" fill="#FEF3F2" stroke="#b45309" stroke-width="1.2" stroke-dasharray="4 3"/>
+      <text x="680" y="248" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">TEST</text>
+      <text x="680" y="266" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">never used</text>
+      <text x="680" y="278" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">in any fold</text>
+
+      <line x1="40" y1="330" x2="780" y2="330" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="350" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">CV mean across folds is the validation score; the test rectangle on the right is touched only after the final model is locked</text>
+    </svg>
+    <figcaption>Top: the three-way partition with role labels. Bottom: five iterations of K-fold cross-validation where the validation fold rotates through the development pool. The test rectangle on the right is the same untouched holdout in both panels; CV replaces the fixed validation slice but does not replace the test set.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The three slices on the top bar are not equal: training is the largest because parameter estimation needs the most data, validation is smaller because hyperparameter spaces are typically lower-dimensional, and test is the smallest slice that still gives a sufficiently precise generalisation estimate. The bottom panel shows that K-fold cross-validation reuses the training pool by rotating the validation fold; every observation in the pool serves as a training point K minus one times and as a validation point exactly once. The dashed test rectangle on the right is identical in both panels and is the immovable object: it does not enter any fold, it does not influence any hyperparameter, it is touched only when the final model is locked.</p>
+
+  <p>Now consider time. The diagram above implicitly assumes the data is exchangeable: any row could in principle stand in for any other. When the data is a time series, that assumption fails. A model that predicts March from April has seen the future, and any cross-validation that includes such a fold reports a metric that overstates production performance. The fix is to choose folds so that every training fold ends before every validation fold begins, which is what <code>TimeSeriesSplit</code> does by construction.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The fundamental rule: three sets, three roles</h3>
+
+  <p>A predictive model attaches two distinct kinds of numbers to itself. The first kind is the <strong>parameters</strong>, which the optimiser solves for given the training data and a loss function: the coefficients $\beta$ in a logistic regression, the split values $c$ at each internal node of a decision tree, the weight matrices $W$ of a neural network. The optimiser writes these numbers automatically by minimising the chosen loss on the training set. The second kind is the <strong>hyperparameters</strong>, which the optimiser does not solve for: the regularisation strength $\lambda$ in a ridge or lasso regression, the maximum tree depth, the learning rate of a gradient-boosting iteration, the number of hidden units in a network. These are inputs to the optimiser, not outputs of it, and they have to be chosen somehow.</p>
+
+  <p>The validation set exists to choose them. The procedure is mechanical: pick a candidate set of hyperparameter values, fit the model on the training data using each candidate, compute the chosen evaluation metric on the validation set, keep the candidate with the best validation score, refit the final model on the union of training and validation, and report the test-set metric on a holdout that has not been seen at any point in the procedure. The discipline is hierarchical and one-way: training informs parameters, validation informs hyperparameters, test informs the single number that is quoted publicly. Touching the test set more than once during the procedure (looking at the test metric, adjusting something, looking again) silently converts the test set into a second validation set, and the quoted generalisation error becomes optimistic. The phrase "touch the test set once" is the entire discipline in five words.</p>
+
+  <p>Conventional split proportions are 60 / 20 / 20 or 70 / 15 / 15. The decision is driven by the absolute size of the validation and test sets, not by their percentages: a 60 / 20 / 20 split on a million-row dataset leaves 200,000 rows in each holdout, which is more than enough; the same proportions on a 1,000-row dataset leave 200 rows, which may not distinguish two competing models reliably. When data is scarce the validation set is replaced by K-fold cross-validation on the training pool, leaving the test set alone.</p>
+
+  <h3>Random split and stratified split</h3>
+
+  <p>The <strong>random split</strong> partitions the rows of the dataset uniformly at random into the desired proportions. It works when the rows are exchangeable: the target distribution in each slice converges to the overall distribution as the slice grows, by the law of large numbers. The scikit-learn idiom is:</p>
+
+  <pre><code>from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)</code></pre>
+
+  <p>The <code>random_state</code> argument fixes the pseudo-random seed so the split is reproducible: the same call on the same data returns the same partition. Reproducibility matters for model validation (a regulator should be able to re-run the development code and obtain bit-identical results) and for debugging (a non-reproducible split makes failure modes intermittent and impossible to diagnose).</p>
+
+  <p>Random splits are not sufficient for imbalanced classification. In retail PD modelling, the default rate is typically between one and five per cent of the sample. A random split of a sample with 200 defaults out of 10,000 observations might produce a test set with 30 defaults or with 50, purely by sampling variation, and the test-set AUC will move accordingly. The <strong>stratified split</strong> fixes this by sampling within each class so that the class proportions are preserved in each slice:</p>
+
+  <pre><code>X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)</code></pre>
+
+  <p>The default rate in the train, validation, and test slices is then guaranteed to match the default rate in the full sample, up to rounding. Stratification reduces the sampling variance of every metric that depends on class proportions (AUC, precision, recall, F1) without changing the expectation, which is exactly the bias-variance behaviour you want from a sampling design.</p>
+
+  <h3>K-fold cross-validation</h3>
+
+  <p>When the dataset is too small to afford a separate validation set, cross-validation reuses the training pool by rotating the validation fold. The pool is partitioned into $K$ disjoint folds of approximately equal size. For each iteration $i = 1, \dots, K$, the model is fit on the union of $K-1$ folds and evaluated on the remaining fold. The K iteration scores are averaged to produce the cross-validation estimate of the validation metric,</p>
+
+  $$\widehat{\operatorname{CV}}(\mathcal{M}) = \frac{1}{K} \sum_{i=1}^{K} \mathcal{L}\!\left(y_{\text{fold } i},\, \hat{f}_{\mathcal{M},\, -i}(X_{\text{fold } i})\right),$$
+
+  <p>where $\hat{f}_{\mathcal{M},\, -i}$ denotes the model $\mathcal{M}$ trained on every fold except fold $i$, and $\mathcal{L}$ is the loss or metric of interest. The K models produced inside the loop are intermediate artefacts; the final model is refit on the entire training pool using the hyperparameters that minimised $\widehat{\operatorname{CV}}$.</p>
+
+  <p>The bias-variance behaviour of the CV estimator is informative. As $K$ increases, each training fold becomes closer in size to the full training pool, so $\hat{f}_{\mathcal{M},\, -i}$ is closer to the model that would have been fit on the full pool, and the bias of $\widehat{\operatorname{CV}}$ as an estimator of true generalisation error decreases. At the same time, the K training sets become more overlapping, so the K scores become more correlated, and the variance of their average increases. The conventional choice $K = 5$ or $K = 10$ balances these. <strong>Leave-one-out cross-validation</strong> sets $K = n$ and gives nearly unbiased but very high-variance estimates; it is also computationally expensive on large datasets because $n$ models must be fit. For most practical work, five-fold or ten-fold strikes the right balance.</p>
+
+  <p><strong>Stratified K-fold</strong> applies the stratification principle to each fold rather than to a single split, ensuring that the class distribution in every validation fold matches the population. For binary classification with imbalanced classes it is the default; the scikit-learn idiom is:</p>
+
+  <pre><code>from sklearn.model_selection import StratifiedKFold, cross_val_score
+
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(model, X, y, cv=skf, scoring="roc_auc")</code></pre>
+
+  <p>The same logic applies to multi-class classification and to any partitioning where class proportions vary across folds enough to affect the metric.</p>
+
+  <h3>Time series splits</h3>
+
+  <p>Random shuffling assumes the rows are exchangeable. When the data is temporal (daily transaction volumes, monthly default rates, intraday prices) the rows are not exchangeable: the row's position in time carries information. A random split lets the model see rows from May during training and asks it to predict rows from March at evaluation, which is information leakage of the most direct kind. A model that has seen future macroeconomic conditions trivially outperforms a model that must extrapolate from past ones, and the cross-validation estimate of generalisation will be optimistic by an amount that is invisible at development time and ruinous in production.</p>
+
+  <p>Time-series splits enforce chronological order. Every training fold ends strictly before its validation fold begins. Two patterns dominate. The <strong>expanding window</strong> grows the training set with each iteration: iteration $i$ trains on data from the start of the series to time $t_i$ and validates on the period from $t_i$ to $t_{i+1}$; iteration $i+1$ extends the training set to $t_{i+1}$ and validates on the next window. This is what scikit-learn's <code>TimeSeriesSplit</code> does:</p>
+
+  <pre><code>from sklearn.model_selection import TimeSeriesSplit
+
+tscv = TimeSeriesSplit(n_splits=5)
+for train_index, test_index in tscv.split(X):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]</code></pre>
+
+  <p>The <strong>sliding window</strong> (rolling window) keeps the training window at a fixed length: iteration $i$ trains on the most recent $L$ observations before $t_i$ and validates on the period from $t_i$ to $t_{i+1}$. The choice between expanding and sliding turns on whether older data is informative. Expanding is appropriate when the underlying process is stationary and older observations still constrain parameter estimates; sliding is appropriate when the process drifts and older data biases the estimate toward conditions that no longer hold. Macro-driven models (default rates, prepayment speeds, deposit balances) typically prefer sliding windows of one to three years, because the relationship between macro covariates and the target changes faster than the parameters of a fixed model can absorb.</p>
+
+  <p><strong>GroupTimeSeriesSplit</strong> is the variant for time-series data with a grouping structure: customers observed monthly, branches reporting weekly, instruments quoted daily. A naive time-series split could place observations of the same customer on either side of the train / validation boundary, which leaks customer-level information across the split. Grouping by customer identifier ensures that all observations of any given customer fall on the same side of the boundary, which makes the validation metric a measure of generalisation to new customers under temporal evolution rather than to new time points for existing customers.</p>
+
+  <h3>Population Stability Index</h3>
+
+  <p>Once a model is deployed, the question shifts from "does it generalise" to "is it still generalising". A model trained on 2024 data and scored on 2026 applications is making predictions on a population whose covariate distribution may have shifted. The PSI quantifies that shift on a per-feature basis (or on the model score itself, which is the single most useful aggregator) and triggers retraining when the shift exceeds a tolerance.</p>
+
+  <p>The construction is: partition the variable into $k$ buckets (commonly deciles for a continuous variable, or the existing levels for a categorical one), compute the proportion of observations in each bucket for the training (expected) and current (actual) populations, and compute</p>
+
+  $$\operatorname{PSI} = \sum_{i=1}^{k} (A_i - E_i) \cdot \ln\!\left(\frac{A_i}{E_i}\right),$$
+
+  <p>where $A_i$ is the actual proportion in bucket $i$ in the current population and $E_i$ is the expected proportion from training. PSI is non-negative (the summand is positive whenever $A_i \ne E_i$, by the same algebraic identity that makes KL divergence non-negative; PSI is in fact the symmetric variant of KL between the two distributions). The standard interpretation bands, established by usage in retail credit decades ago and now treated as default:</p>
+
+  <pre><code>PSI &lt; 0.10    no significant shift, continue using the model
+0.10 - 0.25   moderate shift, investigate and consider recalibration
+PSI &gt; 0.25    significant shift, retrain</code></pre>
+
+  <p>PSI is computed both on the model score (the most direct signal that predictions are drifting) and on the individual features (which localises the drift when score-level PSI fires). A score-level PSI of 0.30 with one feature contributing 0.25 of the total points directly at the feature that needs investigation. The metric is symmetric in the sense that swapping $A$ and $E$ leaves the value unchanged, which matters because there is no a priori reason to call one distribution "expected" and the other "actual" when comparing two arbitrary time windows.</p>
+
+  <h3>A leakage vignette: target encoding without splitting first</h3>
+
+  <p>Consider a binary classification problem with a high-cardinality categorical feature (postcode area, with several thousand levels) and a default outcome. The naive workflow is to compute the target-encoded value of each postcode area as the mean default rate at that postcode, replace the categorical with the encoded numeric column, split into train and test, and fit a logistic regression. The training AUC comes in at 0.91 and the test AUC at 0.89, which looks excellent.</p>
+
+  <p>The leak is structural. The target encoding was computed using every row's outcome, including the rows that ended up in the test set. The encoded value of a postcode area thus carries information about the outcomes of test rows directly. The test AUC is not measuring generalisation; it is measuring how well the model fits a feature that was constructed by looking at the answers. The correct procedure is to split first, compute the encoding from the training rows only, apply that encoding (without re-fitting) to the test rows, and fit the model. The test AUC drops to 0.74, which is the honest generalisation estimate. The 0.15 gap between 0.89 and 0.74 was pure leakage and would have entirely vanished in production, where new postcodes appear and existing ones drift, and the encoding can only ever be applied without re-fitting.</p>
+
+  <p>The generalisation of the vignette is the principle: any feature whose construction uses the target is a model parameter, and parameters are fit on training data only. The same applies to weight-of-evidence encoding, to leave-one-out encoding, to mean target encoding with any smoothing, and to any pseudo-labelling or self-training scheme. The pipeline structure in <a href="02-pipelines.html">lecture 2</a> exists precisely so that this kind of leak is structurally impossible, because the encoding's <code>fit</code> method is only called on the training fold.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for most of the production incidents traceable to the split. Each is invisible at development time and obvious in retrospect.</p>
+
+  <div class="callout warn">
+    <span class="tag">Touching the test set more than once</span>
+    The classic failure. The team looks at the test metric, decides the model is not quite good enough, retunes a hyperparameter, looks at the test metric again, and stops when it crosses an acceptance threshold. The test set is now a second validation set and the quoted generalisation error is optimistic. The fix is procedural: lock the test set in a separate file with a separate access policy, define the model selection rule upfront (best validation metric, ties broken by parsimony or by domain preference), and quote the test metric exactly once, at the end. If the test metric is unacceptable, the response is to redesign the model or relax the requirement, not to retune until it passes.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Random splits on temporal data</span>
+    A model is built on three years of daily transaction data using a random 80 / 20 split. The validation AUC is 0.84 and the model is deployed. Three months later the production AUC has collapsed to 0.62. The original validation included rows from every month of the training window, so the model was effectively interpolating within a known temporal range; production requires extrapolating beyond it. The fix is to use <code>TimeSeriesSplit</code> or a held-out time window from the start, accept the lower validation metric as the honest one, and adjust the model selection criterion accordingly.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Stratification overlooked on imbalanced targets</span>
+    A PD model with a 2.5 per cent default rate is built with a plain random split. The test set comes out with 1.9 per cent defaults by sampling chance; the validation set comes out with 2.8 per cent. The validation metric and the test metric move in opposite directions during tuning and the team blames the model. The fix is one keyword argument: <code>stratify=y</code> on the train_test_split call, and <code>StratifiedKFold</code> in any cross-validation loop. There is no reason to skip stratification in a classification setting; it costs nothing and stabilises every downstream metric.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Group leakage across the split</span>
+    A retail credit dataset has multiple observations per customer (monthly snapshots, application plus subsequent behaviour). A random split places some of customer A's observations in training and others in test. The model learns customer A's idiosyncratic behaviour from the training rows and trivially recognises the same customer at test time, inflating the metric. The fix is <code>GroupKFold</code> or <code>GroupShuffleSplit</code> with the customer identifier as the group: every observation of a given customer falls on the same side of the boundary, and the validation metric becomes a measure of generalisation to new customers rather than to new rows of known customers.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The split is the structural decision that makes every later number in the modelling pipeline either honest or fictional. Three slices, three roles: parameters are fit on training data, hyperparameters are chosen on validation data, generalisation is estimated on a test set that is touched once. Stratification preserves class proportions across slices and matters most when the target is rare, which is the typical credit-risk setting. K-fold cross-validation reuses the training pool when data is scarce, and stratified K-fold combines both ideas. Time-series data breaks the exchangeability assumption that random splits rely on, and <code>TimeSeriesSplit</code> (with sliding or expanding windows) and <code>GroupTimeSeriesSplit</code> are the structural fixes. After deployment, the Population Stability Index tracks whether the population the model is now seeing still resembles the population it was trained on, with PSI bands at 0.10 and 0.25 as the conventional triggers for investigation and retraining respectively.</p>
+
+  <p>Everything in this lecture is undermined by one structural failure: a transformer whose parameters are learned from the target (target encoding, weight-of-evidence, mean imputation, scaler statistics) and that is fit on the full dataset before splitting. The fit step has to live inside the cross-validation loop, on the training fold only, with the resulting transformer applied to validation and test without re-fitting. Scikit-learn's <code>Pipeline</code> object exists to make this enforceable by construction, and that is exactly the subject of <a href="02-pipelines.html">lecture 2</a>: how to compose the transformers from <a href="../01_feature_engineering/04-feature_selection.html">feature selection</a> with the splitting strategy from this lecture so that every fit operation is automatically confined to the correct fold.</p>
+
+  <p>Once the pipeline is in place, the focus shifts from "how do I avoid leakage" to "how do I systematically explore the hyperparameter space the validation set is supposed to score". That is <a href="../06_hyperparameter_tuning/01-tuning_principles.html">lecture 6.01</a>, which builds on the cross-validation framework constructed here and treats grid search, random search, and Bayesian optimisation as different strategies for proposing candidate hyperparameter values to feed into the same validation loop.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State which kind of model number is fit on training data, which is chosen on validation data, and which is estimated on test data. Why is the rule "touch the test set once" a procedural rule rather than a statistical one?</li>
+      <li>A PD modelling sample has 10,000 observations and a default rate of 2.5 per cent. You plan an 80 / 20 train / test split. Explain why stratification is preferred to a plain random split, and state the expected number of defaults in each slice under a stratified split.</li>
+      <li>Derive the bias-variance trade-off in choosing $K$ for K-fold cross-validation. As $K$ increases from 5 to $n$, what happens to the bias of the CV estimator and to its variance?</li>
+      <li>You build a model on monthly default data from January 2022 to December 2025 using a random 80 / 20 split and obtain a validation AUC of 0.84. The model is deployed in January 2026 and the live AUC for January 2026 cohorts is 0.62. Identify the structural problem and propose a split strategy that would have caught it.</li>
+      <li>Compute the PSI given the following expected (training) and actual (current) decile proportions: $E = (12, 11, 14, 12, 12, 10, 12, 6, 6, 5)$ per cent and $A = (10, 10, 13, 12, 13, 11, 13, 7, 6, 5)$ per cent. Interpret the resulting value against the standard bands.</li>
+      <li>Explain why computing a target encoding on the full dataset before splitting into train and test inflates the test-set metric. What is the structural fix and which scikit-learn object enforces it by construction?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 2.02 (<a href="02-pipelines.html">pipelines</a>) shows how scikit-learn's <code>Pipeline</code> and <code>ColumnTransformer</code> objects enforce the leakage discipline from this lecture by construction, ensuring that every transformer's <code>fit</code> method is only called on the training fold.</li>
+      <li><strong>Previous:</strong> Lecture 1.04 (<a href="../01_feature_engineering/04-feature_selection.html">feature selection</a>) ends with the feature matrix that this lecture partitions. Several feature selection methods (recursive feature elimination, sequential selection) themselves require cross-validation and so depend on the framework set up here.</li>
+      <li><strong>Bias-variance frame:</strong> Lecture 1.01 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the machine learning landscape</a>) introduced the bias-variance decomposition; the choice of $K$ in K-fold cross-validation, and the trade-off between expanding and sliding windows in time-series splits, are concrete instances of that decomposition applied to the design of the validation procedure itself.</li>
+      <li><strong>Hyperparameter tuning:</strong> Lecture 6.01 (<a href="../06_hyperparameter_tuning/01-tuning_principles.html">tuning principles</a>) consumes the validation framework constructed here. Grid search, random search, and Bayesian optimisation are three strategies for proposing candidate hyperparameter values; each is scored by the same cross-validation loop defined in this lecture.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Train and test split course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 5 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

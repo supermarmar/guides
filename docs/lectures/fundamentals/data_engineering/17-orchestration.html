@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 17: orchestration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Orchestration</h1>
+  <p class="subtitle">A kitchen at service is not a sequence of recipes. It is a set of dishes that must exist, in a state, by a time, drawing on ingredients that arrive when suppliers feel like delivering them, with a plan for the evening the fish is late. An orchestrator is that plan, written down and executable, and the interesting question is whether it thinks in tasks or in dishes.</p>
+  <div class="meta">
+    <span>Lecture 17 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part V: the undercurrents</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">An <strong>orchestrator</strong> decides what runs, in what order, on what trigger, with what concurrency, and what happens when a step fails. The dependency structure is a directed acyclic graph, and the orchestrator's job is to execute it, observe it, retry it, and let a human intervene.</p>
+
+  <p>Two philosophies compete, and the difference is more than presentational. <strong>Task-centric</strong> orchestration, exemplified by Apache Airflow, describes work: run this extract, then run that transformation, then send that email. <strong>Asset-centric</strong> orchestration, exemplified by Dagster, describes outcomes: this table should exist, be fresh within four hours, and be derived from those two tables. The task view asks "what should happen?"; the asset view asks "what should be true?", and derives the tasks from it.</p>
+
+  <p>Whichever you pick, four properties separate a pipeline that survives from one that generates a weekly incident. Every step is <strong>idempotent</strong>, so a retry is safe. Every run is <strong>parameterised by a partition</strong>, usually a date, so a rerun for March is a rerun for March. Retries have <strong>backoff and a limit</strong>, and failure alerts a named owner. And <strong>concurrency is capped</strong>, so a backfill does not overwhelm the source system you share with the bank's customers.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Two ways to run a kitchen. The first is a list: at six, start the stock; at seven, prepare the garnish; at half past, plate the fish. It works until the fish is late, at which point the list is useless because it describes actions rather than the state of the kitchen, and someone must reason from scratch about what can still proceed. The second is a set of dishes, each with its ingredients and a time by which it must be ready. When the fish is late, the answer is visible: everything not downstream of the fish continues, the fish dish is stale, and the head chef is told which service is at risk. Both are plans. Only the second one answers the question you actually have at seven o'clock.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">The orchestrator is not where logic lives</span>
+    A recurring failure is a pipeline whose business logic has leaked into the orchestration layer: transformations written inside task definitions, values passed between tasks through the orchestrator's own message mechanism, conditional business rules encoded as branching in the graph. It runs, and it is untestable, unreadable, and locked to the tool. Keep the orchestrator thin: it triggers, sequences, retries, and reports. The logic belongs in SQL models, in tested Python modules, in the transformation layer of Lecture 15, where it can be run and tested without the orchestrator being present at all.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Partial failure is the normal case, and the recovery question is what costs you.</strong> A twelve-step monthly pipeline fails at step seven. Which steps must rerun? With idempotent, partitioned steps the answer is "seven onwards, for that partition", and it is a button. Without them the answer requires reasoning about what each step already wrote, whether rerunning step eight will double count, and whether step five's output is still valid, which is an hour of careful thought at three in the morning by someone who did not write it.</p>
+
+  <p><strong>Time-based scheduling is a guess about data arrival.</strong> A job scheduled for two in the morning because the extract "usually lands by one" fails whenever the extract is late, and worse, sometimes succeeds on stale data. Data-aware triggering, a sensor waiting for the manifest file or an asset declaring that it depends on another asset's materialisation, replaces the guess with a fact. The distinction is the single largest source of avoidable overnight failures in banking pipelines, where the upstream extract is produced by a batch you do not control.</p>
+
+  <p><strong>Backfills are where an orchestrator earns its cost.</strong> Reprocessing twenty-four months means twenty-four runs of the same graph with different parameters, with limited concurrency, individual failure tracking, and the ability to resume. That is a feature of the orchestrator or it is a bespoke script somebody writes under pressure. Since Lecture 10 established that backfills are routine rather than exceptional, the capability is not optional.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Task-centric against asset-centric orchestration">
+      <defs>
+        <marker id="ar-orc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#a1a1aa"/>
+        </marker>
+      </defs>
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same pipeline, described two ways</text>
+
+      <!-- task centric -->
+      <text x="380" y="44" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#92400e">TASK-CENTRIC: a graph of things to do</text>
+      <g font-family="Inter" font-size="8.5" fill="#92400e">
+        <rect x="30" y="54" width="112" height="34" rx="6" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="86" y="70" text-anchor="middle" font-weight="600">wait_for_file</text>
+        <text x="86" y="82" text-anchor="middle" font-size="7.5">sensor</text>
+
+        <rect x="164" y="54" width="112" height="34" rx="6" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="220" y="70" text-anchor="middle" font-weight="600">load_bronze</text>
+        <text x="220" y="82" text-anchor="middle" font-size="7.5">python operator</text>
+
+        <rect x="298" y="54" width="112" height="34" rx="6" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="354" y="70" text-anchor="middle" font-weight="600">validate</text>
+        <text x="354" y="82" text-anchor="middle" font-size="7.5">python operator</text>
+
+        <rect x="432" y="54" width="112" height="34" rx="6" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="488" y="70" text-anchor="middle" font-weight="600">dbt_build</text>
+        <text x="488" y="82" text-anchor="middle" font-size="7.5">bash operator</text>
+
+        <rect x="566" y="54" width="112" height="34" rx="6" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="622" y="70" text-anchor="middle" font-weight="600">notify</text>
+        <text x="622" y="82" text-anchor="middle" font-size="7.5">email operator</text>
+      </g>
+      <g stroke="#a1a1aa" stroke-width="1.2" fill="none">
+        <line x1="145" y1="71" x2="160" y2="71" marker-end="url(#ar-orc)"/>
+        <line x1="279" y1="71" x2="294" y2="71" marker-end="url(#ar-orc)"/>
+        <line x1="413" y1="71" x2="428" y2="71" marker-end="url(#ar-orc)"/>
+        <line x1="547" y1="71" x2="562" y2="71" marker-end="url(#ar-orc)"/>
+      </g>
+      <text x="380" y="106" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">Asks: did the task succeed? Answers: yes, at 02:14. Cannot answer: is fact_account_month currently correct?</text>
+
+      <!-- asset centric -->
+      <text x="380" y="140" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#5b21b6">ASSET-CENTRIC: a graph of things that should be true</text>
+      <g font-family="Inter" font-size="8.5" fill="#5b21b6">
+        <rect x="60" y="152" width="130" height="42" rx="6" fill="#F5F3FF" stroke="#7c3aed"/>
+        <text x="125" y="168" text-anchor="middle" font-weight="600">raw_loan_extract</text>
+        <text x="125" y="180" text-anchor="middle" font-size="7.5">partition: 2026-03</text>
+        <text x="125" y="190" text-anchor="middle" font-size="7.5" fill="#1E9D54">fresh, checks passed</text>
+
+        <rect x="230" y="152" width="130" height="42" rx="6" fill="#F5F3FF" stroke="#7c3aed"/>
+        <text x="295" y="168" text-anchor="middle" font-weight="600">stg_loans</text>
+        <text x="295" y="180" text-anchor="middle" font-size="7.5">partition: 2026-03</text>
+        <text x="295" y="190" text-anchor="middle" font-size="7.5" fill="#1E9D54">fresh, checks passed</text>
+
+        <rect x="400" y="152" width="130" height="42" rx="6" fill="#F5F3FF" stroke="#7c3aed"/>
+        <text x="465" y="168" text-anchor="middle" font-weight="600">int_default_flag</text>
+        <text x="465" y="180" text-anchor="middle" font-size="7.5">partition: 2026-03</text>
+        <text x="465" y="190" text-anchor="middle" font-size="7.5" fill="#DC2855">STALE: upstream newer</text>
+
+        <rect x="570" y="152" width="140" height="42" rx="6" fill="#F5F3FF" stroke="#7c3aed"/>
+        <text x="640" y="168" text-anchor="middle" font-weight="600">fact_account_month</text>
+        <text x="640" y="180" text-anchor="middle" font-size="7.5">SLA: fresh within 4h</text>
+        <text x="640" y="190" text-anchor="middle" font-size="7.5" fill="#DC2855">AT RISK</text>
+      </g>
+      <g stroke="#a1a1aa" stroke-width="1.2" fill="none">
+        <line x1="193" y1="173" x2="226" y2="173" marker-end="url(#ar-orc)"/>
+        <line x1="363" y1="173" x2="396" y2="173" marker-end="url(#ar-orc)"/>
+        <line x1="533" y1="173" x2="566" y2="173" marker-end="url(#ar-orc)"/>
+      </g>
+      <text x="380" y="212" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">Asks: is each asset present, fresh, and passing its checks? The tasks to run are derived from the answer.</text>
+
+      <!-- the four properties -->
+      <rect x="30" y="234" width="700" height="150" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="380" y="256" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">THE FOUR PROPERTIES THAT DECIDE WHETHER 03:00 IS SURVIVABLE</text>
+      <g font-family="Inter" font-size="9.5" fill="#115e59">
+        <text x="50" y="280" font-weight="700">Idempotent steps</text>
+        <text x="200" y="280" fill="#3f3f46">a retry cannot double count, so the orchestrator may retry freely</text>
+        <text x="50" y="304" font-weight="700">Partitioned runs</text>
+        <text x="200" y="304" fill="#3f3f46">the date is an explicit parameter with no default, so a rerun targets the right slice</text>
+        <text x="50" y="328" font-weight="700">Bounded retries</text>
+        <text x="200" y="328" fill="#3f3f46">exponential backoff, a limit, a timeout, then an alert to a named owner</text>
+        <text x="50" y="352" font-weight="700">Capped concurrency</text>
+        <text x="200" y="352" fill="#3f3f46">a pool limit per source, so a 24-month backfill cannot degrade a live system</text>
+        <text x="380" y="374" text-anchor="middle" font-style="italic" fill="#0d9488">Miss any one of these and the orchestrator amplifies failures instead of absorbing them.</text>
+      </g>
+    </svg>
+    <figcaption>The same monthly pipeline in both idioms. The task view tells you a job succeeded; the asset view tells you whether a table is currently trustworthy, which is the question a consumer actually has. The green band applies regardless of which tool you choose, and its absence is why so many pipelines are fragile in ways the tool gets blamed for.</figcaption>
+  </figure>
+
+  <h3>Triggers</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Trigger</th><th>Fires when</th><th>Use for</th><th>Hazard</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Schedule</strong></td><td>A clock time or cron expression is reached</td><td>The outer loop: start looking for today's work</td><td>Assumes data has arrived; fails or runs on stale input when it has not</td></tr>
+      <tr><td><strong>Sensor</strong></td><td>An external condition becomes true: a file, a manifest, a table version</td><td>Waiting on a system you do not control</td><td>A sensor that waits forever holds a worker slot; always set a timeout</td></tr>
+      <tr><td><strong>Upstream completion</strong></td><td>A dependency in the same graph finishes</td><td>Ordinary internal sequencing</td><td>None, and this should be the majority of your edges</td></tr>
+      <tr><td><strong>Asset update</strong></td><td>An upstream asset is materialised, possibly in another team's project</td><td>Cross-team dependencies without a shared schedule</td><td>Requires shared asset identity, which is a governance agreement</td></tr>
+      <tr><td><strong>Manual</strong></td><td>A human triggers it</td><td>Backfills, corrections, approved reruns</td><td>Must be logged and permissioned like any production change</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Airflow, and its four classic traps</h3>
+
+  <p>Airflow's model is a Python file defining a <strong>DAG</strong> of <strong>tasks</strong>, each an <strong>operator</strong> instance, executed by a scheduler dispatching to workers. It is mature, ubiquitous, and has a large operator ecosystem, which is why most banks that orchestrate anything orchestrate it with Airflow.</p>
+
+  <pre><code>from airflow.decorators import dag, task
+from airflow.sensors.filesystem import FileSensor
+import pendulum
+
+@dag(
+    schedule="0 2 1 * *",                      # 02:00 on the first of each month
+    start_date=pendulum.datetime(2021, 6, 1, tz="Europe/London"),
+    catchup=False,                             # do NOT silently backfill on deploy
+    max_active_runs=1,
+    default_args={"retries": 3, "retry_exponential_backoff": True,
+                  "retry_delay": pendulum.duration(minutes=5),
+                  "execution_timeout": pendulum.duration(hours=2)},
+    tags=["risk", "monthly"],
+)
+def monthly_risk_pipeline():
+
+    wait_for_manifest = FileSensor(
+        task_id="wait_for_manifest",
+        filepath="/landing/loans/{{ data_interval_start | ds }}/_MANIFEST",
+        poke_interval=300, timeout=6 * 3600, mode="reschedule",   # frees the worker slot
+    )
+
+    @task
+    def load_bronze(reporting_date: str) -&gt; None:
+        ...     # thin wrapper: calls a tested module, passes the date explicitly
+
+    @task
+    def validate(reporting_date: str) -&gt; None:
+        ...     # the Lecture 16 suite; raises to fail the task
+
+    @task
+    def build_models(reporting_date: str) -&gt; None:
+        ...     # invokes dbt for the partition
+
+    date = "{{ data_interval_start | ds }}"
+    wait_for_manifest &gt;&gt; load_bronze(date) &gt;&gt; validate(date) &gt;&gt; build_models(date)
+
+monthly_risk_pipeline()</code></pre>
+
+  <p>Four traps account for most Airflow incidents. <em>Top-level code</em>: anything at module level runs every time the scheduler parses the file, which is constantly, so a database query or a large import there will cripple the scheduler. <em>Passing data through XCom</em>: the inter-task message mechanism is for small values such as identifiers and paths, and pushing a dataframe through it is an anti-pattern that fills the metadata database. <em>Catchup</em>: with <code>catchup=True</code> and a historical start date, deploying a DAG launches a run for every missed interval at once, which has taken down more than one source system. And <em>timezones and the data interval</em>: the parameter you want is almost always the data interval rather than the wall-clock execution time, and confusing them shifts every partition by one period.</p>
+
+  <h3>Dagster, and what the asset model changes</h3>
+
+  <pre><code>import dagster as dg
+
+@dg.asset(
+    partitions_def=dg.MonthlyPartitionsDefinition(start_date="2021-06-01"),
+    group_name="risk",
+    automation_condition=dg.AutomationCondition.eager(),   # rebuild when upstream changes
+)
+def raw_loan_extract(context: dg.AssetExecutionContext) -&gt; None:
+    month = context.partition_key
+    ...     # land the partition
+
+@dg.asset(deps=[raw_loan_extract],
+          partitions_def=dg.MonthlyPartitionsDefinition(start_date="2021-06-01"))
+def fact_account_month(context: dg.AssetExecutionContext) -&gt; None:
+    ...
+
+@dg.asset_check(asset=fact_account_month, blocking=True)
+def grain_is_unique(context) -&gt; dg.AssetCheckResult:
+    duplicates = ...     # count violations of the account-month grain
+    return dg.AssetCheckResult(passed=duplicates == 0,
+                               metadata={"duplicate_rows": duplicates})</code></pre>
+
+  <p>Three things follow from describing assets rather than tasks. The unit of observability is the table, so the interface answers "is <code>fact_account_month</code> for March fresh, and did its checks pass?" rather than "did job 4,412 exit zero". Partitions are first-class, so a backfill is selecting a range of partitions in the interface rather than a special script. And <strong>asset checks</strong> attach the Lecture 16 validations to the asset itself, with a blocking flag that prevents downstream materialisation, which is the publish gate expressed structurally rather than as a task that someone might reorder.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th></th><th>Airflow</th><th>Dagster</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Primary abstraction</strong></td><td>Task in a DAG</td><td>Software-defined asset</td></tr>
+      <tr><td><strong>Strengths</strong></td><td>Ubiquity, operator ecosystem, mature operations, deep talent pool</td><td>Data-aware scheduling, partitions and backfills, asset checks, local testability</td></tr>
+      <tr><td><strong>Weaknesses</strong></td><td>Not data-aware by default; testing a DAG locally is awkward; the traps above</td><td>Smaller ecosystem; the asset model needs unlearning if you arrive from task thinking</td></tr>
+      <tr><td><strong>Choose when</strong></td><td>It is already there, or the estate is heterogeneous scripts and vendor jobs</td><td>Starting fresh with a warehouse-centric, partitioned, table-producing platform</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The pragmatic view: an existing Airflow installation is not a problem to be migrated away from, and most of this lecture's value is available in either tool provided you supply the four properties yourself. What Dagster does is make those properties the path of least resistance rather than a discipline you must impose.</p>
+
+  <h3>Failure handling that works at three in the morning</h3>
+
+  <p>Retries with exponential backoff for transient failures, and a hard limit so a genuinely broken step stops rather than retrying for six hours. An execution timeout on every task, because a hung task holds resources and never alerts. Alerts routed to a named owner per pipeline, not to a shared inbox, with the alert containing the partition, the failing step, the error, and a link to the run. And a <strong>runbook</strong> per pipeline: what this does, who owns it, what the common failures are, what is safe to rerun, and who to call upstream. The runbook is what makes the pipeline supportable by someone other than its author, which is the actual test of whether it is production code.</p>
+
+  <p>One more control belongs here. Cap concurrency per external system, using Airflow pools or Dagster concurrency limits. A backfill of twenty-four months that runs twenty-four extracts in parallel against a live core banking database is an outage you caused, and it is entirely preventable with one configuration value.</p>
+
+  <div class="callout insight">
+    <span class="tag">Orchestrate the checks, not just the work</span>
+    A pattern worth adopting: make validation a node in the graph with the same status as any other, positioned so that nothing downstream runs when it fails. This sounds obvious and is frequently not done, because validation is bolted on as a notification rather than a dependency. When the check is a blocking node, "the data is bad" and "the pipeline stopped" become the same event, which is exactly what you want: consumers keep yesterday's good data instead of receiving today's bad data, and somebody is told. When the check merely emails, consumers get the bad data and the email arrives after they have used it.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: the monthly risk pipeline, and then a twenty-four-month backfill</strong>
+    <p>The pipeline, in dependency order, with the choices that matter at each step.</p>
+    <p><em>1. Wait, do not guess.</em> A sensor waits for the manifest file for the reporting month, in reschedule mode so it releases its worker between checks, with a six-hour timeout. On timeout it alerts the data owner with the expected path. Note what this replaces: a schedule at 02:00 that assumed the extract landed at 01:00 and failed silently on the three nights a year it did not.</p>
+    <p><em>2. Land bronze, idempotently.</em> The task calls a tested module with the reporting date passed explicitly, writing the raw arrival to the partition. Rerunning replaces that partition, per Lecture 06. The task itself is a dozen lines: the orchestrator holds no logic.</p>
+    <p><em>3. Validate, blocking.</em> The Lecture 16 suite runs as its own node. Gate 1 and gate 2 failures raise, which fails the task, which stops the graph. Quarantine counts are recorded as metadata on the run so they are visible in the interface rather than buried in a log.</p>
+    <p><em>4. Build the models.</em> One node invoking the transformation layer for the partition, or better, the transformation models exposed as individual assets so that a failure in one mart does not obscure the success of the others. Reconciliation, gate 3, runs after the build and before anything is marked published.</p>
+    <p><em>5. Publish and notify.</em> The publish step is the atomic commit of Lecture 14. Notification goes to consumers on success with the partition and the headline reconciliation figures, which turns the pipeline into something people trust because they can see it working, rather than something they only hear about when it breaks.</p>
+    <p><em>Now the backfill.</em> A definition change requires reprocessing twenty-four months. The mechanics, given the four properties:</p>
+    <pre><code># Dagster: select the asset and the partition range, in the UI or the CLI
+dagster asset backfill --select fact_account_month+ \
+    --partition-range 2024-04-01...2026-03-01
+
+# Airflow: clear the interval and let the scheduler re-run it
+airflow tasks clear monthly_risk_pipeline \
+    --start-date 2024-04-01 --end-date 2026-03-01 --yes</code></pre>
+    <p><em>The four things that make it safe.</em> Concurrency capped at three partitions at a time, so the source database sees a load comparable to a normal night rather than twenty-four times it. Each partition idempotent, so a partial backfill can simply be re-run for the failed partitions without reasoning about what was already written. Each partition reconciled independently, so a break in one month is visible and localised rather than averaged away. And the whole operation logged as an approved change with a reason, because reprocessing twenty-four months of reported figures is a change to published numbers and belongs in the change record alongside the code that motivated it.</p>
+    <p><em>What goes wrong without them.</em> Without capped concurrency the source degrades and someone from operations calls. Without idempotency the retried partitions double count and the exposure figures are wrong in a way that looks like growth. Without per-partition reconciliation a single bad month hides inside a twenty-four-month average. Without the change record the auditor finds that historical figures moved with no documented reason, which is the finding you least want. Each of these is a five-minute design decision made months earlier.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>An orchestrator triggers, sequences, retries, and reports, and should contain no business logic. Prefer data-aware triggering to clock-based guessing, since the upstream extract is not yours to schedule. Make validation a blocking node so that bad data stops the pipeline rather than emailing about it afterwards. And supply the four properties regardless of tool: idempotent steps, explicit partition parameters, bounded retries with owned alerts, and capped concurrency per external system. Asset-centric tools make these the default; task-centric tools let you have them if you insist. Both are far better than the cron job and the hope.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Contrast task-centric with asset-centric orchestration, and give a question only the second can answer.</li>
+      <li>Name the four properties that make a three-in-the-morning failure survivable, and what breaks without each.</li>
+      <li>Why is a clock schedule a guess, and what replaces it?</li>
+      <li>Give Airflow's four classic traps and the harm each causes.</li>
+      <li>What does a blocking asset check achieve that a validation email does not?</li>
+      <li>Why must concurrency be capped per external system, and what does its absence cause during a backfill?</li>
+      <li>What belongs in a runbook, and what does its existence actually test?</li>
+      <li>List the four safeguards that make a twenty-four-month backfill safe, and the failure each prevents.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="16-data_quality.html">Lecture 16</a> built the checks; this lecture makes them blocking nodes in a graph.</li>
+      <li><strong>Next:</strong> <a href="18-observability_and_contracts.html">Lecture 18</a> covers what to watch between runs, and the contracts that make cross-team dependencies explicit.</li>
+      <li><strong>Cross-link:</strong> idempotency is <a href="06-sql_manipulation.html">Lecture 06</a>; partitioned reruns and backfills are <a href="10-batch_ingestion.html">Lecture 10</a>; the transformation graph inside the build step is <a href="15-dbt_analytics_engineering.html">Lecture 15</a>; deployment of the orchestrator itself is <a href="20-dataops.html">Lecture 20</a>.</li>
+      <li><strong>Outside this course:</strong> <a href="../software_engineering/07-logging_and_observability.html">logging and observability</a> in the software engineering track covers the instrumentation these alerts depend on.</li>
+      <li><strong>Further reading:</strong> the Airflow best-practices documentation, particularly on top-level code and on data intervals; the Dagster documentation's asset concepts and partition guides.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 17 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

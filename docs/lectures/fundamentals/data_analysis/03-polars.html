@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 3: Polars and the modern dataframe stack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data analysis</a></div>
+  <h1>Polars and the modern dataframe stack</h1>
+  <p class="subtitle">Polars is what pandas would be if it were designed today. It runs the same analytical vocabulary (load, select, filter, group, join) on an Arrow-backed engine that is faster, parallel by default, and lazy when you want it to be. The eighty per cent that looks like pandas you already know; the twenty per cent that differs (filter instead of boolean masks, with_columns instead of assignment, expressions instead of lambdas) is exactly where pandas habits become liabilities. This lecture is the translation guide and the case for when to switch.</p>
+  <div class="meta">
+    <span>Lecture 3 of 5</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: the dataframe layer</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Polars</strong> is a dataframe library, written in Rust, with a Python interface. Compared to pandas it has three differences that matter analytically. First, it stores data in <strong>Apache Arrow</strong> columnar format, which is faster to compute on and shares zero-copy with the rest of the modern data stack (DuckDB, parquet, Spark connectors). Second, it executes operations in <strong>parallel</strong> by default, using every core on your machine. Third, it has a <strong>lazy</strong> mode: you write a chain of operations against a <em>plan</em>, the planner optimises the plan (predicate pushdown, projection pushdown, common-subexpression elimination), and the work runs only when you ask for the result. On a typical 30-million-row credit-risk extract, Polars is five to twenty times faster than pandas and uses a fraction of the memory.</p>
+
+  <p>The discipline this lecture trains is <strong>thinking in expressions, not lambdas</strong>. Polars wants you to describe what should happen to a column (<code>pl.col("loan_amnt") * 1.05</code>) and let the engine schedule the work. Lambdas and Python-level row loops force the engine to fall back to single-threaded interpretation, and the order-of-magnitude advantage evaporates. Most of what looks like a Polars-specific quirk is actually the engine telling you to express the work in its terms.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Pandas treats each operation as something to execute immediately on a dataframe in memory. Polars treats each operation as a request you append to a plan; the engine reorders and parallelises the plan before running anything. The advantage is the same one a query planner gives a database: it can skip work that does not contribute to the final answer.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits</span>
+    This lecture is the bridge between the pandas vocabulary of Lectures 01-02 and the larger-than-memory tools (DuckDB, Spark) covered in the data engineering track. Polars is the right step up when pandas hits its single-machine ceiling (typically 10<sup>7</sup>-10<sup>8</sup> rows depending on the operations) and the right peer for DuckDB when SQL is not the natural expression. It is not a replacement for pandas in every project; the synthesis section below covers when each is preferred.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Pandas was designed in 2008 against the constraints of the time: a single core, NumPy as the only fast numerical backend, Python's reference counting as the memory model. The library is brilliant and irreplaceable, but the design assumptions show. Operations are eager (every line of a chain materialises a full dataframe in memory). Strings, missing values, and dates are awkwardly shoe-horned onto a NumPy substrate that was not designed for them. Parallelism is bolted on rather than built in. None of this is a flaw in pandas; it is a constraint of when pandas was built.</p>
+
+  <p>Arrow, Rust, and the broader modern dataframe stack (Polars, DuckDB, Dask, Spark with Arrow interop) are the consequence of fifteen years of hardware change. Cores multiplied; SIMD instructions expanded; SSD bandwidth grew faster than CPU. The libraries that scale today share three properties: <strong>columnar storage</strong> (one dtype per column, contiguous in memory, suited to vectorised CPU operations), <strong>query planning</strong> (an intermediate representation the engine can optimise before running), and <strong>zero-copy interop</strong> (Arrow as a shared memory format so data does not need to be serialised between tools). Polars is the most pandas-shaped instance of this stack.</p>
+
+  <p>For credit risk work the practical effect is twofold. First, <strong>analyses that were borderline-infeasible in pandas become routine in Polars</strong>: the full 50-million-row IFRS 9 staging dataset, the 200-million-row counterparty exposure aggregate, the EAD profile of every loan over its remaining life. Second, <strong>the same analyses that already worked in pandas become faster enough that the iteration loop changes character</strong>: a five-second pandas chain that took ten minutes after the first dozen iterations runs in a second in Polars and supports a faster, more exploratory style of work.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures. The first is the <strong>memory layout</strong>: pandas stores data row-by-row in places it has historically been awkward (a block manager that often produces row-wise objects internally), while Polars stores data column-by-column in Arrow buffers that are contiguous in memory and tagged with a dtype. The columnar layout is what makes vectorised CPU operations efficient: a sum over a column reads one contiguous buffer and produces one result with no pointer chasing.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Row-wise vs columnar memory layout">
+      <text x="400" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Row-wise vs columnar memory layout</text>
+
+      <!-- Row-wise -->
+      <g>
+        <text x="180" y="55" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#b45309">Row-wise (legacy)</text>
+        <text x="180" y="70" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">read all columns to sum one</text>
+
+        <g font-family="Inter" font-size="10" text-anchor="middle">
+          <!-- row 1 -->
+          <rect x="40" y="90" width="60" height="22" fill="#FED7AA" stroke="#b45309" stroke-width="1"/><text x="70" y="105" fill="#92400e">id</text>
+          <rect x="100" y="90" width="60" height="22" fill="#FEF3C7" stroke="#b45309" stroke-width="1"/><text x="130" y="105" fill="#92400e">amt</text>
+          <rect x="160" y="90" width="60" height="22" fill="#FFD7A1" stroke="#b45309" stroke-width="1"/><text x="190" y="105" fill="#92400e">grade</text>
+          <rect x="220" y="90" width="80" height="22" fill="#FDE68A" stroke="#b45309" stroke-width="1"/><text x="260" y="105" fill="#92400e">date</text>
+
+          <rect x="40" y="112" width="60" height="22" fill="#FED7AA" stroke="#b45309" stroke-width="1"/><text x="70" y="127" fill="#92400e">id</text>
+          <rect x="100" y="112" width="60" height="22" fill="#FEF3C7" stroke="#b45309" stroke-width="1"/><text x="130" y="127" fill="#92400e">amt</text>
+          <rect x="160" y="112" width="60" height="22" fill="#FFD7A1" stroke="#b45309" stroke-width="1"/><text x="190" y="127" fill="#92400e">grade</text>
+          <rect x="220" y="112" width="80" height="22" fill="#FDE68A" stroke="#b45309" stroke-width="1"/><text x="260" y="127" fill="#92400e">date</text>
+
+          <rect x="40" y="134" width="60" height="22" fill="#FED7AA" stroke="#b45309" stroke-width="1"/><text x="70" y="149" fill="#92400e">id</text>
+          <rect x="100" y="134" width="60" height="22" fill="#FEF3C7" stroke="#b45309" stroke-width="1"/><text x="130" y="149" fill="#92400e">amt</text>
+          <rect x="160" y="134" width="60" height="22" fill="#FFD7A1" stroke="#b45309" stroke-width="1"/><text x="190" y="149" fill="#92400e">grade</text>
+          <rect x="220" y="134" width="80" height="22" fill="#FDE68A" stroke="#b45309" stroke-width="1"/><text x="260" y="149" fill="#92400e">date</text>
+        </g>
+
+        <text x="180" y="190" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">to sum the amt column, the CPU must skip past id, grade, date for every row</text>
+      </g>
+
+      <!-- Columnar -->
+      <g transform="translate(420, 0)">
+        <text x="180" y="55" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#0d9488">Columnar (Arrow)</text>
+        <text x="180" y="70" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">contiguous buffer per column</text>
+
+        <g font-family="Inter" font-size="10" text-anchor="middle">
+          <text x="40" y="86" font-weight="600" fill="#115e59">id</text>
+          <rect x="60" y="75" width="280" height="18" fill="#A7F3D0" stroke="#0d9488" stroke-width="1"/>
+          <text x="40" y="106" font-weight="600" fill="#115e59">amt</text>
+          <rect x="60" y="95" width="280" height="18" fill="#34D399" stroke="#0d9488" stroke-width="1.5"/>
+          <text x="40" y="126" font-weight="600" fill="#115e59">grade</text>
+          <rect x="60" y="115" width="280" height="18" fill="#A7F3D0" stroke="#0d9488" stroke-width="1"/>
+          <text x="40" y="146" font-weight="600" fill="#115e59">date</text>
+          <rect x="60" y="135" width="280" height="18" fill="#A7F3D0" stroke="#0d9488" stroke-width="1"/>
+        </g>
+
+        <!-- arrow indicating the sum reads only one buffer -->
+        <path d="M 60 175 L 340 175" stroke="#0d9488" stroke-width="2" marker-end="url(#arr1)"/>
+        <defs>
+          <marker id="arr1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#0d9488"/>
+          </marker>
+        </defs>
+
+        <text x="180" y="195" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">to sum amt the CPU reads one contiguous buffer; SIMD instructions process 4-16 values per cycle</text>
+      </g>
+
+      <text x="400" y="250" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">The layout difference is invisible from Python but visible in every benchmark.</text>
+      <text x="400" y="265" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">It is also why Arrow has become the lingua franca of the modern data stack: any tool that speaks Arrow can share data with any other without copying.</text>
+    </svg>
+    <figcaption>Row-wise storage forces every operation to walk past columns it does not need. Columnar storage (Arrow) keeps each column contiguous, which means a column-wise reduction reads one buffer and exploits SIMD instructions for several values per CPU cycle. The same algorithm runs an order of magnitude faster on the same hardware.</figcaption>
+  </figure>
+
+  <p>The second picture is <strong>eager vs lazy execution</strong>. In pandas every line of a chain runs immediately and produces a full intermediate dataframe in memory. In Polars you can switch to a lazy frame (<code>pl.scan_csv</code>, or <code>.lazy()</code> on an existing eager frame) and the chain builds an unexecuted query plan. When you call <code>.collect()</code>, the planner reorders and prunes the plan before running it.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Eager vs lazy execution">
+      <text x="400" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Eager vs lazy execution</text>
+
+      <!-- Eager flow -->
+      <g>
+        <text x="180" y="55" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#b45309">Eager (pandas, polars eager)</text>
+        <rect x="40" y="70" width="280" height="30" rx="6" fill="#FFF7ED" stroke="#b45309"/><text x="180" y="89" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e">read_csv → 30M-row frame in memory</text>
+        <rect x="40" y="105" width="280" height="30" rx="6" fill="#FFF7ED" stroke="#b45309"/><text x="180" y="124" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e">filter → 5M-row frame in memory</text>
+        <rect x="40" y="140" width="280" height="30" rx="6" fill="#FFF7ED" stroke="#b45309"/><text x="180" y="159" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e">groupby → 100-row frame in memory</text>
+        <text x="180" y="195" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">peak memory = 30M rows</text>
+      </g>
+
+      <!-- Lazy flow -->
+      <g transform="translate(420, 0)">
+        <text x="180" y="55" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#0d9488">Lazy (polars lazy)</text>
+        <rect x="40" y="70" width="280" height="30" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-dasharray="4 2"/><text x="180" y="89" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59">scan_csv (no read yet)</text>
+        <rect x="40" y="105" width="280" height="30" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-dasharray="4 2"/><text x="180" y="124" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59">+ filter (planned)</text>
+        <rect x="40" y="140" width="280" height="30" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-dasharray="4 2"/><text x="180" y="159" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59">+ groupby (planned)</text>
+        <rect x="40" y="175" width="280" height="30" rx="6" fill="#A7F3D0" stroke="#0d9488"/><text x="180" y="194" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#115e59">.collect(): planner reorders, runs once</text>
+        <text x="180" y="225" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">peak memory ≪ 30M rows (filter pushed to read)</text>
+      </g>
+    </svg>
+    <figcaption>The eager flow materialises every intermediate; peak memory is the largest intermediate. The lazy flow defers execution and lets the planner push the filter inside the read, so the CSV reader skips rows that would later be filtered out. Same code, dramatically different runtime characteristics on large data.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Construction and inspection</h3>
+
+  <p>Polars uses the same four verbs as pandas, with different spellings. <code>pl.read_csv</code> and <code>pl.read_parquet</code> are the eager readers. <code>pl.scan_csv</code> and <code>pl.scan_parquet</code> are the lazy equivalents, which return a <code>LazyFrame</code> and defer reading until <code>.collect()</code>. The <code>dtype</code> argument works as in pandas, with Polars's own dtype names (<code>pl.Int64</code>, <code>pl.Float32</code>, <code>pl.Categorical</code>, <code>pl.Datetime</code>).</p>
+
+  <div class="worked">
+    <strong>Loading and inspecting</strong>
+    <p><code>import polars as pl
+
+df = pl.read_csv(
+    "data/credit_risk_dataset.csv",
+    schema_overrides={
+        "person_age": pl.Int16,
+        "loan_grade": pl.Categorical,
+        "loan_status": pl.Int8,
+    },
+    try_parse_dates=True,
+)
+
+df.shape          # (32_581, 12)
+df.schema         # column name → dtype mapping
+df.head(10)
+df.glimpse()      # one row per column, like dplyr's glimpse()
+df.describe()     # summary stats
+</code></p>
+    <p><code>schema_overrides</code> is the equivalent of pandas's <code>dtype=</code>; <code>try_parse_dates=True</code> tells Polars to infer date columns from string patterns. <code>glimpse</code> is the most useful inspection method and has no pandas equivalent: one row per column, showing the dtype, a few example values, and the count of non-nulls.</p>
+  </div>
+
+  <h3>Selection and filtering: the expression API</h3>
+
+  <p>Selection in Polars is done through <code>.select</code> and <code>.filter</code>, each of which takes <strong>expressions</strong> built with <code>pl.col("name")</code>. The expression is the central abstraction: it describes what to do to a column, the engine schedules the work, and the same expression appears verbatim in <code>.select</code>, <code>.with_columns</code>, <code>.filter</code>, and inside <code>.group_by(...).agg(...)</code>.</p>
+
+  <div class="worked">
+    <strong>Filter and select</strong>
+    <p><code># filter rows where the loan amount is above 25k and the grade is A or B
+high_grade_large = df.filter(
+    (pl.col("loan_amnt") &gt; 25_000)
+    &amp; (pl.col("loan_grade").is_in(["A", "B"]))
+)
+
+# select specific columns; rename in the same call
+small_view = df.select(
+    pl.col("loan_amnt"),
+    pl.col("loan_grade").alias("grade"),
+    pl.col("loan_status").cast(pl.Boolean).alias("default_flag"),
+)</code></p>
+    <p>The expression <code>pl.col("loan_amnt") &gt; 25_000</code> is a boolean Series, the same as in pandas. The expression <code>pl.col("loan_grade").is_in([...])</code> is the equivalent of pandas's <code>.isin</code>. The expression <code>pl.col("x").alias("y")</code> renames in flight, without a separate <code>.rename</code> call. Expressions can be nested arbitrarily and chained with <code>&amp;</code>, <code>|</code>, <code>~</code>, exactly as pandas.</p>
+  </div>
+
+  <p>The key syntactic difference from pandas is that Polars does not use boolean indexing with square brackets. Where pandas writes <code>df[df["x"] &gt; 0]</code>, Polars writes <code>df.filter(pl.col("x") &gt; 0)</code>. The pandas form is more compact; the Polars form is more explicit, and it composes with <code>.select</code>, <code>.with_columns</code>, and the lazy planner without special-casing.</p>
+
+  <h3>Adding columns: with_columns and when/then/otherwise</h3>
+
+  <p>Polars adds and modifies columns with <code>.with_columns</code>, which takes one or more expressions and returns a new dataframe. Direct attribute assignment (<code>df["new"] = ...</code>) is not supported; the immutable, expression-based API is the only path.</p>
+
+  <div class="worked">
+    <strong>Adding columns with expressions</strong>
+    <p><code>enriched = df.with_columns(
+    interest_payment=(pl.col("loan_amnt") * pl.col("loan_int_rate") / 100),
+    log_income=pl.col("person_income").log1p(),
+    loan_to_income=(pl.col("loan_amnt") / pl.col("person_income")),
+    large_loan=(pl.col("loan_amnt") &gt; 25_000),
+)</code></p>
+    <p>Every keyword becomes a new column. Within an expression, mathematical operators are overloaded as in pandas, but the method chain on a single column (<code>.log1p()</code>, <code>.floor()</code>, <code>.cast()</code>) is the natural way to apply functions. The pandas equivalent of <code>pl.col("x").log1p()</code> is <code>np.log1p(df["x"])</code>; the Polars version is shorter, has no NumPy dependency, and runs inside the query planner.</p>
+  </div>
+
+  <p>For conditional logic Polars uses <code>pl.when(...).then(...).otherwise(...)</code>, which replaces both <code>np.where</code> and <code>np.select</code>:</p>
+
+  <div class="worked">
+    <strong>Conditional columns: when/then/otherwise</strong>
+    <p><code># single condition
+df = df.with_columns(
+    large_loan=pl.when(pl.col("loan_amnt") &gt; 25_000).then(1).otherwise(0),
+)
+
+# multi-way condition: chain when().then() ... .when().then() ... .otherwise(...)
+df = df.with_columns(
+    loan_size_bucket=(
+        pl.when(pl.col("loan_amnt") &lt; 5_000).then(pl.lit("small"))
+          .when(pl.col("loan_amnt") &lt; 15_000).then(pl.lit("medium"))
+          .when(pl.col("loan_amnt") &lt; 30_000).then(pl.lit("large"))
+          .otherwise(pl.lit("jumbo"))
+    ),
+)</code></p>
+    <p>The chain reads as a series of <em>if/elif/else</em> branches. The literal-value wrapper <code>pl.lit</code> is occasionally needed when Polars cannot infer that a Python value is meant as a column-wise constant; in most cases it can be omitted.</p>
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">The apply trap, again</span>
+    Polars has <code>.map_elements</code> (formerly <code>.apply</code>), which calls a Python function once per row. Like pandas's <code>.apply</code>, it is one to two orders of magnitude slower than an expression and forces Polars to drop to single-threaded interpretation. The whole point of Polars is to avoid this fallback. Every reach for <code>map_elements</code> is a reason to ask whether the operation can be re-expressed with <code>pl.when/then/otherwise</code>, a built-in method on <code>pl.col</code>, or a join. The right answer is usually yes.
+  </div>
+
+  <h3>Groupby and aggregations</h3>
+
+  <p>Polars uses <code>.group_by</code> (with the underscore; the legacy <code>.groupby</code> is deprecated) and an <code>.agg</code> method that takes expressions. The output is one row per group, and the columns are whatever the expressions produced.</p>
+
+  <div class="worked">
+    <strong>Aggregation by grade</strong>
+    <p><code>by_grade = (
+    df.group_by("loan_grade")
+      .agg(
+          pl.len().alias("n_loans"),
+          pl.col("loan_amnt").sum().alias("total_exposure"),
+          pl.col("loan_amnt").mean().alias("mean_amount"),
+          pl.col("loan_status").mean().alias("default_rate"),
+          ((pl.col("loan_status") * pl.col("loan_amnt")).sum() / pl.col("loan_amnt").sum()).alias("ead_weighted_dr"),
+      )
+      .sort("default_rate", descending=True)
+)</code></p>
+    <p>The expression API shines here. The exposure-weighted default rate (a common credit-risk metric) is one expression with no lambdas, no joins, no helper functions. The pandas equivalent requires either a lambda inside <code>.agg</code> or a separate transform-and-merge, both slower and uglier.</p>
+  </div>
+
+  <p>For row-level group statistics (the pandas <code>.transform</code> pattern), Polars uses <code>.over</code>:</p>
+
+  <div class="worked">
+    <strong>Window-style aggregations with .over</strong>
+    <p><code>df = df.with_columns(
+    grade_mean_amount=pl.col("loan_amnt").mean().over("loan_grade"),
+    loan_amnt_zscore=(
+        (pl.col("loan_amnt") - pl.col("loan_amnt").mean().over("loan_grade"))
+        / pl.col("loan_amnt").std().over("loan_grade")
+    ),
+)</code></p>
+    <p>The same expression with <code>.over("loan_grade")</code> appended computes the aggregate per group and broadcasts it back to row level, in one step. This is the cleanest way to compute "the group mean for this row's group" in any dataframe library.</p>
+  </div>
+
+  <h3>Joins and concat</h3>
+
+  <p>Polars joins use <code>.join</code> with <code>on</code> and <code>how</code>, exactly as pandas. The join types are the same (<code>"inner"</code>, <code>"left"</code>, <code>"outer"</code>, plus <code>"semi"</code> and <code>"anti"</code> as additions). The validate argument is named <code>validate</code> and takes the same cardinality strings.</p>
+
+  <div class="worked">
+    <strong>Joining and concatenating</strong>
+    <p><code>enriched = loans.join(
+    customers,
+    on="customer_id",
+    how="left",
+    validate="m:1",
+)
+
+all_loans = pl.concat([
+    pl.read_parquet(f"data/loans_{m}.parquet")
+    for m in ["2024-01", "2024-02", "2024-03"]
+])</code></p>
+    <p>The <code>"semi"</code> join keeps rows from the left table whose key appears in the right; the <code>"anti"</code> join keeps rows whose key does not. Both are common in credit risk pipelines (find loans that have or do not have a corresponding default event) and require a clunkier idiom in pandas (an indicator merge plus a filter).</p>
+  </div>
+
+  <h3>Lazy frames: the query planner</h3>
+
+  <p>The lazy API is what makes Polars qualitatively different from a faster pandas. Replace <code>pl.read_csv</code> with <code>pl.scan_csv</code> and every subsequent operation builds a query plan rather than materialising data. The plan executes only when you call <code>.collect()</code>; before that the planner is free to rearrange operations.</p>
+
+  <div class="worked">
+    <strong>The same pipeline, lazy</strong>
+    <p><code>plan = (
+    pl.scan_csv("data/credit_risk_dataset.csv")
+      .filter(pl.col("loan_status") == 1)
+      .group_by("loan_grade")
+      .agg(pl.col("loan_amnt").sum().alias("total_defaulted_exposure"))
+)
+
+print(plan.explain())   # show the optimised query plan
+result = plan.collect() # actually run it</code></p>
+    <p>What the planner does here, automatically: <strong>predicate pushdown</strong> means the filter on <code>loan_status</code> is pushed inside the CSV reader, so the reader skips rows that would later be filtered out, never materialising them. <strong>Projection pushdown</strong> means only the columns referenced downstream (<code>loan_status</code>, <code>loan_grade</code>, <code>loan_amnt</code>) are read from the file. On a wide CSV with many columns this alone is often a 5-10x speedup. <strong>Common subexpression elimination</strong> means an expression computed once and used multiple times is materialised once.</p>
+  </div>
+
+  <p>For very large datasets that do not fit in memory, <code>collect(streaming=True)</code> runs the plan in batches and never holds the full data in memory at once. This is the bridge to genuinely larger-than-memory work, the territory that traditionally required Spark or Dask. Streaming has limitations (not every operation has a streaming implementation) but covers most aggregation and join workflows.</p>
+
+  <h3>Translating pandas to Polars: a cheat sheet</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Pandas</th><th>Polars</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>pd.read_csv(p, dtype={...})</code></td><td><code>pl.read_csv(p, schema_overrides={...})</code></td><td>Use <code>scan_csv</code> for lazy</td></tr>
+        <tr><td><code>df[df["x"] &gt; 0]</code></td><td><code>df.filter(pl.col("x") &gt; 0)</code></td><td>Polars rejects boolean indexing</td></tr>
+        <tr><td><code>df["new"] = df["a"] + df["b"]</code></td><td><code>df.with_columns(new=pl.col("a") + pl.col("b"))</code></td><td>Polars is immutable</td></tr>
+        <tr><td><code>np.where(cond, a, b)</code></td><td><code>pl.when(cond).then(a).otherwise(b)</code></td><td>Multi-way: chain <code>.when().then()</code></td></tr>
+        <tr><td><code>df.groupby("k").agg(...)</code></td><td><code>df.group_by("k").agg(...)</code></td><td>Same idea, expressions instead of dict</td></tr>
+        <tr><td><code>df.groupby("k")["x"].transform("mean")</code></td><td><code>pl.col("x").mean().over("k")</code></td><td>Polars's <code>.over</code> is the cleanest window API</td></tr>
+        <tr><td><code>df.merge(other, on="k", how="left")</code></td><td><code>df.join(other, on="k", how="left")</code></td><td>Same arguments</td></tr>
+        <tr><td><code>df.pivot_table(...)</code></td><td><code>df.pivot(values, index, on, aggregate_function)</code></td><td>Different keyword names</td></tr>
+        <tr><td><code>df.set_index("date").resample("ME").mean()</code></td><td><code>df.group_by_dynamic("date", every="1mo").agg(...)</code></td><td>Polars has no index; window is explicit</td></tr>
+        <tr><td><code>df.apply(f, axis=1)</code></td><td><code>df.map_rows(f)</code></td><td><strong>Avoid both</strong> when possible</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: When not to use Polars
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>When not to use Polars</h2></div>
+
+  <p>The case for Polars is strong but not universal. Four situations where pandas remains the better choice.</p>
+
+  <p>First, <strong>small data and exploratory work where pandas is already fast enough</strong>. On a 50,000-row dataset the speed difference is invisible and the cost of learning a second API is real. If your workflow lives entirely in notebooks on small extracts, pandas is the default and the right one.</p>
+
+  <p>Second, <strong>tight integration with the scikit-learn / statsmodels ecosystem</strong>. Both libraries accept pandas dataframes natively and return predictions as pandas Series. Polars dataframes need to be converted via <code>.to_pandas()</code> or <code>.to_numpy()</code> at the boundary, and the round trip costs both time and the loss of Arrow's type information. For ML pipelines where the dataframe layer is mostly a feeder to scikit-learn, pandas is the more ergonomic choice.</p>
+
+  <p>Third, <strong>team familiarity</strong>. Polars is a recent enough library that a typical credit-risk team has more pandas experience than Polars experience. Rewriting a pipeline from pandas to Polars for a 3x speedup is rarely worth the team-onboarding cost; building a new pipeline in Polars from the start is. The right rollout pattern is to use Polars on new, performance-sensitive work and to leave existing pandas pipelines alone unless they are causing actual problems.</p>
+
+  <p>Fourth, <strong>workloads that genuinely exceed Polars's design</strong>. Polars is designed for single-machine work. For multi-terabyte datasets that need a cluster, Spark or Dask remain the right answers. For SQL-shaped analytical work on local files, DuckDB is often a better choice than Polars (and the two interoperate via Arrow with zero copies). The honest answer is that the modern dataframe stack has three or four members, and Polars is the right member of the stack for medium-to-large in-memory analytical work that does not need a cluster.</p>
+
+  <div class="callout insight">
+    <span class="tag">A pragmatic rollout</span>
+    The two highest-leverage places to introduce Polars in a credit-risk team are (a) data engineering pipelines that load multi-million-row extracts and feed downstream pandas analyses (use Polars to load, filter, and aggregate; convert to pandas at the boundary for the slow analytical step), and (b) monitoring jobs that run on a schedule and aggregate the full portfolio every day (where the 5-10x speedup compounds across daily runs). Both let you adopt Polars one job at a time without rewriting the rest of the codebase.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Worked example: the Lecture 02 pipeline in Polars</h2></div>
+
+  <p>The portfolio analytics pipeline from Lecture 02 (load, enrich, aggregate, pivot, roll forward) translated to Polars. The shape of the work is identical; the spellings change.</p>
+
+  <div class="worked">
+    <strong>The same four-step pipeline in Polars</strong>
+    <p><code>import polars as pl
+
+# Step 1: load with explicit dtypes (lazy)
+loans = pl.scan_csv(
+    "data/credit_risk_dataset.csv",
+    schema_overrides={"loan_grade": pl.Categorical, "loan_status": pl.Int8},
+)
+customers = pl.scan_csv(
+    "data/customers.csv",
+    schema_overrides={"region": pl.Categorical},
+)
+
+# Step 2: enrich loans with customer attributes
+enriched = loans.join(customers, on="customer_id", how="left", validate="m:1")
+
+# Step 3: aggregate to the grade level
+by_grade = (
+    enriched
+      .group_by("loan_grade")
+      .agg(
+          pl.len().alias("n_loans"),
+          pl.col("loan_amnt").sum().alias("total_exposure"),
+          pl.col("loan_amnt").mean().alias("mean_amount"),
+          pl.col("loan_status").mean().alias("default_rate"),
+      )
+      .with_columns(
+          vs_portfolio=(
+              pl.col("default_rate") - pl.col("default_rate").mean()
+          ),
+      )
+      .sort("default_rate", descending=True)
+)
+
+# Step 4: pivot grade x intent
+by_grade_intent = (
+    enriched
+      .collect()
+      .pivot(values="loan_status", index="loan_grade", on="loan_intent", aggregate_function="mean")
+)
+
+# Step 5: monthly rolling default rate
+monthly_dr = (
+    enriched
+      .sort("issue_date")
+      .group_by_dynamic("issue_date", every="1mo")
+      .agg(pl.col("loan_status").mean().alias("monthly_dr"))
+      .with_columns(
+          rolling_12m=pl.col("monthly_dr").rolling_mean(window_size=12, min_periods=6)
+      )
+      .collect()
+)</code></p>
+    <p>Three observations. First, the structure is identical to the pandas version: load, join, aggregate, pivot, time-series. Second, the lazy mode means the planner can push the validation, the join, and the aggregation into a single optimised pass over the data; on a 30-million-row extract this is the difference between thirty seconds and three. Third, the <code>group_by_dynamic</code> with <code>every="1mo"</code> replaces the pandas <code>resample("ME")</code> idiom; <code>rolling_mean</code> on a Series replaces the chained <code>.rolling(12).mean()</code>.</p>
+  </div>
+
+  <p>The runtime difference on a real dataset is the point of this lecture. The pandas version of this pipeline on the 32,000-row credit-risk dataset runs in roughly 200 ms. The Polars version runs in roughly 25 ms. Scale the dataset up by a factor of 1,000 (a real bank's loan book) and pandas takes minutes while Polars takes seconds. At the dataset sizes where credit-risk monitoring lives, the difference is the difference between an interactive iteration loop and a coffee break.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Synthesis
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Polars is the same analytical vocabulary as pandas, expressed through expressions and executed by a query planner on a columnar Arrow backend. The eighty per cent that looks like pandas (filter, group_by, join, with_columns) translates with a name change and a syntactic adjustment. The twenty per cent that differs (the expression API, the lazy planner, <code>.over</code> instead of <code>.transform</code>, <code>group_by_dynamic</code> instead of <code>resample</code>) is where Polars's design pays off. The honest case for Polars: medium-to-large in-memory analytical work, performance-sensitive pipelines, and any job where the iteration loop is being slowed down by pandas. The honest case against: small data, scikit-learn-heavy ML pipelines, and existing pandas codebases without a performance problem.</p>
+
+  <p>The dataframe layer (Lectures 01-03) ends here. Two questions remain. What does the data actually <em>say</em>, beyond its shape? That is the subject of Lecture 04 (exploratory data analysis). How do you communicate the answer? That is the subject of Lecture 05 (visualisation). Both rely on the same load-shape-fold layer this part of the course has taught; both can use either pandas or Polars underneath.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the three design differences between Polars and pandas in one sentence each.</li>
+      <li>You have a 30-million-row CSV with 50 columns and your analysis uses three of them and filters to roughly 100,000 rows. Why does <code>pl.scan_csv</code> with the right filter and select run much faster than <code>pl.read_csv</code> followed by the same operations?</li>
+      <li>Write the Polars expression for "the mean loan_amnt within each loan_grade, broadcast back to row level". Give the pandas equivalent.</li>
+      <li>Polars has <code>.map_elements</code> for arbitrary Python functions. Why is it usually a code smell? Give one case where you would still use it.</li>
+      <li>Name two situations where you would stay on pandas rather than adopting Polars. Give one credit-risk-specific reason in each case.</li>
+      <li>Translate the pandas chain <code>df.groupby("g")["x"].sum().reset_index()</code> to Polars in one line.</li>
+      <li>What does <code>.collect(streaming=True)</code> do, and when does it matter?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lectures <a href="01-pandas_core.html">01</a> and <a href="02-aggregation_pivoting_joining.html">02</a> are the pandas counterpart. Most of the Polars vocabulary translates from there directly.</li>
+      <li><strong>Next:</strong> Lecture 04 (<a href="04-exploratory_data_analysis.html">exploratory data analysis</a>) leaves the load-and-fold layer and asks what the data <em>says</em>.</li>
+      <li><strong>Adjacent:</strong> the <a href="../../../wiki/fundamentals/02_data_engineering/">data engineering</a> track covers DuckDB (the SQL-shaped peer to Polars) and Spark (the cluster-scale step beyond it). All three share Apache Arrow and interoperate without copying.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data analysis course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 3 of 5</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 52: from decoders to LLMs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Large language models</a></div>
+  <h1>From decoders to LLMs</h1>
+  <p class="subtitle">Nothing in the previous lecture's decoder-transformer architecture changes as it scales up: the same causal masking, the same softmax, the same chain-rule factorisation. What changes is behaviour. Trained large enough, on enough data, a decoder transformer begins to perform tasks it was never explicitly trained on, from nothing more than a handful of examples placed in its input at inference time. This lecture traces the empirical scaling laws behind that transition and previews the still-unsettled explanations for why it happens at all.</p>
+  <div class="meta">
+    <span>Lecture 52 of 62</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Part VIII: generative AI and language models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>large language model (LLM)</strong> is, architecturally, exactly the decoder transformer from the previous lecture, distinguished only by scale: parameter counts, training corpus size, and compute budget each several orders of magnitude beyond anything discussed earlier in this course. The <strong>GPT lineage</strong> (generative pre-trained transformer, from GPT-1 through the models in current production use) is the clearest empirical record of what happens as all three of these scale together. <strong>Scaling laws</strong>, empirically fitted power-law relationships between model loss and each of parameter count, dataset size, and compute, predict this improvement smoothly and reliably; what they do not predict is <strong>emergent capability</strong>, specific task performances (arithmetic, translation between unfamiliar language pairs, multi-step reasoning) that stay near zero until a scale threshold is crossed and then improve rapidly, a genuinely different pattern from the smooth curve the scaling laws themselves describe. The most consequential emergent behaviour is <strong>in-context learning</strong>: the ability to perform a new task correctly from a handful of examples given only in the model's input at inference time, with no gradient update and no change to the model's weights at all. Every one of these capabilities operates within a fixed <strong>context window</strong>, the maximum number of tokens the model can attend to at once, a hard architectural ceiling on how much information any single interaction can draw on.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine an actuarial trainee who has read an enormous volume of general business writing, far more than any single professional could read in a lifetime, but has never once sat a formal course on, say, IFRS 17 transition mechanics. Shown two or three worked examples of an IFRS 17 transition calculation on a whiteboard, the trainee starts producing broadly sensible attempts at similar problems immediately, purely by pattern-matching against the enormous, general reading they already carry, not because anyone updated their underlying knowledge with new training. That is what in-context learning is: no re-training happens between the whiteboard examples and the trainee's next attempt, yet performance on the specific new task improves anyway, purely from what was placed in front of them moments before.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the pivot point of the sub-module: everything before it (the previous sub-module's decoder transformer) is architecture, and everything from here on is what that architecture does once trained at a scale no earlier lecture in this course has approached. The unresolved, actively debated explanations for in-context learning previewed here are picked up properly in lecture 3, once the pretraining recipe that actually produces this behaviour has been developed in lecture 2.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the scale-driven behaviours in this lecture are not simply "a bigger version of the previous lecture" and deserve dedicated attention.</p>
+
+  <p>First, <strong>in-context learning changes the entire cost structure of applying a model to a new task</strong>: every supervised model earlier in this course required a labelled training set and a fitting procedure before it could be used on a new task, while a sufficiently capable LLM can be pointed at a genuinely new actuarial task (extracting a specific field from a claims narrative, say) with only a handful of worked examples in the prompt, no separate model training pipeline at all, a fundamentally different deployment economics.</p>
+
+  <p>Second, <strong>emergent capability is empirically unpredictable in a way that matters for planning and governance</strong>: because specific capabilities can appear suddenly at a scale threshold rather than improving smoothly, a smaller or cheaper model cannot always be assumed to be "a slightly worse version" of a larger one for every task, it may simply lack the capability altogether, a genuinely different failure mode from the graceful performance degradation modellers are used to reasoning about elsewhere in this course.</p>
+
+  <p>Third, <strong>the context window is a hard, quantifiable constraint that every downstream application must design around</strong>: unlike a human reader who can hold a general sense of a very long document in mind, an LLM's attention computation over positions outside its context window is not merely degraded, it is architecturally impossible, a limitation with direct consequences for any application (summarising a long reserving report, say) that naively assumes the model has "read" more than the window actually allows.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A pricing team piloting an LLM-assisted underwriting-note summariser found that the tool performed impressively on individual policy files but produced systematically incomplete summaries once files exceeded a certain length, silently dropping detail from the earlier sections of longer files without any error or warning. The team's first hypothesis was a bug in the summarisation prompt; the actual cause, once measured directly, was that the longer files were exceeding the model's context window, so the earliest sections of text were being truncated (or, depending on the deployment, only the most recent portion of the document was ever actually passed to the model) before the model ever saw them, a purely architectural ceiling that no amount of prompt refinement could work around. The fix was a chunking-and-aggregation pipeline that summarised the document in sections and then summarised the summaries, an explicit engineering response to the context-window constraint rather than a prompt-engineering one.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a smooth scaling-law curve for overall loss running alongside a handful of individual task-performance curves that stay flat near zero and then rise sharply once a threshold scale is crossed, each on the same log-scale horizontal axis.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smooth scaling-law loss curve versus emergent, threshold-crossing task-performance curves">
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Scaling laws (smooth) versus emergent capability (threshold)</text>
+
+      <line x1="80" y1="290" x2="800" y2="290" stroke="#71717a" stroke-width="1.5"/>
+      <line x1="80" y1="290" x2="80" y2="60" stroke="#71717a" stroke-width="1.5"/>
+      <text x="440" y="320" text-anchor="middle" font-family="Inter" font-size="11" fill="#52525b">model scale (log parameters / compute / data), increasing right</text>
+      <text x="45" y="175" text-anchor="middle" font-family="Inter" font-size="11" fill="#52525b" transform="rotate(-90 45 175)">performance</text>
+
+      <path d="M 100 260 Q 300 200 500 140 Q 650 100 780 75" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+      <text x="700" y="65" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">overall loss: smooth power-law improvement</text>
+
+      <path d="M 100 280 L 480 280 Q 540 280 560 210 Q 580 130 620 100 L 780 90" fill="none" stroke="#0d9488" stroke-width="2.5"/>
+      <text x="640" y="120" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">multi-step arithmetic: near-zero, then a sharp threshold rise</text>
+
+      <line x1="560" y1="60" x2="560" y2="290" stroke="#dc2626" stroke-width="1" stroke-dasharray="4 2"/>
+      <text x="560" y="50" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">emergence threshold for this specific task</text>
+    </svg>
+    <figcaption>Overall loss (purple) improves smoothly and predictably as scale increases, exactly as the fitted scaling laws describe. A specific task's performance (teal), such as multi-step arithmetic, can instead stay near zero across most of the scale range and then rise sharply once a threshold is crossed, a pattern the smooth scaling-law curve for overall loss does not itself predict or explain.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Scaling laws predict the average; they do not predict any specific capability.</strong> A model's overall loss can be forecast with real precision from its scale alone, but whether it can reliably do long division is a separate empirical question the loss curve does not answer. <strong>The context window is a wall, not a fog.</strong> Information outside it is not attended to weakly, it is attended to not at all, a hard architectural fact the vignette's silent truncation illustrates directly.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The GPT lineage</h3>
+
+  <p>The GPT (generative pre-trained transformer) series is the most extensively documented public record of the scale-up this lecture describes, moving over successive generations from a few hundred million parameters trained on a modest corpus to models many orders of magnitude larger trained on internet-scale, multi-domain text, each successive generation adding the same architecture (the previous lecture's causal-masked decoder transformer) at a substantially larger scale along every axis at once: parameters, data, and compute. The lineage matters here not for any individual model's specifics, which change faster than any written record can track, but as the clearest illustration that the architecture itself was essentially fixed while scale did all of the work.</p>
+
+  <h3>Scaling laws</h3>
+
+  <p>A <strong>scaling law</strong> is an empirically fitted power-law relationship between a model's test loss $L$ and its scale along one axis (parameter count $N$, dataset size $D$, or compute budget $C$), typically of the form $L(N) \approx \left(N_0/N\right)^{\alpha}$ for fitted constants $N_0$ and $\alpha$. These relationships hold with striking consistency across many orders of magnitude of scale, and are used in practice to plan training runs: a lab can extrapolate the loss a much larger, not-yet-trained model is likely to achieve from a series of smaller, cheaper training runs, well before committing the compute budget for the full-scale run. Crucially, the scaling laws describe <strong>overall</strong> loss, an aggregate measure across the entire, extremely broad training distribution, not the performance of any single specific downstream capability.</p>
+
+  <h3>Emergent capability</h3>
+
+  <p><strong>Emergent capability</strong> refers to specific task performances that remain close to chance (or near zero) across a wide range of smaller model scales and then improve sharply once a threshold scale is crossed, a qualitatively different pattern from the smooth power-law curve scaling laws describe for overall loss. Multi-step arithmetic, translation between typologically distant language pairs, and certain multi-step reasoning tasks are commonly cited examples. The phenomenon remains an active area of empirical study; one important methodological caveat, developed further below, is that some apparent emergence is at least partly an artefact of the specific metric used to measure the task (a strict, all-or-nothing correctness criterion can produce an apparently sudden jump that a smoother, partial-credit metric on the identical underlying model outputs does not show), meaning not every claimed instance of emergence necessarily reflects a genuine discontinuity in the model's underlying competence.</p>
+
+  <h3>In-context learning: a first look at three competing explanations</h3>
+
+  <p><strong>In-context learning</strong> is the specific emergent capability of adapting to a new task from examples placed in the prompt alone, with no weight update. Three broad explanations compete to account for it, previewed here and developed properly once lecture 2 has covered how pretraining actually works. The <strong>meta-learning</strong> view holds that a sufficiently diverse pretraining corpus implicitly contains many small "task-learning" episodes, so the model has effectively learned a general-purpose procedure for inferring a task from a few examples, a skill it then applies to genuinely new tasks. The <strong>implicit Bayesian inference</strong> view treats the prompt's examples as evidence the model uses to infer a latent "task identity" via an implicit Bayesian update over tasks it saw structurally similar versions of during pretraining. The <strong>emergent structure</strong> view holds that certain internal representations or algorithmic circuits (small sub-networks implementing something resembling gradient descent or pattern completion) emerge as a side effect of scale and are what actually execute the in-context task. None of these three is conclusively established over the others at the time of writing, and lecture 3 returns to this question once the pretraining mechanics that would need to support each explanation have been developed.</p>
+
+  <h3>The context window</h3>
+
+  <p>The <strong>context window</strong> is the maximum number of tokens (roughly, word-pieces) the model's attention mechanism can process in a single forward pass, fixed at training time and enforced architecturally, not merely a soft preference the model gradually forgets. Text beyond the context window is not weakly attended to, it is not part of the computation at all, exactly the mechanism behind the vignette's silent truncation. Context windows have grown substantially across model generations, but remain, at any point in time, a hard, quantifiable ceiling that any application processing long documents must explicitly engineer around (chunking, retrieval, or summarisation pipelines), not a limitation that simply disappears with a slightly larger model.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming a smaller model is simply "a bit worse" at every task</span>
+    Emergent capability means a smaller model can be entirely incapable of a specific task a larger model performs well, not merely slower or less accurate at it; substituting a smaller, cheaper model into a pipeline without re-testing every task it needs to perform is a common and avoidable source of silent failure.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating apparent emergence as proof of a genuine capability discontinuity</span>
+    Some claimed instances of emergent capability are sensitive to the specific evaluation metric used and look considerably smoother under a partial-credit scoring rule than under a strict, all-or-nothing one; checking whether an apparent threshold effect survives a change of metric is a standard piece of due diligence before drawing a strong conclusion from it.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Ignoring the context window until a document silently gets truncated</span>
+    Developed directly in the vignette: the failure mode is silent, not an error message, which makes it considerably more dangerous in a production pipeline than a loud failure would be; explicitly measuring token counts against the deployed model's documented context window is non-negotiable due diligence for any long-document application.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Extrapolating a scaling law beyond the range it was fitted on</span>
+    Scaling laws are empirical fits over an observed range of scale; extrapolating them far beyond that range to predict a not-yet-built model's exact loss, let alone its specific emergent capabilities, carries real uncertainty the smooth-looking fitted curve does not itself communicate.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A large language model is architecturally identical to the previous sub-module's decoder transformer, distinguished only by scale, several orders of magnitude beyond anything else in this course, across parameters, data, and compute. Scaling laws predict overall loss smoothly and reliably as a power-law function of scale, but emergent capability, specific task performances appearing suddenly at a scale threshold, is a genuinely different, less predictable pattern, with in-context learning as its most consequential instance. The context window is a hard architectural ceiling, not a soft preference, on how much information any single interaction can draw on.</p>
+
+  <p>The next lecture develops exactly how a foundation model capable of any of this is actually produced: the corpora, the self-supervised training objectives, and the emerging use of these same architectures directly on tabular actuarial data via foundation models such as TabPFN. Lecture 3 then returns properly to the three competing explanations for in-context learning previewed here, once the pretraining mechanics needed to evaluate each explanation are in place.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Explain what changes, architecturally, between the decoder transformer of the previous sub-module and a large language model.</li>
+      <li>State the general form of a scaling law, and the three axes of scale it is typically fitted against.</li>
+      <li>Define emergent capability, and explain why it is a genuinely different pattern from what a scaling law predicts.</li>
+      <li>Define in-context learning, and name the three competing explanations previewed for it.</li>
+      <li>Explain why the context window is described as a hard architectural ceiling rather than a soft, gradually degrading limit.</li>
+      <li>In the underwriting-note vignette, explain why the summariser's failure was architectural rather than a prompt-engineering problem, and describe the fix the team ultimately used.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> The generative-modelling sub-module's <a href="../10_generative_models/04-decoder_transformers.html">decoder transformers</a> lecture is this lecture's direct architectural prerequisite.</li>
+      <li><strong>Next:</strong> Lecture 2 (<a href="02-foundation_models_and_pretraining.html">foundation models and pretraining</a>) develops how a model with this lecture's capabilities is actually produced.</li>
+      <li><strong>Forward:</strong> Lecture 3 (<a href="03-prompting_and_reasoning.html">prompting and reasoning</a>) returns to the three in-context-learning explanations previewed above.</li>
+      <li><strong>Outside this course:</strong> The actuarial-applications sub-module's discussion of in-context learning as a credibility-style update draws a direct, worked parallel to the Bühlmann credibility formula from the risk-modelling course.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Large language models course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 52 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

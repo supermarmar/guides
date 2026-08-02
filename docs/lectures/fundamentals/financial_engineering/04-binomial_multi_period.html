@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 4: the multi-period binomial model</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>The multi-period binomial model</h1>
+  <p class="subtitle">One binomial step, repeated <code>n</code> times, builds a tree with only <code>n+1</code> endpoints instead of <code>2^n</code>, because up-then-down and down-then-up land on the same stock price. That single fact of recombination is what makes the model computable, and it is what turns the static hedge of a forward into the dynamic, self-financing hedge that underlies every option pricing formula that follows.</p>
+  <div class="meta">
+    <span>Lecture 4 of 13</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Source: <code>UP / 4 - Multi-Period Binomial Model.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Take the single-period binomial model from lecture 3 and chain it together <code>n</code> times. At each node the stock moves up by a factor <code>u</code> or down by a factor <code>d</code>, and because <code>u</code> and <code>d</code> are the same at every node, an up-move followed by a down-move lands on exactly the same price as a down-move followed by an up-move. The tree <strong>recombines</strong>. After <code>n</code> steps there are only <code>n+1</code> distinct stock prices, not <code>2^n</code>, and that is the difference between a model you can compute on paper and one you cannot.</p>
+
+  <p>Pricing on the tree runs backwards. Set the option's payoff at every node at maturity, then step back one period at a time, applying the single-period risk-neutral formula at every node you pass through. The hedge ratio <code>Δ</code>, the number of units of stock held to replicate the option, is recomputed at every node: it is not the one-off, buy-and-hold hedge of the forward contract in lecture 1, it is a <strong>dynamic</strong> hedge that is rebalanced at each step using only the cash already in the replicating portfolio. That last clause, self-financing, is the technical condition that makes the whole scheme arbitrage-free. Send the number of steps to infinity with the step size shrinking to keep the total variance fixed, and the tree price converges to the Black-Scholes price: the multi-period binomial model is the discrete scaffolding on which continuous-time option pricing is built.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine pricing an option that expires in three months by working out, at every single day between now and expiry, exactly how many shares you would need to hold to match the option's payoff if the stock ticked up or down that day. On the last day, the answer is obvious: hold one share if the option is in the money, hold none if it is not. Walk backwards one day at a time and the "obvious" answer from the day after tells you what to hold today. You never guess the option's value; you compute it, one day at a time, from the future backwards, and at every single day you are allowed to check whether it is better to just cash in the option there and then rather than carry on holding the replicating shares. That second check is the whole story of American options.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP source builds the recombining tree and states the Cox-Ross-Rubinstein parameters without deriving them, noting only that "the reason for this choice of u and d values will not be apparent now". It works a fully explicit 2-step and 3-step European call by hand, and a separate 2-step and 3-step American put at a different strike, tabulating the exercised state at every node. This lecture derives the CRR moment-matching argument the source defers, states the formal self-financing condition and the martingale/tower-property reading of backward induction, derives the closed-form binomial-tail-probability price and its convergence to Black-Scholes, and prices the European call alongside the American and European put on one shared tree and strike so the early-exercise premium isolates to a single node. The odd-even convergence oscillation and its standard fixes, averaging, Richardson extrapolation, Broadie-Detemple smoothing, are absent from the source entirely.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The single-period binomial model of lecture 3 proved a point: you can price a derivative by finding a replicating portfolio and invoking no-arbitrage, without ever needing to know the real-world probability of the stock going up. The multi-period model proves the point that actually matters in practice: that same argument still works when the replicating portfolio has to be rebuilt at every node along the way, using only money already inside the portfolio. This is the first time in the course that a hedge is <em>dynamic</em> rather than static, and dynamic self-financing replication is the single idea that Black-Scholes, the martingale pricing framework, and every exotic-option pricing model in this course are built on.</p>
+
+  <p>The multi-period tree also earns its keep on its own terms. It is the standard production tool for pricing American and Bermudan options, where the holder's right to exercise early has no closed form in continuous time but drops out of the tree almost for free: check <code>max(intrinsic, continuation)</code> at every node. It handles discrete dividends without any special machinery. It is trivially explainable to a non-technical audience, which matters more in a risk committee than it does in a textbook. Lecture 5 calibrates the tree's parameters to real market data; everything from here to there assumes you can build the tree, price on it, and know what its limitations are.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures carry the whole lecture. The first shows why the tree is computationally tractable at all: the recombination that collapses <code>2^n</code> possible paths down to <code>n+1</code> distinct endpoints. The second contrasts the static hedge you built for the forward in lecture 1 with the dynamic, rebalanced hedge an option demands, because that contrast is the conceptual leap this lecture is asking you to make.</p>
+
+  <h3>Picture one: the recombining tree</h3>
+
+  <p>Label a node by the step number <code>j</code> (how many periods have elapsed) and the number of up-moves <code>k</code> that produced it. Whatever order the up- and down-moves arrived in, the stock price at that node is</p>
+
+  <p>$$ S_{j,k} = S_0 \, u^{k} \, d^{\,j-k}, \qquad 0 \le k \le j. $$</p>
+
+  <p>The order does not appear in the formula, only the count. That is recombination in one line: <code>ud</code> and <code>du</code> both give <code>S_0 u d</code>. At step <code>j</code> there are <code>j+1</code> possible values of <code>k</code>, hence <code>j+1</code> distinct nodes, however many of the <code>2^j</code> possible up/down sequences fed into them. A non-recombining tree, by contrast, would need <code>2^j</code> nodes at step <code>j</code>: for a modest <code>j = 30</code>, that is over a billion nodes against 31.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three-step recombining binomial tree showing stock prices at each node, with up and down moves converging onto shared nodes">
+      <defs>
+        <marker id="arrowBinN" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#82817D"/>
+        </marker>
+        <radialGradient id="nodeGradUpBinN" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#DDF1E5"/>
+          <stop offset="100%" stop-color="#4FAE6B"/>
+        </radialGradient>
+        <radialGradient id="nodeGradMidBinN" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#EAE6FA"/>
+          <stop offset="100%" stop-color="#7B61FF"/>
+        </radialGradient>
+        <radialGradient id="nodeGradDownBinN" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#FBEDE4"/>
+          <stop offset="100%" stop-color="#F08C42"/>
+        </radialGradient>
+      </defs>
+
+      <text x="410" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#191918">Recombination: n + 1 nodes at step n, not 2^n</text>
+
+      <text x="80"  y="52" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#82817D">Step 0</text>
+      <text x="280" y="52" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#82817D">Step 1</text>
+      <text x="480" y="52" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#82817D">Step 2</text>
+      <text x="700" y="52" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#82817D">Step 3</text>
+
+      <!-- edges -->
+      <line x1="80" y1="250" x2="280" y2="140" stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="80" y1="250" x2="280" y2="360" stroke="#A6A5A1" stroke-width="1.5"/>
+
+      <line x1="280" y1="140" x2="480" y2="70"  stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="280" y1="140" x2="480" y2="250" stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="280" y1="360" x2="480" y2="250" stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="280" y1="360" x2="480" y2="430" stroke="#A6A5A1" stroke-width="1.5"/>
+
+      <line x1="480" y1="70"  x2="700" y2="55"  stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="480" y1="70"  x2="700" y2="185" stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="480" y1="250" x2="700" y2="185" stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="480" y1="250" x2="700" y2="315" stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="480" y1="430" x2="700" y2="315" stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="480" y1="430" x2="700" y2="445" stroke="#A6A5A1" stroke-width="1.5"/>
+
+      <!-- step 0 -->
+      <circle cx="80" cy="250" r="24" fill="url(#nodeGradMidBinN)"/>
+      <text x="80" y="255" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="11" fill="#ffffff">100.0</text>
+
+      <!-- step 1 -->
+      <circle cx="280" cy="140" r="24" fill="url(#nodeGradUpBinN)"/>
+      <text x="280" y="145" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="11" fill="#ffffff">112.2</text>
+      <circle cx="280" cy="360" r="24" fill="url(#nodeGradDownBinN)"/>
+      <text x="280" y="365" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="11" fill="#ffffff">89.1</text>
+
+      <!-- step 2 -->
+      <circle cx="480" cy="70" r="24" fill="url(#nodeGradUpBinN)"/>
+      <text x="480" y="75" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="11" fill="#ffffff">126.0</text>
+      <circle cx="480" cy="250" r="26" fill="url(#nodeGradMidBinN)"/>
+      <text x="480" y="255" text-anchor="middle" font-family="JetBrains Mono" font-weight="700" font-size="11" fill="#ffffff">100.0</text>
+      <circle cx="480" cy="430" r="24" fill="url(#nodeGradDownBinN)"/>
+      <text x="480" y="435" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="11" fill="#ffffff">79.4</text>
+
+      <!-- step 3 -->
+      <circle cx="700" cy="55" r="24" fill="url(#nodeGradUpBinN)"/>
+      <text x="700" y="60" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="10.5" fill="#ffffff">141.4</text>
+      <circle cx="700" cy="185" r="24" fill="url(#nodeGradUpBinN)"/>
+      <text x="700" y="190" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="10.5" fill="#ffffff">112.2</text>
+      <circle cx="700" cy="315" r="24" fill="url(#nodeGradDownBinN)"/>
+      <text x="700" y="320" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="10.5" fill="#ffffff">89.1</text>
+      <circle cx="700" cy="445" r="24" fill="url(#nodeGradDownBinN)"/>
+      <text x="700" y="450" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="10.5" fill="#ffffff">70.7</text>
+
+      <text x="560" y="150" text-anchor="middle" font-family="Inter" font-style="italic" font-size="10.5" fill="#7B61FF">ud and du recombine</text>
+    </svg>
+    <figcaption>A three-step recombining tree with <code>S_0 = 100</code>, using the worked example's Cox-Ross-Rubinstein parameters. The two paths into the central node at each step, one up then down, one down then up, land on the same price. That collapse is what keeps the node count linear in the number of steps instead of exponential.</figcaption>
+  </figure>
+
+  <h3>Picture two: static hedge versus dynamic hedge</h3>
+
+  <p>Lecture 1 replicated a forward with a portfolio you set up once and never touched again: buy the asset, borrow the present value of <code>K</code>, wait. That works because the forward's payoff is linear in <code>S(T)</code>, so a fixed number of units of the underlying replicates it at every future date, not just at maturity. An option's payoff is not linear, so no fixed holding of the underlying replicates it throughout its life. The hedge ratio has to change as the stock moves and as time passes, and it has to change using only cash that is already inside the replicating portfolio: no top-ups, no withdrawals. That constraint is called <strong>self-financing</strong>, and it is the reason the multi-period tree needs an argument at every node rather than one argument at the start.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Comparison of the forward's static hedge with the option's dynamic, rebalanced hedge across three periods">
+      <defs>
+        <marker id="arrowEndBinN" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#52525b"/>
+        </marker>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#191918">One hedge set once, versus one hedge rebuilt at every node</text>
+
+      <!-- Lane A: static -->
+      <g transform="translate(40,50)">
+        <rect x="0" y="0" width="720" height="90" rx="10" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="1.5"/>
+        <rect x="0" y="0" width="150" height="90" rx="10" fill="#1E9D54"/>
+        <text x="75" y="40" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#ffffff">Forward</text>
+        <text x="75" y="60" text-anchor="middle" font-family="Inter" font-weight="500" font-size="11" fill="#DDF1E5">static hedge</text>
+
+        <rect x="180" y="15" width="510" height="60" rx="6" fill="#ffffff" stroke="#4FAE6B" stroke-width="1"/>
+        <text x="196" y="36" font-family="Inter" font-weight="600" font-size="11" fill="#134e4a">t = 0, 1, 2, 3</text>
+        <text x="196" y="56" font-family="Inter" font-size="11" fill="#134e4a">Hold one unit of the asset throughout. Never rebalanced. Nothing to check at intermediate nodes.</text>
+      </g>
+
+      <!-- Lane B: dynamic -->
+      <g transform="translate(40,160)">
+        <rect x="0" y="0" width="720" height="150" rx="10" fill="#EAE6FA" stroke="#7B61FF" stroke-width="1.5"/>
+        <rect x="0" y="0" width="150" height="150" rx="10" fill="#5B47E0"/>
+        <text x="75" y="70" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#ffffff">Option</text>
+        <text x="75" y="90" text-anchor="middle" font-family="Inter" font-weight="500" font-size="11" fill="#EAE6FA">dynamic hedge</text>
+
+        <rect x="180" y="20" width="150" height="55" rx="6" fill="#ffffff" stroke="#C8BFFF" stroke-width="1"/>
+        <text x="255" y="42" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="12" fill="#3D2EB5">Δ₀</text>
+        <text x="255" y="60" text-anchor="middle" font-family="Inter" font-size="10" fill="#3D2EB5">t = 0</text>
+
+        <line x1="335" y1="47" x2="365" y2="47" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowEndBinN)"/>
+
+        <rect x="375" y="20" width="150" height="55" rx="6" fill="#ffffff" stroke="#C8BFFF" stroke-width="1"/>
+        <text x="450" y="42" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="12" fill="#3D2EB5">Δ₁</text>
+        <text x="450" y="60" text-anchor="middle" font-family="Inter" font-size="10" fill="#3D2EB5">t = 1</text>
+
+        <line x1="530" y1="47" x2="560" y2="47" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowEndBinN)"/>
+
+        <rect x="570" y="20" width="120" height="55" rx="6" fill="#ffffff" stroke="#C8BFFF" stroke-width="1"/>
+        <text x="630" y="42" text-anchor="middle" font-family="JetBrains Mono" font-weight="600" font-size="12" fill="#3D2EB5">Δ₂</text>
+        <text x="630" y="60" text-anchor="middle" font-family="Inter" font-size="10" fill="#3D2EB5">t = 2</text>
+
+        <rect x="180" y="90" width="510" height="45" rx="6" fill="#ffffff" stroke="#C8BFFF" stroke-width="1"/>
+        <text x="196" y="110" font-family="Inter" font-weight="600" font-size="10.5" fill="#3D2EB5">At every node: buy or sell Δⱼ − Δⱼ₋₁ units of stock,</text>
+        <text x="196" y="126" font-family="Inter" font-size="10.5" fill="#3D2EB5">funded entirely from the bond account already inside the portfolio.</text>
+      </g>
+    </svg>
+    <figcaption>The forward's replicating portfolio is fixed at inception. The option's replicating portfolio is rebuilt at every node, but every rebuild is funded from cash already in the portfolio: no money is injected or withdrawn along the way. That is the self-financing condition proved formally in section 4.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Backward induction: the algorithm</h3>
+
+  <p>Fix a European claim with payoff <code>f(S_T)</code> at maturity, an <code>n</code>-step tree, per-period gross up-factor <code>u</code>, down-factor <code>d</code>, per-period risk-free growth factor <code>R = e^{r\,\Delta t}</code>, and risk-neutral up-probability <code>q</code> satisfying <code>d &lt; R &lt; u</code> so that <code>q = (R - d)/(u - d) \in (0,1)</code>. The algorithm has two parts.</p>
+
+  <div class="worked">1. Terminal step (j = n). At every node k = 0, ..., n, set the option value
+   equal to the payoff:
+       f_{n,k} = f(S_{n,k}) = f(S_0 u^k d^{n-k})
+
+2. Backward recursion (j = n-1, n-2, ..., 0). At every node (j,k), apply the
+   single-period risk-neutral formula, using the two children of (j,k) at
+   step j+1, namely (j+1,k+1) [up move] and (j+1,k) [down move]:
+
+       f_{j,k} = (1/R) * [ q * f_{j+1,k+1}  +  (1-q) * f_{j+1,k} ]
+
+   and, if a hedge is required, the local Delta at that node is
+
+       Delta_{j,k} = ( f_{j+1,k+1} - f_{j+1,k} ) / ( S_{j+1,k+1} - S_{j+1,k} )
+
+Repeat step 2 until j = 0. f_{0,0} is the price today.</div>
+
+  <p>The recursion visits every node exactly once, so pricing a European claim on an <code>n</code>-step tree costs <code>O(n^2)</code> arithmetic operations, one for each of the roughly <code>n^2/2</code> nodes. Two things are worth holding onto. First, <code>Delta</code> is recomputed at every node: the hedge ratio that replicates the option between step <code>j</code> and step <code>j+1</code> depends on the node you are standing at, which is exactly the dynamic hedge from the picture in section 3. Second, the recursion never refers to the real-world probability of an up-move; it only ever uses <code>q</code>, which is why the price does not depend on what you believe the stock will actually do.</p>
+
+  <h3>Self-financing and the dynamic replication proof</h3>
+
+  <div class="defcard">
+    <div class="term">Self-financing portfolio</div>
+    <div class="def">A trading strategy specifying, at every node <code>(j,k)</code>, a number of shares <code>Delta_{j,k}</code> and a bond holding <code>B_{j,k}</code>, such that the portfolio's value the instant before rebalancing at node <code>(j+1, \cdot)</code> exactly equals its value the instant after rebalancing. No cash is added to or removed from the strategy at any node after time zero: every rebalance is funded purely by reallocating the existing portfolio value between stock and bond.</div>
+  </div>
+
+  <p>Define the portfolio value process <code>V_{j,k} = Delta_{j-1,\cdot}\, S_{j,k} + B_{j-1,\cdot}\, R^{\,j}</code>, the value of yesterday's holdings marked at today's prices. The claim is that if <code>Delta</code> and <code>B</code> are chosen at each node by the two equations</p>
+
+  <p>$$ \Delta_{j,k}\,S_{j+1,k+1} + B_{j,k}\,R^{j+1} = f_{j+1,k+1}, \qquad \Delta_{j,k}\,S_{j+1,k} + B_{j,k}\,R^{j+1} = f_{j+1,k}, $$</p>
+
+  <p>then <code>V_{j,k} = f_{j,k}</code> at every node, and the strategy is self-financing by construction. Solving the two equations for <code>Delta_{j,k}</code> reproduces exactly the local hedge ratio in the algorithm above; back-substituting gives <code>B_{j,k}</code>. The portfolio value at node <code>(j,k)</code>, built from yesterday's <code>(Delta_{j-1}, B_{j-1})</code> and marked at today's stock price, equals <code>f_{j,k}</code>, the value computed by the backward recursion; and rebalancing to today's <code>(Delta_j, B_j)</code> costs exactly that same amount, because the two equations were solved so that the portfolio matches the option's value at both possible children before the rebalance happens. No cash crosses the boundary of the portfolio at any node. Chaining this node by node from <code>j=n</code> back to <code>j=0</code> is precisely backward induction; it is not a separate argument, it is the same recursion read as a hedging instruction rather than a pricing instruction.</p>
+
+  <h3>The martingale statement</h3>
+
+  <p>Collect the discounted option value process <code>f_{j,k} / R^{\,j}</code>. Backward induction says <code>f_{j,k} = (1/R)\bigl[q f_{j+1,k+1} + (1-q) f_{j+1,k}\bigr]</code>, which rearranges to</p>
+
+  <p>$$ \frac{f_{j,k}}{R^{\,j}} = \mathbb{E}^{\mathbb{Q}} \left[ \left. \frac{f_{j+1,K_{j+1}}}{R^{\,j+1}} \, \right| \, \mathcal{F}_j \right], $$</p>
+
+  <p>where the expectation is taken under <code>Q</code>, the measure that makes every up-move probability equal to <code>q</code>. The discounted price of any attainable claim is a <code>Q</code>-martingale: its conditional expected value at any later date, discounted back, equals its value today. Applying the <strong>tower property</strong> of conditional expectation, the one-step relation nests all the way from maturity to today:</p>
+
+  <p>$$ \frac{f_{0,0}}{R^0} = \mathbb{E}^{\mathbb{Q}}\!\left[\frac{f_{1,\cdot}}{R}\right] = \mathbb{E}^{\mathbb{Q}}\!\left[\mathbb{E}^{\mathbb{Q}}\!\left[\frac{f_{2,\cdot}}{R^2}\,\Big|\,\mathcal{F}_1\right]\right] = \mathbb{E}^{\mathbb{Q}}\!\left[\frac{f_{2,\cdot}}{R^2}\right] = \cdots = \mathbb{E}^{\mathbb{Q}}\!\left[\frac{f_{n,\cdot}}{R^{\,n}}\right]. $$</p>
+
+  <p>Backward induction, applied node by node, and a single risk-neutral expectation of the discounted terminal payoff, applied once, must therefore give the same answer. That is why the closed-form binomial sum below and the step-by-step recursion above always agree: they are the same statement, one expanded via the tower property and one left folded.</p>
+
+  <h3>The closed-form European price as a binomial sum</h3>
+
+  <p>Unfolding the recursion in one step, using the tower-property argument above, gives the price directly as an expectation under <code>Q</code> of the discounted terminal payoff, with the terminal stock price binomially distributed:</p>
+
+  <p>$$ f_0 = \frac{1}{R^n} \sum_{k=0}^{n} \binom{n}{k} q^k (1-q)^{n-k} \, f\bigl(S_0\, u^k d^{n-k}\bigr). $$</p>
+
+  <p>For a European call with strike <code>K</code>, the payoff is zero below the strike, so the sum only needs the smallest <code>k</code>, call it <code>k^*</code>, for which the node finishes in the money: <code>S_0 u^{k} d^{n-k} > K</code>. Because <code>u\,d = 1</code> under the standard parameterisation below, <code>S_0 u^k d^{n-k} = S_0 u^{2k-n}</code>, so the in-the-money condition becomes <code>u^{2k-n} > K/S_0</code>, i.e. <code>k > n/2 + \ln(K/S_0)/(2\ln u)</code>; <code>k^*</code> is the smallest integer above that threshold. Splitting the sum at <code>k^*</code> and separating the two payoff terms gives</p>
+
+  <p>$$ c_0 = S_0 \sum_{k=k^*}^{n} \binom{n}{k} \left(\frac{q\,u}{R}\right)^{k} \left(\frac{(1-q)\,d}{R}\right)^{n-k} \; - \; \frac{K}{R^n} \sum_{k=k^*}^{n} \binom{n}{k} q^k (1-q)^{n-k}. $$</p>
+
+  <p>The second sum is the probability, under <code>Q</code>, that a Binomial<code>(n,q)</code> random variable exceeds <code>k^*-1</code>. The first sum has exactly the same binomial shape, but under a tilted probability <code>q' = qu/R</code> (which is itself a valid probability, since <code>qu/R + (1-q)d/R = 1</code> follows from the definition of <code>q</code>). The call price is therefore the spot times one binomial tail probability, minus the discounted strike times another. As <code>n \to \infty</code>, both binomial tails converge to normal tails by the central limit theorem, and this two-binomial-tail structure becomes exactly the two-normal-tail structure of the Black-Scholes formula, <code>N(d_1)</code> and <code>N(d_2)</code>. The multi-period binomial call price is the finite-<code>n</code> ancestor of Black-Scholes, not merely an approximation to it.</p>
+
+  <h3>American options: the early-exercise test</h3>
+
+  <p>An American claim can be exercised at any node, not only at maturity, so the recursion gains a comparison at every step. Let <code>g(S)</code> denote the intrinsic (immediate exercise) value, for example <code>max(K - S, 0)</code> for a put. The terminal step is unchanged, <code>f_{n,k} = g(S_{n,k})</code>. At every earlier node,</p>
+
+  <p>$$ f_{j,k} = \max\Bigl( g(S_{j,k}), \; \text{continuation value} \Bigr), \qquad \text{continuation value} = \frac{1}{R}\bigl[q\,f_{j+1,k+1} + (1-q)\,f_{j+1,k}\bigr]. $$</p>
+
+  <p>Continuation value is exactly the European backward-induction formula: it is what the option would be worth if you were forced to hold it one more period. The American value at each node is the better of exercising now and holding on. Nodes where <code>g(S_{j,k})</code> strictly exceeds the continuation value are exercised early; plotting those nodes against stock price and time traces out the <strong>exercise boundary</strong>. Because a non-dividend-paying call is never worth more dead than alive (holding it always dominates exercising, since the continuation value of a call is bounded below by <code>S_{j,k} - K/R</code> which exceeds the intrinsic value <code>S_{j,k}-K</code> whenever the discount factor is below one), the American call on a non-dividend stock equals the European call. Puts have no such shield: the worked example below finds an early-exercise node explicitly.</p>
+
+  <h3>The Cox-Ross-Rubinstein parameterisation</h3>
+
+  <p>The tree needs <code>u</code>, <code>d</code>, and <code>q</code> chosen so that, as the step size <code>\Delta t</code> shrinks, the tree's terminal distribution converges to the lognormal distribution assumed for the stock under geometric Brownian motion with volatility <code>\sigma</code> and risk-free rate <code>r</code>. Cox, Ross and Rubinstein's (1979) choice is</p>
+
+  <p>$$ u = e^{\sigma \sqrt{\Delta t}}, \qquad d = \frac{1}{u} = e^{-\sigma \sqrt{\Delta t}}, \qquad q = \frac{e^{r\,\Delta t} - d}{u - d}. $$</p>
+
+  <p>To see why this converges correctly, write the per-period log return as a two-point random variable, <code>\ln u</code> with probability <code>q</code> and <code>\ln d = -\ln u</code> with probability <code>1-q</code>. Expanding <code>q</code> in powers of <code>\sqrt{\Delta t}</code> (a Taylor expansion of the exponentials defining <code>u</code>, <code>d</code>, and <code>R</code>) gives <code>q = \tfrac12 + \tfrac12\bigl(r - \tfrac12\sigma^2\bigr)\sqrt{\Delta t}/\sigma + O(\Delta t)</code>. Substituting, the mean of the per-period log return is</p>
+
+  <p>$$ \mathbb{E}[\ln(S_1/S_0)] = (2q-1)\,\sigma\sqrt{\Delta t} = \left(r - \tfrac12\sigma^2\right)\Delta t + O(\Delta t^{3/2}), $$</p>
+
+  <p>matching the risk-neutral drift of geometric Brownian motion to leading order, and the variance is <code>4q(1-q)\sigma^2\Delta t = \sigma^2 \Delta t + O(\Delta t^{3/2})</code>, matching the target variance to leading order too. Summing <code>n = T/\Delta t</code> nearly-independent log returns and invoking the central limit theorem, the terminal log stock price converges in distribution to a normal with mean <code>(r-\tfrac12\sigma^2)T</code> and variance <code>\sigma^2 T</code>, exactly the Black-Scholes lognormal assumption, and the tree price converges to the Black-Scholes price. Two well-known alternatives adjust the same matching problem differently: the <strong>Jarrow-Rudd</strong> tree sets <code>q = 1/2</code> exactly and lets <code>u</code> and <code>d</code> absorb the drift instead, which is convenient for simulation but recombines with a slightly different node spacing; the <strong>Tian</strong> tree matches the first three moments of the lognormal exactly rather than only the first two to leading order, which improves small-<code>n</code> accuracy at the cost of a less memorable formula.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustrative convergence of the binomial European call price to the Black-Scholes price as the number of steps increases, oscillating between odd and even step counts">
+      <defs>
+        <linearGradient id="bandGradBinN" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#DEEAFB" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#DEEAFB" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#191918">Binomial price versus number of steps n</text>
+
+      <line x1="80" y1="70" x2="80" y2="300" stroke="#A6A5A1" stroke-width="1.5"/>
+      <line x1="80" y1="300" x2="760" y2="300" stroke="#A6A5A1" stroke-width="1.5" marker-end="url(#arrowBinN)"/>
+      <text x="60" y="185" text-anchor="middle" font-family="Inter" font-size="11" fill="#82817D" transform="rotate(-90 60 185)">tree price</text>
+      <text x="760" y="322" text-anchor="end" font-family="Inter" font-size="11" fill="#82817D">n (number of steps)</text>
+
+      <line x1="80" y1="185" x2="760" y2="185" stroke="#0F62FE" stroke-width="1.5" stroke-dasharray="6 5"/>
+      <text x="765" y="182" font-family="Inter" font-size="10.5" fill="#0F62FE">Black-Scholes</text>
+
+      <polyline points="100,115 140,255 180,145 220,230 260,158 300,213 340,168 380,200 420,175 470,193 540,180 610,188 690,183 750,182"
+        fill="none" stroke="#5B47E0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <circle cx="140" cy="255" r="4" fill="#F08C42"/>
+      <circle cx="180" cy="145" r="4" fill="#4FAE6B"/>
+      <circle cx="220" cy="230" r="4" fill="#F08C42"/>
+      <circle cx="260" cy="158" r="4" fill="#4FAE6B"/>
+
+      <text x="140" y="275" text-anchor="middle" font-family="Inter" font-size="10" fill="#C76B2A">odd n</text>
+      <text x="180" y="128" text-anchor="middle" font-family="Inter" font-size="10" fill="#1E9D54">even n</text>
+      <text x="220" y="250" text-anchor="middle" font-family="Inter" font-size="10" fill="#C76B2A">odd n</text>
+      <text x="260" y="141" text-anchor="middle" font-family="Inter" font-size="10" fill="#1E9D54">even n</text>
+    </svg>
+    <figcaption>Odd and even step counts alternate on opposite sides of the true price and the swings shrink as <code>n</code> grows, because whether the strike lands near a node or between two nodes flips with parity. Section 5 discusses averaging, Richardson extrapolation, and smoothing as fixes for this oscillation.</figcaption>
+  </figure>
+
+  <h3>Worked example: a three-step tree</h3>
+
+  <p>Price a European call and an American put, both struck at <code>K = 100</code>, on a stock with <code>S_0 = 100</code>, <code>\sigma = 20\%</code>, <code>r = 5\%</code> continuously compounded, <code>T = 1</code> year, using an <code>n = 3</code>-step Cox-Ross-Rubinstein tree.</p>
+
+  <div class="worked">Step size and CRR parameters:
+  dt = T/n = 1/3 = 0.3333
+  u  = exp(sigma * sqrt(dt)) = exp(0.2 * 0.5774) = exp(0.11547) = 1.1224
+  d  = 1/u                                                       = 0.8909
+  R  = exp(r * dt)          = exp(0.05/3)         = exp(0.016667) = 1.01681
+  q  = (R - d) / (u - d)    = (1.01681 - 0.8909) / (1.1224 - 0.8909)
+     = 0.12591 / 0.23146 = 0.5438        1 - q = 0.4562
+
+Stock tree (S_0 = 100), using u*d = 1 so S_{j,k} = 100 * u^(2k-j):
+  Step 0:                              100.00
+  Step 1:                    89.09              112.24
+  Step 2:           79.38             100.00             125.98
+  Step 3:  70.72            89.09             112.24             141.40
+
+European call payoffs at step 3, max(S-K,0): 0.00, 0.00, 12.24, 41.40
+American put payoffs at step 3, max(K-S,0): 29.28, 10.91, 0.00, 0.00</div>
+
+  <p>Backward induction for the European call, one node at a time. At step 2, node <code>uu</code> (<code>S=125.98</code>): <code>c = (q \times 41.40 + (1-q)\times 12.24)/R = (0.5438 \times 41.40 + 0.4562\times12.24)/1.01681 = 27.63</code>. Node <code>ud</code> (<code>S=100.00</code>): <code>c = (0.5438\times12.24 + 0.4562\times0)/1.01681 = 6.55</code>. Node <code>dd</code> (<code>S=79.38</code>): both children pay zero, so <code>c=0.00</code>. At step 1, node <code>u</code>: <code>c=(0.5438\times27.63+0.4562\times6.55)/1.01681=17.71</code>. Node <code>d</code>: <code>c=(0.5438\times6.55+0.4562\times0)/1.01681=3.50</code>. At step 0: <code>c_0=(0.5438\times17.71+0.4562\times3.50)/1.01681=11.04</code>.</p>
+
+  <p>Cross-checking with the closed-form binomial sum: only <code>k=2</code> (node <code>uud</code>, <code>S=112.24</code>) and <code>k=3</code> (node <code>uuu</code>, <code>S=141.40</code>) finish in the money, so <code>k^*=2</code> and</p>
+
+  <p>$$ c_0 = \frac{1}{R^3}\Bigl[\binom{3}{2}q^2(1-q)\times 12.24 + \binom{3}{3}q^3\times 41.40\Bigr] = \frac{1}{1.0518}\bigl[3(0.2957)(0.4562)(12.24) + (0.1608)(41.40)\bigr] = \frac{11.610}{1.0518} = 11.04, $$</p>
+
+  <p>which matches the backward-induction figure to the cent, exactly as the tower-property argument in this section says it must.</p>
+
+  <p>Now the American put on the same tree. At step 2, node <code>uu</code> has intrinsic value zero and continuation value <code>0.00</code>: <code>P_{uu}=0.00</code>. Node <code>ud</code> (<code>S=100.00</code>) has intrinsic value zero and continuation value <code>(0.5438\times0+0.4562\times10.91)/1.01681=4.89</code>, so <code>P_{ud}=4.89</code>, no early exercise. Node <code>dd</code> (<code>S=79.38</code>) has intrinsic value <code>100-79.38=20.62</code> and continuation value <code>(0.5438\times10.91+0.4562\times29.28)/1.01681=18.97</code>: intrinsic exceeds continuation, so the put is exercised early and <code>P_{dd}=20.62</code>, not <code>18.97</code>. At step 1, node <code>u</code>: intrinsic <code>0</code>, continuation <code>(0.5438\times0+0.4562\times4.89)/1.01681=2.20</code>, so <code>P_u=2.20</code>. Node <code>d</code> (<code>S=89.09</code>): intrinsic <code>10.91</code>, continuation <code>(0.5438\times4.89+0.4562\times20.62)/1.01681=11.87</code>: continuation wins, no early exercise, <code>P_d=11.87</code>. At step 0: intrinsic <code>0</code>, continuation <code>(0.5438\times2.20+0.4562\times11.87)/1.01681=6.50</code>, so <code>P_0=6.50</code>.</p>
+
+  <p>The European put on the identical tree, found either by repeating the recursion without the early-exercise comparison or, faster, by put-call parity <code>p_0 = c_0 - S_0 + K/R^n = 11.04-100+100\,e^{-0.05}=11.04-100+95.12=6.17</code>, is strictly below the American value: <code>6.17 &lt; 6.50</code>. The gap, <code>0.33</code>, is the early-exercise premium, and it is entirely attributable to the single node <code>dd</code>, where the option is worth more dead than alive.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Step, node</th><th>Stock price</th><th>Eur. call value</th><th>Amer. put value</th><th>Put exercised early?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>100.00</td><td>11.04</td><td>6.50</td><td>No</td></tr>
+        <tr><td>1, u</td><td>112.24</td><td>17.71</td><td>2.20</td><td>No</td></tr>
+        <tr><td>1, d</td><td>89.09</td><td>3.50</td><td>11.87</td><td>No (continuation 11.87 &gt; intrinsic 10.91)</td></tr>
+        <tr><td>2, uu</td><td>125.98</td><td>27.63</td><td>0.00</td><td>No</td></tr>
+        <tr><td>2, ud</td><td>100.00</td><td>6.55</td><td>4.89</td><td>No</td></tr>
+        <tr><td>2, dd</td><td>79.38</td><td>0.00</td><td>20.62</td><td><strong>Yes</strong> (intrinsic 20.62 &gt; continuation 18.97)</td></tr>
+        <tr><td>3, uuu</td><td>141.40</td><td>41.40 (payoff)</td><td>0.00 (payoff)</td><td>&mdash;</td></tr>
+        <tr><td>3, uud</td><td>112.24</td><td>12.24 (payoff)</td><td>0.00 (payoff)</td><td>&mdash;</td></tr>
+        <tr><td>3, udd</td><td>89.09</td><td>0.00 (payoff)</td><td>10.91 (payoff)</td><td>&mdash;</td></tr>
+        <tr><td>3, ddd</td><td>70.72</td><td>0.00 (payoff)</td><td>29.28 (payoff)</td><td>&mdash;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Why anyone still builds a tree once Black-Scholes exists</h3>
+
+  <p>Black-Scholes gives a closed form for a plain European option in one line; the tree needs a spreadsheet. Practitioners still reach for the tree in four situations. American and Bermudan exercise have no general closed form in continuous time, but drop out of the tree as a one-line comparison at every node, exactly as in the worked example. Discrete dividends, which break the clean scaling that makes Black-Scholes tractable, are handled on a tree by simply subtracting the dividend from the stock price at the ex-dividend node and carrying on. Path-independent exotics with awkward payoffs (a call spread, a digital, a chooser) reuse the identical recursion with a different terminal function, no new theory required. Perhaps the least glamorous but most durable reason: a tree is auditable. You can print it out, hand it to a risk committee or a regulator, and point at the exact node where the model decided to exercise. A stochastic PDE solver cannot be explained that way in a room with a whiteboard.</p>
+
+  <h3>The odd-even convergence problem, and its fixes</h3>
+
+  <p>The oscillation in the convergence figure above is not numerical noise, it is structural: whether the strike price sits close to a node or squarely between two nodes flips as <code>n</code> increases by one, and that flip changes the sign of the discretisation error in the payoff near the money. Three standard fixes address it without abandoning the tree. <strong>Averaging</strong> takes the mean of the price at <code>n</code> and <code>n+1</code> steps (or, more cleanly, <code>n</code> and <code>n+2</code> to stay within the same parity class), which cancels much of the oscillation because the two errors point in opposite directions. <strong>Richardson extrapolation</strong> treats the tree error as leading-order <code>O(1/n)</code> and combines the prices at <code>n</code> and <code>2n</code> steps, <code>2\hat{f}(2n) - \hat{f}(n)</code>, to cancel that leading term algebraically. The <strong>Broadie-Detemple smoothing</strong> technique replaces the jagged terminal payoff with the exact Black-Scholes value one step before expiry, since the distribution one period before maturity is still simple enough to price in closed form, which removes the kink at the strike that causes the oscillation in the first place and typically buys several extra digits of accuracy at no extra computational cost.</p>
+
+  <h3>Where the tree gives out</h3>
+
+  <p>Path-dependent payoffs break recombination outright. An Asian option's payoff depends on the average stock price over the whole path, so two different paths that arrive at the same node carry different running averages and are no longer interchangeable: the state at each node needs an auxiliary variable (the running average, bucketed into a manageable number of levels) bolted onto the stock price, in what is usually called a forward shooting grid. Lookback and barrier options need similar bookkeeping. High-dimensional problems are worse: a tree pricing a basket of five correlated underlyings needs a state space that grows combinatorially with the number of assets, and the tree's <code>O(n^2)</code> advantage over a naive <code>O(2^n)</code> path count evaporates as soon as the dimension climbs. That is the point at which the industry switches to Monte Carlo simulation, whose cost grows only linearly in the number of underlyings, at the price of statistical rather than exact convergence.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Too few steps is a specific danger for American options, not merely a generic accuracy complaint. The exercise boundary is a genuinely continuous curve in the underlying model, and a coarse tree approximates it with a jagged, piecewise-constant staircase that can sit visibly on the wrong side of the true boundary near the money, understating the early-exercise premium exactly where it is largest. A three-step tree is fine for teaching the mechanics, as in the worked example above, but production American option pricing typically runs hundreds of steps, or applies one of the acceleration methods above, before the price is trusted for risk or P&amp;L.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Explain in one sentence why the multi-period binomial tree has <code>n+1</code> nodes at step <code>n</code> rather than <code>2^n</code>, and state the node-indexing formula <code>S_{j,k}</code> in terms of <code>u</code>, <code>d</code>, and <code>S_0</code>.</li>
+      <li>Write down the two steps of the backward-induction algorithm for a European claim, and state what changes for an American claim.</li>
+      <li>Define a self-financing trading strategy. Explain why the two equations pinning down <code>Delta_{j,k}</code> and <code>B_{j,k}</code> at a node guarantee that no cash is injected or withdrawn when the portfolio is rebalanced.</li>
+      <li>State the martingale property of the discounted price process of an attainable claim under <code>Q</code>. Use the tower property to explain why one risk-neutral expectation of the discounted terminal payoff must agree with the fully unfolded backward induction.</li>
+      <li>Derive the closed-form binomial sum for a European call, identify the critical <code>k^*</code>, and explain why the resulting expression is a difference of two binomial tail probabilities. What does this expression become as <code>n\to\infty</code>?</li>
+      <li>State the Cox-Ross-Rubinstein choices of <code>u</code>, <code>d</code>, and <code>q</code>. Show, to leading order in <code>\Delta t</code>, that the mean and variance of the per-period log return match the target risk-neutral lognormal dynamics.</li>
+      <li>On a three-step tree with <code>S_0=100</code>, <code>K=100</code>, <code>u=1.1224</code>, <code>d=0.8909</code>, <code>q=0.5438</code>, and <code>R=1.01681</code> per period, verify that the node <code>(2, 0)</code> (two down-moves) is an early-exercise node for an American put, and explain, without recomputing every number, why node <code>(1,1)</code> (one up-move) is not.</li>
+      <li>Explain in your own words why a non-dividend-paying American call is never exercised early, using the continuation-value inequality in section 4.</li>
+      <li>Describe the odd-even oscillation in binomial convergence and name two distinct techniques for reducing it, explaining briefly how each works.</li>
+      <li>Give two reasons a risk function at a bank would still build a binomial tree today rather than relying solely on Black-Scholes, and one reason it would abandon the tree in favour of Monte Carlo simulation.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="03-binomial_single_period.html">Single-period binomial model (previous)</a>, the one-step building block this lecture chains together <code>n</code> times.</li>
+      <li><a href="05-binomial_calibration.html">Binomial calibration (next)</a>, fitting <code>u</code>, <code>d</code>, and <code>q</code> to real volatility surfaces and dividend schedules rather than the textbook constants used here.</li>
+      <li>Black-Scholes PDE (planned), the continuous-time limit this lecture's convergence argument points towards.</li>
+      <li>Exotic and path-dependent options (planned), where the recombination this lecture relies on breaks down and auxiliary state variables or Monte Carlo take over.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 4 - Multi-Period Binomial Model.pdf</code> (primary source)</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 2: Binomial Trees, for the formula summary (<code>u</code>, <code>d</code>, <code>q</code>, delta, gamma)</li>
+      <li>Hull, <em>Options, Futures and Other Derivatives</em>, chapters 13 and 21 (trees, American exercise, numerical procedures)</li>
+      <li>Cox, Ross and Rubinstein (1979), <em>Option Pricing: a Simplified Approach</em>, the original tree and its continuous limit</li>
+      <li>Broadie and Detemple (1996) on smoothing the American exercise boundary; Jarrow and Rudd (1983) and Tian (1993) on alternative parameterisations</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The source states the Cox-Ross-Rubinstein parameters <code>u = e^(σ√Δt)</code>, <code>d = 1/u</code> without deriving them, explicitly deferring the justification ("the reason for this choice of u and d values will not be apparent now"). It never returns to derive the moment-matching argument, the martingale/tower-property statement, the closed-form binomial-tail-probability price, or its convergence to Black-Scholes: all four are worked from scratch in section 4 of this lecture.</li>
+      <li>American exercise is not a footnote in the source: it works a full 2-step and 3-step American put example (struck at $92, on the same $90 underlying used for its European call example) and tabulates the exercised state at every node. What the source does not do is price a European and an American claim at the same strike on the same tree, so it has no single figure for the early-exercise premium the way this lecture's worked example isolates it to node <code>dd</code>.</li>
+      <li>The source does not name or define a self-financing trading strategy, and does not state the martingale property of the discounted price process or invoke the tower property. Its backward induction is presented purely as a pricing recursion, not also as a hedging argument.</li>
+      <li>The source has no discussion of the odd-even oscillation in binomial convergence, nor of averaging, Richardson extrapolation, or Broadie-Detemple smoothing as fixes.</li>
+      <li>The source does cover path-dependent exotics, chooser, look-back, and knock-in/knock-out barrier options, priced on the same lattice by carrying an auxiliary state variable (the running minimum or maximum) at each node. This lecture references that class of problem only qualitatively in the grandmaster section; the source's treatment, though brief, is more concrete.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 4: the multi-period binomial model</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

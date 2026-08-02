@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 2: tokenisation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Tokenisation</h1>
+  <p class="subtitle">A language model never sees your text. It sees a list of integers produced by a separate component that was trained before the model was, on a dataset chosen by somebody else, according to design decisions nobody documented in the model card. That component sets a hard floor on what the model can do with numbers, spelling and non-English script, decides how much of your document fits in the context window, and determines your API bill. Almost nobody thinks about it until it breaks something, at which point it explains a startling proportion of the failures people attribute to the model.</p>
+  <div class="meta">
+    <span>Lecture 2 of 18</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: what is under the bonnet</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>tokenizer</strong> converts text into a list of integer <strong>token IDs</strong>, each indexing an entry in a fixed <strong>vocabulary</strong> established when the tokenizer was trained. It is a separate artefact from the model, paired with it permanently, and it operates in both directions: it encodes your prompt on the way in and decodes the model's chosen IDs into readable text on the way out. Three decisions determine its behaviour: the <strong>tokenisation method</strong>, most commonly <strong>byte pair encoding</strong> for GPT-family models or <strong>WordPiece</strong> for BERT; the <strong>parameters</strong>, chiefly vocabulary size, which special tokens exist, and whether capitalisation survives; and the <strong>training corpus</strong>, which is why a code model and a text model tokenise the same Python function completely differently. Modern tokenisers work at <strong>subword</strong> granularity, sitting between whole words, which cannot handle anything unseen, and individual characters, which handle everything but waste the context window. The consequences are concrete and constant: how digits are split determines whether the model can do arithmetic, how whitespace is handled determines whether it can write Python, and how well the vocabulary covers a language determines what that language costs you per API call.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine you must send a long document abroad using a telegraph code book, and the code book was printed years ago by someone who mostly wrote English business correspondence. Common English words have their own short codes. Rarer words have to be spelled out in fragments: "apologising" goes as "apolog" plus "ising". Words from other languages are not in the book at all, so they go letter by letter, or byte by byte, at several times the cost. Now notice the two things that follow. First, the receiving clerk never sees your document, only the codes, so anything the book cannot express is information the clerk will never have. Second, you're billed per code sent, so an identical-length message in a language the book covers badly costs you multiples of what it costs in English. That code book is the tokenizer, and both consequences are real.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the track</span>
+    Lecture 1 loaded a tokenizer alongside a model without opening it. This lecture opens it. Lecture 3 takes the token IDs this lecture produces and follows them into the embedding matrix, and lecture 4 follows the resulting vectors through the model. The three lectures together are the complete path from a string you typed to a string the model returned.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Four consequences, all of which you will hit.</p>
+
+  <p>First, <strong>tokenisation is the root cause of the arithmetic and spelling failures people blame on reasoning</strong>. When a model gets 870 and 871 confused, or cannot count the letters in a word, the usual explanation offered is that it "doesn't really understand". The more precise explanation is that the GPT-2 tokenizer gave 870 a single token and split 871 into "8" and "71", so those two numbers have no relationship in the model's input at all. The same applies to spelling: if "strawberry" is three tokens, the model has no direct view of its letters, and asking it to count the letter r is asking it to do something its input representation actively obscures.</p>
+
+  <p>Second, <strong>the tokenizer sets your context budget and therefore your bill</strong>. Context windows and API pricing are both denominated in tokens, not characters. English averages roughly four characters per token on a modern tokenizer. Languages poorly represented in the training corpus can run at one or two characters per token, so the same document in Thai or Amharic can cost several times what it costs in English and can overflow a context window that comfortably held the English version. If you're budgeting for a multilingual pipeline, measuring token counts per language is the first thing to do, not the last.</p>
+
+  <p>Third, <strong>the tokenizer decides whether the model can work with code at all</strong>. Python's meaning lives in its indentation. A tokenizer that represents four leading spaces as three or four separate tokens forces the model to track indentation depth by counting, which it does badly. A tokenizer with a single token for each whitespace run up to length 83, which is what GPT-4's has, hands the model the indentation level as one symbol. This is not a subtle effect, and it's why code models ship with their own tokenisers.</p>
+
+  <p>Fourth, <strong>the tokenizer and model are a matched pair, and mixing them produces silent nonsense rather than an error</strong>. Token ID 5281 means something specific to the model that was trained alongside the tokenizer producing it. Feed a model IDs from a different tokenizer with an overlapping ID range and nothing throws; you just get output that looks like the model has had a stroke.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team building a document-extraction pipeline over scanned policy schedules benchmarked two comparable open models and found one dramatically worse at pulling out sums assured. The natural conclusion was that the weaker model was simply less capable, and the team started planning a fine-tune. Someone checked the tokenisation first. The stronger model's tokenizer split every digit into its own token, so "1,250,000" arrived as a clean sequence of digit symbols. The weaker model's tokenizer had learned multi-digit chunks from its training corpus, so the same figure arrived as an idiosyncratic mixture such as "125" plus "0," plus "000", with the chunk boundaries shifting depending on the surrounding punctuation. The model was not failing to read the number; it was being shown a different, inconsistent number each time the formatting varied. No amount of fine-tuning would have fixed the representation, and the actual fix, normalising the numeric formatting in the input before tokenisation, took an afternoon.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a round trip in which the model sits in the middle and never touches text at either end.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The tokenisation round trip: text encoded to token IDs, processed by the model, and decoded back to text">
+      <defs>
+        <marker id="tokArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The model never sees text. The same tokenizer sits on both sides of it.</text>
+
+      <!-- input text -->
+      <rect x="15" y="40" width="150" height="56" rx="8" fill="#FFFFFF" stroke="#a1a1aa" stroke-width="1.5"/>
+      <text x="90" y="62" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">your prompt</text>
+      <text x="90" y="80" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#52525b">"Write an email"</text>
+
+      <!-- tokenizer encode -->
+      <rect x="195" y="40" width="150" height="56" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="270" y="62" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">TOKENIZER</text>
+      <text x="270" y="80" text-anchor="middle" font-family="Inter" font-size="9" fill="#a16207">encode</text>
+
+      <!-- ids in -->
+      <rect x="375" y="40" width="150" height="56" rx="8" fill="#F4F4F2" stroke="#71717a" stroke-width="1.5"/>
+      <text x="450" y="62" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">token IDs</text>
+      <text x="450" y="80" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#52525b">[1, 14350, 385, 4876]</text>
+
+      <!-- model -->
+      <rect x="555" y="40" width="150" height="56" rx="8" fill="#FCE7F3" stroke="#be185d" stroke-width="2"/>
+      <text x="630" y="62" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#831843">MODEL</text>
+      <text x="630" y="80" text-anchor="middle" font-family="Inter" font-size="9" fill="#be185d">integers in, integers out</text>
+
+      <line x1="165" y1="68" x2="195" y2="68" stroke="#71717a" stroke-width="1.8" marker-end="url(#tokArrow)"/>
+      <line x1="345" y1="68" x2="375" y2="68" stroke="#71717a" stroke-width="1.8" marker-end="url(#tokArrow)"/>
+      <line x1="525" y1="68" x2="555" y2="68" stroke="#71717a" stroke-width="1.8" marker-end="url(#tokArrow)"/>
+
+      <!-- return path -->
+      <path d="M 705 68 Q 760 68 760 130 Q 760 158 705 158" fill="none" stroke="#71717a" stroke-width="1.8" marker-end="url(#tokArrow)"/>
+
+      <rect x="555" y="130" width="150" height="56" rx="8" fill="#F4F4F2" stroke="#71717a" stroke-width="1.5"/>
+      <text x="630" y="152" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">generated IDs</text>
+      <text x="630" y="170" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#52525b">[3323, 622, 29901]</text>
+
+      <rect x="375" y="130" width="150" height="56" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="450" y="152" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">SAME TOKENIZER</text>
+      <text x="450" y="170" text-anchor="middle" font-family="Inter" font-size="9" fill="#a16207">decode</text>
+
+      <rect x="195" y="130" width="150" height="56" rx="8" fill="#FFFFFF" stroke="#a1a1aa" stroke-width="1.5"/>
+      <text x="270" y="152" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">readable output</text>
+      <text x="270" y="170" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#52525b">"Subject:"</text>
+
+      <line x1="555" y1="158" x2="525" y2="158" stroke="#71717a" stroke-width="1.8" marker-end="url(#tokArrow)"/>
+      <line x1="375" y1="158" x2="345" y2="158" stroke="#71717a" stroke-width="1.8" marker-end="url(#tokArrow)"/>
+
+      <!-- the vocabulary -->
+      <rect x="195" y="212" width="330" height="66" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="360" y="232" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">THE VOCABULARY: a fixed lookup table</text>
+      <text x="360" y="250" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#b45309">3323 &#8596; "Sub"   622 &#8596; "ject"   29901 &#8596; ":"</text>
+      <text x="360" y="268" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#92400e">frozen when the tokenizer was trained, before the model existed</text>
+
+      <line x1="290" y1="186" x2="290" y2="212" stroke="#b45309" stroke-width="1.2" stroke-dasharray="3 2"/>
+      <line x1="450" y1="186" x2="450" y2="212" stroke="#b45309" stroke-width="1.2" stroke-dasharray="3 2"/>
+
+      <text x="800" y="232" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">Everything the</text>
+      <text x="800" y="245" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">vocabulary cannot</text>
+      <text x="800" y="258" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">express is invisible</text>
+      <text x="800" y="271" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">to the model.</text>
+    </svg>
+    <figcaption>The same tokenizer encodes on the way in and decodes on the way out, using one frozen vocabulary in both directions. The model's entire experience of your text is the integer sequence in the middle. Anything the vocabulary cannot distinguish, the model cannot distinguish either, and no amount of prompting or fine-tuning recovers information that the encoding step discarded.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>The tokenizer is a lossy compressor with opinions.</strong> It was trained to represent one particular corpus efficiently, and everything outside that corpus, other languages, unusual formatting, domain jargon, gets represented badly or not at all. <strong>Token boundaries are the model's atoms.</strong> The model can reason about relationships between tokens and has no direct access to anything inside one, which is why questions about letters inside a word and digits inside a number are structurally hard in a way that questions about words in a sentence are not.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Watching it happen</h3>
+
+  <p>Take a prompt and look at what the model actually receives.</p>
+
+  <pre><code>prompt = "Write an email apologizing to Sarah for the tragic gardening mishap."
+
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids
+# tensor([[    1, 14350,   385,  4876, 27746,  5281,   304, 19235,   363,   278,
+#          25305,   293, 16423,   292,   286,   728,   481, 29889]])
+
+for token_id in input_ids[0]:
+    print(token_id.item(), repr(tokenizer.decode(token_id)))</code></pre>
+
+  <p>Decoded one at a time, with Phi-3's tokenizer, that prompt comes out as:</p>
+
+  <div class="worked">
+    <h4>What the model is given</h4>
+1     '&lt;s&gt;'          &#8592; special: beginning of text
+14350 'Write'
+385   'an'
+4876  'email'
+27746 'apolog'       &#8592; a stem, not a word
+5281  'izing'        &#8592; a suffix, glued to the stem
+304   'to'
+19235 'Sarah'
+363   'for'
+278   'the'
+25305 'trag'
+293   'ic'
+16423 'garden'
+292   'ing'
+286   'm'
+728   'ish'
+481   'ap'           &#8592; "mishap" cost three tokens
+29889 '.'
+  </div>
+
+  <p>Four things to notice. Common words get one token each. Less common words are split into a stem and a suffix, so "apologizing" is "apolog" plus "izing" and shares its stem with "apology" and "apologetic". Rarer words fragment badly: "mishap" costs three tokens. Punctuation is its own token. Spaces have no token of their own; instead, tokens that continue a word carry a hidden marker, and tokens without it are assumed to have a space in front. This is why <code>tokenizer.decode</code> on a single ID can look subtly wrong and why you should decode the whole sequence when you want to see real text.</p>
+
+  <p>The output side works identically in reverse. When the model generates, it emits IDs, and it emitted 3323 then 622 then 29901 to produce "Subject:", because "Sub" and "ject" are separate vocabulary entries. Nothing about "Subject" exists as a unit anywhere in the model's output.</p>
+
+  <h3>Four granularities</h3>
+
+  <p>Subword tokenisation is standard now, but it is one point on a spectrum, and understanding the ends explains why the middle won.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The word tokenization split at word, subword, character and byte granularity, with the trade-offs of each">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same word at four granularities</text>
+
+      <!-- Word -->
+      <text x="20" y="52" font-family="Inter" font-size="11" font-weight="700" fill="#3f3f46">WORD</text>
+      <rect x="120" y="38" width="140" height="24" rx="4" fill="#DEEAFB" stroke="#2A3A78"/>
+      <text x="190" y="55" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#2A3A78">tokenization</text>
+      <text x="290" y="49" font-family="Inter" font-size="9" fill="#115e59">&#10003; 1 token, maximally compact</text>
+      <text x="290" y="62" font-family="Inter" font-size="9" fill="#9f1239">&#10007; any unseen word becomes [UNK]; "apology / apologise / apologetic" are three unrelated entries</text>
+
+      <!-- Subword -->
+      <text x="20" y="102" font-family="Inter" font-size="11" font-weight="700" fill="#3f3f46">SUBWORD</text>
+      <rect x="120" y="88" width="66" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/>
+      <text x="153" y="105" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#115e59">token</text>
+      <rect x="190" y="88" width="70" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/>
+      <text x="225" y="105" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#115e59">ization</text>
+      <text x="290" y="99" font-family="Inter" font-size="9" fill="#115e59">&#10003; unseen words decompose into known pieces; shared stems and suffixes</text>
+      <text x="290" y="112" font-family="Inter" font-size="9" fill="#115e59">&#10003; ~3 to 4 characters per token in English: the practical sweet spot</text>
+      <text x="290" y="125" font-family="Inter" font-size="9" font-weight="600" fill="#0d9488">this is what essentially every current model uses</text>
+
+      <!-- Character -->
+      <text x="20" y="168" font-family="Inter" font-size="11" font-weight="700" fill="#3f3f46">CHARACTER</text>
+      <g font-family="JetBrains Mono" font-size="9" fill="#92400e">
+        <rect x="120" y="154" width="17" height="24" rx="3" fill="#FFF7ED" stroke="#b45309"/><text x="128" y="171" text-anchor="middle">t</text>
+        <rect x="140" y="154" width="17" height="24" rx="3" fill="#FFF7ED" stroke="#b45309"/><text x="148" y="171" text-anchor="middle">o</text>
+        <rect x="160" y="154" width="17" height="24" rx="3" fill="#FFF7ED" stroke="#b45309"/><text x="168" y="171" text-anchor="middle">k</text>
+        <rect x="180" y="154" width="17" height="24" rx="3" fill="#FFF7ED" stroke="#b45309"/><text x="188" y="171" text-anchor="middle">e</text>
+        <rect x="200" y="154" width="17" height="24" rx="3" fill="#FFF7ED" stroke="#b45309"/><text x="208" y="171" text-anchor="middle">n</text>
+        <rect x="220" y="154" width="17" height="24" rx="3" fill="#FFF7ED" stroke="#b45309"/><text x="228" y="171" text-anchor="middle">i</text>
+        <rect x="240" y="154" width="17" height="24" rx="3" fill="#FFF7ED" stroke="#b45309"/><text x="248" y="171" text-anchor="middle">z</text>
+        <text x="266" y="171" fill="#b45309">&#8230;</text>
+      </g>
+      <text x="290" y="165" font-family="Inter" font-size="9" fill="#115e59">&#10003; nothing is ever unknown; spelling is directly visible</text>
+      <text x="290" y="178" font-family="Inter" font-size="9" fill="#9f1239">&#10007; roughly 3&#215; the tokens, so roughly a third of the usable context</text>
+      <text x="290" y="191" font-family="Inter" font-size="9" fill="#9f1239">&#10007; the model must learn to spell every word before it can use it</text>
+
+      <!-- Byte -->
+      <text x="20" y="234" font-family="Inter" font-size="11" font-weight="700" fill="#3f3f46">BYTE</text>
+      <g font-family="JetBrains Mono" font-size="8" fill="#831843">
+        <rect x="120" y="220" width="30" height="24" rx="3" fill="#FCE7F3" stroke="#be185d"/><text x="135" y="236" text-anchor="middle">0x74</text>
+        <rect x="153" y="220" width="30" height="24" rx="3" fill="#FCE7F3" stroke="#be185d"/><text x="168" y="236" text-anchor="middle">0x6F</text>
+        <rect x="186" y="220" width="30" height="24" rx="3" fill="#FCE7F3" stroke="#be185d"/><text x="201" y="236" text-anchor="middle">0x6B</text>
+        <text x="228" y="236" fill="#be185d">&#8230;</text>
+      </g>
+      <text x="290" y="231" font-family="Inter" font-size="9" fill="#115e59">&#10003; genuinely universal: every script, every emoji, no vocabulary needed</text>
+      <text x="290" y="244" font-family="Inter" font-size="9" fill="#9f1239">&#10007; longest sequences of all; research systems (ByT5, CANINE) rather than production</text>
+
+      <line x1="15" y1="264" x2="865" y2="264" stroke="#d4d4d8" stroke-width="1"/>
+      <text x="440" y="284" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">Most subword tokenisers keep raw bytes in the vocabulary as a last resort, so they never emit an unknown token. That makes them byte-fallback, not byte-level.</text>
+    </svg>
+    <figcaption>Word tokens are compact but brittle, because the vocabulary is closed and anything outside it is lost. Character and byte tokens are universal but expensive, since they multiply sequence length and force the model to learn spelling before it can learn meaning. Subword tokenisation takes the useful properties of both: frequent words stay single tokens, rare words decompose into known fragments, and nothing is truly unrepresentable.</figcaption>
+  </figure>
+
+  <h3>How the three methods build a vocabulary</h3>
+
+  <p><strong>Byte pair encoding</strong> builds the vocabulary from the bottom up. Start with every individual character (or byte) as a token. Count every adjacent pair in the training corpus, merge the most frequent pair into a new single token, and add it to the vocabulary. Repeat until the vocabulary reaches its target size. The ordered list of merges <em>is</em> the tokenizer: encoding new text means applying the same merges in the same order. Frequent sequences therefore become single tokens and rare ones stay fragmented, which is exactly the behaviour you want and also exactly why the numeric splits are so arbitrary.</p>
+
+  <p><strong>WordPiece</strong>, used by BERT, works the same way but chooses which pair to merge differently: rather than the most frequent pair, it picks the merge that most increases the likelihood of the training corpus under a simple language model. It marks continuation pieces with a <code>##</code> prefix, so "capitalization" becomes <code>capital</code> plus <code>##ization</code>, and the prefix doubles as the record of where the spaces were.</p>
+
+  <p><strong>SentencePiece</strong>, used by the T5 family, is better thought of as a wrapper that fixes a different problem. It treats the input as a raw character stream including the spaces, encoding a space as a visible marker character, which means it never needs a language-specific pre-tokenisation step and decoding is exactly reversible. That matters for languages such as Mandarin and Thai that do not delimit words with spaces at all. Inside, it can run either BPE or a <strong>unigram language model</strong>, which works top-down instead: start with a large candidate vocabulary and repeatedly prune the candidates that cost the least likelihood when removed.</p>
+
+  <h3>Seven tokenisers on the same text</h3>
+
+  <p>The clearest way to see how much these choices matter is to run one deliberately awkward string through several real tokenisers. The string needs capitals, a non-Latin script, an emoji, Python code with keywords and indentation, and a number.</p>
+
+  <pre><code>text = """
+English and CAPITALIZATION
+show_tokens False None elif == &gt;= else: two tabs:"\t\t" Three tabs: "\t\t\t"
+12.0*50=600
+"""</code></pre>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Tokenizer</th>
+          <th>Method</th>
+          <th>Vocab</th>
+          <th>"CAPITALIZATION"</th>
+          <th>Whitespace and newlines</th>
+          <th>Digits</th>
+          <th>Emoji and Chinese</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>BERT uncased</strong><br>2018</td>
+          <td>WordPiece</td>
+          <td>30,522</td>
+          <td><code>capital</code> <code>##ization</code><br>(2, lowercased)</td>
+          <td>Newlines discarded entirely</td>
+          <td><code>12</code> <code>.</code> <code>0</code></td>
+          <td>Both become <code>[UNK]</code></td>
+        </tr>
+        <tr>
+          <td><strong>BERT cased</strong><br>2018</td>
+          <td>WordPiece</td>
+          <td>28,996</td>
+          <td><code>CA</code> <code>##PI</code> <code>##TA</code> <code>##L</code> <code>##I</code> <code>##Z</code> <code>##AT</code> <code>##ION</code><br>(8)</td>
+          <td>Newlines discarded entirely</td>
+          <td><code>12</code> <code>.</code> <code>0</code></td>
+          <td>Both become <code>[UNK]</code></td>
+        </tr>
+        <tr>
+          <td><strong>GPT-2</strong><br>2019</td>
+          <td>BPE</td>
+          <td>50,257</td>
+          <td><code>CAP</code> <code>ITAL</code> <code>IZ</code> <code>ATION</code><br>(4)</td>
+          <td>Preserved. Four spaces cost three tokens</td>
+          <td>Irregular chunks</td>
+          <td>Several byte tokens each, but reconstructed exactly</td>
+        </tr>
+        <tr>
+          <td><strong>Flan-T5</strong><br>2022</td>
+          <td>SentencePiece</td>
+          <td>32,100</td>
+          <td><code>CA</code> <code>PI</code> <code>TAL</code> <code>IZ</code> <code>ATION</code><br>(5)</td>
+          <td>No newline or whitespace tokens at all</td>
+          <td><code>12.</code> <code>0</code></td>
+          <td>Both become <code>&lt;unk&gt;</code></td>
+        </tr>
+        <tr>
+          <td><strong>GPT-4</strong><br>2023</td>
+          <td>BPE</td>
+          <td>~100,000</td>
+          <td><code>CAPITAL</code> <code>IZATION</code><br>(2)</td>
+          <td>One token per whitespace run, up to 83. <code>elif</code> is a single token</td>
+          <td>Irregular chunks</td>
+          <td>Byte tokens, reconstructed exactly</td>
+        </tr>
+        <tr>
+          <td><strong>StarCoder2</strong><br>2024</td>
+          <td>BPE</td>
+          <td>49,152</td>
+          <td><code>CAPITAL</code> <code>IZATION</code><br>(2)</td>
+          <td>One token per whitespace run</td>
+          <td><strong>Every digit its own token:</strong> <code>6</code> <code>0</code> <code>0</code></td>
+          <td>Byte tokens</td>
+        </tr>
+        <tr>
+          <td><strong>Galactica</strong><br>2022</td>
+          <td>BPE</td>
+          <td>50,000</td>
+          <td><code>CAP</code> <code>ITAL</code> <code>IZATION</code><br>(3)</td>
+          <td>One token per whitespace run, and uniquely also per <em>tab</em> run</td>
+          <td>Every digit its own token</td>
+          <td>Byte tokens</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Read down the "CAPITALIZATION" column and you can watch tokenisers get better at English between 2018 and 2023, from eight tokens to two. Read the whitespace column and you can see the field discovering that code matters: GPT-2 spends three tokens on four spaces, GPT-4 spends one. Read the digit column and you see the deliberate correction of a known defect. StarCoder2 and Galactica force every digit into its own token specifically so that arithmetic becomes tractable, accepting longer sequences as the price. Read the last column and you see the difference between a tokenizer that discards what it cannot represent, as BERT and Flan-T5 do by emitting an unknown token, and one that falls back to raw bytes, as the BPE tokenisers do, and can therefore reconstruct the original exactly.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why every-digit-its-own-token helps</span>
+    Under GPT-2's tokenizer, 870 happens to be a single token while 871 is two, <code>8</code> and <code>71</code>. Nothing in the input tells the model those numbers are adjacent, and their embeddings are unrelated vectors that happened to be learned from different contexts. Splitting every digit gives the model a consistent, positional, base-ten representation, which is what arithmetic needs. This is a good example of a general principle: when a model is bad at something, check whether the input representation is making it hard before concluding the model is incapable.
+  </div>
+
+  <h3>Special tokens</h3>
+
+  <p>Alongside pieces of text, the vocabulary holds tokens that carry structural meaning. Which ones exist tells you what the model was designed to do.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Token</th><th>Purpose</th><th>Where it appears</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>&lt;s&gt;</code>, <code>&lt;|endoftext|&gt;</code></td><td>Marks the start of a sequence, and the point at which generation should stop</td><td>Universal</td></tr>
+        <tr><td><code>[PAD]</code></td><td>Fills unused positions so a batch of different-length inputs can be one rectangular tensor</td><td>Any model trained in batches</td></tr>
+        <tr><td><code>[UNK]</code></td><td>Stands in for anything not representable. A tokenizer with byte fallback never needs it</td><td>WordPiece, SentencePiece</td></tr>
+        <tr><td><code>[CLS]</code></td><td>Prepended to the input; its output vector is used as the summary of the whole sequence</td><td>BERT-family, lectures 5 and 16</td></tr>
+        <tr><td><code>[SEP]</code></td><td>Separates two texts given to the model at once, which is how a cross-encoder compares a query against a candidate</td><td>BERT-family, lecture 12</td></tr>
+        <tr><td><code>[MASK]</code></td><td>Marks a hidden token the model must predict during masked language modelling</td><td>BERT-family, lecture 16</td></tr>
+        <tr><td><code>&lt;|user|&gt;</code>, <code>&lt;|assistant|&gt;</code>, <code>&lt;|system|&gt;</code></td><td>Delimit conversational turns and speaker roles</td><td>Any instruction-tuned chat model, lecture 7</td></tr>
+        <tr><td><code>&lt;fim_prefix&gt;</code>, <code>&lt;fim_middle&gt;</code>, <code>&lt;fim_suffix&gt;</code></td><td>Fill-in-the-middle: lets the model complete a gap using the text on both sides, not just before</td><td>GPT-4, StarCoder2</td></tr>
+        <tr><td><code>&lt;filename&gt;</code>, <code>&lt;reponame&gt;</code></td><td>Tells the model which file and repository a piece of code belongs to</td><td>StarCoder2</td></tr>
+        <tr><td><code>[START_REF]</code>, <code>[END_REF]</code>, <code>&lt;work&gt;</code></td><td>Wrap academic citations, and mark step-by-step working</td><td>Galactica</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The last three rows make the general point. Special tokens are how a model builder encodes domain structure directly into the input format. StarCoder2's repository and filename tokens exist because a function call in one file often refers to a definition in another, and the model needs to know which files share a repository. Galactica's <code>&lt;work&gt;</code> token is a dedicated marker for chain-of-thought working, baked into the vocabulary rather than prompted for. If you're ever training a tokenizer for a specialised domain, this is the lever with the highest return.</p>
+
+  <h3>The three design choices, restated</h3>
+
+  <p>Everything above reduces to three decisions made before the model was trained.</p>
+
+  <div class="defcard">
+    <span class="term">Method</span>
+    <span class="def">BPE, WordPiece, or SentencePiece with BPE or unigram inside it. Determines the algorithm that selects the vocabulary and, with byte fallback, whether anything can ever be truly unrepresentable.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">Parameters</span>
+    <span class="def">Vocabulary size, typically 30,000 to 50,000 historically and increasingly 100,000 or more; which special tokens exist; and whether capitalisation is preserved. A larger vocabulary means shorter sequences and a larger embedding matrix, so it is a direct trade of memory against context efficiency.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">Training corpus</span>
+    <span class="def">The dataset the merge statistics were computed on. Two tokenisers with an identical method and identical parameters trained on English prose and on Python will produce entirely different vocabularies, and each will be inefficient on the other's domain.</span>
+  </div>
+
+  <p>The corpus point deserves emphasis because it is the one people forget. Every token spent on an over-represented language is a token unavailable for an under-represented one, which is the mechanism behind the cost asymmetry noted earlier. It is also why a text-focused tokenizer applied to a Python file wastes a substantial fraction of its tokens on indentation that carries one bit of information per level.</p>
+
+  <div class="callout warn">
+    <span class="tag">Practical checks worth running before you trust a model on your data</span>
+    Tokenise a representative sample of your actual text and look at the characters-per-token ratio; anything much below three in English means the vocabulary is a poor fit for your domain. Tokenise your numeric fields under their real formatting and check the splits are stable when the formatting varies. Round-trip a sample through encode then decode and diff it against the original, because a tokenizer that emits unknown tokens is silently destroying data. If you're paying per token, measure the ratio separately for every language you handle before you set a budget.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The tokenizer is a frozen, lossy lookup table sitting on both sides of the model, and the model's entire experience of language is the integer sequence it produces. Its behaviour follows from three choices made before you arrived: the method, most often byte pair encoding; the parameters, chiefly vocabulary size and which special tokens exist; and the corpus its merge statistics were computed on. Subword granularity won because it keeps frequent words compact while still decomposing anything unfamiliar. The practical consequences are the ones to remember: digit splitting determines arithmetic competence, whitespace handling determines code competence, vocabulary coverage determines what a given language costs you, and mismatching a tokenizer to a model produces nonsense rather than an error.</p>
+
+  <p>Lecture 3 takes these token IDs and follows them one step further in, into the embedding matrix where each ID becomes a vector. That lecture also separates the three quite different things this track has so far been calling embeddings, and shows why using the wrong one is the most common mistake in building a search system.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Explain why a tokenizer and its model cannot be swapped independently, and what failure mode results if you try.</li>
+      <li>State the three factors that determine how a tokenizer breaks down text, and give an example of each changing the result.</li>
+      <li>Describe how byte pair encoding builds its vocabulary, and explain why the resulting splits of numbers are irregular.</li>
+      <li>Give the two advantages of subword tokens over word tokens and the two over character tokens.</li>
+      <li>Explain the difference between a tokenizer that emits an unknown token and one with byte fallback, and why it matters for data integrity.</li>
+      <li>Explain why StarCoder2 gives every digit its own token, and name what it gives up to do so.</li>
+      <li>State why the same document can cost several times more to process in one language than another, and where in the pipeline that cost arises.</li>
+      <li>In the policy-schedule vignette, explain why fine-tuning would not have fixed the problem.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 1 (<a href="01-the_language_ai_landscape.html">the language AI landscape</a>) loaded the tokenizer object this lecture opens up.</li>
+      <li><strong>Next:</strong> Lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>) turns these token IDs into vectors.</li>
+      <li><strong>Assumed:</strong> The machine learning track's <a href="../machine_learning/05_deep_learning/05-word_embeddings.html">word embeddings</a> lecture introduces tokenisation and the vocabulary at the level word2vec needs. This lecture is the production-scale version of that same idea.</li>
+      <li><strong>Forward:</strong> The chat special tokens return in lecture 7 (<a href="07-prompt_engineering.html">prompt engineering</a>), where getting the template wrong is a common and expensive mistake; <code>[CLS]</code> and <code>[MASK]</code> return in lecture 16 (<a href="16-fine_tuning_representation_models.html">fine-tuning representation models</a>); <code>[SEP]</code> returns in lecture 12 (<a href="12-retrieval_quality_and_evaluation.html">retrieval quality</a>) as the mechanism inside a cross-encoder.</li>
+      <li><strong>Context budget:</strong> Lecture 4 (<a href="04-inside_the_forward_pass.html">inside the forward pass</a>) explains why the context window is a hard architectural limit rather than a configurable one, which is what makes the token count computed here binding.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 2 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

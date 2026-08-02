@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 11: hedging and the Greeks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>Hedging and the Greeks</h1>
+  <p class="subtitle">A Black-Scholes price is a single number. The Greeks are what that number does when the world moves: five partial derivatives that turn a static formula into a live risk report. This lecture differentiates the call and put prices from lecture 9 five ways, derives the one identity that ties them together, and builds up from a single delta hedge to a simultaneous delta, gamma and vega hedge with a fully reconciled numerical example.</p>
+  <div class="meta">
+    <span>Lecture 11 of 13</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Source: <code>UP / 10 - Hedging &amp; Greeks.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Every Greek in this lecture answers the same question pointed in a different direction: if one input to the option's price nudges up by a small amount, how much does the price move? <code>Delta</code> answers it for the spot price, <code>gamma</code> for the rate of change of delta itself, <code>vega</code> for volatility, <code>theta</code> for the passage of time, and <code>rho</code> for the interest rate. Hedging is the discipline of holding a second position whose own Greek exactly cancels the first, so that whichever input moves, the combined portfolio does not.</p>
+
+  <p>Formally, if <code>Π(t, S<sub>t</sub>)</code> is the value of a portfolio built from a single underlying and derivatives on it, the Greeks are simply the partial derivatives of <code>Π</code> with respect to <code>S</code>, <code>t</code>, <code>σ</code> and <code>r</code>. Lecture 9 built the closed-form Black-Scholes price for a European call and put; this lecture differentiates that price five ways and asks what each derivative is good for. The one identity worth carrying away above everything else falls straight out of the Black-Scholes PDE: theta, the financing cost of a delta hedge, and half of gamma times the variance of the underlying always sum to the risk-free growth of the option's own value. Everything else in this lecture is commentary on that single line.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine you have written a call option and, to protect yourself, you buy a certain number of shares so that a one-cent move in the stock does not change the value of your combined position. That number of shares is delta. Now ask the harder question: as the stock keeps moving, does that number of shares itself need to change? Yes, and the rate at which it changes is gamma. Every time gamma forces you to trade more shares to stay hedged, you are paying, or being paid, for the privilege, and that payment is exactly theta. The whole lecture is an attempt to make that last sentence precise, in numbers you can check.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP source proves the closed-form Greeks, states the put-call parity relations between them, works one static numerical example (Table 4.1 and Figures 4.1 to 4.5 for an XYZ stock), and introduces delta and delta-gamma neutrality for static portfolios. It stops there: no discussion of how often a hedge should be rebalanced, what discrete rebalancing costs, how the hedging error behaves as the rebalancing interval shrinks, or the second-order Greeks (vanna, volga, charm) that a real risk report tracks every morning. This lecture adds all four, plus a fully reconciled numerical delta-hedge simulation over one day and one week.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>A price is only half the story on a derivatives desk; the desk lives or dies by how that price changes, not by the price itself. Nobody holds an option to maturity and simply collects the payoff. A market maker sells thousands of options a day, cannot forecast where any one of them will end up, and instead manages a book by continuously offsetting its sensitivities. The Greeks are the vocabulary of that management: a trader who says "I'm long gamma and short vega" has said everything that matters about the shape of their risk, without mentioning a single option price.</p>
+
+  <p>The Greeks are also what makes the replication argument of lecture 9 operational rather than merely theoretical. The proof that <code>C(t,S) = S\,N(d_1) - Ke^{-r(T-t)}N(d_2)</code> works by constructing a replicating portfolio of <code>Δ</code> shares of stock financed by borrowing. That portfolio is not static, unlike the forward's replicating portfolio from lecture 1: <code>Δ</code> changes as <code>S</code> and <code>t</code> move, so the hedge has to be recomputed and re-traded. Gamma tells you how fast the hedge ratio itself is moving, vega tells you how exposed the whole position is to a parameter the model assumes is fixed, and theta tells you the price of standing still. Master this lecture and lecture 9's abstract proof turns into a concrete, checkable trading rule.</p>
+
+  <p>There is a second, quieter reason this material earns its own lecture rather than a paragraph at the end of lecture 9. Every one of the closed-form Greeks below is a genuine calculus exercise, differentiating <code>N(d_1)</code> and <code>N(d_2)</code> through the chain rule with <code>d_1</code> and <code>d_2</code> themselves functions of <code>S</code>, <code>t</code>, <code>r</code> and <code>σ</code>. Getting comfortable with that differentiation, and with the algebraic identity <code>S_0 N'(d_1) = K e^{-r(T-t)} N'(d_2)</code> that keeps reappearing and cancelling terms, is excellent practice for the kind of careful, mechanical calculus this course rewards throughout, and it is also, not coincidentally, exactly the calculation the source's own exercises ask a student to reproduce by hand.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures carry the whole lecture. The first shows delta and gamma as functions of spot, and how both reshape as expiry approaches: delta sharpens from a gentle S-curve into something close to a step function, and gamma sharpens from a wide, gentle hump into a narrow spike. The second shows what happens economically to a delta-hedged option position once you let time pass and the spot actually move: a parabola of gamma profit sitting on top of a flat theta cost, the two combining into the smile-shaped profit and loss curve every option trader carries in their head.</p>
+
+  <h3>Picture one: delta and gamma reshape as expiry approaches</h3>
+
+  <p>Far from expiry, delta rises gently from near 0 deep out of the money to near 1 deep in the money, and gamma is a wide, low hump centred on the strike. Close to expiry, the same call has almost no time value left to speak of: it behaves like a bet that is either already won or already lost, so delta collapses towards a step function (0 below the strike, 1 above it) and gamma, which is the slope of that step, has to concentrate all of its area into a narrower and narrower spike. In the mathematical limit <code>T - t \to 0</code>, gamma at the money diverges to infinity: an infinitely sharp corner has an infinite second derivative. This is not a curiosity; it is the entire reason discrete hedging is dangerous precisely when an at-the-money option is about to expire.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Delta and gamma of a European call as functions of the spot price, comparing a curve far from expiry with a curve close to expiry">
+      <defs>
+        <marker id="axArrGrk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Delta and gamma of a call: far from expiry versus close to expiry</text>
+
+      <!-- Panel 1: Delta -->
+      <text x="70" y="55" font-family="Inter" font-weight="600" font-size="12" fill="#18181b">Delta</text>
+      <line x1="70" y1="225" x2="740" y2="225" stroke="#71717a" stroke-width="1.5" marker-end="url(#axArrGrk)"/>
+      <line x1="70" y1="235" x2="70" y2="60" stroke="#71717a" stroke-width="1.5" marker-end="url(#axArrGrk)"/>
+      <text x="748" y="230" font-family="Inter" font-size="11" fill="#71717a">S</text>
+      <text x="52" y="72" font-family="Inter" font-size="11" fill="#71717a">1</text>
+      <line x1="405" y1="220" x2="405" y2="230" stroke="#18181b" stroke-width="2"/>
+      <text x="405" y="246" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#18181b">K</text>
+
+      <path d="M 70 218 C 220 205, 300 172, 405 148 C 500 128, 600 96, 740 78" fill="none" stroke="#0f766e" stroke-width="2.5" stroke-dasharray="6 4"/>
+      <path d="M 70 224 C 300 223, 370 224, 400 190 C 424 132, 460 82, 500 79 C 600 77, 680 77, 740 77" fill="none" stroke="#b45309" stroke-width="3"/>
+
+      <rect x="530" y="58" width="200" height="48" rx="6" fill="#ffffff" stroke="#e4e4e7"/>
+      <line x1="540" y1="72" x2="565" y2="72" stroke="#0f766e" stroke-width="2.5" stroke-dasharray="6 4"/>
+      <text x="570" y="76" font-family="Inter" font-size="10.5" fill="#3f3f46">far from expiry</text>
+      <line x1="540" y1="92" x2="565" y2="92" stroke="#b45309" stroke-width="3"/>
+      <text x="570" y="96" font-family="Inter" font-size="10.5" fill="#3f3f46">close to expiry</text>
+
+      <!-- Panel 2: Gamma -->
+      <text x="70" y="272" font-family="Inter" font-weight="600" font-size="12" fill="#18181b">Gamma</text>
+      <line x1="70" y1="435" x2="740" y2="435" stroke="#71717a" stroke-width="1.5" marker-end="url(#axArrGrk)"/>
+      <line x1="70" y1="445" x2="70" y2="280" stroke="#71717a" stroke-width="1.5" marker-end="url(#axArrGrk)"/>
+      <text x="748" y="440" font-family="Inter" font-size="11" fill="#71717a">S</text>
+      <line x1="405" y1="430" x2="405" y2="440" stroke="#18181b" stroke-width="2"/>
+      <text x="405" y="456" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#18181b">K</text>
+
+      <path d="M 70 430 C 220 428, 320 356, 405 340 C 490 356, 590 428, 740 430" fill="none" stroke="#0f766e" stroke-width="2.5" stroke-dasharray="6 4"/>
+      <path d="M 70 432 Q 300 431 385 425 Q 400 300 405 292 Q 410 300 425 425 Q 500 431 740 432" fill="none" stroke="#b45309" stroke-width="3"/>
+      <text x="405" y="285" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">keeps rising as T − t → 0</text>
+
+      <text x="400" y="470" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#52525b">Gamma is the slope of delta, so its spike is delta's kink becoming a genuine corner as expiry nears.</text>
+    </svg>
+    <figcaption>Delta softens a step function into a curve; gamma is the slope of that curve, so it is wide and low when delta is gentle, and narrow and tall when delta is nearly a step. Both effects intensify together as time to maturity shrinks.</figcaption>
+  </figure>
+
+  <h3>Picture two: the gamma-theta trade</h3>
+
+  <p>A delta-hedged long option position (long the option, short <code>Δ</code> shares) has no first-order exposure to the spot: a small move in either direction leaves the combined position roughly unchanged. What is left over, once the delta exposure is cancelled, is a second-order gain from gamma that grows with the square of the realised move, and a first-order cost from theta that accrues regardless of whether the spot moves at all. Plot the net profit and loss against the size of the realised move and the shape is a parabola sitting on a shelf below zero: small moves lose money to time decay, large moves in either direction make money from convexity, and the two break even at a specific move size set by the ratio of theta to gamma.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Profit and loss of a delta-hedged long option position as a function of the realised spot move, showing a gamma profit parabola sitting on a theta cost shelf">
+      <defs>
+        <linearGradient id="profitAreaGrk" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="#ccfbf1" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#ccfbf1" stop-opacity="0.7"/>
+        </linearGradient>
+        <marker id="pnlArrGrk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Delta-hedged long option: profit and loss against the realised move</text>
+
+      <line x1="70" y1="250" x2="730" y2="250" stroke="#71717a" stroke-width="1.5" marker-end="url(#pnlArrGrk)"/>
+      <line x1="400" y1="380" x2="400" y2="60" stroke="#71717a" stroke-width="1.5" marker-end="url(#pnlArrGrk)"/>
+      <text x="735" y="255" font-family="Inter" font-size="12" fill="#71717a">ΔS</text>
+      <text x="410" y="72" font-family="Inter" font-size="12" fill="#71717a">P&amp;L</text>
+      <text x="384" y="266" text-anchor="end" font-family="Inter" font-size="11" fill="#71717a">0</text>
+
+      <polygon points="70,90 250,250 550,250 730,90 730,250 70,250" fill="url(#profitAreaGrk)"/>
+
+      <path d="M 70 90 C 200 220, 320 320, 400 320 C 480 320, 600 220, 730 90" fill="none" stroke="#0f766e" stroke-width="3"/>
+
+      <line x1="70" y1="320" x2="730" y2="320" stroke="#b45309" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="80" y="335" font-family="Inter" font-size="11" fill="#92400e">theta: paid every day, whatever the spot does</text>
+
+      <line x1="250" y1="250" x2="250" y2="380" stroke="#3f3f46" stroke-width="1.2" stroke-dasharray="3 3"/>
+      <line x1="550" y1="250" x2="550" y2="380" stroke="#3f3f46" stroke-width="1.2" stroke-dasharray="3 3"/>
+      <text x="250" y="396" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#3f3f46">−breakeven</text>
+      <text x="550" y="396" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#3f3f46">+breakeven</text>
+
+      <text x="140" y="150" font-family="Inter" font-size="11" font-style="italic" fill="#115e59">gamma profit</text>
+      <text x="360" y="345" font-family="Inter" font-size="11" font-style="italic" fill="#7c2d12">theta loss zone</text>
+    </svg>
+    <figcaption>The classic long-gamma, short-theta profile. The parabola is the second-order gain from gamma; the dashed shelf is the first-order cost from theta. Moves smaller than the breakeven size lose the theta cost; moves larger than it earn more from gamma than they pay in theta.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Setting up the notation</h3>
+
+  <p>Let <code>Π(t, S<sub>t</sub>)</code> denote the pricing function of a portfolio built on a single underlying with price <code>S<sub>t</sub></code>: it may be a bare option, a book of many options, or a mixed position of options and stock. The Greeks are the partial derivatives of that pricing function with respect to the state variable <code>S</code> and the three parameters <code>t</code>, <code>r</code> and <code>σ</code>. Writing <code>N(\cdot)</code> for the standard normal cumulative distribution function and <code>N'(\cdot)</code> for its density, exactly as lecture 9 uses them in <code>d_1</code> and <code>d_2</code>, every closed form below is built from the same two building blocks.</p>
+
+  <div class="defcard">
+    <div class="term">The Greeks</div>
+    <div class="def">The partial derivatives of a portfolio's pricing function <code>Π(t, S<sub>t</sub>)</code>: <code>Δ = ∂Π/∂S</code> (delta), <code>Γ = ∂²Π/∂S²</code> (gamma), <code>ρ = ∂Π/∂r</code> (rho), <code>Θ = ∂Π/∂t</code> (theta), and <code>vega = ∂Π/∂σ</code>. Four of the five are named after Greek letters; vega is not, a mismatch the source PDF itself flags with a footnote to that effect.</div>
+  </div>
+
+  <h3>Delta: the hedge ratio itself</h3>
+
+  <p>Delta measures how much the option's value moves for a one-unit move in the spot, holding everything else fixed. For a European call with strike <code>K</code> and time to maturity <code>T</code>, lecture 9's pricing formula differentiates to a startlingly clean result:</p>
+
+  <p>$$ \Delta_{\text{call}} = N(d_1), \qquad \Delta_{\text{put}} = N(d_1) - 1. $$</p>
+
+  <p>Both formulas use exactly the <code>d_1</code> from the call and put price, with no further calculation required. The put's delta follows immediately from differentiating put-call parity twice with respect to <code>S</code>: since <code>C - P = S - Ke^{-r(T-t)}</code>, differentiating once gives <code>Δ_C - Δ_P = 1</code>, and the source states this identity explicitly as its own proposition. Delta ranges over <code>(0,1)</code> for a call and <code>(-1,0)</code> for a put, moves from near 0 deep out of the money to near 1 (or <code>-1</code>) deep in the money, and, as picture one showed, sharpens from a gentle sigmoid into something close to a step function as expiry approaches. Delta is precisely the number of shares needed to hedge one unit of the option, and it is exactly the same number that lectures 3, 4 and 9 already computed as the replicating hedge ratio in the binomial tree and in the continuous-time construction of the Black-Scholes PDE: <code>Δ = [V(uS_0) - V(dS_0)] / [(u-d)S_0]</code> in the tree, converging to <code>∂V/∂S</code> in the continuous limit.</p>
+
+  <p>Contrast this with the forward contract from lecture 1. Its value is <code>V(t) = S(t) - Ke^{-r(T-t)}</code>, so <code>∂V/∂S = 1</code>, constant for every <code>S</code> and every <code>t</code>. That is exactly why the cash-and-carry hedge in lecture 1 was static: buy the asset once, hold it, done. An option's delta moves continuously between 0 and 1 as <code>S</code> and <code>t</code> change, so its replicating hedge cannot be set up once and forgotten. Every later Greek in this lecture exists because delta refuses to sit still.</p>
+
+  <h3>Gamma: the cost of a hedge that will not sit still</h3>
+
+  <p>Gamma is the second derivative of the price with respect to spot, or equivalently the first derivative of delta: it measures how fast the hedge ratio itself needs to be adjusted. The closed form, identical for a call and a put of the same strike and maturity, is</p>
+
+  <p>$$ \Gamma = \frac{N'(d_1)}{S_0 \, \sigma \sqrt{T}}. $$</p>
+
+  <p>Gamma is always positive for a long call or a long put, which is what makes a long option position convex in the spot: it gains more from an up-move than it loses from an equal-sized down-move, at the level of the second derivative. It peaks at the money, where <code>d_1</code> is near zero and <code>N'(d_1)</code> is at its own peak, and it grows without bound as <code>T - t \to 0</code> for an at-the-money strike, since the denominator <code>\sqrt{T-t}</code> shrinks to zero exactly where the numerator does not. This is not an abstract limit: it is the entire reason a hedger who trades once a day rather than continuously will find their hedging error concentrated in precisely the at-the-money, near-expiry corner of their book. A trader who owns gamma is said to be <em>long gamma</em>, and benefits from realised movement in the underlying, in either direction; a trader who is short gamma (typically because they have sold options) is exposed to exactly the opposite: large moves hurt them, and they must trade in the direction the market is already moving to stay hedged, which is the mechanical reason short-gamma positions are said to "chase the market".</p>
+
+  <h3>Vega: hedging a parameter the model calls constant</h3>
+
+  <p>Vega measures sensitivity to volatility, and its closed form for both a call and a put is</p>
+
+  <p>$$ \text{vega} = S_0 \sqrt{T} \, N'(d_1). $$</p>
+
+  <p>Vega is largest for long-dated, at-the-money options: the <code>\sqrt{T}</code> term grows with maturity, and <code>N'(d_1)</code> peaks at the money exactly as it does for gamma. Deep in- or out-of-the-money options, and options close to expiry, have negligible vega, since a change in an assumed volatility barely moves a price that is already almost certain to expire in or out of the money. For a continuous dividend yield <code>q</code>, exactly as lecture 10 introduces it, the correct adjustment carries a discount factor on the spot term, <code>\text{vega} = e^{-q(T-t)} S_0 \sqrt{T} \, N'(d_1)</code>, matching the same <code>e^{-q(T-t)}</code> adjustment that appears throughout the dividend-adjusted price and delta.</p>
+
+  <p>Vega carries a genuine conceptual awkwardness worth sitting with. The Black-Scholes model assumes <code>σ</code> is a single known constant for the life of the option; vega is the sensitivity of the price to changing a parameter the model insists cannot change. In practice this is resolved by treating the formula as a translation device rather than a physical law: traders quote and trade "implied volatility", the value of <code>σ</code> that reprices the model to the observed market price, and vega tells them how much that quoted number moves the price if the market's quote for it shifts. It is comparative statics dressed up as a hedge, and it works well enough in practice that entire desks are organised around vega risk, but a fully honest treatment of "the risk that volatility itself is random" needs a genuinely stochastic-volatility model, which lies outside the Black-Scholes framework altogether.</p>
+
+  <h3>Theta and the identity that ties the Greeks together</h3>
+
+  <p>Theta measures the rate of change of the option's value with respect to calendar time, holding the spot fixed. For a European call,</p>
+
+  <p>$$ \Theta_{\text{call}} = -\frac{S_0 \, \sigma \, N'(d_1)}{2\sqrt{T}} - rKe^{-rT}N(d_2), \qquad \Theta_{\text{put}} = -\frac{S_0 \, \sigma \, N'(d_1)}{2\sqrt{T}} + rKe^{-rT}N(d_2). $$</p>
+
+  <p>Both terms of the call's theta are typically negative, which is why a long option position is said to suffer "time decay": with the spot fixed, an option is worth less tomorrow than today, simply because there is less time left for it to move into the money. The put is the one place this is not automatic: its second term is positive, and for a deep in-the-money put with a high interest rate, the discounting benefit on the strike can outweigh the loss of optionality, giving a European put a rare instance of positive theta.</p>
+
+  <p>The single most illuminating result in this lecture falls out of rearranging the Black-Scholes PDE itself, which lecture 9 derives from the replicating-portfolio argument and lecture 7's Itô's lemma. Written in terms of the Greeks of a call, the PDE says exactly this:</p>
+
+  <div class="worked">Start from the Black-Scholes PDE for a European call C(t, S):
+
+  ∂C/∂t + rS ∂C/∂S + ½σ²S² ∂²C/∂S² = rC
+
+Substitute the Greek definitions Θ = ∂C/∂t, Δ = ∂C/∂S, Γ = ∂²C/∂S²:
+
+  Θ + rSΔ + ½σ²S²Γ = rC
+
+Check against the base case S = 100, K = 100, r = 5%, σ = 20%, T = 1, t = 0:
+
+  Θ            =  -6.4140          (time decay, per year)
+  rSΔ          =  0.05 × 100 × 0.6368  =  3.1842
+  ½σ²S²Γ       =  0.5 × 0.04 × 10 000 × 0.018762  =  3.7524
+                                                     -------
+                                       Sum:            0.5225
+
+  rC           =  0.05 × 10.4506  =  0.5225                    ✓ matches</div>
+
+  <p>Read the identity as a budget. <code>rSΔ</code> is the interest cost of financing <code>Δ</code> shares of stock, the carry on a delta hedge. <code>½σ²S²Γ</code> is the expected gain from convexity per unit time, since <code>σ²S²</code> is the instantaneous variance of the underlying and gamma converts a variance into a value. Theta is whatever is left over once carry and expected gamma gain are accounted for, forced to make the sum equal the risk-free growth <code>rC</code> of the option's own value. Rearranged as <code>Θ = rC - rSΔ - ½σ²S²Γ</code>, this says a continuously delta-hedged option position, correctly financed, earns exactly the risk-free rate on capital employed: no more, no less. Theta is not an independent cost; it is the precise price the model charges for the gamma convexity a long option holder is given, and the precise subsidy it pays a short option holder for carrying that convexity risk.</p>
+
+  <h3>Rho, and the second-order Greeks that matter in practice</h3>
+
+  <p>Rho measures sensitivity to the risk-free rate, <code>\rho_{\text{call}} = K(T-t)e^{-r(T-t)}N(d_2)</code> and <code>\rho_{\text{put}} = -K(T-t)e^{-r(T-t)}N(-d_2)</code>, and is generally the least actively managed Greek on an equity or FX options desk, since rates move slowly relative to spot and volatility over the life of a typical option. Three second-order and cross Greeks earn their keep on a real desk despite rarely appearing in an introductory course. Vanna, the cross-derivative <code>∂²Π/∂S∂σ</code> (equivalently <code>∂Δ/∂σ</code> or <code>∂\text{vega}/∂S</code>), measures how a delta hedge shifts when volatility moves, and drives the risk in skew-sensitive positions. Volga, or vomma, <code>∂²Π/∂σ²</code>, measures the convexity of the price in volatility itself, and captures the extra profit or loss a position accrues from large moves in implied volatility rather than small ones. Charm, <code>∂Δ/∂t</code>, measures how fast delta decays purely from the passage of time, and matters most for hedgers who cannot rebalance continuously through a weekend or around an expiry.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Greek</th><th>Definition</th><th>European call</th><th>European put</th><th>Sign, long call</th><th>Where it peaks</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Delta, <code>Δ</code></td><td><code>∂Π/∂S</code></td><td><code>N(d_1)</code></td><td><code>N(d_1) - 1</code></td><td>positive</td><td>near 1 deep ITM, near 0 deep OTM</td></tr>
+        <tr><td>Gamma, <code>Γ</code></td><td><code>∂²Π/∂S²</code></td><td><code>N'(d_1)/(S_0\sigma\sqrt{T})</code></td><td>same as call</td><td>positive</td><td>at the money, and grows without bound as <code>T-t \to 0</code></td></tr>
+        <tr><td>Vega</td><td><code>∂Π/∂σ</code></td><td><code>S_0\sqrt{T}N'(d_1)</code></td><td>same as call</td><td>positive</td><td>long-dated, at the money</td></tr>
+        <tr><td>Theta, <code>Θ</code></td><td><code>∂Π/∂t</code></td><td><code>-\frac{S_0\sigma N'(d_1)}{2\sqrt{T}} - rKe^{-rT}N(d_2)</code></td><td><code>-\frac{S_0\sigma N'(d_1)}{2\sqrt{T}} + rKe^{-rT}N(d_2)</code></td><td>usually negative</td><td>most negative at the money, near expiry</td></tr>
+        <tr><td>Rho, <code>ρ</code></td><td><code>∂Π/∂r</code></td><td><code>K T e^{-rT}N(d_2)</code></td><td><code>-K T e^{-rT}N(-d_2)</code></td><td>positive</td><td>deep ITM, long-dated</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The source's own Table 4.1 works one static example in exactly this spirit: an XYZ stock at <code>σ = 30.04\%</code> and <code>r = 13\%</code>, European calls and puts struck at 100 cents with three months to maturity, priced and differentiated across spot values from 20 to 200. The resulting figures (4.1 to 4.5 in the source) reproduce every qualitative shape this lecture has just derived: delta traces the S-curve of picture one, gamma and vega both trace a hump centred on the strike, theta dips to its most negative value at the money, and rho rises monotonically like a second S-curve. Different parameters, same shapes: that consistency across arbitrary <code>σ</code> and <code>r</code> is the entire point of having closed forms rather than a bespoke table for every possible input.</p>
+
+  <h3>Delta hedging in practice: the rebalancing trade-off</h3>
+
+  <p>Continuous delta hedging, the idealisation behind the replicating-portfolio proof in lecture 9, is a mathematical convenience, not a trading instruction: no desk rebalances infinitely often. In practice a hedger rebalances at discrete dates, say <code>n</code> equally spaced dates over the life of the option, and each interval between rebalances leaves a small residual exposure of exactly the shape picture two showed, roughly <code>½Γ(ΔS)² + ΘΔt</code>, where <code>ΔS</code> is the (random) move over the interval. Because the local hedging error scales with the square of a move whose variance is itself proportional to the length of the interval, the variance of the error contributed by each interval is of order <code>(Δt)^2</code>, and there are <code>n = T/Δt</code> such intervals, so the total variance of the hedging error over the life of the option is of order <code>n \cdot (\Delta t)^2 = T^2/n</code>. The standard deviation of the total hedging error therefore scales like <code>1/\sqrt{n}</code>: rebalancing four times as often roughly halves the typical hedging error, a classic diminishing-returns relationship. Transaction costs push the other way, since every rebalance crosses a bid-offer spread and pays a commission, and trading more often multiplies the number of times that cost is paid. The practical rebalancing frequency a desk chooses is exactly the point at which the marginal reduction in hedging-error variance from trading more often stops being worth the marginal transaction cost of doing so, a trade-off the closed-form Greeks are silent on but that dominates how a real book is actually run.</p>
+
+  <h3>Gamma and vega hedging: a small linear system</h3>
+
+  <p>Delta neutrality alone leaves a portfolio exposed to gamma and vega, and no amount of trading the underlying can fix that, since the stock itself has zero gamma and zero vega: it is linear in <code>S</code> and has no dependence on <code>σ</code> at all. Neutralising gamma and vega as well requires two further traded instruments whose own Greeks are known, typically two other options on the same underlying. Suppose a portfolio <code>Π</code> is to be hedged using quantities <code>β_Y</code> and <code>β_Z</code> of two options <code>Y</code> and <code>Z</code>, plus <code>β_S</code> shares of stock to finish the job on delta. Gamma and vega neutrality require</p>
+
+  <p>$$ \Gamma_\Pi + \beta_Y \Gamma_Y + \beta_Z \Gamma_Z = 0, \qquad \text{vega}_\Pi + \beta_Y \,\text{vega}_Y + \beta_Z \,\text{vega}_Z = 0, $$</p>
+
+  <p>a two-equation, two-unknown linear system in <code>β_Y</code> and <code>β_Z</code>, exactly the source's Example 2 extended from delta-gamma to delta-gamma-vega. Once <code>β_Y</code> and <code>β_Z</code> are known, the residual delta is mopped up with stock: <code>β_S = -(Δ_\Pi + \beta_Y Δ_Y + \beta_Z Δ_Z)</code>, since stock contributes nothing to gamma or vega and so cannot disturb the neutrality just achieved.</p>
+
+  <h3>Worked example</h3>
+
+  <p>Take the course base case from lecture 9: <code>S_0 = 100</code>, <code>K = 100</code>, <code>r = 5\%</code>, <code>σ = 20\%</code>, <code>T = 1</code>, giving <code>d_1 = 0.35</code>, <code>d_2 = 0.15</code> and call price <code>10.4506</code>. Differentiating that price five ways gives</p>
+
+  <p>$$ \Delta = 0.6368, \quad \Gamma = 0.018762, \quad \text{vega} = 37.524 \; (\text{per unit } \sigma, \text{ so } 0.37524 \text{ per volatility point}), $$</p>
+  <p>$$ \Theta = -6.4140 \text{ per year} \; (-0.017573 \text{ per calendar day}), \quad \rho = 53.232 \; (\text{per unit } r, \text{ so } 0.53232 \text{ per 100 basis points}). $$</p>
+
+  <p>The PDE identity checks exactly against these figures, as the worked block above shows: <code>Θ + rSΔ + ½σ²S²Γ = -6.4140 + 3.1842 + 3.7524 = 0.5225</code>, matching <code>rC = 0.05 \times 10.4506 = 0.5225</code> to four decimal places.</p>
+
+  <p><strong>One-day simulation.</strong> Suppose the market maker has sold this call and delta-hedged by buying <code>Δ = 0.6368</code> shares. One trading day passes (<code>Δt = 1/365</code>) and the spot rises by <code>ΔS = +1</code>, to <code>101</code>. Recomputing the exact Black-Scholes price at the new spot and the slightly shorter maturity gives a new call value of <code>11.0790</code>, a genuine price change of <code>0.6284</code>. The Taylor decomposition into delta, gamma and theta contributions gives</p>
+
+  <p>$$ \Delta \cdot \Delta S + \tfrac{1}{2}\Gamma(\Delta S)^2 + \Theta \, \Delta t = 0.6368 + 0.009381 - 0.017573 = 0.6286, $$</p>
+
+  <p>within <code>0.0003</code> of the exact repricing, the residual coming from higher-order terms the quadratic approximation ignores. Stripping out the delta term, which the stock hedge exactly cancels, leaves a hedged profit and loss of <code>+0.009381 - 0.017573 = -0.008192</code>: a small loss, because a one-point move is smaller than the day's breakeven move. Solving <code>½Γ(ΔS)^2 = |\Theta|\Delta t</code> gives a breakeven move of <code>1.369</code>; since the realised move of 1 point was smaller than that, the position lost money to time decay, exactly as picture two's parabola predicts.</p>
+
+  <p><strong>One-week simulation.</strong> Over a week (<code>Δt = 7/365</code>) the spot instead falls by <code>ΔS = -3</code>, to <code>97</code>. The exact repriced call is <code>8.5081</code>, a change of <code>-1.9425</code>. The Taylor decomposition gives <code>0.6368 \times (-3) + \tfrac{1}{2}(0.018762)(9) + (-6.4140)(7/365) = -1.9105 + 0.084429 - 0.123008 = -1.9491</code>, within <code>0.0066</code> of the exact figure, a slightly larger residual than the one-day case because the quadratic approximation is being asked to cover a wider interval. The hedged profit and loss (gamma and theta only) is <code>0.084429 - 0.123008 = -0.038579</code>, again a loss, since the week's breakeven move works out to <code>3.621</code> points and the realised move of 3 fell just short of it.</p>
+
+  <p><strong>Gamma-vega hedge.</strong> Suppose the same market maker, short one unit of the base-case call, wants to add gamma and vega neutrality using a 3-month at-the-money call (<code>Y</code>: <code>Δ_Y = 0.5695</code>, <code>Γ_Y = 0.039288</code>, <code>\text{vega}_Y = 19.644</code>) and a 2-year at-the-money call (<code>Z</code>: <code>Δ_Z = 0.6897</code>, <code>Γ_Z = 0.012479</code>, <code>\text{vega}_Z = 49.914</code>). Solving the <code>2×2</code> system <code>0.039288\,\beta_Y + 0.012479\,\beta_Z = 0.018762</code> and <code>19.644\,\beta_Y + 49.914\,\beta_Z = 37.524</code> gives <code>β_Y = 0.2729</code> and <code>β_Z = 0.6444</code>. The residual delta before hedging with stock is <code>-0.6368 + 0.2729(0.5695) + 0.6444(0.6897) = -0.0370</code>, so buying <code>0.0370</code> shares finishes a portfolio that is simultaneously delta-, gamma- and vega-neutral against small moves in spot and volatility alike.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>A real desk manages a risk report, not a valuation</h3>
+
+  <p>Nobody on a trading floor revalues one option at a time and marvels at the number. A real options desk aggregates delta, gamma, vega, theta and rho across every position in the book, often thousands of them across many strikes, maturities and even underlyings, and looks at the totals. The individual Black-Scholes price of any one option is almost incidental; what the desk manages is the shape of the aggregated Greek exposure, and the daily task is deciding which residual exposures to hedge away and which to keep as a deliberate view.</p>
+
+  <h3>Delta is the easy risk; gamma and vega are the ones that lose money</h3>
+
+  <p>Delta is trivially hedged, cheaply and continuously, by trading the underlying itself, which is why a well-run desk rarely carries meaningful outright delta risk for long. Gamma and vega are harder, because hedging them requires other options, which themselves carry gamma and vega that must in turn be managed, and because both are genuinely path-dependent risks: a badly hedged gamma or vega position loses money not from where the market ends up but from how it got there. The Greeks that actually blow up a book on a bad day are almost never delta; they are gamma, when realised moves swing far more than a hedge assumed, and vega, when implied volatility itself repriced sharply.</p>
+
+  <h3>What a Greek risk report actually looks like</h3>
+
+  <p>Ask to see an actual options risk report and you will not find one delta, one gamma and one vega number for the whole book. You will find a grid: rows for maturity buckets (overnight, one week, one month, three months, one year, and further out), columns for moneyness buckets (far out of the money, near the money, at the money, near in the money, far in the money), and a Greek in each cell, aggregated across every position that falls into it. Reading the grid tells a trader where the book's risk actually lives, which is almost never uniform. A book can show a perfectly flat total vega while carrying a large long-vega position in one-month at-the-money options offset by an equally large short-vega position in one-year options, an offsetting pair that looks neutral in aggregate and is anything but neutral if the volatility term structure twists rather than shifts in parallel, exactly the danger the callout below flags.</p>
+
+  <h3>The gamma-theta trade is the economic content of an option</h3>
+
+  <p>Strip away everything else and an option position, once delta-hedged, is a bet on realised volatility against the volatility priced into the premium. Being long gamma means paying theta every day in exchange for convexity that pays off if the underlying moves more than the market expected; being short gamma means collecting theta every day in exchange for convexity risk that costs money if the underlying moves more than expected. Picture two's parabola-on-a-shelf is not a stylised diagram of a special case: it is, quite literally, what every option position reduces to once its first-order spot risk has been hedged away.</p>
+
+  <h3>Discrete hedging error is not a bug to be engineered away</h3>
+
+  <p>The <code>1/\sqrt{n}</code> scaling result is the honest limit of the replication story lecture 9 tells: the Black-Scholes proof that an option can be perfectly replicated relies on continuous, costless rebalancing, and no real market offers either. However tightly a desk rebalances, some residual hedging error survives, and it survives specifically at the corners the mental model highlighted, at the money and near expiry, precisely where gamma is largest. A trader who understands this treats the Black-Scholes Greeks as an excellent first-order map of the risk, not a promise that the risk can be eliminated.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Greeks computed from a model whose assumptions are violated are still numbers, and it is tempting to trust them anyway. A Black-Scholes delta assumes constant volatility and continuous trading; if volatility is stochastic or the underlying can jump, the true hedge ratio differs from <code>N(d_1)</code>, sometimes substantially, especially away from the money. A subtler and more common failure is aggregating vega across different maturities as though it were a single number: vega measures sensitivity to a parallel shift in a single flat volatility, but implied volatility term structures do not move in parallel, so a book with offsetting vega at different maturities can look flat while carrying real exposure to the volatility surface twisting rather than shifting. A risk report that reduces the volatility surface to one vega number is reporting a convenient fiction.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Write down the five Greeks as partial derivatives of a general pricing function <code>Π(t, S<sub>t</sub>)</code>. Which one is not, strictly, named after a Greek letter?</li>
+      <li>State the closed-form delta of a European call and of a European put in terms of <code>N(d_1)</code>. Derive <code>Δ_{\text{put}} = Δ_{\text{call}} - 1</code> from put-call parity.</li>
+      <li>Explain why the delta of a forward contract is always 1 and never changes, contrast this with an option's delta, and connect the difference to why lecture 1's cash-and-carry hedge is static while an option hedge must be rebalanced.</li>
+      <li>Show that gamma is identical for a call and a put with the same strike and maturity. (Hint: differentiate the put-call parity relation twice with respect to spot.)</li>
+      <li>Derive the identity <code>Θ + rSΔ + ½σ²S²Γ = rC</code> from the Black-Scholes PDE. Using the base case (<code>S=100, K=100, r=5\%, σ=20\%, T=1</code>), verify the identity numerically.</li>
+      <li>A market maker is short one unit of the base-case call and wants to hedge delta, gamma and vega using a 3-month at-the-money call, a 2-year at-the-money call, and the stock. Set out the linear system that determines the two option quantities, and explain in one paragraph why the stock alone cannot achieve gamma or vega neutrality.</li>
+      <li>For a delta-hedged long option position, explain why a realised spot move smaller than a certain breakeven size loses money and a move larger than that size makes money. What two Greeks, and what time interval, determine the breakeven size?</li>
+      <li>Explain why the standard deviation of discrete-hedging error scales like <code>1/\sqrt{n}</code> in the number of equally spaced rebalancing dates. You do not need a full derivation, only the intuition for where each power comes from.</li>
+      <li>Give one sentence each for vanna, volga and charm, stating which two Greeks (or which Greek and which variable) each one links.</li>
+      <li>A deep in-the-money European put on a non-dividend stock can, unusually, show positive theta. Using the put's theta formula, state the condition under which this occurs and explain it in economic terms.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="12-interest_rate_derivatives.html">Interest rate derivatives (planned)</a>, where the Greek framework generalises from a single spot and a single volatility to an entire term structure of rates, and where the forward-futures convexity distinction from lecture 1 becomes economically material.</li>
+      <li><a href="13-credit_risk_models.html">Credit risk models (planned)</a>, where sensitivities to spread, default probability and recovery play the role the Greeks play here, and where the gamma-theta style trade-off reappears as the economics of holding versus hedging credit exposure.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 10 - Hedging &amp; Greeks.pdf</code> (primary source), an image-only PDF read by rasterising each of its 14 pages and reading them as images</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 4 (Black-Scholes theory), which carries the formula sheet for the Greeks used in this lecture</li>
+      <li><a href="09-black_scholes.html">Lecture 9</a>, for the call and put pricing formulas and the <code>d_1</code>, <code>d_2</code> notation this lecture differentiates throughout</li>
+      <li><a href="10-dividends.html">Lecture 10</a>, for the continuous dividend yield adjustment carried through to the dividend-adjusted Greeks</li>
+      <li>Hull, <em>Options, Futures and Other Derivatives</em>, chapter 19, for a fuller practitioner treatment of vanna, volga, charm and Greek-based P&amp;L attribution</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The source's initial statement of the theta formula (Proposition 4.3.2, on the definitions page) is not obviously consistent with its own later summary formula (section 4.4.1) for the sign of the leading term; this lecture uses the summary version throughout, verified directly against the Black-Scholes PDE identity, and the two match exactly.</li>
+      <li>More significantly, the source's dividend-adjusted section (4.4.2) writes the call and put value, delta, gamma, theta and vega with a factor <code>e^{+\delta(T-t)}</code> multiplying the spot term. This is inconsistent with the standard convention (and with lecture 1's own cash-and-carry formula, <code>F(t) = S(t)e^{(r-q)(T-t)}</code>), and with the source's own asset-or-nothing option formulas one page later, which correctly use <code>e^{-\delta(T-t)}</code>. This lecture uses the standard negative-exponent convention, consistent with lecture 10 and with the source's own binary-option formulas, and treats the vanilla-option sign as a likely transcription error in the source.</li>
+      <li>The source proves the closed-form Greeks and works one static numerical table, but never discusses discrete rebalancing error, transaction costs, or the <code>1/\sqrt{n}</code> scaling result central to why delta hedging is imperfect in practice, nor does it name vanna, volga or charm despite having built all the machinery needed to introduce them. This lecture supplies that material as an extension.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 11: hedging and the Greeks</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

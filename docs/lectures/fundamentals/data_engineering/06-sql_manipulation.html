@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 6: SQL III, manipulation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>SQL III: manipulation</h1>
+  <p class="subtitle">A ledger is never erased. When a bookkeeper discovers an error, they do not rub out the entry; they post a correcting entry and leave both visible, so the history of what was believed remains inspectable alongside what is now believed. Double-entry bookkeeping worked this out in the fifteenth century, and it is still the right instinct for a data platform.</p>
+  <div class="meta">
+    <span>Lecture 6 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part II: SQL and data modelling</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Data manipulation language changes contents: <code>INSERT</code> adds rows, <code>UPDATE</code> edits them, <code>DELETE</code> removes them, and <code>MERGE</code> does whichever of the three each incoming row requires. Wrapped around all of them are <strong>transactions</strong>, which make a group of statements behave as a single all-or-nothing unit.</p>
+
+  <p>The transactional world uses all four statements freely, because a till must edit the balance it holds. The analytical world, which is where this course lives, uses them differently and much more sparingly. An analytical table is written by one pipeline in bulk, must be reproducible, and usually must retain history for audit. That pushes the design towards <strong>append and overwrite</strong> rather than row-level editing: append new snapshots, overwrite a whole partition when it needs rebuilding, and never edit a row in place if the previous value has any evidential value.</p>
+
+  <p>The property that ties this together is <strong>idempotency</strong>: running the same load twice produces the same table as running it once. A pipeline without it accumulates duplicates on every retry, and retries are not exceptional, they are how a scheduler responds to a network blip at three in the morning.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A bookkeeper finds that last March's rent was posted twice. They do not reach for an eraser. They post a reversing entry dated today, referencing the original, and both lines stay in the book forever. Anyone can now answer two different questions: what do we believe the March rent was, and what did we believe it was in March? A data platform that runs <code>UPDATE</code> to fix last March can answer only the first, and it is the second question that a supervisor asks.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">The two statements that end careers</span>
+    <code>DELETE FROM table;</code> with the <code>WHERE</code> clause forgotten empties the table. <code>UPDATE table SET x = y;</code> with the <code>WHERE</code> clause forgotten sets every row. Both are valid SQL, both execute instantly, and both are irreversible outside a transaction. The habit that prevents it: write the statement as a <code>SELECT</code> first, inspect the row count, then convert it to the mutation, and run mutations inside an explicit transaction so that a wrong count can be rolled back rather than explained.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Non-idempotent loads corrupt slowly, which is the worst way to corrupt.</strong> A load that appends without first clearing what it is replacing does not fail on the second run; it succeeds and doubles a month. The row count looks large but plausible, the default rate is unchanged because both copies carry the same flags, and the total exposure is exactly twice what it should be. That defect can survive several reporting cycles, and the discovery usually comes from an external reconciliation, which is the most expensive place to find it.</p>
+
+  <p><strong>Row-level editing destroys the evidence a regulated model needs.</strong> BCBS 239 expects a bank to explain a risk number and to reproduce it. An <code>UPDATE</code> that corrects an arrears count leaves no record that the previous value existed, so the question from Lecture 03, why did last month's number change, becomes unanswerable. This is why analytical platforms in banks trend towards immutability: append corrections with a system date, never overwrite the past.</p>
+
+  <p><strong>On columnar storage, updates are not cheap.</strong> A transactional database updates a row in place. A columnar file cannot: the value is buried inside a compressed column chunk, so changing one row means rewriting the file that holds it, and changing one row in each of a thousand files means rewriting a thousand files. Lecture 14 covers the two strategies table formats use to make this tolerable, but the design lesson is available now: batch your changes, address whole partitions, and prefer rebuilding a slice to editing rows within it.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Transactions, and what can go wrong without them</h3>
+
+  <pre><code>BEGIN TRANSACTION;
+
+  DELETE FROM account_snapshots
+  WHERE  reporting_date = DATE '2026-03-31';
+
+  INSERT INTO account_snapshots
+  SELECT * FROM staging_march_snapshot;
+
+COMMIT;   -- or ROLLBACK; to abandon both statements</code></pre>
+
+  <p>The two statements above are a single logical operation: replace March. Without the transaction, a failure between them leaves the table with March missing, which is a worse state than either the old data or the new. With it, a reader either sees the old March or the new one, and a crash leaves the old one intact. This is atomicity and isolation from Lecture 03 doing exactly the job they were designed for.</p>
+
+  <p>Isolation is not binary; engines offer levels, and the level determines which anomalies are possible.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Anomaly</th><th>What you observe</th><th>Prevented by</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Dirty read</strong></td><td>You see another transaction's uncommitted change, which may then be rolled back</td><td>Read committed and above</td></tr>
+      <tr><td><strong>Non-repeatable read</strong></td><td>The same row read twice in one transaction gives different values</td><td>Repeatable read and above</td></tr>
+      <tr><td><strong>Phantom read</strong></td><td>The same filter read twice returns a different set of rows, because someone inserted</td><td>Serialisable, or snapshot isolation</td></tr>
+      <tr><td><strong>Lost update</strong></td><td>Two transactions read, compute, and write; one result silently overwrites the other</td><td>Explicit locking, or a conflict-detecting engine</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Most modern engines implement <strong>multi-version concurrency control</strong>, keeping several versions of each row so that readers see a consistent snapshot as at the moment their statement or transaction began, without blocking writers. This is why a long analytical query on such an engine does not stop the writes, and it is the mechanism behind the snapshot reads that Lecture 03 said analytical platforms need. For a data pipeline the practical guidance is short: wrap each logical publish in one transaction, keep transactions short, and do not hold one open while a human thinks.</p>
+
+  <h3>Four write patterns, and when each is right</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four write patterns for analytical tables">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Four ways to get today's data into an analytical table</text>
+
+      <!-- append -->
+      <rect x="30" y="42" width="330" height="76" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="46" y="64" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">1. APPEND</text>
+      <text x="46" y="82" font-family="Inter" font-size="10" fill="#0d9488">INSERT new rows, never touch old ones</text>
+      <text x="46" y="98" font-family="Inter" font-size="10" fill="#0d9488">Idempotent? No, unless guarded by a key check</text>
+      <text x="46" y="112" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">Use for: immutable event history</text>
+
+      <!-- overwrite partition -->
+      <rect x="400" y="42" width="330" height="76" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="416" y="64" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">2. OVERWRITE PARTITION</text>
+      <text x="416" y="82" font-family="Inter" font-size="10" fill="#7c3aed">DELETE one date, INSERT it again, in one transaction</text>
+      <text x="416" y="98" font-family="Inter" font-size="10" fill="#7c3aed">Idempotent? Yes, by construction</text>
+      <text x="416" y="112" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">Use for: monthly snapshots (the default)</text>
+
+      <!-- merge -->
+      <rect x="30" y="132" width="330" height="76" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="46" y="154" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">3. MERGE / UPSERT</text>
+      <text x="46" y="172" font-family="Inter" font-size="10" fill="#b45309">Match on a key: update if present, insert if not</text>
+      <text x="46" y="188" font-family="Inter" font-size="10" fill="#b45309">Idempotent? Yes, if the match key is correct</text>
+      <text x="46" y="202" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">Use for: slowly changing reference data</text>
+
+      <!-- in-place update -->
+      <rect x="400" y="132" width="330" height="76" rx="10" fill="#FEE2E2" stroke="#DC2855" stroke-width="2"/>
+      <text x="416" y="154" font-family="Inter" font-size="12" font-weight="700" fill="#991b1b">4. IN-PLACE UPDATE</text>
+      <text x="416" y="172" font-family="Inter" font-size="10" fill="#b91c1c">UPDATE rows to new values, old values gone</text>
+      <text x="416" y="188" font-family="Inter" font-size="10" fill="#b91c1c">Idempotent? Usually, but destroys history</text>
+      <text x="416" y="202" font-family="Inter" font-size="10" font-weight="600" fill="#991b1b">Use for: almost nothing in a risk platform</text>
+
+      <!-- rerun demonstration -->
+      <rect x="30" y="228" width="700" height="152" rx="10" fill="#F4F4F5" stroke="#52525b" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="380" y="252" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#27272a">THE RERUN TEST: THE SCHEDULER RETRIES AT 03:14 AFTER A NETWORK BLIP</text>
+
+      <text x="130" y="280" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="600" fill="#115e59">Append, unguarded</text>
+      <text x="130" y="300" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#3f3f46">run 1: 2,000,000 rows</text>
+      <text x="130" y="316" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#3f3f46">run 2: 4,000,000 rows</text>
+      <text x="130" y="336" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#DC2855">exposure doubles, silently</text>
+
+      <text x="380" y="280" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="600" fill="#5b21b6">Overwrite partition</text>
+      <text x="380" y="300" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#3f3f46">run 1: 2,000,000 rows</text>
+      <text x="380" y="316" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#3f3f46">run 2: 2,000,000 rows</text>
+      <text x="380" y="336" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1E9D54">identical, safe to retry</text>
+
+      <text x="620" y="280" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="600" fill="#92400e">Merge on key</text>
+      <text x="620" y="300" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#3f3f46">run 1: 2,000,000 rows</text>
+      <text x="620" y="316" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#3f3f46">run 2: 2,000,000 rows</text>
+      <text x="620" y="336" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1E9D54">identical, safe to retry</text>
+
+      <text x="380" y="366" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#52525b">A retry is not an exception to plan around later. It is the normal behaviour of every scheduler in Lecture 17.</text>
+    </svg>
+    <figcaption>The four patterns and the test that separates them. Overwrite-by-partition is the workhorse for periodic snapshots because idempotency comes free: the delete defines exactly what the insert is allowed to replace. Note that the unguarded append is the only pattern that fails the rerun test, and it is also the easiest one to write by accident.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Inserting</h3>
+
+  <pre><code>-- positional: fragile, breaks silently when a column is added
+INSERT INTO customers
+VALUES ('C0001', 'Nadoy', DATE '1985-03-14', 'retail', 'samir@example.com', CURRENT_TIMESTAMP);
+
+-- named: always do this instead
+INSERT INTO customers (customer_id, surname, date_of_birth, segment, email)
+VALUES ('C0001', 'Nadoy', DATE '1985-03-14', 'retail', 'samir@example.com');
+
+-- from a query, which is how pipelines actually load
+INSERT INTO account_snapshots (account_id, reporting_date, balance, arrears_months)
+SELECT account_id, DATE '2026-03-31', balance, arrears_months
+FROM   staging_march
+WHERE  account_id IS NOT NULL;
+
+-- DuckDB conveniences: straight from a dataframe or a file
+INSERT INTO reporting BY NAME SELECT * FROM my_dataframe;
+INSERT INTO reporting BY NAME SELECT * FROM 'extracts/loans_2026_03.parquet';</code></pre>
+
+  <p>Always name your columns. A positional insert is a bet that nobody will ever add a column to the table, and when that bet loses the failure is a silent column shift rather than an error, which puts the arrears count into the balance field. DuckDB's <code>BY NAME</code> clause matches source columns to target columns by name rather than position and is worth using for exactly this reason.</p>
+
+  <h3>Deleting, and its faster cousin</h3>
+
+  <pre><code>DELETE FROM account_snapshots
+WHERE  reporting_date = DATE '2026-03-31';   -- never omit the WHERE
+
+-- remove everything, fast, keeping the table definition
+TRUNCATE TABLE staging_march;</code></pre>
+
+  <p><code>DELETE</code> is row-by-row and logged, so it can be rolled back and is slow over large volumes. <code>TRUNCATE</code> discards everything at once and is dramatically faster, at the cost of finer control and, in some engines, of transactional rollback. Use truncate for staging tables you rebuild every run and delete for a targeted removal inside a transaction.</p>
+
+  <p>In a regulated platform, prefer neither. A <strong>soft delete</strong> marks a row as no longer current instead of removing it, typically with a <code>valid_to</code> timestamp or an <code>is_current</code> flag, so the row remains available for audit and for reproducing an earlier report. Queries then read a view filtered to current rows, which keeps the complexity in one place. This is the same mechanism as the slowly changing dimension in Lecture 08, arriving here as an operational habit.</p>
+
+  <h3>Updating, including the trap</h3>
+
+  <pre><code>UPDATE customers
+SET    segment = 'sme'
+WHERE  customer_id = 'C0001';
+
+-- conditional on another table
+UPDATE accounts
+SET    interest_rate = interest_rate + 0.0025
+WHERE  account_id IN (SELECT account_id FROM rate_review WHERE outcome = 'increase');</code></pre>
+
+  <p>Now the trap, which is worth its own paragraph because it is both common and silent. Consider setting a discount from another table with a correlated subquery:</p>
+
+  <pre><code>-- WRONG: sets discount to NULL for every customer with no promotion
+UPDATE customers
+SET    discount = (SELECT discount FROM promotions p WHERE p.customer_id = customers.customer_id);
+
+-- RIGHT: restrict the rows being updated to those with a match
+UPDATE customers
+SET    discount = (SELECT discount FROM promotions p WHERE p.customer_id = customers.customer_id)
+WHERE  customer_id IN (SELECT customer_id FROM promotions);</code></pre>
+
+  <p>Without the outer <code>WHERE</code>, the statement updates every row in the table, and for rows with no matching promotion the subquery returns null, so their existing discount is wiped. The statement reports success and the damage is invisible until someone notices that discounts disappeared. The general rule: an <code>UPDATE</code> driven by a subquery needs the outer <code>WHERE</code> to restrict the update to rows the subquery can actually serve.</p>
+
+  <h3>Merge: the upsert</h3>
+
+  <pre><code>-- ANSI form, supported by most warehouses and Spark
+MERGE INTO customers AS target
+USING staging_customers AS source
+   ON target.customer_id = source.customer_id
+WHEN MATCHED AND (target.segment    IS DISTINCT FROM source.segment
+               OR target.email      IS DISTINCT FROM source.email)
+  THEN UPDATE SET segment = source.segment,
+                  email   = source.email,
+                  updated_at = CURRENT_TIMESTAMP
+WHEN NOT MATCHED
+  THEN INSERT (customer_id, surname, date_of_birth, segment, email)
+       VALUES (source.customer_id, source.surname, source.date_of_birth,
+               source.segment, source.email);
+
+-- PostgreSQL and DuckDB also offer the shorter conflict form
+INSERT INTO customers (customer_id, surname, segment, email)
+SELECT customer_id, surname, segment, email FROM staging_customers
+ON CONFLICT (customer_id)
+DO UPDATE SET segment = EXCLUDED.segment,
+              email   = EXCLUDED.email;</code></pre>
+
+  <p>Three details make the difference between a merge that works and one that quietly misbehaves. The match condition must be a genuine key, because if the source contains two rows for one key the merge is ambiguous and most engines raise an error, which is the good outcome; deduplicate the source first with the <code>ROW_NUMBER</code> idiom from Lecture 05. The <code>IS DISTINCT FROM</code> comparison treats nulls as comparable, so a change from null to a value is detected, which <code>!=</code> would miss. And updating a timestamp on matched rows only when something actually changed keeps the change history meaningful rather than recording a touch on every run.</p>
+
+  <h3>The idempotent load, written out</h3>
+
+  <pre><code>BEGIN TRANSACTION;
+
+  -- 1. clear exactly the slice this run owns
+  DELETE FROM account_snapshots
+  WHERE  reporting_date = DATE '2026-03-31';
+
+  -- 2. write it, deduplicated, from the staged arrival
+  INSERT INTO account_snapshots
+      (account_id, reporting_date, customer_id, product, balance,
+       arrears_months, default_date, source_system, loaded_at)
+  SELECT account_id,
+         DATE '2026-03-31',
+         customer_id,
+         product,
+         balance,
+         arrears_months,
+         default_date,
+         'core_banking',
+         CURRENT_TIMESTAMP
+  FROM   staging_march
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id
+                             ORDER BY extract_timestamp DESC) = 1;
+
+  -- 3. assert before committing
+  -- (row count within tolerance of last month, no nulls in key columns)
+
+COMMIT;</code></pre>
+
+  <p>This is the pattern to internalise, and it is the one Lectures 10 and 17 will assume. The delete and the insert address the same slice, defined by the same predicate, inside one transaction. Run it once or five times and the table is identical. The third step, asserting before committing rather than after, is what turns a bad load into a rollback instead of an incident, and it is the operational half of Lecture 16.</p>
+
+  <div class="callout insight">
+    <span class="tag">The parameter that must not be implicit</span>
+    Notice that the reporting date appears three times as a literal. In a real pipeline it is a parameter, and the single most common cause of a corrupted load is a parameter that defaults to "today" when the job is rerun for a past date. Make the date an explicit required argument with no default, so that a rerun for March is a rerun for March rather than a rerun that overwrites March's slice with today's data. This is the same argument as the one against hard-coded paths in <a href="../software_engineering/11-jupyter_and_reproducibility.html">notebook promotion</a>, and it costs one line to get right.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: a late-arriving payments correction, done three ways</strong>
+    <p>The situation, which recurs monthly in every bank. On 12 May, the collections system sends corrected payment records for March: 214 accounts were recorded as having missed a payment they in fact made. The March arrears counts, the March default flags, and therefore the March default rate are all wrong. Consider three responses.</p>
+    <p><em>Response one: update the rows.</em> An <code>UPDATE</code> sets <code>arrears_months = 0</code> and <code>default_date = NULL</code> for the 214 accounts in the March snapshot. The March default rate now reads correctly at 1.42 per cent. The cost is that the platform can no longer produce the number it reported in April, which was 1.51 per cent, so the variance question is unanswerable and the April regulatory submission cannot be reconciled to the platform that produced it. In a bank this is not a shortcut, it is a control failure.</p>
+    <p><em>Response two: rebuild the partition, keeping the old version.</em> Rerun the March load from the corrected source with the idempotent pattern above, which deletes and rewrites March. Before doing so, the previous version of the partition is retained: either because the table format keeps prior versions, per Lecture 14, or because the load archives the slice it is about to replace. The corrected March is now current, the reported March is still retrievable, and the difference is a query. This is the standard answer.</p>
+    <p><em>Response three: append a corrected version with bitemporal keys.</em> The snapshot table carries both a <code>reporting_date</code> (business date, March) and a <code>version_valid_from</code> (system date, 12 May). The corrected rows are appended rather than replacing anything, and a view selects the latest version per account per reporting date. Every consumer sees corrected data by default, any consumer can ask for the data as it stood on any past date, and nothing is ever deleted. The cost is a more complex model and a mandatory view layer, so that no analyst accidentally queries the base table and double counts the two versions.</p>
+    <p><em>Which to choose.</em> Response two is the right default: it is simple, it satisfies reproducibility, and modern table formats give it to you almost for free. Response three earns its complexity on tables where corrections are frequent and the audit requirement is explicit, which in practice means the datasets feeding regulatory capital and IFRS 9 numbers. Response one is never right on a table anybody has reported from.</p>
+    <p><em>The control that catches this class of problem.</em> Whichever response you choose, the load should record how many rows changed and how the aggregate moved, and alert when either exceeds a tolerance. A correction touching 214 accounts and moving the default rate by nine basis points is worth a human reading a line in a log. A correction touching 214,000 accounts is worth stopping the pipeline. Lecture 18 makes that instinct into monitors.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Manipulation in an analytical platform is not the same activity as manipulation in a transactional one. Insert with named columns, delete only within a transaction and only to define what an insert may replace, treat in-place updates as a last resort because they destroy the evidence a regulated model needs, and use merge where reference data genuinely changes in place. Wrap each logical publish in a transaction, assert before committing, and make the partition parameter explicit. The test of all of it is the rerun: if running the load twice does not produce the same table as running it once, the pipeline is not finished.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Define idempotency for a data load and explain why an unguarded append fails it while overwrite-by-partition does not.</li>
+      <li>Give the four transaction anomalies and the isolation level that prevents each.</li>
+      <li>Why is a positional <code>INSERT</code> dangerous, and what is the failure mode when a source adds a column?</li>
+      <li>Write out the correlated-update trap and its fix, and say what the wrong version does to rows with no match.</li>
+      <li>Distinguish <code>DELETE</code>, <code>TRUNCATE</code>, and a soft delete, and say which belongs in a regulated risk history.</li>
+      <li>In a <code>MERGE</code>, why use <code>IS DISTINCT FROM</code> rather than <code>!=</code>, and what must be true of the source before you run it?</li>
+      <li>A late correction arrives for a month that has already been reported. Give the three possible responses and argue for one.</li>
+      <li>Why are row-level updates expensive on columnar storage, and what does that imply for how you batch changes?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="05-sql_queries.html">Lecture 05</a> supplied the deduplication idiom that every safe load in this lecture depends on.</li>
+      <li><strong>Next:</strong> <a href="07-normalisation.html">Lecture 07 (normalisation)</a> turns to design: which tables should exist, and why splitting them prevents the update anomalies this lecture works around.</li>
+      <li><strong>Then:</strong> <a href="08-dimensional_modelling.html">Lecture 08</a> covers slowly changing dimensions, which is the soft-delete and bitemporal machinery formalised.</li>
+      <li><strong>Cross-link:</strong> <a href="10-batch_ingestion.html">Lecture 10</a> puts the idempotent load inside an incremental ingestion pattern with watermarks; <a href="14-lakehouse_table_formats.html">Lecture 14</a> explains how table formats make partition overwrite and time travel cheap; <a href="17-orchestration.html">Lecture 17</a> is the scheduler whose retries motivate all of this.</li>
+      <li><strong>Banking link:</strong> the reproducibility argument here is the practical content of the BCBS 239 lineage expectation introduced in <a href="01-introduction.html">Lecture 01</a>.</li>
+      <li><strong>Further reading:</strong> Kleppmann's <em>Designing Data-Intensive Applications</em> chapter 7 is the clearest treatment of isolation levels and the anomalies they permit.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 6 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

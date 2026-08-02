@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CCR lecture 2: counterparty exposures</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / Counterparty credit risk</div>
+  <h1>Counterparty exposures: four metrics, one scalar, and a quantity that is not identified</h1>
+  <p class="subtitle">The exposure measures that feed the internal model method are four, not three, and the difference between two of them is where the framework's treatment of short-dated trades lives. The 1.4 scalar that sits in front of them is not arbitrary: it can be inverted into the exposure-default correlation it assumes, which turns out to depend on the book. And the market-implied default probability everyone quotes is not separately identified from the recovery rate.</p>
+  <div class="meta">
+    <span>CCR 2 of 2</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Sources: <code>docs/wiki/.../counterparty_credit_risk/02-counterparty_exposures.md</code>, Basel framework CRE53, Basel II Annex 4</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Four quantities, in a strict order. <strong>Expected exposure</strong> $EE(t)$ is the average positive mark-to-market at a future date. <strong>Expected positive exposure</strong> is the time-weighted average of $EE$ over the first year. <strong>Effective expected exposure</strong> is the running maximum of $EE$, which prevents the profile from declining. <strong>Effective expected positive exposure</strong> is the time-weighted average of that running maximum, and it is what the capital formula consumes: $\text{EAD} = \alpha \times \text{Effective EPE}$.</p>
+
+  <p>The source collapses two of these, defining expected positive exposure as the running maximum. That object is Effective $EE$ under Basel CRE53, and the mislabelling matters for a specific reason developed in step 4: it makes it impossible to see that <strong>the effective adjustment does nothing on a long-dated swap and bites only on early-peaking profiles</strong>, which is what it exists for.</p>
+
+  <p>The $\alpha$ of 1.4 can be inverted. Modelling exposure as $\exp(\sigma Z)$ and default as a correlated threshold event gives $\mathbb{E}[E \mid \text{default}] / \mathbb{E}[E] = \Phi(\rho\sigma - z_q)/\text{PD}$, so a 1.4 uplift corresponds to a definite correlation. At a 1 per cent probability of default that correlation is <strong>0.43 on a low-volatility book and 0.16 on a high-volatility one</strong>. One scalar, embedding assumptions that differ by a factor of nearly three depending on whose book it is applied to.</p>
+
+  <p>And the market-implied probability of default is not what it appears. The credit triangle $\text{spread} \approx \lambda \times \text{LGD}$ has two unknowns and one observation. Varying the assumed recovery across a plausible range moves the five-year default probability from <strong>8.0 to 22.1 per cent</strong>, a range of 94 per cent, while moving the product PD times LGD by only <strong>8.1 per cent</strong>. The spread identifies expected loss and says almost nothing about either factor separately.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Simulate thousands of futures. In each one, work out what the trades would be worth. Keep the ones where they owe us, average those, and do it for every future date. Then multiply by a fudge factor, because in the futures where they owe us most they are also most likely to be in trouble.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that the four metrics are examinable and are easy to confuse, and the confusion is not harmless. A candidate who defines expected positive exposure as a running maximum has the Basel definition of effective expected exposure and will lose the mark. Worse, the collapse hides the design logic: the two averages exist to convert a profile into a single number, and the running maximum exists to stop a declining profile understating credit risk. Those are different jobs.</p>
+
+  <p>The second reason is that the exposure profile is a genuinely different object from anything else in credit risk. A loan exposure declines predictably. A derivative exposure typically rises then falls, because diffusion widens the distribution of future values while amortisation shrinks the remaining cash flows, and the peak of that hump is where the risk sits. Whether the peak falls inside or outside the first year determines whether the framework's effective adjustment does anything at all.</p>
+
+  <p>The third reason is that the 1.4 scalar is the single largest number in the calculation that nobody derives. It is described in the source, correctly, as covering model uncertainty and wrong-way risk. Being able to invert it into an implied correlation converts it from a regulatory constant into a testable assumption, which is the difference between accepting a floor and knowing whether it binds on your portfolio.</p>
+
+  <p>And a fourth reason with a practical edge. Market-implied default probabilities are used for two purposes in most banks: pricing and capitalising credit valuation adjustment, which needs expected loss, and setting counterparty limits, which needs a probability. The first use is sound and the second is not, and the reason is identification rather than data quality, so no amount of better market data fixes it.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>One exposure profile with four metrics drawn on it, one survival curve, and the correlation that makes the two interact.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 760 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Counterparty exposure measurement. A hump-shaped expected exposure profile is shown with the running maximum above it, and the two time-weighted averages over the first year marked as horizontal lines. Two cases are contrasted: a long swap peaking after one year where the effective adjustment does nothing, and a short trade peaking inside the year where it bites. Below, the survival curve derived from a hazard rate, and a panel showing that the alpha of 1.4 inverts into an implied exposure-default correlation that depends on the exposure volatility.">
+      <rect x="0" y="0" width="760" height="700" fill="#FFFFFF"/>
+
+      <text x="20" y="22" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#37352F">FOUR METRICS, IN ORDER, ON ONE PROFILE</text>
+
+      <!-- profile A: late peak -->
+      <rect x="20" y="32" width="352" height="230" rx="7" fill="#FFFFFF" stroke="#3E7A45" stroke-width="1.6"/>
+      <text x="34" y="52" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#3E7A45">A &nbsp;5-YEAR SWAP &middot; peak at year 2</text>
+      <line x1="56" y1="230" x2="360" y2="230" stroke="#5C5B57" stroke-width="1.2"/>
+      <line x1="56" y1="230" x2="56" y2="68" stroke="#5C5B57" stroke-width="1.2"/>
+      <line x1="116" y1="230" x2="116" y2="68" stroke="#C2C1BD" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="118" y="80" font-family="Inter, sans-serif" font-size="8" fill="#5C5B57">1 year</text>
+      <polyline points="56,230 71,196 86,180 101,171 116,164 131,161 146,164 161,169 176,177 191,187 206,197 221,208 236,217 251,225 266,229 281,230" fill="none" stroke="#37352F" stroke-width="2.4"/>
+      <text x="150" y="150" font-family="Inter, sans-serif" font-size="8" fill="#37352F">EE(t)</text>
+      <line x1="56" y1="176" x2="116" y2="176" stroke="#0F62FE" stroke-width="2.2"/>
+      <text x="60" y="170" font-family="Inter, sans-serif" font-size="8" font-weight="600" fill="#0F62FE">EPE = 2.7250</text>
+      <line x1="56" y1="183" x2="116" y2="183" stroke="#DC2855" stroke-width="2.2" stroke-dasharray="4 2"/>
+      <text x="60" y="199" font-family="Inter, sans-serif" font-size="8" font-weight="600" fill="#DC2855">Effective EPE = 2.7250</text>
+      <text x="34" y="248" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#3E7A45">EE rises all year, so Effective EE = EE and the two averages</text>
+      <text x="34" y="258" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#3E7A45">are IDENTICAL. The effective adjustment is inert here.</text>
+
+      <!-- profile B: early peak -->
+      <rect x="388" y="32" width="352" height="230" rx="7" fill="#FFFFFF" stroke="#DC2855" stroke-width="1.6"/>
+      <text x="402" y="52" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#DC2855">B &nbsp;1-YEAR FX FORWARD &middot; peak at month 5</text>
+      <line x1="424" y1="230" x2="728" y2="230" stroke="#5C5B57" stroke-width="1.2"/>
+      <line x1="424" y1="230" x2="424" y2="68" stroke="#5C5B57" stroke-width="1.2"/>
+      <line x1="544" y1="230" x2="544" y2="68" stroke="#C2C1BD" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="546" y="80" font-family="Inter, sans-serif" font-size="8" fill="#5C5B57">1 year</text>
+      <polyline points="424,230 454,182 484,158 514,148 544,157 574,171 604,187 634,199 664,212 694,222 724,229" fill="none" stroke="#37352F" stroke-width="2.4"/>
+      <polyline points="514,148 544,148 574,148 604,148" fill="none" stroke="#B5540E" stroke-width="2.4" stroke-dasharray="5 3"/>
+      <text x="556" y="142" font-family="Inter, sans-serif" font-size="8" font-weight="600" fill="#B5540E">Effective EE holds the peak</text>
+      <line x1="424" y1="168" x2="544" y2="168" stroke="#0F62FE" stroke-width="2.2"/>
+      <text x="428" y="163" font-family="Inter, sans-serif" font-size="8" font-weight="600" fill="#0F62FE">EPE = 3.4500</text>
+      <line x1="424" y1="163" x2="544" y2="163" stroke="#DC2855" stroke-width="2.2" stroke-dasharray="4 2"/>
+      <text x="428" y="199" font-family="Inter, sans-serif" font-size="8" font-weight="600" fill="#DC2855">Effective EPE = 3.5500, a 2.9% uplift</text>
+      <text x="402" y="248" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#DC2855">The peak falls INSIDE the year, so the running maximum bites.</text>
+      <text x="402" y="258" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#DC2855">This is the case the adjustment exists for.</text>
+
+      <rect x="20" y="272" width="720" height="48" rx="6" fill="#F1EEFB" stroke="#5B47E0" stroke-width="1.5"/>
+      <text x="34" y="290" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#5B47E0">THE ORDER MATTERS AND THE SOURCE COLLAPSES TWO OF THEM</text>
+      <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#37352F">
+        <text x="34" y="306">EE(t) -> EPE = time-weighted mean of EE over yr 1 &nbsp;&nbsp;|&nbsp;&nbsp; Effective EE(t) = running max of EE -> Effective EPE = its mean. EAD = alpha x Effective EPE</text>
+      </g>
+      <text x="34" y="316" font-family="Inter, sans-serif" font-size="8" font-weight="600" fill="#DC2855">The source calls the running maximum "EPE". Under Basel CRE53 that is Effective EE, and the true EPE is the plain average.</text>
+
+      <!-- survival curve -->
+      <rect x="20" y="332" width="352" height="184" rx="7" fill="#FFFFFF" stroke="#0F62FE" stroke-width="1.5"/>
+      <text x="34" y="352" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#0F62FE">FROM SPREAD TO SURVIVAL CURVE</text>
+      <text x="34" y="372" font-family="JetBrains Mono, monospace" font-size="9" fill="#37352F">S(t) = exp(-integral of lambda)</text>
+      <text x="34" y="386" font-family="JetBrains Mono, monospace" font-size="9" fill="#37352F">PD(t) = 1 - S(t)</text>
+      <line x1="56" y1="486" x2="356" y2="486" stroke="#5C5B57" stroke-width="1.2"/>
+      <line x1="56" y1="486" x2="56" y2="398" stroke="#5C5B57" stroke-width="1.2"/>
+      <text x="34" y="402" font-family="Inter, sans-serif" font-size="8" fill="#5C5B57">1.0</text>
+      <path d="M 56 400 Q 130 414 200 434 Q 270 454 350 470" fill="none" stroke="#0F62FE" stroke-width="2.4"/>
+      <text x="220" y="428" font-family="Inter, sans-serif" font-size="8" font-weight="600" fill="#0F62FE">S(t), survival</text>
+      <path d="M 56 484 Q 130 470 200 450 Q 270 430 350 414" fill="none" stroke="#DC2855" stroke-width="2.4" stroke-dasharray="4 3"/>
+      <text x="240" y="466" font-family="Inter, sans-serif" font-size="8" font-weight="600" fill="#DC2855">PD(t), cumulative</text>
+      <text x="34" y="504" font-family="Inter, sans-serif" font-size="8.5" fill="#37352F">Exactly inverse. Bootstrapped from CDS in preference to bonds,</text>
+      <text x="34" y="513" font-family="Inter, sans-serif" font-size="8.5" fill="#37352F">because bonds carry liquidity and tax effects that must be stripped.</text>
+
+      <!-- alpha inversion -->
+      <rect x="388" y="332" width="352" height="184" rx="7" fill="#FCE9EE" stroke="#DC2855" stroke-width="1.6"/>
+      <text x="402" y="352" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#DC2855">WHAT THE ALPHA OF 1.4 ACTUALLY ASSUMES</text>
+      <text x="402" y="372" font-family="JetBrains Mono, monospace" font-size="8.5" fill="#37352F">E[E | default] / E[E] = Phi(rho.sigma - z_q) / PD</text>
+      <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#37352F">
+        <text x="402" y="394">PD 1%, multiplier by correlation and exposure vol</text>
+        <text x="402" y="410">  rho    sig=0.3   sig=0.5   sig=0.8</text>
+        <text x="402" y="424">  0.0      1.000     1.000     1.000</text>
+        <text x="402" y="438">  0.3      1.266     1.476     1.847</text>
+        <text x="402" y="452">  0.5      1.476     1.893     2.703</text>
+        <text x="402" y="466">  0.8      1.847     2.703     4.586</text>
+      </g>
+      <text x="402" y="486" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#DC2855">alpha 1.4 implies rho = 0.43 at sigma 0.3</text>
+      <text x="402" y="497" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#DC2855">and only rho = 0.16 at sigma 0.8</text>
+      <text x="402" y="510" font-family="Inter, sans-serif" font-size="8.5" fill="#37352F">One scalar. Two very different assumptions.</text>
+
+      <!-- identification -->
+      <rect x="20" y="526" width="720" height="80" rx="7" fill="#F7F2D8" stroke="#B5540E" stroke-width="1.6"/>
+      <text x="34" y="546" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="#B5540E">THE CREDIT TRIANGLE HAS TWO UNKNOWNS AND ONE OBSERVATION</text>
+      <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#37352F">
+        <text x="34" y="566">150bp spread:   LGD 30%  ->  5y PD 22.12%   |   LGD 60%  ->  5y PD 11.75%   |   LGD 90%  ->  5y PD 7.996%</text>
+        <text x="34" y="580">                PD x LGD    0.06636         |   PD x LGD    0.07050         |   PD x LGD  0.07196</text>
+      </g>
+      <text x="34" y="598" font-family="Inter, sans-serif" font-size="9" font-weight="600" fill="#DC2855">The PD moves 94%. The product moves 8.1%. Fit for CVA, unfit for limits, and no better data fixes it.</text>
+
+      <!-- monte carlo cost -->
+      <rect x="20" y="616" width="720" height="72" rx="7" fill="#F4F6EF" stroke="#3E7A45" stroke-width="1.5"/>
+      <text x="34" y="636" font-family="Inter, sans-serif" font-size="10.5" font-weight="600" fill="#3E7A45">AND WHY THE SYSTEMS ARE HARD: THE RELATIVE STANDARD ERROR OF EE IS 1.4634 / sqrt(N)</text>
+      <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#37352F">
+        <text x="34" y="656">1% precision at one time point on one netting set:  N = 21,416 paths</text>
+        <text x="34" y="670">x 50 time points x 5,000 netting sets:              5,353,981,634 revaluations of the book</text>
+      </g>
+      <text x="34" y="684" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#3E7A45">Which is why closed-form approximations survived as long as they did, and why they are still used for limits.</text>
+    </svg>
+    <figcaption>The two panels at the top are the same four definitions applied to two profiles. The difference between them is the whole content of the word "effective", and it is invisible if the running maximum is called expected positive exposure.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The four metrics, correctly ordered</h3>
+
+  <p>Start from the definition that is uncontroversial. The <strong>expected exposure</strong> at a future date is $EE(t) = \mathbb{E}[\max(V(t), 0)]$, where $V(t)$ is the mark-to-market of the netting set from the bank's perspective. Only the positive part matters: if the netting set is worth less than nothing to the bank, the counterparty's default costs the bank nothing on credit grounds. The expectation is taken over the joint distribution of all relevant market factors, which is why simulation is the norm.</p>
+
+  <p>From $EE$, three further quantities are built and the Basel framework keeps them distinct. <strong>Expected positive exposure</strong> is the time-weighted average of $EE$ over the first year, or to maturity if the netting set matures sooner. <strong>Effective expected exposure</strong> at each date is the maximum of $EE$ at that date or any earlier one, a running maximum that prevents a declining profile from reducing measured credit risk. <strong>Effective expected positive exposure</strong> is the time-weighted average of the effective expected exposure over the same first year, and it is the quantity the capital formula uses.</p>
+
+  <div class="worked">TWO PROFILES, FOUR METRICS, AND WHY THE ORDER MATTERS
+
+  PROFILE A, a five-year swap. Diffusion dominates early and
+  amortisation late, so the hump peaks around year 2.
+
+    quarterly EE over year 1     1.80  2.60  3.10  3.40
+    Effective EE over year 1     1.80  2.60  3.10  3.40
+    EPE            = 2.7250
+    Effective EPE  = 2.7250
+    ratio          = 1.0000
+    EAD at 1.4     = 3.8150
+
+  PROFILE B, a one-year FX forward. The peak is at month 5
+  and the profile then declines to zero at maturity.
+
+    quarterly EE over year 1     2.40  3.60  4.10  3.70
+    Effective EE over year 1     2.40  3.60  4.10  4.10
+    EPE            = 3.4500
+    Effective EPE  = 3.5500
+    ratio          = 1.0290
+    EAD at 1.4     = 4.9700
+
+  THE POINT
+    In profile A the EE rises throughout the first year, so
+    the running maximum equals the EE at every point and
+    Effective EPE equals EPE EXACTLY. The effective
+    adjustment does nothing at all.
+
+    In profile B the peak falls inside the year, so the
+    running maximum holds the peak while the EE declines,
+    and Effective EPE exceeds EPE by 2.9%.
+
+  WHICH TELLS YOU WHAT THE ADJUSTMENT IS FOR
+    Short-dated and early-peaking netting sets. On a long
+    swap book it is inert, and a bank that has implemented
+    it and cannot demonstrate any difference has probably
+    implemented it correctly.
+
+    That inference is unavailable if the running maximum is
+    called EPE, because the two concepts have then been
+    merged and there is nothing to compare.</div>
+
+  <div class="callout warn">
+    <span class="tag">Correction to the source</span>
+    The wiki defines expected positive exposure as $EPE(t) = \max_{s \leq t} EE(s)$. Under Basel CRE53, and Annex 4 of the original Basel II text, that object is <strong>effective expected exposure</strong>; expected positive exposure is the plain time-weighted average of $EE$. The source then defines effective expected positive exposure as the time-weighted average of its own "EPE", which given its definition arrives at the correct formula for effective EPE. So the capital number is right and the vocabulary is wrong, which is the most awkward kind of error to inherit: it produces the right answer in practice and the wrong answer in an exam.
+  </div>
+
+  <h3>Survival curves, and what a credit spread actually contains</h3>
+
+  <p>For the standardised approach to credit valuation adjustment, the probabilities of default must be market-implied rather than historical, and they come from bonds or credit default swaps. The <strong>default intensity</strong> or hazard rate $\lambda(t)$ is the instantaneous probability of default per unit time, and from it follow the cumulative default probability $PD(t) = 1 - \exp(-\int_0^t \lambda)$ and the survival curve $S(t) = \exp(-\int_0^t \lambda)$, which are exactly complementary.</p>
+
+  <p>Bootstrapping the hazard curve from observed prices requires four assumptions the source lists and they are worth taking seriously: linearity when interpolating between sparse maturities, the risk-free curve used for discounting, the recovery rate used to separate default probability from the spread, and the treatment of liquidity and volatility premia, which are not default risk and must be stripped out. Credit default swaps are preferred to bonds precisely because they are instruments whose purpose is to trade credit, so fewer of these confounds are present, and proxy spreads from comparable names are used where no swap trades.</p>
+
+  <p>The source also makes a shape observation worth keeping: investment grade names typically show hazard rates that increase with maturity, because there is more room to deteriorate than to improve, while distressed names can show declining hazard rates if the market expects an early resolution one way or the other.</p>
+
+  <h3>Closed form against simulation, and what simulation costs</h3>
+
+  <p>Early counterparty risk systems used closed-form approximations built on existing value-at-risk infrastructure: fast, implementable with what a market risk function already had, and adequate for simple low-dimensional portfolios. What they could not do was handle correlation, diversification and credit migration simultaneously, particularly for path-dependent payoffs. Monte Carlo simulation replaced them because it can carry multiple risk factors, their correlations, rating migration, uncertain recoveries, and mitigants including netting and collateral, all at once.</p>
+
+  <p>The cost is worth quantifying, because it explains both why the transition took so long and why closed forms survive for some purposes.</p>
+
+  <div class="worked">THE COMPUTATIONAL BILL
+
+  EE(t) IS A SAMPLE MEAN, SO ITS ERROR IS THE USUAL ONE
+    for V ~ N(0, s):
+      E[max(V,0)]   = s / sqrt(2 pi)       = 0.3989 s
+      var(max(V,0)) = s^2 (1/2 - 1/(2 pi)) = 0.3408 s^2
+      sd                                   = 0.5838 s
+      RELATIVE sd                          = 1.4634
+
+    so the relative standard error of EE is 1.4634 / sqrt(N)
+
+  PATHS NEEDED, AT ONE TIME POINT, ON ONE NETTING SET
+      5.0%  precision           857 paths
+      2.0%                    5,354
+      1.0%                   21,416
+      0.5%                   85,664
+      0.1%                2,141,593
+
+  NOW SCALE IT
+    50 time points out to the horizon
+    5,000 netting sets across the counterparty book
+    at 1% precision
+
+      21,416 x 50 x 5,000 = 5,353,981,634 revaluations
+
+  FIVE BILLION FULL REVALUATIONS OF THE BOOK, and every one
+  of them prices a portfolio of derivatives.
+
+  WHAT THIS EXPLAINS
+    Why the overnight batch exists, why exposure numbers are
+    a day old when limits are checked against them, and why
+    banks still run closed-form approximations intraday for
+    pre-deal limit checks while the simulation runs
+    overnight for capital.
+
+    It also explains the pressure to reduce time points and
+    paths, which is a precision decision usually made by an
+    infrastructure team on cost grounds rather than by a
+    risk team on accuracy grounds.</div>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The alpha of 1.4 is an assumption about correlation, and it can be inverted</h3>
+
+  <p>The source describes the 1.4 as a conservative regulatory scaling factor covering model uncertainty and the tendency for exposures to be correlated with default, which is right. It is more useful than that, because the wrong-way risk component can be written down and the scalar inverted into the correlation it assumes.</p>
+
+  <div class="worked">INVERTING THE SCALAR
+
+  A MINIMAL MODEL
+    exposure          E = exp(sigma Z),   Z ~ N(0,1)
+    default occurs    when Y > z_q, Y ~ N(0,1), P = PD
+    wrong-way risk    corr(Z, Y) = rho > 0
+
+  Then, using the standard bivariate normal tilt,
+
+    E[E | default] / E[E]  =  Phi(rho.sigma - z_q) / PD
+
+  SANITY CHECK
+    at rho = 0 this is Phi(-z_q)/PD = PD/PD = 1.000 exactly,
+    as independence requires.
+
+  THE MULTIPLIER AT A 1% PROBABILITY OF DEFAULT
+
+      rho     sigma=0.3   sigma=0.5   sigma=0.8
+      0.0        1.000       1.000       1.000
+      0.2        1.172       1.300       1.514
+      0.3        1.266       1.476       1.847
+      0.5        1.476       1.893       2.703
+      0.8        1.847       2.703       4.586
+
+  NOW SOLVE FOR THE rho THAT GIVES EXACTLY 1.4
+
+      PD      sigma 0.3   sigma 0.5   sigma 0.8
+      0.5%      0.395       0.237       0.148
+      1.0%      0.430       0.258       0.161
+      3.0%      0.510       0.306       0.191
+
+  READ THE TABLE ACROSS EACH ROW
+    The same scalar of 1.4 embeds a correlation assumption
+    of 0.43 on a low-volatility book and 0.16 on a
+    high-volatility one, a factor of 2.7 apart.
+
+  SO THE SCALAR IS REGRESSIVE IN EXPOSURE VOLATILITY
+    A quiet netting set gets credit for a substantial
+    wrong-way correlation. A volatile one gets credit for
+    almost none, because the same multiplicative uplift
+    represents a smaller correlation when the exposure
+    distribution is already wide.
+
+    Since volatile books are exactly the ones where
+    wrong-way risk is most damaging, a single fixed alpha is
+    weakest where it is needed most.
+
+  AND IT PRICES THE OWN-ESTIMATE OPTION PROPERLY
+    Lecture 1 noted that own estimates of alpha are
+    permitted with a floor of 1.2, worth 14.3% of exposure.
+    This table says what a bank has to demonstrate to claim
+    it: that its actual exposure-default correlation is
+    below the level the supervisory scalar assumes. On a
+    volatile book, where 1.4 implies only rho = 0.16, that
+    is a demanding claim. On a quiet book, where it implies
+    0.43, it may be straightforward.
+
+    Which is the opposite of how the option is usually
+    discussed, as a reward for modelling sophistication. It
+    is available in proportion to how little wrong-way risk
+    you actually have.</div>
+
+  <p>Two caveats to keep the result honest. The model is deliberately minimal: a single lognormal exposure factor and a single-threshold default, so it captures the direction and rough magnitude of wrong-way risk and not the path dependence of a real netting set. And the 1.4 covers model uncertainty as well as wrong-way risk, so the implied correlations above are upper bounds on the wrong-way component. Neither caveat affects the comparative point, which is that the implied assumption varies with the book while the scalar does not.</p>
+
+  <h3>The market-implied default probability is not identified</h3>
+
+  <p>The source states the credit triangle plainly: a credit spread is approximately the product of default probability and loss given default, so estimating one implies the other. That is exactly right, and the consequence deserves more emphasis than it usually gets, because it determines which uses of a market-implied probability are legitimate.</p>
+
+  <div class="worked">ONE OBSERVATION, TWO UNKNOWNS
+
+  A 150 BASIS POINT FIVE-YEAR CDS SPREAD
+    credit triangle:  spread = lambda x LGD
+    so                lambda = spread / LGD
+
+    assumed   implied     5-year        product
+      LGD     lambda        PD          PD x LGD
+      30%     0.0500     22.120%        0.06636
+      40%     0.0375     17.097%        0.06839
+      60%     0.0250     11.750%        0.07050
+      80%     0.0187      8.949%        0.07159
+      90%     0.0167      7.996%        0.07196
+
+  THE PD SPANS 8.0% TO 22.1%, A RANGE OF 94% OF THE MIDPOINT.
+  THE PRODUCT SPANS A RANGE OF 8.1%.
+
+  WHAT IS AND IS NOT IDENTIFIED
+    The spread pins down expected loss. It does not pin down
+    either factor, and the recovery rate that would separate
+    them is not observable ex ante for a name that has not
+    defaulted.
+
+  WHICH USES SURVIVE
+    CVA pricing and CVA capital depend on the product, so
+    the recovery assumption is nearly immaterial and the
+    market-implied approach is sound.
+
+    A counterparty LIMIT framework expressed in probability
+    of default depends on the factor. The same 150 basis
+    point spread supports a five-year default probability of
+    8% or 22% according to an assumption the bank has made
+    and typically not documented.
+
+  THE PRACTICAL RULE
+    Use market-implied quantities for the product and
+    historical or rating-based quantities for the factor.
+    Mixing them, for instance setting a limit in market-
+    implied PD terms and a provision in historical PD terms,
+    produces two numbers that cannot be reconciled and a
+    long argument about which is wrong. Neither is.
+
+  AND NOTE WHAT WOULD NOT HELP
+    Better market data, more liquid names, tighter bid-offer.
+    None of it identifies a second parameter from one
+    equation. This is an identification problem, not a
+    measurement problem.</div>
+
+  <h3>Wrong-way risk, and why netting can make it worse</h3>
+
+  <p>Wrong-way risk is the adverse correlation between exposure and counterparty credit quality: the bank's exposure is largest exactly when the counterparty is least able to pay. The source's two examples are well chosen. A bank that has sold credit protection to a counterparty on a reference entity linked to that counterparty's own fortunes faces the extreme case, and a bank with a foreign exchange swap against a sovereign faces the systemic version, since a sharp currency depreciation both increases the exposure and stresses the sovereign.</p>
+
+  <p>There is a structural point worth adding, and it connects to the netting result from lecture 1. Netting reduces exposure by exploiting the imperfect correlation between trade values. Wrong-way risk arises from correlation between exposure and default. A netting set constructed to maximise offsets is selected for internal diversification, but nothing in that selection reduces the correlation of the <em>net</em> exposure with the counterparty's credit. Indeed a netting set dominated by one directional position, which is the case where netting is worth least, is also the case where the net exposure most closely tracks a single market factor and therefore most plausibly tracks the counterparty's fortunes.</p>
+
+  <p>So the two effects are not independent, and they point the same way for the same book. A directional netting set gets little netting benefit and carries more concentrated wrong-way risk. A diverse one gets a large netting benefit and its net exposure is a blend of factors less likely to align with any one counterparty's distress. That is a reason to think about netting sets in terms of what drives them rather than how many trades they contain.</p>
+
+  <div class="callout insight">
+    <span class="tag">What closes the counterparty track</span>
+    Both lectures ended in the same place from different directions. Lecture 1 found that the netting benefit is a function of correlation and not of documentation. This one found that the regulatory scalar is a statement about correlation and that the market-implied default probability is not identified without an assumption. In each case a number that looks like a fact turns out to be an assumption about joint behaviour, which is the defining feature of counterparty credit risk: nothing about it is a property of one instrument.
+  </div>
+
+  <div class="callout feynman">
+    <span class="tag">Exam tip</span>
+    The four exposure metrics are a favourite because they are easy to state wrongly. Give them in order and say what each step does: $EE$ is the profile, $EPE$ averages it over the first year, effective $EE$ is the running maximum that stops the profile declining, and effective $EPE$ averages that. A further mark is available for saying why the running maximum exists, which is that credit risk does not fall simply because a trade is closer to maturity, and another for noting the one-year cap and that it is the shorter of one year and maturity.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Write the definition of expected exposure and explain why only the positive part enters.</li>
+      <li>Give all four exposure metrics in order, and say what each construction step accomplishes.</li>
+      <li>Why does the effective adjustment take a running maximum rather than allowing the profile to decline?</li>
+      <li><strong>Do the arithmetic.</strong> For profile A in step 4, compute EPE and effective EPE over the first year and the ratio between them. Explain the result.</li>
+      <li><strong>Do the arithmetic.</strong> Repeat for profile B and explain why the answer differs.</li>
+      <li>What class of netting set does the effective adjustment actually bite on, and what would you conclude if it made no difference on a long swap book?</li>
+      <li>State the labelling error in the source and give the correct Basel definitions of both quantities involved.</li>
+      <li>Why is a derivative exposure profile typically hump-shaped, and what determines where the peak falls?</li>
+      <li>Define the default intensity and write both the cumulative default probability and the survival curve in terms of it.</li>
+      <li>Give the four assumptions required to bootstrap a hazard curve from observed prices.</li>
+      <li>Why are credit default swap prices preferred to bond prices, and what is done for names with no traded swap?</li>
+      <li>Why do investment grade hazard curves typically rise with maturity while distressed ones can fall?</li>
+      <li>What could closed-form approximations not do, and why do they nonetheless survive for some purposes?</li>
+      <li><strong>Do the arithmetic.</strong> Derive the relative standard deviation of the positive part of a zero-mean normal, and hence the number of paths needed for one per cent precision on expected exposure.</li>
+      <li><strong>Do the arithmetic.</strong> Scale that to fifty time points and five thousand netting sets. What operational facts does the answer explain?</li>
+      <li>Write the wrong-way risk multiplier for the minimal model and verify it equals one at zero correlation.</li>
+      <li><strong>Do the arithmetic.</strong> At a one per cent probability of default and an exposure volatility of 0.5, what multiplier does a correlation of 0.5 produce? What correlation does a multiplier of 1.4 correspond to?</li>
+      <li>Why is a single fixed alpha regressive in exposure volatility, and why is that the wrong way round?</li>
+      <li>What must a bank demonstrate to claim an own estimate of alpha, and why is that harder on a volatile book?</li>
+      <li>State the credit triangle and explain what a single spread observation does and does not identify.</li>
+      <li><strong>Do the arithmetic.</strong> For a 150 basis point spread, compute the implied five-year default probability at recoveries of 30 and 90 per cent, and the product in each case. Compare the two ranges.</li>
+      <li>Which uses of a market-implied default probability are legitimate and which are not? Why would better market data not help?</li>
+      <li>Give the two examples of wrong-way risk in the source and say which is the extreme case and which the systemic one.</li>
+      <li>Explain why a directional netting set suffers on both the netting benefit and wrong-way risk, and what that implies for how netting sets should be assessed.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <h4>This completes the counterparty track</h4>
+    <ul>
+      <li><a href="01-context.html">CCR lecture 1</a> covered the regulatory frame, netting and hedging sets, the two capital charges, and a correction to the full BA-CVA formula. This lecture covered the exposure mathematics those charges consume, and corrected the exposure metric labels.</li>
+      <li>Next in the credit risk track: <a href="../index.html">credit concentration risk</a> in three lectures, and the application scoring subtree.</li>
+    </ul>
+
+    <h4>What this depends on</h4>
+    <ul>
+      <li><a href="01-context.html">CCR lecture 1</a> for the netting set as the unit of measurement, the two capital formulas this feeds, and the own-estimate alpha floor that step 5 prices.</li>
+      <li><a href="../../market_risk/02-var_and_coherent_risk_measures.html">Market risk lecture 2</a> for the value-at-risk machinery the early closed-form approaches borrowed, and <a href="../../market_risk/05-frtb_internal_models_approach.html">lecture 5</a> for the internal model approval framework.</li>
+      <li><a href="../a-irb_capital/02-credit_losses.html">A-IRB lecture 2</a> for the banking book loss framework and the Vasicek single-factor model whose correlation structure is the analogue of the wrong-way correlation here.</li>
+    </ul>
+
+    <h4>Where this reappears</h4>
+    <ul>
+      <li>Hazard rates and survival curves are the same objects used in <a href="../../../../../../fundamentals/actuarial_science/index.html">the actuarial science track</a> for mortality, and in <a href="../../../../../../fundamentals/statistics/index.html">survival analysis</a>, where censoring and the proportional hazards specification are developed properly.</li>
+      <li>Monte Carlo simulation and its convergence properties recur in <a href="../../../../../../fundamentals/financial_engineering/index.html">financial engineering</a>, where variance reduction techniques address exactly the computational bill computed in step 4.</li>
+      <li>The identification argument about products and factors reappears wherever a market price is used to infer a component: in <a href="../ifrs9_impairments/08-fli.html">IFRS 9 forward-looking information</a>, where a fitted relationship identifies a conditional mean and not a mechanism.</li>
+    </ul>
+
+    <h4>Source material</h4>
+    <ul>
+      <li>Wiki: <code>credit_risk/counterparty_credit_risk/02-counterparty_exposures.md</code>, for the exposure concepts, the two purposes of the effective measure, the credit spread and default curve discussion with the four bootstrapping assumptions, the hazard rate with both derived curves, the comparison of bond and CDS inputs, the closed-form and Monte Carlo comparison with the four-step simulation procedure, and both wrong-way risk examples.</li>
+      <li>Basel framework CRE53 and Annex 4 of the original Basel II text for the definitions of expected exposure, expected positive exposure, effective expected exposure and effective expected positive exposure, and for the alpha with its 1.2 own-estimate floor.</li>
+    </ul>
+
+    <h4>Cross-references</h4>
+    <ul>
+      <li>Every figure in the four worked blocks was computed for this lecture and verified numerically: both exposure profiles with all four metrics, the wrong-way multiplier table across three probabilities of default and three exposure volatilities with the implied correlations solved by bisection, the credit triangle at five recovery assumptions with both ranges, and the Monte Carlo path counts from the exact moments of the positive part of a normal. The two exposure profiles, the spread, the recoveries and the system dimensions are invented for illustration.</li>
+      <li><strong>Correction to the source.</strong> Expected positive exposure is defined there as the running maximum of expected exposure, which under Basel CRE53 is effective expected exposure. The final effective EPE formula is nonetheless correct, so the capital number is unaffected and the vocabulary is not.</li>
+      <li>The inversion of the alpha into an implied correlation, the observation that the scalar is regressive in exposure volatility and what that implies for the own-estimate option, the quantification of the identification problem in the credit triangle, the computational bill, and the argument that directional netting sets suffer twice are derived here rather than stated in the source.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All CCR lectures</a> &middot; <a href="../index.html">Credit risk</a></span>
+  <span>CCR 2 of 2: counterparty exposures</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

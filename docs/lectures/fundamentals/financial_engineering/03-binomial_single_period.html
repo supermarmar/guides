@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 3: the single-period binomial model</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>The single-period binomial model</h1>
+  <p class="subtitle">The binomial model builds a derivative price out of two numbers and one assumption: the underlying can only move to one of two values over the period, and no arbitrage is available anywhere in the market. Solve two equations in two unknowns, replicate the payoff exactly, and the price falls out with no reference to how likely the up move actually is. That last fact is the one nobody believes the first time they see it.</p>
+  <div class="meta">
+    <span>Lecture 3 of 13</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Source: <code>UP / 3 - Binomial Single Period.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Take one asset over one period, from time <code>0</code> to time <code>T</code>. Its price starts at <code>S</code> and ends at one of exactly two values: <code>uS</code> if the period is an "up" move, <code>dS</code> if it is a "down" move. A derivative on this asset pays <code>f_u</code> in the up state and <code>f_d</code> in the down state. The question the whole lecture answers is: what is this derivative worth today?</p>
+
+  <p>The answer comes from replication, not forecasting. Build a portfolio of <code>&Delta;</code> shares of the underlying and <code>B</code> in the risk-free bond that pays exactly <code>f_u</code> in the up state and exactly <code>f_d</code> in the down state. Two states, two traded assets, two equations, two unknowns: the system has a unique solution. Because no arbitrage exists, the derivative must be worth exactly what this replicating portfolio costs today, <code>f_0 = &Delta;S + B</code>. Rearranged, this same number can be written as a discounted expectation, $f_0 = e^{-rT}\bigl(q f_u + (1-q) f_d\bigr)$, under a manufactured probability <code>q</code> called the risk-neutral probability. The real-world probability of the up move, usually called <code>p</code>, appears nowhere in either formula.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine a share worth 100 today that will be worth either 120 or 90 in a year, and a friend offers you a side bet that pays 15 if the share goes up and nothing if it goes down. You do not need to know whether the share is more likely to rise or fall to price that bet fairly. You only need to ask: what combination of the share itself and a bank account, bought today, would leave you holding exactly 15 in the up world and exactly nothing in the down world? Whatever that combination costs to build is the only price for the bet that nobody can arbitrage against you. If you tried to price it using your own view of how likely the share is to rise, someone with a different view would trade against you and win, because the replicating portfolio does not care about views: it is built entirely from prices that already exist in the market.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP source already does more of the heavy lifting than a typical first course: it proves both directions of the no-arbitrage condition by explicit arbitrage construction, and it already identifies <code>Q</code> as a risk-neutral (martingale) probability directly from the identity $S_0 = e^{-r\tau}[qS(\text{up}) + (1-q)S(\text{down})]$. What this lecture adds is the explicit reconnection of that martingale identity to the forward price derived in lecture 1, a full numerical worked example carrying a call and a put through the replication, the risk-neutral formula and a put-call parity check simultaneously, and the market-completeness discussion framed through the first and second fundamental theorems of asset pricing, including the trinomial counterexample. None of the source's own results are being corrected here; this lecture is building on top of them.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The single-period binomial model is the smallest possible laboratory for the idea that carries the rest of this course: a derivative's price is not a forecast, it is the cost of a hedge. Lecture 1 built that idea for a forward using a static portfolio held from start to finish. This lecture builds the same idea for a general payoff, including the sharply non-linear ones such as options that a forward-style static hedge cannot reach without the extra ingredient a binomial tree supplies: two states of the world resolving one period of randomness, matched exactly by a portfolio with two moving parts.</p>
+
+  <p>Practically, the model is the backbone of every option pricing system built before or alongside Black-Scholes. Multi-period trees (lecture 4) are this single step stitched together recursively; the Cox-Ross-Rubinstein calibration (lecture 5) chooses <code>u</code> and <code>d</code> so that the tree converges to a continuous diffusion; the Black-Scholes PDE (lecture 10) is what remains when the step size shrinks to zero and the two-equation system becomes a partial differential equation. Conceptually, the single-period model is where you first meet the risk-neutral probability <code>q</code>, the object every later chapter of the course reuses under different names: the equivalent martingale measure, the pricing measure, the <code>Q</code>-measure. Understand where <code>q</code> comes from here, by solving two linear equations, and it stops looking mysterious when it reappears dressed in stochastic calculus.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures carry the whole argument. The first is the tree itself: one starting price, two possible destinations, one derivative payoff attached to each destination. The second is what happens when you plot the replicating portfolio's value as a function of the terminal share price: a single straight line, because the portfolio holds a fixed number of shares and a fixed bond position throughout the period. That straight line only has to agree with the derivative's actual payoff at two points, because those are the only two terminal prices the model allows. One period plus two states is exactly the amount of randomness a straight line can hedge.</p>
+
+  <h3>Picture one: the one-step tree</h3>
+
+  <p>At time <code>0</code> the asset is worth <code>S</code>. At time <code>T</code> it is worth <code>uS</code> with <code>u &gt; 1</code> in the up state, or <code>dS</code> with <code>d &lt; 1</code> in the down state (the model does not require <code>d &lt; 1 &lt; u</code> strictly, only <code>d &lt; u</code>, but that is the usual picture). A derivative maturing at <code>T</code> pays <code>f_u</code> in the first state and <code>f_d</code> in the second. This lecture adopts continuous compounding throughout, matching the bond convention from lecture 1: the risk-free bond grows from <code>1</code> at time <code>0</code> to <code>e^{rT}</code> at time <code>T</code>, with <code>r</code> the continuously compounded risk-free rate. Some textbooks instead use the discrete convention <code>1 + r</code> for one period; every formula below converts by replacing <code>e^{rT}</code> with <code>1 + r</code>, and nothing else changes.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One-step binomial tree showing the underlying price and derivative payoff in the up and down states">
+      <defs>
+        <marker id="treeArrBin1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#52525b"/>
+        </marker>
+        <linearGradient id="upGradBin1" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#0f766e"/>
+          <stop offset="100%" stop-color="#14b8a6"/>
+        </linearGradient>
+        <linearGradient id="downGradBin1" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#b45309"/>
+          <stop offset="100%" stop-color="#d97706"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="28" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">The one-step tree: one asset, two states, two dates</text>
+
+      <text x="130" y="60" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#71717a">time 0</text>
+      <text x="695" y="60" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#71717a">time T</text>
+
+      <circle cx="130" cy="210" r="48" fill="#f4f4f5" stroke="#18181b" stroke-width="1.5"/>
+      <text x="130" y="204" text-anchor="middle" font-family="Inter" font-weight="700" font-size="16" fill="#18181b">S</text>
+      <text x="130" y="224" text-anchor="middle" font-family="JetBrains Mono" font-size="9.5" fill="#52525b">price today</text>
+
+      <line x1="177" y1="185" x2="590" y2="95" stroke="url(#upGradBin1)" stroke-width="3" marker-end="url(#treeArrBin1)"/>
+      <line x1="177" y1="235" x2="590" y2="325" stroke="url(#downGradBin1)" stroke-width="3" marker-end="url(#treeArrBin1)"/>
+
+      <rect x="300" y="110" width="90" height="26" rx="13" fill="#0f766e"/>
+      <text x="345" y="128" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#ffffff">&times; u</text>
+
+      <rect x="300" y="280" width="90" height="26" rx="13" fill="#b45309"/>
+      <text x="345" y="298" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#ffffff">&times; d</text>
+
+      <rect x="610" y="55" width="175" height="82" rx="10" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+      <text x="697" y="80" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#134e4a">uS</text>
+      <text x="697" y="100" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59">derivative pays</text>
+      <text x="697" y="120" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#134e4a">f_u</text>
+
+      <rect x="610" y="285" width="175" height="82" rx="10" fill="#fffbeb" stroke="#b45309" stroke-width="1.5"/>
+      <text x="697" y="310" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#7c2d12">dS</text>
+      <text x="697" y="330" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e">derivative pays</text>
+      <text x="697" y="350" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#7c2d12">f_d</text>
+
+      <text x="400" y="398" text-anchor="middle" font-family="Inter" font-style="italic" font-size="11.5" fill="#71717a">The real-world probability of the up move never enters the price. Only u, d, r and T do.</text>
+    </svg>
+    <figcaption>One period, one asset, two states. The derivative payoffs <code>f_u</code> and <code>f_d</code> are whatever the contract specifies: for a call struck at <code>K</code>, $f_u = \max(uS - K, 0)$ and $f_d = \max(dS - K, 0)$, but the replication argument below works for any payoff attached to these two nodes.</figcaption>
+  </figure>
+
+  <h3>Picture two: why a straight line is enough</h3>
+
+  <p>A portfolio of <code>&Delta;</code> shares and <code>B</code> in the bond has time-<code>T</code> value $\Delta S_T + B e^{rT}$, which is a straight line in the terminal share price <code>S_T</code>. A general derivative payoff, such as a call, is not a straight line: it is flat below the strike and rising above it. The two disagree almost everywhere as functions of <code>S_T</code>. But the binomial model does not ask the line to match the payoff everywhere; it only asks the two to agree at the two values <code>S_T</code> is actually allowed to take, <code>dS</code> and <code>uS</code>. Two points determine a line uniquely, so a match at exactly two points is always achievable, regardless of how kinked the true payoff is in between. This is the entire reason the single-period model is exactly solvable: the randomness has only two outcomes, and a straight line has exactly enough freedom (an intercept and a slope) to hit two prescribed points.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Replicating portfolio value as a straight line coinciding with the kinked derivative payoff at the two tree nodes">
+      <defs>
+        <marker id="axisArrBin1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="400" y="28" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Replication is exact where it needs to be: at the two nodes</text>
+
+      <!-- Axes -->
+      <line x1="60" y1="260" x2="760" y2="260" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrBin1)"/>
+      <line x1="80" y1="370" x2="80" y2="50" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrBin1)"/>
+      <text x="755" y="282" text-anchor="end" font-family="Inter" font-size="12" fill="#71717a">S_T</text>
+      <text x="60" y="45" font-family="Inter" font-size="12" fill="#71717a">value</text>
+
+      <!-- Kinked true payoff, dashed -->
+      <path d="M 100 260 L 410 260 L 630 60" fill="none" stroke="#b45309" stroke-width="3" stroke-dasharray="8 6" stroke-linecap="round"/>
+
+      <!-- Straight replicating line, solid -->
+      <line x1="135" y1="310" x2="685" y2="60" stroke="#0f766e" stroke-width="3.5" stroke-linecap="round"/>
+
+      <!-- K marker -->
+      <line x1="410" y1="255" x2="410" y2="265" stroke="#18181b" stroke-width="2"/>
+      <rect x="396" y="270" width="28" height="18" rx="3" fill="#18181b"/>
+      <text x="410" y="283" text-anchor="middle" font-family="Inter" font-weight="600" font-size="10.5" fill="#ffffff">K</text>
+
+      <!-- Down node -->
+      <circle cx="245" cy="260" r="7" fill="#18181b"/>
+      <line x1="245" y1="260" x2="245" y2="330" stroke="#71717a" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="245" y="350" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#18181b">dS</text>
+      <text x="180" y="245" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">(dS, f_d)</text>
+
+      <!-- Up node -->
+      <circle cx="575" cy="110" r="7" fill="#18181b"/>
+      <line x1="575" y1="110" x2="575" y2="330" stroke="#71717a" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="575" y="350" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#18181b">uS</text>
+      <text x="640" y="100" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">(uS, f_u)</text>
+
+      <!-- Legend -->
+      <rect x="470" y="330" width="18" height="4" fill="#0f766e"/>
+      <text x="494" y="335" font-family="Inter" font-size="11.5" fill="#134e4a">replicating portfolio, &Delta;S_T + Be^{rT} (straight, all S_T)</text>
+      <rect x="470" y="352" width="18" height="4" fill="#b45309" stroke-dasharray="3 3"/>
+      <text x="494" y="357" font-family="Inter" font-size="11.5" fill="#7c2d12">true derivative payoff (kinked, agrees only at the two nodes)</text>
+    </svg>
+    <figcaption>The straight teal line is the replicating portfolio's value as a function of the terminal share price. The dashed amber line is a generic kinked payoff, a call in this sketch. The two curves are entirely different functions, yet they meet exactly at the two dots, because those are the only two values <code>S_T</code> can take. That agreement at two points is all the no-arbitrage argument needs.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The no-arbitrage condition on the parameters</h3>
+
+  <p>Not every choice of <code>u</code>, <code>d</code> and <code>r</code> describes a market free of arbitrage. The condition that rules out the obvious cheats is</p>
+
+  <p>$$ d \; < \; e^{rT} \; < \; u. $$</p>
+
+  <div class="defcard">
+    <div class="term">No-arbitrage condition</div>
+    <div class="def">The risk-free bond's growth factor <code>e^{rT}</code> must sit strictly between the down factor <code>d</code> and the up factor <code>u</code>. Read economically: the risky asset must be able to beat the bond in at least one state (else nobody would hold it) and must be able to lose to the bond in at least one state (else it would be a bond with extra steps, and shorting it against the bond would be a free lunch).</div>
+  </div>
+
+  <p>Both directions of the inequality are provable by explicit construction, not just by appeal to intuition. Suppose first that $e^{rT} \le d$, so that the down state alone already beats or matches the bond. Then both states beat or match the bond, and the following portfolio is an arbitrage.</p>
+
+  <div class="worked">Suppose e^{rT} <= d (the bond never beats the stock, in either state).
+
+Trades at time 0 (net cost zero):
+  1. Borrow S in cash at the risk-free rate.            cash  +S
+  2. Buy one unit of the underlying for S.               cash  -S
+                                                          ------
+                                                   Net cost: 0
+
+At time T:
+  Loan has grown to S * exp(rT), which must be repaid.   outflow  S * exp(rT)
+  Stock is worth either uS (up) or dS (down).
+
+  Up state payoff:    uS - S*exp(rT)  =  S(u - exp(rT))   >  0   since u > d >= exp(rT)
+  Down state payoff:   dS - S*exp(rT) =  S(d - exp(rT))  >= 0   since d >= exp(rT)
+
+The portfolio costs nothing today, is never worth less than zero at T, and is worth
+strictly more than zero in the up state. That is an arbitrage, so e^{rT} <= d cannot hold.</div>
+
+  <p>The mirror case runs the same way. Suppose instead that $e^{rT} \ge u$, so the up state no longer even matches the bond.</p>
+
+  <div class="worked">Suppose e^{rT} >= u (the stock never beats the bond, in either state).
+
+Trades at time 0 (net cost zero):
+  1. Short one unit of the underlying, receiving S.       cash  +S
+  2. Invest the proceeds S in the risk-free bond.         cash  -S
+                                                          ------
+                                                   Net cost: 0
+
+At time T:
+  Bond investment has grown to S * exp(rT).               inflow   S * exp(rT)
+  Must buy back the stock at either uS (up) or dS (down) to close the short.
+
+  Up state payoff:    S*exp(rT) - uS  =  S(exp(rT) - u)  >= 0   since exp(rT) >= u
+  Down state payoff:  S*exp(rT) - dS  =  S(exp(rT) - d)   >  0   since exp(rT) >= u > d
+
+The portfolio again costs nothing, never loses, and strictly profits in the down state.
+That is an arbitrage, so e^{rT} >= u cannot hold either.</div>
+
+  <p>Between these two forbidden regions lies exactly one surviving possibility, $d < e^{rT} < u$, and it is the condition assumed for the rest of this lecture. Every quoted binomial tree you will meet, whether hand-built or calibrated by the Cox-Ross-Rubinstein rule in lecture 5, must satisfy it, or the tree is internally inconsistent and admits a free lunch somewhere in its branches.</p>
+
+  <h3>Replication: solving for &Delta; and B</h3>
+
+  <p>The replicating portfolio holds <code>&Delta;</code> units of the underlying and <code>B</code> in the bond, chosen so that its time-<code>T</code> value matches the derivative's payoff in both states:</p>
+
+  <p>$$ \Delta \, uS + B\, e^{rT} = f_u, \qquad \Delta \, dS + B\, e^{rT} = f_d. $$</p>
+
+  <p>Two linear equations, two unknowns. Subtracting the second from the first eliminates <code>B</code> and isolates <code>&Delta;</code> immediately:</p>
+
+  <p>$$ \Delta \, (u - d) S = f_u - f_d \quad \Longrightarrow \quad \Delta = \frac{f_u - f_d}{(u-d)S}. $$</p>
+
+  <p>Substituting back into either equation and solving for <code>B</code> gives</p>
+
+  <p>$$ B = e^{-rT} \, \frac{u f_d - d f_u}{u - d}. $$</p>
+
+  <p><code>&Delta;</code> has two readings worth holding onto simultaneously. First, it is the <strong>hedge ratio</strong>: the number of shares a desk must hold against one unit of the derivative to be immunised against the next move in the underlying, whichever way it goes. Second, it is a <strong>discrete derivative</strong> in the calculus sense: $\Delta = (f_u - f_d) / (uS - dS)$ is exactly the slope "change in derivative value divided by change in underlying value" between the two states, the discrete-time ancestor of the continuous-time Greek $\partial f/\partial S$ you will meet properly once Black-Scholes gives <code>f</code> a smooth dependence on <code>S</code>.</p>
+
+  <h3>The price as the cost of replication, and its risk-neutral twin</h3>
+
+  <p>No-arbitrage forces the derivative's price today to equal the cost of building the replicating portfolio, by exactly the same contradiction argument used for forwards in lecture 1: if the derivative traded for anything else, buying the cheaper of the two and selling the dearer would be a zero-cost portfolio with a guaranteed positive payoff. So</p>
+
+  <p>$$ f_0 = \Delta S + B. $$</p>
+
+  <p>Substituting the formulas for <code>&Delta;</code> and <code>B</code> and simplifying algebraically turns this into a strikingly different-looking, but numerically identical, expression:</p>
+
+  <p>$$ f_0 = e^{-rT} \left[ \left( \frac{e^{rT} - d}{u - d} \right) f_u \; + \; \left( \frac{u - e^{rT}}{u - d} \right) f_d \right]. $$</p>
+
+  <p>Define <code>q = (e^{rT} - d) / (u - d)</code>. The bracket becomes <code>q f_u + (1-q) f_d</code>, and the price reads as a discounted expected value:</p>
+
+  <p>$$ \boxed{\; f_0 = e^{-rT} \bigl( q\, f_u + (1-q)\, f_d \bigr), \qquad q = \frac{e^{rT} - d}{u - d}. \;} $$</p>
+
+  <p><code>q</code> is a genuine probability, meaning $0 < q < 1$, precisely when the no-arbitrage condition holds. Write it out: $q > 0$ requires $e^{rT} > d$, and $q < 1$ requires $e^{rT} < u$ (check: $q<1 \iff e^{rT}-d < u-d \iff e^{rT}<u$). These are exactly the two halves of $d < e^{rT} < u$ proved by construction above. The algebra and the arbitrage argument are the same fact wearing two outfits: a valid probability exists exactly when a free lunch does not.</p>
+
+  <h3>The risk-neutral measure makes the discounted stock a martingale</h3>
+
+  <p>The construction of <code>q</code> was aimed at the derivative's payoff, but it does something to the underlying too that is worth checking directly. Compute the expected time-<code>T</code> stock price under <code>q</code>:</p>
+
+  <p>$$ \mathbb{E}^{\mathbb{Q}}[S_T] = q\, uS + (1-q)\, dS = S \bigl[ u q + d(1-q) \bigr]. $$</p>
+
+  <p>Substitute $q = (e^{rT}-d)/(u-d)$ and simplify the bracket:</p>
+
+  <p>$$ uq + d(1-q) = d + (u-d) q = d + (e^{rT} - d) = e^{rT}. $$</p>
+
+  <p>So $\mathbb{E}^{\mathbb{Q}}[S_T] = S e^{rT}$: under the risk-neutral measure, the expected terminal stock price is exactly the current spot grown forward at the risk-free rate. Equivalently, the discounted stock price $e^{-rt} S_t$ is a martingale under <code>Q</code>, the discrete single-step version of the property that will reappear throughout the stochastic calculus block of this course. This is not a coincidence sitting alongside lecture 1; it is the same object. Lecture 1 showed $F(0) = S e^{rT}$ for the forward price and separately that $F(0) = \mathbb{E}^{\mathbb{Q}}[S_T]$. The binomial model has just rebuilt that identity from first principles, using nothing but the replication argument applied to the underlying asset itself (which trivially replicates itself, with $\Delta=1$, $B=0$).</p>
+
+  <div class="callout insight">
+    <span class="tag">The point everyone resists at first</span>
+    The real-world probability <code>p</code> of the up move, whatever an analyst genuinely believes it to be, appears in neither <code>f_0 = \Delta S + B</code> nor its risk-neutral rewriting. This feels wrong the first time you see it: surely a more likely outcome should be worth more? The resolution is that the price was never an expectation under the real-world measure to begin with. It is the cost of a hedge, built entirely from <code>u</code>, <code>d</code>, <code>S</code> and <code>r</code>, none of which encode how likely either branch is. <code>q</code> is not a forecast smuggled in through the back door; it is simply the set of weights that make the no-arbitrage price look like an expectation, chosen after the fact to make the algebra readable. Two traders with wildly different views on <code>p</code> will still agree on <code>f_0</code>, because both are pricing the same hedge, not making the same bet.
+  </div>
+
+  <h3>Worked example: a one-year call and put on the same tree</h3>
+
+  <p>Let $S = 100$, $u = 1.2$, $d = 0.9$, $r = 5\%$ continuously compounded, $T = 1$ year. First check the no-arbitrage condition: $d = 0.9 < e^{0.05} = 1.05127 < u = 1.2$, so the tree is arbitrage-free and <code>q</code> is a genuine probability.</p>
+
+  <div class="worked">Step 1: the risk-neutral probability
+  q = (exp(rT) - d) / (u - d) = (1.05127 - 0.9) / (1.2 - 0.9) = 0.15127 / 0.3 = 0.50424
+  1 - q = 0.49576
+
+Step 2: the call, struck at K = 105
+  Up state:    f_u = max(uS - K, 0) = max(120 - 105, 0) = 15
+  Down state:  f_d = max(dS - K, 0) = max(90 - 105, 0)  = 0
+
+  Price:  C = exp(-rT) * (q * 15 + (1-q) * 0)
+            = 0.95123 * (0.50424 * 15) = 0.95123 * 7.5636 = 7.1947
+
+  Delta = (f_u - f_d) / ((u-d)S) = (15 - 0) / (0.3 * 100) = 0.5
+  B     = exp(-rT) * (u*f_d - d*f_u) / (u-d)
+        = 0.95123 * (1.2*0 - 0.9*15) / 0.3 = 0.95123 * (-45) = -42.8053
+
+  Check f_0 = Delta*S + B = 0.5*100 - 42.8053 = 50 - 42.8053 = 7.1947   matches
+
+Step 3: verify the replication in both states
+  Up:    Delta*(uS) + B*exp(rT) = 0.5*120 + (-42.8053)*1.05127 = 60 - 45 = 15   = f_u
+  Down:  Delta*(dS) + B*exp(rT) = 0.5*90  + (-42.8053)*1.05127 = 45 - 45 = 0    = f_d
+
+Step 4: the put, same strike K = 105
+  Up state:    g_u = max(K - uS, 0) = max(105 - 120, 0) = 0
+  Down state:  g_d = max(K - dS, 0) = max(105 - 90, 0)  = 15
+
+  Price:  P = exp(-rT) * (q * 0 + (1-q) * 15)
+            = 0.95123 * (0.49576 * 15) = 0.95123 * 7.4364 = 7.0738
+
+  Delta_put = (g_u - g_d) / ((u-d)S) = (0 - 15) / 30 = -0.5
+  B_put     = exp(-rT) * (u*g_d - d*g_u) / (u-d) = 0.95123 * (1.2*15) / 0.3 = 57.0738
+
+Step 5: put-call parity, from lecture 2
+  C - P  =  7.1947 - 7.0738 = 0.1209
+  S - K*exp(-rT)  =  100 - 105*0.95123 = 100 - 99.8791 = 0.1209   matches exactly</div>
+
+  <p>Every number closes exactly, which is not a rounding coincidence: the replication argument guarantees it by construction, and put-call parity from lecture 2 is simply the binomial call price and put price sharing the same <code>S</code>, <code>K</code>, <code>r</code> and <code>T</code>. The put's hedge is short half a share and long cash in the bond, the mirror image of the call's hedge of long half a share and borrowed cash, which is exactly what put-call parity says a synthetic position should look like.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Aspect</th><th>Replication view</th><th>Risk-neutral view</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>What you solve first</td><td>&Delta; and B, from two linear equations in two unknowns</td><td><code>q</code>, from the no-arbitrage condition on <code>u, d, r</code></td></tr>
+        <tr><td>Price formula</td><td>$f_0 = \Delta S + B$</td><td>$f_0 = e^{-rT}(q f_u + (1-q) f_d)$</td></tr>
+        <tr><td>Role of the real-world probability <code>p</code></td><td>Never appears</td><td>Never appears; <code>q</code> is not an estimate of <code>p</code></td></tr>
+        <tr><td>What guarantees no arbitrage</td><td>The portfolio literally reproduces the payoff in both states, by construction</td><td><code>q</code> is a valid probability precisely when $d < e^{rT} < u$</td></tr>
+        <tr><td>What it hands a trading desk</td><td>The actual hedge: <code>&Delta;</code> shares and <code>B</code> in cash, to hold today</td><td>A fast pricing formula that extends cleanly to multi-period trees (lecture 4)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Why two states and two assets is exactly complete</h3>
+
+  <p>A market is <strong>complete</strong> if every conceivable derivative payoff can be replicated by trading in the assets already available. The single-period binomial model is complete because it has exactly two linearly independent assets, the stock and the bond, spanning exactly two states of the world. The system $\Delta uS + Be^{rT} = f_u$, $\Delta dS + Be^{rT} = f_d$ has a unique solution for <em>any</em> pair $(f_u, f_d)$, because its coefficient matrix is invertible whenever $u \ne d$. Change the model to three possible terminal prices (a trinomial step) while still trading only the stock and the bond, and the system becomes two equations in three unknowns: generically solvable for infinitely many $(\Delta, B, \Delta')$ combinations, none of them unique, and a derivative payoff that depends on which of the three states occurs can no longer be pinned to one price. What you get instead is a <em>range</em> of arbitrage-free prices, bounded by the cheapest and dearest of the replicating strategies subject to natural constraints. Completeness is not a generic feature of markets with randomness; it is a coincidence of counting that happens to hold when states and traded assets match exactly.</p>
+
+  <h3>The first and second fundamental theorems of asset pricing</h3>
+
+  <p>Stated informally, because the single-period binomial model makes both theorems checkable by hand rather than by measure theory. The <strong>first fundamental theorem</strong> says a market has no arbitrage if and only if there exists at least one equivalent martingale measure, a probability measure under which every discounted traded asset price is a martingale. In this lecture, that measure is <code>q</code>, and its existence (as a genuine probability strictly between 0 and 1) was shown above to be equivalent to $d < e^{rT} < u$, exactly the no-arbitrage condition. The <strong>second fundamental theorem</strong> says a no-arbitrage market is complete if and only if the equivalent martingale measure is unique. In the binomial model <code>q</code> is pinned down by a single equation with a single solution, so uniqueness (and hence completeness) is automatic; in the trinomial extension above, infinitely many probability triples make the discounted stock a martingale, matching the infinitely many replicating strategies and the resulting price range instead of a price point.</p>
+
+  <h3>Delta hedging is the practical content of the theory</h3>
+
+  <p>Strip away the measure theory and what a trading desk actually does with this lecture is compute <code>&Delta;</code> and hold that many shares against a short option position, rebalancing as <code>S</code>, <code>u</code> and <code>d</code> change from one period to the next. The entire apparatus of risk-neutral pricing exists to make that hedge ratio computable quickly and consistently across thousands of positions, not because anyone at the desk believes <code>q</code> describes the real world. Multi-period trees (lecture 4) repeat this single-period calculation backwards from maturity to today, one node at a time, with a new <code>&Delta;</code> computed at every node the tree passes through. Black-Scholes (lecture 10) is the continuous-time limit of exactly this rebalancing, with <code>&Delta;</code> becoming $\partial f/\partial S$ and the discrete two-state jump becoming instantaneous diffusion.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    It is tempting, especially once <code>q</code> has been computed and looks exactly like a probability, to read it as the market's forecast of the up move, or to back out an implied <code>p</code> from option prices and treat it as a consensus view. Resist this. <code>q</code> is a device for writing the no-arbitrage price as an expectation; it depends only on <code>u</code>, <code>d</code> and <code>r</code>, none of which say anything about how likely either state is. The real-world probability <code>p</code> matters enormously for other things, such as the expected return on holding the option unhedged, or for a risk manager estimating value at risk, but it plays no role whatsoever in the fair price, which is a replication cost and not a bet.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the no-arbitrage condition on <code>u</code>, <code>d</code> and <code>e^{rT}</code>. Explain in one sentence, without reference to <code>q</code>, why each of the two inequalities has to hold.</li>
+      <li>A tree has $u = 1.1$, $d = 1.05$, and $e^{rT} = 1.03$. Show this admits an arbitrage. Construct the trading strategy explicitly and compute its payoff in both states.</li>
+      <li>Derive <code>&Delta;</code> and <code>B</code> from the two replication equations $\Delta uS + Be^{rT} = f_u$ and $\Delta dS + Be^{rT} = f_d$, showing every algebraic step.</li>
+      <li>Show algebraically that $f_0 = \Delta S + B$ can be rewritten as $e^{-rT}(qf_u + (1-q)f_d)$ with $q = (e^{rT}-d)/(u-d)$.</li>
+      <li>Prove that $0 < q < 1$ if and only if $d < e^{rT} < u$.</li>
+      <li>Show that $\mathbb{E}^{\mathbb{Q}}[S_T] = Se^{rT}$ under the risk-neutral probability <code>q</code>, and explain in one sentence how this connects to the forward price from lecture 1.</li>
+      <li>Using $S=100$, $u=1.15$, $d=0.85$, $r=4\%$, $T=1$, price a call struck at $K=100$. Compute <code>q</code>, the price, <code>&Delta;</code> and <code>B</code>, and verify the replication in both states.</li>
+      <li>For the same tree as question 7, price the put struck at $K=100$ and check put-call parity against your call price.</li>
+      <li>Explain why a single-period model with three possible terminal stock prices, but still only a stock and a bond to trade, fails to be complete. What happens to the price of a payoff that depends on which of the three states occurs?</li>
+      <li>State the first and second fundamental theorems of asset pricing informally, in one sentence each, and explain which one is doing the work when we say the binomial model produces a unique price rather than a range.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="02-options.html">Options</a>, whose payoffs are the <code>f_u</code> and <code>f_d</code> this lecture takes as given; put-call parity from that lecture is exactly the identity checked in the worked example above.</li>
+      <li><a href="04-binomial_multi_period.html">Binomial model: multi-period, recursion and the CRR tree</a>, where this single step is applied recursively backwards from maturity, node by node, and the Cox-Ross-Rubinstein rule chooses <code>u</code> and <code>d</code> so the tree converges to a continuous diffusion.</li>
+      <li>Calibration of the binomial tree to market data (planned), where <code>q</code> reappears as the object implied by quoted option prices rather than assumed from <code>u</code> and <code>d</code>.</li>
+      <li>The Black-Scholes PDE and the risk-neutral solution (planned), the continuous-time limit of exactly the replication argument used here.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 3 - Binomial Single Period.pdf</code> (primary source)</li>
+      <li><code>UP / Notes.pdf</code>, sections 9.6 and 9.10 (finite-state models and risk-neutral pricing): the general <code>S</code>-state version of this lecture's two-state case, built from elementary state prices rather than a replicating portfolio</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 1 (Arbitrage Portfolios &amp; Single Step Binomial): carries this lecture's pricing and hedging formulae, $S_0=e^{-rT}[qS(\text{up})+(1-q)S(\text{down})]$, $V_0=e^{-rT}[qU+(1-q)D]$, $\Delta$ and $a$, in the source's own notation</li>
+      <li>Hull, <em>Options, Futures and Other Derivatives</em>, chapter 13 (one-step trees, replication, risk-neutral valuation)</li>
+      <li>Bj&ouml;rk, <em>Arbitrage Theory in Continuous Time</em>, chapters 2 and 3 (the one-period model, the two fundamental theorems)</li>
+      <li>Cox, Ross and Rubinstein (1979), <em>Option Pricing: a Simplified Approach</em>, the original paper</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The source already proves both directions of the no-arbitrage condition $d < e^{r\tau} < u$ by explicit arbitrage construction (borrow-and-buy when the down state already beats the bond; short-and-invest when the bond already beats the up state), closely matching the two constructions in section 4 above. This lecture's constructions restate the source's own proof in <code>u</code>/<code>d</code> notation rather than filling a gap.</li>
+      <li>The source already shows the discounted share price is a <code>Q</code>-martingale and names <code>Q</code> a risk-neutral or martingale measure directly from that identity. It does not, however, connect this to the forward price of lecture 1; that connection, and the observation that the two are "the same object," is this lecture's own addition.</li>
+      <li>The source has no discussion of market completeness, does not name the first or second fundamental theorem of asset pricing, and gives no trinomial (or any multi-state) counterexample. The whole of the grandmaster's-perspective treatment of completeness is new relative to the source.</li>
+      <li>The source parametrises the two terminal states directly as $S(\text{up})$ and $S(\text{down})$ and never introduces multiplicative factors <code>u</code>, <code>d</code>, so it does not require $d < 1 < u$ at all. This lecture's <code>u</code>/<code>d</code> notation is a convention layered on top ($u = S(\text{up})/S$, $d = S(\text{down})/S$), mathematically equivalent but worth flagging so the two are not mistaken for different models.</li>
+      <li>The source solves the two replication equations for $a$ and $b$ by Cramer's rule on the $2\times2$ system, rather than by the direct elimination used in section 4; both derivations reach the same $\Delta$ and $B$.</li>
+      <li>The source contains no numerical worked example; the $S=100$, $u=1.2$, $d=0.9$ example in section 4, and its check against put-call parity, is original to this lecture.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 3: the single-period binomial model</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

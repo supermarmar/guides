@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 4: the credibility transformer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="index.html">AI for actuaries</a></div>
+  <h1>The credibility transformer</h1>
+  <p class="subtitle">The deepest architecture in this course applies the tabular transformer's feature-tokenizer-plus-CLS-token idea, developed in the deep-learning sub-module, to a genuinely actuarial problem: letting a network's own attention mechanism discover, during ordinary training, a mechanism that behaves exactly like Bühlmann credibility weighting, with no credibility formula ever written into the architecture by hand.</p>
+  <div class="meta">
+    <span>Lecture 4 of 7</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Source: <em>AI Tools for Actuaries</em> (SSRN 5162304), ch. 3</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The deep-learning sub-module's <strong>feature tokenizer transformer</strong> embeds every covariate, categorical and continuous alike, into a common vector dimension, treats each embedded covariate as a "token" in a sequence, and prepends a learned <strong>CLS token</strong> that, after passing through the transformer's self-attention layers, aggregates information from every other token into a single summary vector used for the final prediction. The <strong>credibility transformer</strong> extends this architecture with one further, deliberately actuarial addition: alongside the ordinary covariate tokens, a dedicated <strong>prior token</strong> represents a stable, collateral (population-level) estimate, directly analogous to the collateral mean in a Bühlmann credibility formula, and is included in the attention computation on an equal footing with the genuine covariate tokens. During training, a <strong>Bernoulli credibility mechanism</strong> (a coin-flip regularisation device, randomly withholding the individual-level tokens with some probability during stochastic gradient descent) forces the network to learn to fall back sensibly on the prior token whenever individual-level information is unavailable or noisy, exactly the behaviour a credibility formula's weight $Z$ produces by explicit construction. The remarkable empirical and theoretical result this architecture demonstrates is that the learned attention weight the network places on the prior token, versus the individual covariate tokens, in the fully-trained model's own attention row, recovers something functionally equivalent to the Bühlmann credibility weight $Z$, discovered entirely by gradient descent rather than derived by hand. <strong>Integrated variable importance</strong> then extends the LocalGLMnet-style sparsity diagnostic from lecture 3 to this deeper, attention-based architecture, summing attention weight contributions across the whole network to attribute the final prediction back to individual covariates.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine training a new pricing analyst by repeatedly hiding some of their usual data sources at random and asking them to still produce a sensible quote, sometimes with full information, sometimes with almost none. Forced to cope with missing individual data often enough during training, the analyst learns, without ever being handed an explicit formula, exactly how much weight to place on the specific policy's own history versus the wider book's average experience whenever the specific history happens to be thin or unavailable, precisely the balance a credibility formula computes explicitly. The credibility transformer is this training regime made literal: the Bernoulli mechanism randomly withholds individual-level tokens during training, and the network discovers, through nothing but gradient descent under that regime, a fallback behaviour functionally identical to Bühlmann credibility weighting.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What is beyond the source</span>
+    The source develops the credibility transformer's architecture and its Bühlmann-equivalence result directly. This lecture makes the connection to lecture 3's LocalGLMnet sparsity test explicit by developing integrated variable importance as its direct generalisation to an attention-based architecture, and draws out precisely why the Bernoulli mechanism is the specific device that forces credibility-like behaviour to emerge, rather than treating the emergence as an unexplained empirical curiosity.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the credibility transformer earns its place as this course's deepest architecture rather than being a purely academic curiosity.</p>
+
+  <p>First, <strong>the Bühlmann-equivalence result is a genuine, independent validation of over a century of actuarial theory, not merely a clever engineering trick</strong>: a modern, general-purpose deep-learning architecture, trained with no credibility formula ever written into its structure, rediscovering behaviour functionally equivalent to Bühlmann credibility weighting is strong, independent evidence that credibility theory was capturing something real and general about how sparse and stable information should be blended, not an artefact specific to the linear, closed-form actuarial derivation.</p>
+
+  <p>Second, <strong>the architecture handles the scarce-data problem from lecture 1 directly and by design, rather than as an afterthought</strong>: because the network is explicitly trained, via the Bernoulli mechanism, to cope gracefully with missing or thin individual-level information, it is structurally well suited to precisely the small-sample actuarial settings (a newly launched product line, a thinly observed policyholder) this entire course has repeatedly flagged as the point of genuine difference between actuarial and mainstream machine-learning data.</p>
+
+  <p>Third, <strong>integrated variable importance gives this deepest, least directly interpretable architecture in the course a genuine, quantitative interpretability tool</strong>, addressing head-on the fear that the most flexible architecture in the course is also the least defensible to a validator; a credibility transformer's predictions can still be attributed back to specific covariates with a specific, reproducible number, not merely asserted to be sensible on faith.</p>
+
+  <div class="callout insight">
+    <span class="tag">A worked comparison</span>
+    A reserving team fitted a credibility transformer to a portfolio segment with widely varying policy tenure, some policyholders with a decade of claims history, others newly onboarded with almost none. Inspecting the trained model's learned attention weight on the prior token across policyholders of different tenure, the team found the weight on the prior token decreased smoothly and monotonically as a policyholder's own claims history lengthened, precisely the shape a Bühlmann credibility weight $Z_l = n_l/(n_l+k)$ traces as $n_l$ grows, a shape nobody had told the network to produce. Overlaying the network's learned weight curve directly against a conventionally fitted Bühlmann credibility curve on the identical data showed the two tracking each other closely across the full range of tenure, a genuine, independent cross-check that gave the team real confidence in the network's behaviour on the thinnest, newest policies, exactly the population a validator would scrutinise most closely.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Picture a row of tokens entering a transformer's attention mechanism, the individual covariate tokens alongside a dedicated prior token representing the stable, collateral estimate, with the CLS token's final attention weights across that row settling, after training under the Bernoulli mechanism, into a pattern that mirrors a Bühlmann credibility weight exactly.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 780 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A CLS token attending across covariate tokens and a prior token, with the learned weight on the prior token mirroring Bühlmann credibility">
+      <text x="390" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Attention over covariate tokens and a dedicated prior token</text>
+
+      <circle cx="120" cy="150" r="30" fill="#7c3aed"/>
+      <text x="120" y="146" text-anchor="middle" font-family="Inter" font-size="10" fill="#ffffff" font-weight="700">CLS</text>
+      <text x="120" y="160" text-anchor="middle" font-family="Inter" font-size="8" fill="#ede9fe">summary</text>
+
+      <g font-family="Inter" font-size="9">
+        <rect x="230" y="60" width="90" height="40" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="275" y="84" text-anchor="middle" fill="#115e59">age token</text>
+
+        <rect x="230" y="115" width="90" height="40" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="275" y="139" text-anchor="middle" fill="#115e59">region token</text>
+
+        <rect x="230" y="170" width="90" height="40" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="275" y="194" text-anchor="middle" fill="#115e59">history token</text>
+
+        <rect x="230" y="225" width="90" height="40" rx="6" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="275" y="249" text-anchor="middle" fill="#92400e" font-weight="700">prior token</text>
+      </g>
+
+      <path d="M 150 145 L 225 80" stroke="#0d9488" stroke-width="1.2" opacity="0.6"/>
+      <path d="M 150 148 L 225 135" stroke="#0d9488" stroke-width="1.8" opacity="0.75"/>
+      <path d="M 150 152 L 225 190" stroke="#0d9488" stroke-width="1.2" opacity="0.6"/>
+      <path d="M 150 158 L 225 245" stroke="#b45309" stroke-width="3" opacity="0.9"/>
+
+      <rect x="380" y="80" width="360" height="200" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="560" y="105" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">After training under the Bernoulli mechanism</text>
+      <text x="560" y="135" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">weight on the prior token, as a function</text>
+      <text x="560" y="150" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">of the policyholder's own tenure,</text>
+      <text x="560" y="165" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">traces the identical curve as</text>
+      <text x="560" y="180" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">$Z_l = n_l / (n_l + k)$</text>
+      <text x="560" y="210" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">discovered entirely by gradient descent,</text>
+      <text x="560" y="225" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">with no credibility formula written into the architecture</text>
+    </svg>
+    <figcaption>The CLS token attends across every covariate token and, distinctively, a dedicated prior token representing the stable, collateral estimate (the thick line, weighted more heavily here to represent a thin-history policyholder). Trained under the Bernoulli mechanism, which forces the network to cope with individual tokens being randomly withheld, the network's learned attention weight on the prior token settles into a shape functionally equivalent to the Bühlmann credibility weight, exactly the reserving vignette's finding.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A credibility formula is a hand-derived special case of what an attention mechanism can discover on its own.</strong> The Bühlmann-equivalence result is not a coincidence engineered into the architecture; it emerges from training under a specific, deliberately chosen regularisation regime. <strong>Forcing a model to cope with missing information is what teaches it credibility.</strong> The Bernoulli mechanism's random withholding is the exact training discipline that produces this behaviour; without it, nothing forces the network to learn a graceful fallback at all.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Recap: feature tokenizer and CLS token</h3>
+
+  <p>The deep-learning sub-module's <strong>tabular transformer</strong> lecture develops the feature tokenizer transformation, embedding every covariate (categorical via a learned lookup, continuous via a learned linear projection) into a common vector dimension, and the <strong>CLS token</strong>, a learned vector prepended to the sequence of embedded covariate tokens that, after the transformer's self-attention layers process the whole sequence, has aggregated information from every token into a single summary representation, subsequently decoded into a prediction. This architecture is the direct prerequisite for everything in this lecture; a reader unfamiliar with it should revisit that lecture before continuing.</p>
+
+  <h3>The prior token</h3>
+
+  <p>The credibility transformer's single distinguishing addition is a <strong>prior token</strong>, a further embedded vector, alongside the ordinary covariate tokens, representing a stable, population-level (collateral) estimate rather than any individual policyholder's own covariate value. This token participates in the self-attention computation on an equal footing with every genuine covariate token, meaning the CLS token's final summary is free to attend to the prior token more or less heavily depending on what the rest of the input suggests is appropriate, exactly the mechanism that, once trained correctly, produces credibility-like behaviour.</p>
+
+  <h3>The Bernoulli credibility mechanism</h3>
+
+  <p>During stochastic gradient descent, a <strong>Bernoulli credibility mechanism</strong> randomly withholds the individual-level covariate tokens with some fixed probability at each training step, forcing the network, on those specific training steps, to produce a sensible prediction using little or nothing beyond the prior token. Because this happens repeatedly and randomly throughout training, the network cannot simply memorise a fixed weighting between the prior token and the individual tokens; it must instead learn a genuinely adaptive rule, placing more weight on individual information when that information is present and reliable, and falling back more heavily on the prior token when it is not, exactly the behaviour this lecture's Feynman test and worked comparison both illustrate directly.</p>
+
+  <h3>The hidden Bühlmann credibility formula inside the attention row</h3>
+
+  <p>Once trained, the CLS token's learned attention weight on the prior token, examined as a function of how much individual-level information a given input actually carries (a policyholder's tenure, or the number of prior observations for that policyholder), reproduces, closely and empirically, the shape of a Bühlmann credibility weight $Z_l = n_l/(n_l+k)$: near zero when individual information is sparse, rising smoothly towards one as individual information accumulates. This is the architecture's central result: nowhere in the model's specification is a credibility formula written down explicitly, yet the specific combination of a dedicated prior token and Bernoulli-regularised training produces behaviour functionally equivalent to one, a genuine, independent piece of evidence that Bühlmann credibility theory was capturing a real, general statistical regularity rather than an artefact of its own particular closed-form derivation.</p>
+
+  <h3>The decoder and integrated variable importance</h3>
+
+  <p>After the transformer's attention layers, the CLS token's final summary vector is passed through a standard decoder (a small feed-forward network) to produce the final prediction, exactly as in the ordinary tabular transformer. <strong>Integrated variable importance</strong> extends the LocalGLMnet-style sparsity diagnostic from lecture 3 to this deeper architecture by summing each covariate token's total attention-weighted contribution to the CLS token's final summary across every attention layer (rather than reading off a single layer's weights in isolation, which can be misleading in a genuinely deep, multi-layer transformer), giving a single, aggregated importance score per covariate that is more robust to the specific quirks of any one attention layer and directly comparable across covariates.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The Bühlmann-equivalence result is evidence, not a proof, and should be checked on your own data</h3>
+  <p>The empirical finding that a trained credibility transformer's attention weights mirror a Bühlmann credibility curve is a strong, genuinely reassuring result, but it is an empirical regularity observed across the specific settings it has been tested on, not a theorem guaranteeing the identical behaviour on every dataset. The grandmaster discipline, illustrated directly in this lecture's reserving vignette, is to check the correspondence directly on your own data (plotting the learned prior-token weight against tenure or sample size and comparing it to a conventionally fitted credibility curve) rather than assuming the equivalence holds without verification.</p>
+
+  <h3>The Bernoulli withholding probability is itself a meaningful hyperparameter</h3>
+  <p>A withholding probability set too low gives the network too little incentive to learn a genuine fallback behaviour, since individual information is rarely actually missing during training; set too high, and the network may learn an overly conservative reliance on the prior token even when good individual information genuinely is available. Tuning this probability is not a purely technical exercise, it is directly analogous to setting the credibility standard $k$ in a conventional Bühlmann calculation, and should be informed by the same actuarial judgement about how much individual data genuinely warrants trust in the specific line of business at hand.</p>
+
+  <h3>Integrated variable importance is a genuine interpretability tool, not a full substitute for LocalGLMnet's transparency</h3>
+  <p>Integrated variable importance gives a useful, aggregated importance score, but it does not give the same directly-inspectable, per-observation coefficient function that a LocalGLMnet supplies. For a decision genuinely requiring the fullest possible transparency into how a specific covariate's effect varies across the population, a LocalGLMnet (lecture 3) may remain the more defensible choice even where a credibility transformer achieves marginally better raw predictive accuracy; the choice between the two is, once again, the eight-properties trade-off from lecture 1, not a strict dominance of one architecture over the other.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Describe the prior token, and explain what distinguishes it from an ordinary covariate token in the credibility transformer's attention computation.</li>
+      <li>Describe the Bernoulli credibility mechanism, and explain why it is the specific device that forces credibility-like behaviour to emerge during training.</li>
+      <li>State the Bühlmann-equivalence result, and explain in what sense it is evidence rather than a formal proof.</li>
+      <li>Explain how integrated variable importance generalises the LocalGLMnet sparsity test from lecture 3 to a deeper, multi-layer architecture.</li>
+      <li>Explain why the Bernoulli withholding probability is described as a meaningful hyperparameter rather than a purely technical setting.</li>
+      <li>In the reserving vignette, explain precisely what the team compared, and why that comparison specifically addressed a validator's likely concern.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next in this course</h4>
+    <ul>
+      <li><a href="05-generative_and_llm_applications.html">Lecture 5: generative and LLM applications</a>, which turns from actuarial-specific supervised architectures to where generative models and large language models genuinely help.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li>Wüthrich, Richman, Avanzi, Lindholm, Maggi, Mayer, Schelldorfer and Scognamiglio, <em>AI Tools for Actuaries</em>, chapter 3 (version 20 January 2026, <a href="https://ssrn.com/abstract=5162304">https://ssrn.com/abstract=5162304</a>, CC BY-NC).</li>
+    </ul>
+    <h4>Cross-references</h4>
+    <ul>
+      <li>The <a href="../../machine_learning/05_deep_learning/09-tabular_transformers.html">tabular transformers</a> lecture develops the feature tokenizer and CLS token this lecture builds on directly.</li>
+      <li>The <a href="../04_risk_modelling/07-credibility_theory.html">credibility theory</a> lecture derives the Bühlmann credibility formula this lecture's architecture is shown to rediscover empirically.</li>
+      <li><a href="03-actuarial_network_architectures.html">Lecture 3</a>'s LocalGLMnet sparsity test is the direct predecessor of this lecture's integrated variable importance.</li>
+    </ul>
+    <h4>Further reading</h4>
+    <ul>
+      <li>Richman and Wüthrich (2024), "Credibility transformers". The original architecture and Bühlmann-equivalence result.</li>
+      <li>Devlin, Chang, Lee and Toutanova (2019), "BERT: pre-training of deep bidirectional transformers". The original CLS-token mechanism this lecture's architecture builds on.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All AI for actuaries lectures</a></span>
+  <span>Lecture 4 of 7: the credibility transformer</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+
+</body>
+</html>

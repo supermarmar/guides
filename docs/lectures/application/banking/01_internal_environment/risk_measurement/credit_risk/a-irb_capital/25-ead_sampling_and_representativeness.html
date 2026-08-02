@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EAD sampling and representativeness</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>EAD sampling and representativeness</h1>
+  <p class="subtitle">Fixed 12-month-horizon sampling produces one row per default event drawn from one snapshot, which is cleaner than PD's overlapping cohorts and faster than LGD's MRP-truncated workouts. The representativeness diagnostics transfer directly from PD with minor adjustments for the EAD-specific feature set (utilisation, limit, balance).</p>
+  <div class="meta">
+    <span>A-IRB 25 of n &mdash; EAD 3 of 7</span>
+    <span>Reading time, 25 minutes</span>
+    <span>Sources: <code>04_feature_engineering/ead/03-sampling.md</code>, <code>04-data-representativeness.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">EAD sampling differs from PD sampling in one critical structural way: the development sample is built with a <strong>fixed 12-month horizon</strong> rather than overlapping monthly cohorts. For each monthly snapshot in the development window, the bank identifies the facilities active at the snapshot, filters to those that default exactly 12 months later, records the realised EAD at the default event, and computes EADF = EAD / limit at observation. The 12 monthly snapshots in a single development year produce 12 non-overlapping cohorts; each default contributes exactly one row, drawn from the snapshot 12 months prior to its default date. This automatic non-overlap removes the de-duplication and correlation problems that motivated PD's sample-design discussions.</p>
+
+  <p>Four samples emerge from the same machinery: the <strong>development sample</strong> (twelve monthly fixed-horizon cohorts, typically from the most recent calendar year that has a full 12 months of outcome data); the <strong>calibration sample</strong> (37 quarterly snapshots over the LRA window, used to anchor the LRA and downturn EADF in lecture 28); the <strong>OOS sample</strong> (an 80/20 random split of the development sample, valid because the fixed horizon gives row-level independence); and the <strong>OOT sample</strong> (a single snapshot from the most recent fully-observable date, reserved entirely for temporal validation).</p>
+
+  <p>Representativeness diagnostics are the same as PD: PSI on key risk drivers between development and application populations, chi-square goodness-of-fit, CDI on individual model variables, time-series checks on DoD components, and macro representativeness for the calibration sample. CRR Article 174(c) and PRA SS4/24 §8.2 to §8.15 are the legal anchors, exactly as for PD. The diagnostic battery is operationally lighter than for PD or LGD because the smaller sample produces tighter and faster computations.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    PD sampling worried about the correlation between snapshots of the same obligor; LGD sampling worried about the survivorship bias from resolved versus unresolved workouts. EAD sampling has neither problem. The fixed 12-month horizon means each default contributes exactly one row (no correlation), and the at-default capture means the row is finalised the moment default occurs (no waiting for resolution). The cleaner sample geometry is the structural benefit of the EAD framing; representativeness is then the only remaining design question.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The fixed-horizon construction is the structural advantage of the EAD sampling design. PD's overlapping-cohort approach gave each obligor potentially dozens of rows (one per snapshot during their performing life) and required explicit de-duplication to one row per facility before fitting; LGD's resolved-only approach excluded any facility whose workout was still in progress and required the MRP waiting period; EAD's fixed-horizon approach sidesteps both by tying each row to a unique default event at a specific snapshot date. The cleaner geometry simplifies the validator's review (no de-duplication assumptions to check, no MRP truncation bias to challenge) and reduces the supervisory dialogue around sample-construction edge cases.</p>
+
+  <p>The trade-off is that the sample is smaller. For a retail card portfolio with 5,000 defaults per month, twelve monthly cohorts produce 60,000 rows. That is enough for stable GLM coefficients on 15 to 25 features but limits the modelling team's ability to explore aggressive segmentation. Most banks therefore segment EAD lightly (utilisation bands, product type, partner) and rely on within-segment GLM coefficients to do the residual rank-ordering work.</p>
+
+  <p>The representativeness work is where most supervisory attention sits for EAD. The diagnostic battery is mechanically lighter than for PD (fewer rows means PSI / CSI runs faster), but the substance is the same: PSI on key risk drivers between the development sample (typically 2023 cohorts) and the application portfolio (typically the most recent 6 months). The bank's job is to show the application portfolio's distribution of utilisation, limit, product mix, partner mix and segment composition is consistent with the development sample's; the diagnostic results travel into the validation pack as table 11 to 15.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The clearest way to see the EAD sampling design is to compare it side by side with PD sampling. The diagram below puts the two designs on the same axes.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PD vs EAD sampling: overlapping cohorts vs fixed horizon">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">PD sampling versus EAD sampling: overlapping cohorts vs fixed horizon</text>
+
+      <!-- PD section -->
+      <text x="200" y="58" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">PD: overlapping cohorts</text>
+
+      <!-- Timeline -->
+      <line x1="40" y1="120" x2="380" y2="120" stroke="#475569" stroke-width="1"/>
+      <text x="385" y="123" font-family="Inter" font-size="9" fill="#64748b">time</text>
+
+      <!-- Snapshots -->
+      <g font-family="Inter" font-size="8" fill="#1e3a8a">
+        <circle cx="80" cy="120" r="3" fill="#1e3a8a"/>
+        <text x="80" y="135" text-anchor="middle">s1</text>
+        <circle cx="130" cy="120" r="3" fill="#1e3a8a"/>
+        <text x="130" y="135" text-anchor="middle">s2</text>
+        <circle cx="180" cy="120" r="3" fill="#1e3a8a"/>
+        <text x="180" y="135" text-anchor="middle">s3</text>
+        <circle cx="230" cy="120" r="3" fill="#1e3a8a"/>
+        <text x="230" y="135" text-anchor="middle">s4</text>
+        <circle cx="280" cy="120" r="3" fill="#1e3a8a"/>
+        <text x="280" y="135" text-anchor="middle">s5</text>
+      </g>
+
+      <!-- Overlapping 12m windows -->
+      <rect x="80" y="80" width="190" height="14" fill="#eff6ff" stroke="#1e3a8a" opacity="0.6"/>
+      <rect x="130" y="65" width="190" height="14" fill="#eff6ff" stroke="#1e3a8a" opacity="0.6"/>
+      <rect x="180" y="50" width="190" height="14" fill="#eff6ff" stroke="#1e3a8a" opacity="0.6"/>
+
+      <!-- One facility's defaults appears in multiple snapshots -->
+      <text x="200" y="170" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">A default at month 10 appears as the 12m outcome of s1, s2, s3</text>
+      <text x="200" y="184" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#1e3a8a">&rArr; correlated rows, requires de-duplication</text>
+
+      <!-- EAD section -->
+      <text x="700" y="58" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#0f766e">EAD: fixed 12-month horizon</text>
+
+      <!-- Timeline -->
+      <line x1="540" y1="120" x2="880" y2="120" stroke="#475569" stroke-width="1"/>
+      <text x="885" y="123" font-family="Inter" font-size="9" fill="#64748b">time</text>
+
+      <!-- Snapshots -->
+      <g font-family="Inter" font-size="8" fill="#0f766e">
+        <circle cx="580" cy="120" r="3" fill="#0f766e"/>
+        <text x="580" y="135" text-anchor="middle">Jan</text>
+        <circle cx="630" cy="120" r="3" fill="#0f766e"/>
+        <text x="630" y="135" text-anchor="middle">Feb</text>
+        <circle cx="680" cy="120" r="3" fill="#0f766e"/>
+        <text x="680" y="135" text-anchor="middle">Mar</text>
+        <circle cx="730" cy="120" r="3" fill="#0f766e"/>
+        <text x="730" y="135" text-anchor="middle">Apr</text>
+        <circle cx="780" cy="120" r="3" fill="#0f766e"/>
+        <text x="780" y="135" text-anchor="middle">May</text>
+      </g>
+
+      <!-- Non-overlapping 12m windows -->
+      <rect x="580" y="80" width="190" height="14" fill="#DDF1E5" stroke="#0f766e"/>
+      <text x="675" y="91" text-anchor="middle" font-family="Inter" font-size="8" fill="#134e4a">Jan23 cohort (12m forward)</text>
+
+      <!-- Single row per default -->
+      <text x="700" y="170" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">A default at Jan24 appears only as the outcome of the Jan23 snapshot</text>
+      <text x="700" y="184" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#134e4a">&rArr; non-overlapping rows, no de-duplication needed</text>
+
+      <!-- Bottom panel: the four samples -->
+      <rect x="40" y="220" width="820" height="170" fill="#fef9c3" stroke="#92400e" stroke-width="1.2"/>
+      <text x="450" y="244" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">The four EAD samples</text>
+
+      <g font-family="Inter" font-size="9" fill="#92400e">
+        <text x="60" y="270" font-weight="700">Development</text>
+        <text x="60" y="284">12 monthly fixed-horizon cohorts</text>
+        <text x="60" y="298">(typically most recent year with full 12m outcome)</text>
+        <text x="60" y="312">no downsampling; whole sample used</text>
+
+        <text x="280" y="270" font-weight="700">Calibration</text>
+        <text x="280" y="284">37 quarterly snapshots over LRA window</text>
+        <text x="280" y="298">includes downturn cohorts (e.g. 2008-09)</text>
+        <text x="280" y="312">non-overlapping &rArr; no double-counting</text>
+
+        <text x="490" y="270" font-weight="700">OOS</text>
+        <text x="490" y="284">80/20 random split of development</text>
+        <text x="490" y="298">row-level independence is automatic</text>
+        <text x="490" y="312">no facility-level split needed</text>
+
+        <text x="690" y="270" font-weight="700">OOT</text>
+        <text x="690" y="284">most recent single fully-observable</text>
+        <text x="690" y="298">snapshot (e.g. March 2024)</text>
+        <text x="690" y="312">tests temporal stability</text>
+
+        <text x="450" y="360" text-anchor="middle" font-weight="700">Application sample: most recent snapshots (e.g. June-Dec 2024); used for stability and RWA impact monitoring</text>
+        <text x="450" y="375" text-anchor="middle" font-size="8" font-style="italic">representativeness diagnostics compare development to application: PSI, chi-square, CDI, time-series, macro</text>
+      </g>
+    </svg>
+    <figcaption>EAD sampling versus PD sampling. PD's overlapping 12-month windows place the same default in multiple rows (correlated, requiring de-duplication). EAD's fixed 12-month horizon places each default in exactly one row at one snapshot, automatically eliminating the correlation. The bottom panel summarises the four samples produced by the EAD machinery: development (12 monthly fixed-horizon cohorts), calibration (37 quarterly snapshots over the LRA window), OOS (80/20 random split), OOT (most recent single snapshot), plus the application sample for monitoring.</figcaption>
+  </figure>
+
+  <p>Three properties of the geometry to internalise. First, the <strong>fixed-horizon construction gives row-level independence for free</strong>: each default contributes one row drawn from one snapshot, so the OOS sample can be a simple random 80/20 row split rather than the facility-level split PD needs. Second, the <strong>calibration sample is non-overlapping by construction</strong>: quarterly snapshots 12 months apart cannot share a default event, so the overlap-bias question PD addressed under PRA SS4/24 §11.10c does not arise for EAD. Third, the <strong>application sample is the same in shape as PD's</strong>: the rolling current portfolio against which the bank monitors representativeness drift; the EAD-specific challenge is that the development cohort is only one year (2023 by convention) so application drift can build up faster than for PD's multi-year development window.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The four samples</h3>
+
+  <table>
+    <thead>
+      <tr><th>Sample</th><th>Construction</th><th>Used for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Development</td><td>Twelve monthly snapshots from the most recent fully-observable calendar year (e.g. Jan 2023 to Dec 2023). For each snapshot, all active facilities are identified; those that default exactly in the 12-month forward window contribute one row with target = EAD_at_default / Limit_at_snapshot</td><td>Fitting the GLM in lecture 27</td></tr>
+      <tr><td>Calibration</td><td>Thirty-seven quarterly snapshots spanning the LRA window (typically including the GFC downturn vintage 2008 to 2009). Same fixed-horizon construction per snapshot. Non-overlapping by construction (quarterly snapshots 12m apart cannot share a default)</td><td>LRA and downturn EADF calibration in lecture 28</td></tr>
+      <tr><td>OOS</td><td>80/20 random row-level split of the development sample. Row-level independence is automatic from the fixed-horizon construction</td><td>Cross-facility generalisation test in lecture 29</td></tr>
+      <tr><td>OOT</td><td>The most recent fully-observable snapshot (typically March 2024 for a model built in late 2024 / early 2025; six months of post-snapshot data required to observe the 12m outcome). Reserved entirely for temporal validation</td><td>Temporal stability test in lecture 29</td></tr>
+      <tr><td>Application</td><td>The most recent monthly snapshots (typically the most recent 6 months). The future application portfolio</td><td>Monitoring; representativeness diagnostics; RWA impact analysis</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Sampling decisions and their EAD-specific resolutions</h3>
+
+  <ol>
+    <li>
+      <strong>Snapshot window selection.</strong> The development window is typically one calendar year (twelve cohorts). The 12 cohorts give cross-seasonal coverage automatically (defaults from January through December cohorts span the full year). The calibration window is much longer (10+ years quarterly) because LRA / downturn anchoring requires cycle coverage.
+    </li>
+    <li>
+      <strong>De-duplication.</strong> Not needed. The fixed-horizon construction guarantees one row per (facility, default event) automatically. If a facility re-defaults in a subsequent year, the second default contributes a second row drawn from a snapshot in the second development window; the two rows are observationally independent.
+    </li>
+    <li>
+      <strong>Sample splitting.</strong> Random 80/20 row-level split is the standard for OOS; temporal hold-out for OOT. The PD rejection of random row-level splits (because of facility-level correlation) does not apply.
+    </li>
+    <li>
+      <strong>Downsampling.</strong> Not needed and not done. The development sample is precious (tens of thousands of rows per year); every row enters. Up-weighting may be applied to under-represented segments to recover proportionality to the application portfolio.
+    </li>
+    <li>
+      <strong>Calibration window.</strong> Drawn separately on quarterly snapshots over the LRA window. The selection of the LRA window itself (cycle coverage, COVID exclusions, downturn identification) follows the PD playbook from <a href="14-pd_risk_quantification.html">lecture 14</a> with EAD-specific MEVs.
+    </li>
+  </ol>
+
+  <h3>Representativeness diagnostics</h3>
+
+  <p>The same battery as PD (lecture 11) and LGD (lecture 18) applies, with three EAD-specific notes.</p>
+
+  <h4>PSI and chi-square on key risk drivers</h4>
+
+  <p>The standard variable battery for EAD representativeness:</p>
+
+  <ul>
+    <li><strong>Current utilisation bands</strong>: the dominant EAD driver, so PSI on utilisation is the first check.</li>
+    <li><strong>Credit limit bands</strong>: limit composition shifts (a product launch that raises average limits) move the EADF distribution structurally.</li>
+    <li><strong>Current balance bands</strong>: complementary to utilisation.</li>
+    <li><strong>Delinquency buckets</strong>: a facility's delinquency status at observation is highly predictive of EADF.</li>
+    <li><strong>Product group</strong>: especially for portfolios with multiple card products or partner programmes.</li>
+    <li><strong>Revolver vs transactor status</strong>: revolvers carry higher EADF than transactors.</li>
+    <li><strong>Months on Book</strong>: limit-management actions and customer behaviour evolve with tenure.</li>
+    <li><strong>External score bands (e.g. FICO)</strong>: weaker EAD driver than for PD or LGD but still informative.</li>
+  </ul>
+
+  <p>Standard thresholds: PSI &lt; 0.10 stable; 0.10 to 0.25 watch; &gt; 0.25 material drift. The interpretation is identical to PD and LGD; only the variable list differs.</p>
+
+  <h4>CDI on individual model variables</h4>
+
+  <p>Per-variable CDI is computed for each variable in the final EAD model (which lecture 26 will produce). The CDI panel runs through every quarter and every segment, looking for sustained drift. Variables with persistent CDI &gt; 0.25 are flagged for either re-segmentation, MoC overlay, or rebuild.</p>
+
+  <h4>Definition-of-default consistency</h4>
+
+  <p>Time-series plots of the DoD components (bankruptcy, charge-off, forbearance, fraud) check that the default trigger has been operationally stable across the development and application periods. The same diagnostic from PD's lecture 11; relevant for EAD because a shift in the default-trigger mix (more bankruptcy-driven defaults, fewer DPD-driven defaults) shifts the EADF distribution mechanically.</p>
+
+  <h4>Macroeconomic representativeness (calibration only)</h4>
+
+  <p>Applied to the calibration sample. Quarterly realised EADFs are plotted against macroeconomic variables (unemployment, GDP, credit-card industry utilisation, consumer confidence) to verify cyclical sensitivity. The chosen LRA and downturn periods must produce empirically observed EADF differences (downturn cohorts should have higher average EADF than benign cohorts) that match the expected cyclical pattern.</p>
+
+  <h4>Lending-standards and limit-management policy representativeness</h4>
+
+  <p>A qualitative check, but consequential for EAD specifically. Banks that change their limit-management strategy (proactive credit-line increases, line-down strategies for stressed customers) materially shift the EADF distribution. The modelling team confirms with the limit-management team and the collections team that no material policy change is anticipated in the deployment window; where one is anticipated, the model either accommodates it via a policy flag or excludes the affected cohorts.</p>
+
+  <h3>Population-construction edge cases</h3>
+
+  <p>Three edge cases recur across portfolios.</p>
+
+  <ul>
+    <li><strong>Acquired portfolios</strong>. A portfolio acquired mid-development-window has limited internal behavioural data; its EAD profile may differ structurally from organically-originated facilities. Standard practice: add a product / partner flag to segmentation and re-test representativeness per segment.</li>
+    <li><strong>Run-off portfolios</strong>. A product line in run-off (no new originations) has an ageing customer base whose EADF dynamics differ from the open book. Standard practice: separate calibration segment, with MoC overlay if the sample is thin.</li>
+    <li><strong>System migration breaks</strong>. A core-banking-system migration between calendar years can break behavioural feature continuity (the "balance trend" feature loses one of its observations). Standard practice: exclude affected snapshots; document in the limitations register.</li>
+  </ul>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the fixed-horizon construction is the design's strongest feature</strong>. It eliminates two problems (snapshot correlation, MRP truncation) that consume validation effort for PD and LGD respectively. The supervisor's review of EAD sampling is correspondingly shorter; the development team's documentation is correspondingly tighter. Banks that build their EAD pipeline carefully sometimes discover the sampling work is the easiest part of the EAD build, which is unusual in the IRB world.</p>
+
+  <p>The second lesson is on the <strong>single-year development window</strong>. Using 12 monthly cohorts from one calendar year for development gives cross-seasonal coverage but limited cross-cycle coverage. A 2023 development window does not include any cycle stress; the LRA / downturn calibration in lecture 28 carries the entire job of cycle representativeness. Banks whose calibration window does not include a real downturn (which is the case for any portfolio younger than 15 years) carry an MoC overlay for the gap.</p>
+
+  <p>The third lesson is on <strong>application-portfolio drift</strong>. With only one year of development data, drift in the application portfolio against development can build up faster than for PD. A bank that fits its EAD model on 2023 cohorts and deploys in 2025 should run PSI on the 2025 application portfolio versus 2023 development; meaningful drift (PSI &gt; 0.1) triggers either re-fitting on 2024 cohorts or an MoC overlay. The standard development practice of "fit once, monitor quarterly, rebuild every 3 to 5 years" is more demanding for EAD because the cohort base is narrower.</p>
+
+  <p>The fourth lesson is structural: the <strong>OOS / OOT split is more revealing for EAD than for PD</strong>. A model that passes OOS but fails OOT on PD signals temporal drift; the same combination on EAD often signals a limit-management policy change in the OOT period. Practitioners reading the OOS / OOT results have to ask not just "is there drift" but "what caused it"; the answer for EAD is most often a policy event rather than a credit-cycle event.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>State the fixed-horizon construction for the EAD development sample. How does it differ from PD's overlapping-cohort construction, and why is this difference a feature rather than a constraint?</li>
+    <li>Why does the EAD sampling design not require de-duplication? Compare with PD where de-duplication is mandatory.</li>
+    <li>Random 80/20 row-level OOS splitting was rejected for PD. Why is it acceptable for EAD?</li>
+    <li>What is the typical development sample size for a retail card EAD model? What does this imply for segmentation depth?</li>
+    <li>Why is the calibration sample built on 37 quarterly snapshots rather than monthly snapshots like the development sample? What does the quarterly cadence give you?</li>
+    <li>Name the standard PSI variable battery for EAD representativeness. Which variable is the dominant EADF driver, and so the first PSI check?</li>
+    <li>A bank's development sample uses twelve cohorts from 2023. The application portfolio in 2025 shows PSI of 0.15 on utilisation bands. What does this signal, and what remediation options does the bank have?</li>
+    <li>State three population-construction edge cases for EAD and the standard treatment of each.</li>
+    <li>Why does the lending-standards and limit-management policy review matter more for EAD than for PD?</li>
+    <li>The OOS test passes but the OOT test fails for an EAD model. What is the most common cause for EAD specifically, distinct from the PD interpretation?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/ead/03-sampling.md</code> &mdash; fixed-horizon construction, four samples, no downsampling.</li>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/ead/04-data-representativeness.md</code> &mdash; PSI, chi-square, CDI battery (shared with PD).</li>
+      <li>Supplementary: CRR Article 174(c), 182(3); PRA SS4/24 §8.2 to §8.15.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="11-pd_sampling_and_representativeness.html">PD sampling and representativeness</a> &mdash; the protocol this lecture adapts.</li>
+      <li><a href="18-lgd_sampling_and_representativeness.html">LGD sampling and representativeness</a> &mdash; comparison case for vintage indexing and resolved-vs-unresolved.</li>
+      <li><a href="23-ead_concept.html">EAD concept</a> &mdash; the EADF target and PiT / LRA / DT architecture.</li>
+      <li><a href="24-ead_target_and_data.html">EAD target and data</a> &mdash; the 12-month horizon and row-construction rules.</li>
+    </ul>
+
+    <p><strong>Forward references inside the EAD sequence:</strong></p>
+    <ul>
+      <li>26-ead_feature_engineering (next) &mdash; consumes the development sample defined here.</li>
+      <li>27-ead_risk_differentiation (planned) &mdash; the GLM model fit on the development sample.</li>
+      <li>28-ead_risk_quantification (planned) &mdash; uses the calibration sample for LRA / downturn EADF.</li>
+      <li>29-ead_testing (planned) &mdash; uses OOS and OOT samples for back-testing.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Article 174(c), 182(3). The legislative anchors for representativeness and EAD history.</li>
+      <li>PRA SS4/24 paragraphs 8.2 to 8.15. UK supervisory expectations for representativeness.</li>
+      <li>EBA/GL/2017/16, paragraphs 154 to 188 (EAD modelling). The European authority's interpretation.</li>
+      <li>BCBS CRE36.95. International anchor for the 12-month fixed-horizon EAD construction.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 25 of n &middot; EAD 3 of 7.</span>
+  <span><a href="24-ead_target_and_data.html">Previous: target and data</a> &middot; <a href="26-ead_feature_engineering.html">Next: feature engineering</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

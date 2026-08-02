@@ -1,0 +1,435 @@
+﻿<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 9: diagrams as code</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Diagrams as code: Mermaid and friends</h1>
+  <p class="subtitle">A diagram is the smallest unit of documentation that survives translation between people. This lecture covers the family of text-source diagram languages (Mermaid, PlantUML, Graphviz, D2), the rendering pipeline that turns them into pictures, and the editorial discipline that decides which kind of diagram earns a place on the page.</p>
+  <div class="meta">
+    <span>Lecture 9 of 16</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part III: documentation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Diagrams as code</strong> is the practice of describing a diagram in a plain-text source file and letting a renderer produce the picture. The source lives in the repository alongside the prose, is reviewed in the same pull request, and is rebuilt by CI when something changes. Contrast the older workflow, in which a diagram is drawn in Visio or PowerPoint, exported to PNG, and pasted into Confluence, where it begins to rot the moment it is uploaded.</p>
+
+  <p>Four tools cover roughly nine in ten cases. <strong>Mermaid</strong> (Knut Sveidqvist, 2014) is a Markdown-friendly language for flowcharts, sequence diagrams, class diagrams, state diagrams, entity-relationship diagrams, and a handful of others. It is the diagram language GitHub renders natively inside fenced code blocks. <strong>PlantUML</strong> (Arnaud Roques, 2009) is the older, UML-rigorous predecessor, more verbose but with stronger semantics for software-engineering diagrams. <strong>Graphviz</strong>, by Stephen North and Emden Gansner at AT&amp;T Bell Labs (1991), is the low-level layout engine that sits underneath much of the family. <strong>D2</strong> (Alexander Wang, 2022) is the newest member, with a typed-language feel and a renderer that puts more thought into final-frame layout than the others.</p>
+
+  <p>The structural argument for all of them is the same: text is diffable, text is reviewable, text survives the death of any specific editor. The structural argument against is also the same: an automatic layout engine never makes the diagram a hand drawing would have made, and there are diagrams (a polished architecture poster, a marketing schematic) where a human placing the boxes is the correct answer. The art is choosing the right tool for the right diagram, and accepting that the gain from diffability usually outweighs the loss of typographic control.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A diagram language is a compiler. The input is a description of nodes and edges (or actors and messages, or states and transitions). The output is a picture. The language constrains what you can say; the renderer decides where each shape lands. If you know what the language can express, what the renderer is free to change, and what survives version control, you can hold an opinion on every "should we use Mermaid or PlantUML" debate without rehearsing the syntax.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The deep reason diagrams matter, beyond aesthetics, is that they compress relations that prose cannot. Edward Tufte's argument in <em>The Visual Display of Quantitative Information</em> (1983) is that a good diagram has high data-ink ratio: every mark on the page carries information that is hard to convey in words. A flowchart of an approval workflow communicates branching faster than a five-paragraph description; an ER diagram communicates referential structure faster than a schema dump. The diagram is not decoration. It is the most compact representation of structural understanding the team has.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that diagrams rot faster than prose. Prose can be wrong in a paragraph and still be useful; a diagram that is wrong in one box is wrong everywhere, because the reader trusts the picture as a single artefact. A Confluence page from 2019 with a PNG architecture diagram and a paragraph below it almost always has the picture out of date and the paragraph somewhere closer to the truth, because the prose was easier to edit. Diagrams as code closes that gap. When the source is one Markdown commit away from the diagram, the diagram is fixed in the same review that fixes the surrounding text.</p>
+
+  <p>The second reason is that diagrams in version control are reviewable in the engineering sense. A pull request that changes a flowchart shows the diff as text: an arrow added, a node renamed, a branch removed. A reviewer can spot a missing edge or an inconsistent label the way they spot a missing return statement. A PNG attached to a PR is opaque; either you replace it wholesale or you do not touch it. The same Bacchelli and Bird study cited in Lecture 5 (Microsoft 2013) found that reviewers comment on what they can read; if the artefact is binary, the artefact gets a rubber stamp.</p>
+
+  <p>The third reason is that the diagram-as-code workflow scales with the team. A team of five with one designer can keep Visio diagrams roughly in sync with the system. A team of fifty cannot. The discipline that the source is text, the renderer is automatic, and the build is CI is the same discipline that scaled documentation in the docs-as-code era (Lecture 7). Brooks's "Show me your flowcharts and conceal your tables, and I shall continue to be mystified. Show me your tables, and I won't usually need your flowcharts; they'll be obvious" (1975) is the classic warning against decorative diagrams. The flowcharts that earn their place are the ones that show structure the prose cannot.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The rendering pipeline</h3>
+
+  <p>Every diagram-as-code tool fits the same four-stage pipeline. The author writes <strong>source</strong> in a text file (or a fenced Markdown block). A <strong>parser</strong> reads the source and builds an internal graph: nodes, edges, attributes. A <strong>layout engine</strong> decides where each node lands and how each edge routes; this is the hard problem, and most tools delegate it to one of a small number of algorithms. A <strong>renderer</strong> emits the final SVG or PNG. The author edits the first stage; the rest is automatic.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The diagram-as-code rendering pipeline">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The rendering pipeline</text>
+
+      <g font-family="Inter" font-size="12">
+        <rect x="40"  y="60" width="140" height="80" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2" rx="6"/>
+        <text x="110" y="95"  text-anchor="middle" font-weight="700" fill="#3D2EB5">Source</text>
+        <text x="110" y="115" text-anchor="middle" font-size="11" fill="#37352F">.mmd / .puml / .dot</text>
+        <text x="110" y="130" text-anchor="middle" font-size="11" fill="#71717a">human-authored</text>
+
+        <rect x="220" y="60" width="140" height="80" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2" rx="6"/>
+        <text x="290" y="95"  text-anchor="middle" font-weight="700" fill="#1E9D54">Parser</text>
+        <text x="290" y="115" text-anchor="middle" font-size="11" fill="#37352F">graph in memory</text>
+        <text x="290" y="130" text-anchor="middle" font-size="11" fill="#71717a">nodes &amp; edges</text>
+
+        <rect x="400" y="60" width="140" height="80" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2" rx="6"/>
+        <text x="470" y="95"  text-anchor="middle" font-weight="700" fill="#C76B2A">Layout</text>
+        <text x="470" y="115" text-anchor="middle" font-size="11" fill="#37352F">dot / dagre / ELK</text>
+        <text x="470" y="130" text-anchor="middle" font-size="11" fill="#71717a">positions chosen</text>
+
+        <rect x="580" y="60" width="140" height="80" fill="#FBEDE4" stroke="#F08C42" stroke-width="2" rx="6"/>
+        <text x="650" y="95"  text-anchor="middle" font-weight="700" fill="#C76B2A">Renderer</text>
+        <text x="650" y="115" text-anchor="middle" font-size="11" fill="#37352F">SVG / PNG</text>
+        <text x="650" y="130" text-anchor="middle" font-size="11" fill="#71717a">final picture</text>
+
+        <line x1="180" y1="100" x2="220" y2="100" stroke="#71717a" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="360" y1="100" x2="400" y2="100" stroke="#71717a" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="540" y1="100" x2="580" y2="100" stroke="#71717a" stroke-width="1.5" marker-end="url(#arrow)"/>
+      </g>
+
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>The author owns the first box. The other three are automatic, and the choice of tool is largely a choice of how that automation behaves.</figcaption>
+  </figure>
+
+  <h3>Layout: the part the human gives up</h3>
+
+  <p>The reason a hand-drawn diagram can look better than an auto-laid one is that a human reasons about reading order, visual weight, and white space at the same time. A layout engine optimises a measurable proxy: edge crossings, total edge length, hierarchical level separation. The classic algorithm is <strong>Sugiyama-style layered layout</strong> (Sugiyama, Tagawa, Toda, 1981), implemented as <code>dot</code> in Graphviz and as <code>dagre</code> in Mermaid. It produces clean top-down or left-right flowcharts when the graph is acyclic, and acceptable results when it is not. The Eclipse Layout Kernel (<strong>ELK</strong>) is a more recent option, with better routing for large graphs and the ability to nest containers; Mermaid offers ELK as an alternative engine since version 10.</p>
+
+  <p>The thing the engine cannot do is intent. If two boxes are conceptually paired but unrelated in the graph, the engine will not place them next to each other. If a node is "more important" than its neighbours, the engine will not make it bigger. Diagrams as code is the right default; the exception is the diagram that needs to look exactly a certain way, and for those the answer is to draw it in Excalidraw or draw.io and accept the cost.</p>
+
+  <h3>A taxonomy of diagram types</h3>
+
+  <p>The relevant diagram types, in rough order of how often they appear in a software-engineering codebase, are:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Diagram</th><th>What it shows</th><th>Typical use</th><th>Languages</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Flowchart</td><td>Steps connected by branches</td><td>Decision logic, approval flows, pipelines</td><td>Mermaid, PlantUML, Graphviz, D2</td></tr>
+      <tr><td>Sequence</td><td>Actors and time-ordered messages</td><td>API exchanges, auth flows, batch jobs</td><td>Mermaid, PlantUML</td></tr>
+      <tr><td>State</td><td>States and transitions</td><td>Order lifecycles, account status machines</td><td>Mermaid, PlantUML</td></tr>
+      <tr><td>Class</td><td>Types and their relationships</td><td>Domain models, ORM schemas</td><td>Mermaid, PlantUML</td></tr>
+      <tr><td>Entity-relationship</td><td>Tables and foreign keys</td><td>Database schemas, data lineage</td><td>Mermaid, PlantUML, dbdocs</td></tr>
+      <tr><td>Architecture (C4)</td><td>System, container, component, code</td><td>Service maps, deployment overviews</td><td>Structurizr, PlantUML (C4-PlantUML), Mermaid</td></tr>
+      <tr><td>Gantt</td><td>Tasks on a timeline</td><td>Project plans, release schedules</td><td>Mermaid</td></tr>
+      <tr><td>Mindmap</td><td>Hierarchical concept tree</td><td>Brainstorming, syllabus maps</td><td>Mermaid</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The pragmatic rule for which diagram to pick is the question the reader is trying to answer. If the question is "what happens next?", a flowchart or state diagram. If the question is "who talks to whom?", a sequence diagram. If the question is "what does the data look like?", an ER or class diagram. If the question is "how is the system put together?", a C4 architecture diagram. Diagrams that try to answer more than one question are usually worse at all of them.</p>
+
+  <div class="defcard">
+    <strong>C4 model.</strong> Simon Brown's diagrammatic framework (proposed 2011, c4model.com) for software architecture, structured as four nested levels: <em>context</em> (the system in its environment), <em>container</em> (the deployable units), <em>component</em> (the major pieces inside a container), and <em>code</em> (class-level detail, rarely drawn). The cardinal rule is that each level zooms one step deeper; you never mix scales on the same page.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Mermaid</h3>
+
+  <p>Mermaid is the diagram language that has won the documentation default. GitHub renders it inside Markdown fenced blocks; GitLab, Bitbucket, Notion, Obsidian, and the MkDocs Material theme do the same. The grammar is small enough that you can learn the constructs in an evening, and the renderer is a JavaScript library (mermaid-js) that ships in every major Markdown surface.</p>
+
+  <p>A flowchart in Mermaid begins with <code>flowchart</code> (or <code>graph</code>) and a direction (<code>TD</code>, <code>LR</code>, <code>BT</code>, <code>RL</code>). Nodes are declared with an identifier and a label in brackets; the bracket style chooses the shape. Edges are arrows of various weights. The whole construct is a fenced block with the language tag <code>mermaid</code>.</p>
+
+  <pre><code class="language-md">```mermaid
+flowchart LR
+    A[Loan application] --&gt; B{Score &gt;= cutoff?}
+    B --&gt;|Yes| C[Approve]
+    B --&gt;|No|  D[Decline]
+    C --&gt; E[(Disbursement)]
+    D --&gt; F[/Notify customer/]
+```</code></pre>
+
+  <p>A sequence diagram begins with <code>sequenceDiagram</code>. Actors are declared with <code>participant</code> or <code>actor</code>; messages are arrows between them, with the arrow style indicating whether the message is synchronous, asynchronous, or a response.</p>
+
+  <pre><code class="language-md">```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as Auth API
+    participant DB as Token store
+    C-&gt;&gt;API: POST /token (credentials)
+    API-&gt;&gt;DB: lookup user
+    DB--&gt;&gt;API: user record
+    API--&gt;&gt;C: 200 + access_token
+```</code></pre>
+
+  <p>A state diagram begins with <code>stateDiagram-v2</code>. States are declared by name; transitions use a colon-separated label.</p>
+
+  <pre><code class="language-md">```mermaid
+stateDiagram-v2
+    [*] --&gt; Performing
+    Performing --&gt; Stage_2 : DPD &gt; 30
+    Stage_2 --&gt; Stage_3 : DPD &gt; 90 or default trigger
+    Stage_2 --&gt; Performing : cure
+    Stage_3 --&gt; Performing : cure
+    Stage_3 --&gt; [*] : write-off
+```</code></pre>
+
+  <p>An entity-relationship diagram begins with <code>erDiagram</code>. The crow's-foot notation is built in; cardinalities are signalled by symbols on each end of the relationship line.</p>
+
+  <pre><code class="language-md">```mermaid
+erDiagram
+    CUSTOMER ||--o{ ACCOUNT : holds
+    ACCOUNT  ||--o{ TRANSACTION : records
+    CUSTOMER {
+        string customer_id PK
+        string name
+        date   date_of_birth
+    }
+    ACCOUNT {
+        string account_id PK
+        string customer_id FK
+        string product
+        decimal balance
+    }
+```</code></pre>
+
+  <p>A C4 context diagram is supported via the <code>C4Context</code> directive (since Mermaid 9), with <code>Person</code>, <code>System</code>, <code>System_Ext</code>, and <code>Rel</code> primitives.</p>
+
+  <pre><code class="language-md">```mermaid
+C4Context
+    Person(customer, "Customer", "Holds a current account")
+    System(banking, "Core banking", "Ledger, products, statements")
+    System_Ext(payments, "Faster Payments", "UK retail rails")
+    Rel(customer, banking, "Uses")
+    Rel(banking,  payments, "Settles via")
+```</code></pre>
+
+  <p>Mermaid also supports class diagrams, gantt charts, mindmaps, user journeys, requirement diagrams, timeline diagrams, and a quadrant chart, all with similar fenced-block syntax. The Mermaid Live Editor (mermaid.live) is the standard authoring surface, with instant preview and PNG/SVG export. The full grammar is at mermaid.js.org.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Mermaid's parser is strict about reserved characters. Parentheses, square brackets, and curly braces in node labels need to be quoted: <code>A["State (i)"]</code>, not <code>A[State (i)]</code>. Likewise, the pipe character in edge labels needs escaping. The error messages from the parser are unhelpful; the fix is almost always to wrap any non-trivial label in double quotes.
+  </div>
+
+  <h3>PlantUML</h3>
+
+  <p>PlantUML is older and more verbose. Where Mermaid optimises for brevity, PlantUML optimises for UML compliance. A PlantUML file begins with <code>@startuml</code> and ends with <code>@enduml</code>; in between, the grammar is rich enough to express every UML 2 diagram type, plus archmate, gantt, BPMN, work-breakdown structures, salt wireframes, and a long tail of domain extensions.</p>
+
+  <pre><code class="language-md">@startuml
+actor Customer
+participant "Auth API" as API
+database "Token store" as DB
+
+Customer -&gt; API : POST /token
+API -&gt; DB : lookup user
+DB --&gt; API : user record
+API --&gt; Customer : 200 + access_token
+@enduml</code></pre>
+
+  <p>PlantUML's strengths are the depth of its UML semantics (proper aggregation versus composition arrows, full UML state-machine vocabulary, formal use-case actors), its skinparam system for typography control, and its long history of integrations (Atlassian Confluence, Eclipse, IntelliJ, VS Code). Its weakness is that the renderer is a Java service: you either install Java locally, run a Docker image, or hit a hosted plantuml.com endpoint. None of those is as frictionless as Mermaid's "GitHub already renders it".</p>
+
+  <p>The decision rule between Mermaid and PlantUML in practice is: Mermaid for documentation that lives in a Markdown surface (GitHub, MkDocs, Notion), PlantUML where the team writes UML rigorously and a Java toolchain is acceptable.</p>
+
+  <h3>Graphviz and DOT</h3>
+
+  <p>Graphviz is the elder of the family. Its language, <strong>DOT</strong>, is the lowest-level of the four covered here: a graph is a list of nodes and edges with attributes, and the layout engine (<code>dot</code> for hierarchical, <code>neato</code> and <code>fdp</code> for spring-model, <code>circo</code> for circular, <code>twopi</code> for radial) chooses the geometry. Most higher-level tools, including PlantUML and Mermaid in some modes, sit on top of Graphviz.</p>
+
+  <pre><code class="language-dot">digraph PD_pipeline {
+    rankdir=LR;
+    node [shape=box, style=rounded, fontname="Inter"];
+
+    raw       [label="raw data"];
+    features  [label="feature engineering"];
+    train     [label="train / test split"];
+    fit       [label="logit fit"];
+    val       [label="validation"];
+    monitor   [label="monitoring"];
+
+    raw -&gt; features -&gt; train -&gt; fit -&gt; val -&gt; monitor;
+    val -&gt; features [label="iterate", style=dashed];
+}</code></pre>
+
+  <p>DOT's value is that everything else delegates to it. When a Mermaid or PlantUML diagram lays out badly, the fix is sometimes to drop into DOT directly. The cost is that DOT has no domain semantics: there is no "actor", no "state", no "class". It is a low-level graph language; you build the abstractions yourself.</p>
+
+  <h3>D2</h3>
+
+  <p>D2 (Alexander Wang, 2022; d2lang.com) is the newest entrant and the only modern language designed from scratch for declarative diagramming. Its syntax is dense and HCL-like, the renderer is written in Go, and the layout engine (dagre, ELK, or D2's own TALA) is selectable per diagram. D2 supports nested containers, themes, and an animation feature that Mermaid lacks.</p>
+
+  <pre><code class="language-d2">customer -&gt; web_app: places order
+web_app -&gt; order_service: HTTP POST
+order_service -&gt; inventory: reserve stock
+order_service -&gt; payments: charge card
+payments -&gt; bank: ISO 20022
+
+bank: {
+  shape: cylinder
+  style.fill: "#FBF1D4"
+}</code></pre>
+
+  <p>D2's selling point is layout quality and aesthetic polish: the same source produces diagrams that look closer to a hand drawing than Mermaid or DOT manage. The trade-off is ecosystem maturity. GitHub does not render D2 inline; MkDocs needs a plugin; the community is smaller. For an internal documentation site where look matters, D2 is worth the install cost. For a README on GitHub, Mermaid still wins.</p>
+
+  <h3>The category beyond text: Excalidraw and draw.io</h3>
+
+  <p>Not every diagram should be code. A hand-drawn architecture poster that hangs above a team's desk, a marketing schematic for a pitch deck, or a domain map drawn collaboratively in a workshop are all better served by a direct-manipulation editor. The two relevant tools are <strong>Excalidraw</strong> (Vjeux et al., 2020), with its hand-drawn aesthetic and JSON file format, and <strong>draw.io</strong> (now diagrams.net, JGraph 2005), the workhorse for technical diagrams in pretty much any team that has used Confluence.</p>
+
+  <p>Both Excalidraw and draw.io save to text-based formats (Excalidraw to a JSON-ish file, draw.io to an XML file) that can be checked into git. The diff is not human-readable in the same way Mermaid is, but the file is at least versionable and the source is not lost when someone deletes the Confluence page. The rule of thumb is: use Mermaid for diagrams that exist to support prose, use Excalidraw or draw.io for diagrams that exist as the artefact.</p>
+
+  <h3>Rendering: where the diagram appears</h3>
+
+  <p>The same Mermaid source file renders in different surfaces with different out-of-the-box support. The matrix below catalogues the relevant integrations.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Surface</th><th>Mermaid</th><th>PlantUML</th><th>Graphviz</th><th>D2</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>GitHub README and issues</td><td>Native</td><td>Image link only</td><td>Image link only</td><td>Image link only</td></tr>
+      <tr><td>GitLab</td><td>Native</td><td>Native (server-side)</td><td>Image link only</td><td>Image link only</td></tr>
+      <tr><td>MkDocs Material</td><td>Plugin (<code>pymdownx.superfences</code> + <code>mermaid2</code>)</td><td>Plugin (<code>plantuml-markdown</code>)</td><td>Plugin</td><td>Plugin</td></tr>
+      <tr><td>Sphinx + MyST</td><td>Extension (<code>sphinxcontrib-mermaid</code>)</td><td>Extension</td><td>Extension (<code>sphinx.ext.graphviz</code>)</td><td>Extension</td></tr>
+      <tr><td>Notion</td><td>Native (since 2023)</td><td>No</td><td>No</td><td>No</td></tr>
+      <tr><td>Obsidian</td><td>Native</td><td>Plugin</td><td>Plugin</td><td>Plugin</td></tr>
+      <tr><td>VS Code preview</td><td>Built-in extension</td><td>Extension</td><td>Extension</td><td>Extension</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The pattern, reading down the Mermaid column, is the reason it has become the default. Wherever you write Markdown, Mermaid is one or two clicks of configuration away from rendering. The others are not as universally supported, and the friction matters more than the language differences in deciding which gets used.</p>
+
+  <h3>Diagrams in continuous integration</h3>
+
+  <p>Diagrams as code earns its name when the build is automated. The pattern is the same as for prose: a CI job runs on every push, the renderer is invoked on each diagram source file, the output is checked against the previous render, and the build fails if a referenced diagram source has a syntax error. For Mermaid, the renderer is <code>mmdc</code> (mermaid-cli); for PlantUML, the Java jar or a Docker image; for Graphviz, the <code>dot</code> binary; for D2, the <code>d2</code> binary.</p>
+
+  <pre><code class="language-yaml"># .github/workflows/diagrams.yml
+name: Render diagrams
+on:
+  pull_request:
+    paths: ['docs/**/*.mmd', 'docs/**/*.puml']
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install -g @mermaid-js/mermaid-cli
+      - run: |
+          for f in $(find docs -name '*.mmd'); do
+            mmdc -i "$f" -o "${f%.mmd}.svg" --theme neutral
+          done
+      - run: git diff --exit-code docs/
+</code></pre>
+
+  <p>The final <code>git diff --exit-code</code> turns the job into a check: if the rendered SVGs have drifted from what is committed, the build fails and the author is prompted to commit the rendered output. This is the same pattern as auto-formatting (Lecture 2): the CI is the enforcement layer; the developer never argues with the tool.</p>
+
+  <h3>Worked example: a credit-risk pipeline diagram</h3>
+
+  <div class="worked">
+    <strong>Worked example: documenting an IFRS 9 ECL pipeline in Mermaid</strong>
+    <p>The task is to produce a single-page overview of the IFRS 9 ECL calculation pipeline for the model documentation pack. The reader is an internal validator who needs to understand the data flow before reading the methodology in detail. The previous version of this page used a PowerPoint slide exported to PNG; it had drifted from the code by two releases.</p>
+    <p>Step 1 (identify the artefact). The diagram should answer one question: "what are the inputs, the stages, and the outputs of the ECL calculation?". This is a flowchart, not a sequence diagram (there are no actors) and not a class diagram (we are showing flow, not types).</p>
+    <p>Step 2 (sketch the nodes and edges). The inputs are: account-level exposure data, macroeconomic scenarios, calibrated PD/LGD/EAD models, and the staging criteria. The stages are: feature build, PD term-structure projection, LGD application, EAD projection, ECL aggregation, and disclosure tables. The outputs are: Stage 1/2/3 ECL by portfolio, FLI-overlay, and the IFRS 9 disclosure file.</p>
+    <p>Step 3 (draft the Mermaid source). A left-to-right flowchart with three swimlanes (inputs, stages, outputs) implemented as <code>subgraph</code> blocks. Stage colouring is via class definitions at the bottom of the block.</p>
+
+<pre><code class="language-md">```mermaid
+flowchart LR
+    subgraph Inputs
+        E[Account exposures]
+        M[Macro scenarios]
+        P[PD model]
+        L[LGD model]
+        S[Staging rules]
+    end
+    subgraph Pipeline
+        F[Feature build]
+        T[PD term structure]
+        A[LGD application]
+        X[EAD projection]
+        G[ECL aggregation]
+        V[FLI overlay]
+    end
+    subgraph Outputs
+        O1[Stage 1/2/3 ECL]
+        O2[Disclosure tables]
+    end
+    E --&gt; F
+    P --&gt; T
+    L --&gt; A
+    M --&gt; T
+    M --&gt; A
+    S --&gt; G
+    F --&gt; T --&gt; A --&gt; X --&gt; G --&gt; V --&gt; O1
+    V --&gt; O2
+```</code></pre>
+
+    <p>Step 4 (commit and embed). The Mermaid source is saved at <code>docs/ifrs9/figures/pipeline.md</code>, fenced as a mermaid block. The model documentation page in MkDocs references it with an <code>--8&lt;-- "ifrs9/figures/pipeline.md"</code> include. A pull request that retires the FLI overlay step is a one-line change to the source; the diagram updates on the next build.</p>
+    <p>Step 5 (review). A reviewer pulls the PR, looks at the rendered diagram in the build preview, and comments inline on the diagram source: "the LGD model also takes macroeconomic scenarios; should there be an arrow from M to L?". The author adds the arrow, commits, and the diagram is corrected in the same review that surfaced the gap. None of that conversation would have happened if the diagram had been a PNG.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Diagrams as code is the same idea as docs as code, applied to the visual layer. The source is text; the source lives in the repository; the rendering is automatic; the review is the pull request. The four languages worth knowing are Mermaid, PlantUML, Graphviz, and D2. The default is Mermaid, because GitHub renders it natively and the other tools are one configuration line away in every Markdown surface. PlantUML earns its keep on teams that take UML seriously. Graphviz is the layout engine of last resort. D2 is the new option to evaluate when aesthetics matter more than ecosystem reach.</p>
+
+  <p>The discipline beneath the tool choice is editorial. A diagram earns its place by answering one question better than prose could. A flowchart that restates a paragraph is decoration; an ER diagram that compresses three pages of schema dump is doing work. The Tufte principle is the right test: every mark on the page should carry information. The next lecture turns to a different problem in the documentation family: the Jupyter notebook, where prose and code share the same file, and the reproducibility question becomes the central one.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the four stages of the diagram-as-code rendering pipeline. Which stage does the author control directly?</li>
+      <li>You are documenting an authentication flow involving a client, an API, and a token store. Which diagram type is most appropriate, and which language would you use if the docs live on GitHub?</li>
+      <li>What is the C4 model? Name its four levels and the rule about mixing them.</li>
+      <li>Write a Mermaid flowchart that branches on a "score &gt;= 600" decision into "approve" and "decline" outcomes.</li>
+      <li>Under what circumstances would you choose Excalidraw or draw.io over Mermaid?</li>
+      <li>What does the line <code>git diff --exit-code docs/</code> do at the end of the diagrams CI job, and why is it useful?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="08-markdown_and_docs.html">Lecture 8 (markdown and the documentation toolchain)</a> covered the text source; this lecture covers the visual companion in the same workflow.</li>
+      <li><strong>Next:</strong> <a href="10-html_and_css.html">Lecture 10 (HTML, CSS, and the visual layer)</a> turns to the rendering target your Mermaid SVGs and Markdown actually land in.</li>
+      <li><strong>Cross-link:</strong> <a href="11-jupyter_and_reproducibility.html">Lecture 11 (Jupyter notebooks and reproducibility)</a> covers the third documentation surface, where prose, code, and output share one file.</li>
+      <li><strong>Cross-link:</strong> <a href="13-git.html">Lecture 13 (version control with git)</a> covers the review mechanics that make diagram diffs useful in the first place.</li>
+      <li><strong>Cross-link:</strong> <a href="15-ci_cd.html">Lecture 15 (continuous integration and delivery)</a> covers the build pattern that compiles the diagrams on every push.</li>
+      <li><strong>Outside this course:</strong> Mermaid documentation (mermaid.js.org); PlantUML reference (plantuml.com); Graphviz documentation (graphviz.org); D2 language guide (d2lang.com); Simon Brown, "The C4 model for visualising software architecture" (c4model.com); Sugiyama, Tagawa, and Toda, "Methods for visual understanding of hierarchical system structures" (IEEE Transactions on Systems, Man, and Cybernetics, 1981); Edward Tufte, <em>The Visual Display of Quantitative Information</em> (1983).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 9 of 16</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

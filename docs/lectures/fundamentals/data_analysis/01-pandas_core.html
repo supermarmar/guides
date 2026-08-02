@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 1: DataFrames and the pandas core</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data analysis</a></div>
+  <h1>DataFrames and the pandas core</h1>
+  <p class="subtitle">Before you aggregate, model, or visualise anything, you load a rectangle into memory and characterise it. This lecture teaches the dataframe as a typed table, the four verbs you apply to it (load, inspect, select, transform), and the half-dozen pandas patterns that account for most of the analytical work a credit risk team does in a week. Master this layer and Polars, Spark, and SQL all feel like dialects of the same language.</p>
+  <div class="meta">
+    <span>Lecture 1 of 5</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Part I: the dataframe layer</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>dataframe</strong> is a typed rectangle in memory: rows are observations, columns are variables, and every column carries a single <em>dtype</em> that determines which operations are legal on it. Pandas is the canonical Python library for working with this object. Almost every analytical task reduces to four verbs applied to that rectangle: <strong>load</strong> it from somewhere (CSV, Parquet, a SQL database), <strong>inspect</strong> it (shape, dtypes, head, describe), <strong>select</strong> the part you want (a column, a slice of rows, a filtered subset), and <strong>transform</strong> it (add columns, replace values, recast types). Everything else in the pandas API is a refinement of one of those four verbs.</p>
+
+  <p>The discipline this lecture trains is <strong>typing the rectangle correctly the first time</strong>. A column read as a string when it should be a date, a float read with thousand-separator commas as text, an integer code read as float because of a single missing value: each of these is a one-line mistake that propagates silently through every downstream analysis. Half the bugs in a junior analyst's notebook live in the first cell.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Think of a dataframe as a spreadsheet with one extra rule: every column must hold values of the same kind. A salary column holds numbers, a country column holds strings, a default-date column holds dates. The rule lets pandas precompute how to add, group, sort, and join entire columns at once without checking each cell. Break the rule (mix strings and numbers in one column) and pandas falls back to a generic "object" dtype, which is slow, opaque, and the most common cause of "my pipeline was fast last week".
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the data analysis world</span>
+    This lecture lives at the <strong>load and shape</strong> stage of the data analysis pipeline. Lecture 02 takes the same rectangle and folds it (groupby, pivot, join). Lecture 03 swaps pandas for Polars, the same vocabulary running on a faster engine. Lectures 04 and 05 leave shape behind and ask what the data <em>says</em> (exploratory analysis, visualisation). Without the layer this lecture teaches, none of the next four are reproducible.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons to take the dataframe layer seriously despite its apparent simplicity. First, <strong>every model development document opens with <code>df = pd.read_csv(...)</code></strong>. The choice of dtype at load time determines what <code>df.describe()</code> reports, whether a join later in the pipeline matches the keys you expected, and whether a date filter does what you wrote or silently sorts strings lexicographically. A loan_id column read as integer and then joined to a customer table where loan_id was read as string returns an empty merge, and a junior analyst spends a morning before finding it.</p>
+
+  <p>Second, <strong>memory and speed are functions of dtype</strong>. A 32,000-row loan dataset costs roughly 3 MB if every column is the right dtype and 30 MB if everything is read as the generic <code>object</code> type. The factor of ten matters less on toy data and more on the 30-million-row portfolio extract that a real credit risk model is built on. Bad dtypes are the difference between an analysis that runs in a notebook and one that does not.</p>
+
+  <p>Third, <strong>pandas is the lingua franca of analytical Python</strong>. Scikit-learn, statsmodels, seaborn, ydata-profiling, even Polars itself all accept and return objects that look like pandas dataframes. The verbs in this lecture are the API surface that the rest of the data science stack assumes you have already mastered. Polars (Lecture 03) and SQL (the data engineering track) both reuse this vocabulary; learn it here once.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold the following picture in your head. A dataframe is a rectangle of <em>n</em> rows and <em>p</em> columns. The rows are <strong>observations</strong> (loans, customers, transactions, days, snapshots). The columns are <strong>variables</strong>, each with a <strong>name</strong> (a string label), a <strong>dtype</strong> (the kind of value it holds), and a possibly-missing value at each row. Two further structures sit alongside the rectangle: an <strong>index</strong> (the row labels, an integer range by default), and the <strong>columns object</strong> (an analogous list of column labels). Every pandas operation is parameterised on one or both of those axes.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Anatomy of a pandas dataframe">
+      <text x="400" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Anatomy of a pandas dataframe</text>
+
+      <!-- Columns label -->
+      <text x="400" y="55" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">columns (axis = 1)</text>
+
+      <!-- column header row with dtype chips -->
+      <g font-family="Inter" font-size="11" text-anchor="middle">
+        <rect x="120" y="70" width="120" height="32" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="180" y="86" font-weight="600" fill="#5b21b6">loan_id</text>
+        <text x="180" y="98" font-size="9" font-style="italic" fill="#7c3aed">Int64</text>
+
+        <rect x="240" y="70" width="120" height="32" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="300" y="86" font-weight="600" fill="#5b21b6">loan_amount</text>
+        <text x="300" y="98" font-size="9" font-style="italic" fill="#7c3aed">float64</text>
+
+        <rect x="360" y="70" width="120" height="32" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="420" y="86" font-weight="600" fill="#5b21b6">loan_grade</text>
+        <text x="420" y="98" font-size="9" font-style="italic" fill="#7c3aed">category</text>
+
+        <rect x="480" y="70" width="120" height="32" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="540" y="86" font-weight="600" fill="#5b21b6">issue_date</text>
+        <text x="540" y="98" font-size="9" font-style="italic" fill="#7c3aed">datetime64</text>
+
+        <rect x="600" y="70" width="120" height="32" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="660" y="86" font-weight="600" fill="#5b21b6">default</text>
+        <text x="660" y="98" font-size="9" font-style="italic" fill="#7c3aed">bool</text>
+      </g>
+
+      <!-- Index column -->
+      <text x="70" y="125" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#0d9488">index</text>
+
+      <g font-family="Inter" font-size="10" text-anchor="middle">
+        <!-- index cells -->
+        <rect x="40" y="135" width="60" height="28" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <text x="70" y="153" fill="#115e59">0</text>
+        <rect x="40" y="163" width="60" height="28" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <text x="70" y="181" fill="#115e59">1</text>
+        <rect x="40" y="191" width="60" height="28" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <text x="70" y="209" fill="#115e59">2</text>
+        <rect x="40" y="219" width="60" height="28" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <text x="70" y="237" fill="#115e59">…</text>
+      </g>
+
+      <!-- data cells -->
+      <g font-family="Inter" font-size="11" text-anchor="middle" fill="#27272a">
+        <rect x="120" y="135" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="180" y="153">L0001</text>
+        <rect x="240" y="135" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="300" y="153">10,000.00</text>
+        <rect x="360" y="135" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="420" y="153">B</text>
+        <rect x="480" y="135" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="540" y="153">2021-03-14</text>
+        <rect x="600" y="135" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="660" y="153">False</text>
+
+        <rect x="120" y="163" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="180" y="181">L0002</text>
+        <rect x="240" y="163" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="300" y="181">25,500.00</text>
+        <rect x="360" y="163" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="420" y="181">D</text>
+        <rect x="480" y="163" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="540" y="181">2020-11-02</text>
+        <rect x="600" y="163" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="660" y="181">True</text>
+
+        <rect x="120" y="191" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="180" y="209">L0003</text>
+        <rect x="240" y="191" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="300" y="209">7,200.00</text>
+        <rect x="360" y="191" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="420" y="209">A</text>
+        <rect x="480" y="191" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="540" y="209">2022-07-19</text>
+        <rect x="600" y="191" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="660" y="209">False</text>
+
+        <rect x="120" y="219" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="180" y="237">…</text>
+        <rect x="240" y="219" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="300" y="237">…</text>
+        <rect x="360" y="219" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="420" y="237">…</text>
+        <rect x="480" y="219" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="540" y="237">…</text>
+        <rect x="600" y="219" width="120" height="28" fill="#FFFFFF" stroke="#d4d4d8" stroke-width="1"/><text x="660" y="237">…</text>
+      </g>
+
+      <!-- index arrow / label -->
+      <text x="70" y="275" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#0d9488">rows (axis = 0)</text>
+      <text x="70" y="290" text-anchor="middle" font-family="Inter" font-size="10" fill="#0d9488">observations</text>
+
+      <!-- annotations -->
+      <text x="400" y="320" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">A column is a Series. A row, sliced out, is also a Series. The whole table is a DataFrame.</text>
+      <text x="400" y="340" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">Every column's dtype is part of the contract: it determines which operations are legal and how fast they run.</text>
+    </svg>
+    <figcaption>The dataframe is a rectangle with an index, named columns, and a dtype per column. The dtype is not cosmetic: it is the contract between you and pandas about what operations are legal on each column, and the largest single determinant of memory and speed.</figcaption>
+  </figure>
+
+  <p>The dtype taxonomy is short. <strong>Integer</strong> (<code>int8</code> through <code>int64</code>, plus the nullable <code>Int64</code> with a capital I) for counts and IDs. <strong>Float</strong> (<code>float32</code>, <code>float64</code>) for measured continuous quantities. <strong>Boolean</strong> (<code>bool</code>) for flags. <strong>Datetime</strong> (<code>datetime64[ns]</code>) for timestamps. <strong>Category</strong> for repeated string labels with a small fixed vocabulary (loan grade, employment status). <strong>Object</strong> for arbitrary Python objects, almost always strings, and the fallback that pandas uses when it cannot infer anything more specific. Memory follows directly: an <code>int8</code> column is eight times smaller than an <code>int64</code> column, a categorical column is one byte per row plus a dictionary, an object column is a pointer per row plus the strings themselves. Speed follows for the same reason: the narrower the dtype, the more values per cache line, the faster the operation.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>NumPy underneath: arrays before dataframes</h3>
+
+  <p>Pandas is built on <strong>NumPy</strong>. A pandas <code>Series</code> is, conceptually, a NumPy array with a label per element (the index) and a name. A <code>DataFrame</code> is a dictionary of Series sharing one index. Three NumPy ideas leak through pandas and are worth knowing directly.</p>
+
+  <p>First, <strong>vectorisation</strong>. NumPy operations apply elementwise to arrays without a Python-level loop, and run in compiled C. The performance gap between a vectorised operation and an explicit Python loop is typically two orders of magnitude. The first principle of analytical Python is: write the operation on the whole column, not on each row.</p>
+
+  <p>Second, <strong>broadcasting</strong>. When two arrays have compatible shapes, NumPy applies an operation pair-wise without you having to reshape them manually. <code>df["loan_amount"] * 1.05</code> multiplies every value by the scalar; <code>df["loan_amount"] - df["loan_amount"].mean()</code> subtracts the scalar mean from every value; <code>df[["a", "b"]] - df[["a", "b"]].mean()</code> subtracts a per-column mean from each column. The rules are mechanical and worth reading once in the NumPy documentation; in practice, "scalar broadcasts everywhere" covers 80 per cent of cases.</p>
+
+  <p>Third, <strong>missing values</strong>. NumPy floats represent missingness with <code>NaN</code> (not-a-number), the IEEE 754 sentinel. Pandas extends this to other dtypes via the nullable extensions (<code>Int64</code>, <code>boolean</code>, <code>string</code>), which use a separate bitmask to mark missing entries and preserve the underlying dtype. The classic pandas trap is that <em>any column with a single missing integer becomes a float column</em> if you use the legacy <code>int64</code> dtype; the cure is to use the nullable <code>Int64</code> explicitly.</p>
+
+  <h3>Loading data: read_csv done properly</h3>
+
+  <p>The single most important pandas function is <code>pd.read_csv</code>. Used naively it accepts a path and returns a dataframe; used properly it parameterises five things you should specify, not let pandas guess.</p>
+
+  <div class="worked">
+    <strong>Loading a credit risk CSV with dtypes specified</strong>
+    <p><code>import pandas as pd
+
+df = pd.read_csv(
+    "data/credit_risk_dataset.csv",
+    dtype={
+        "person_age": "Int16",
+        "person_income": "Int64",
+        "person_emp_length": "float32",
+        "person_home_ownership": "category",
+        "loan_intent": "category",
+        "loan_grade": "category",
+        "loan_amnt": "Int32",
+        "loan_int_rate": "float32",
+        "loan_status": "Int8",
+        "loan_percent_income": "float32",
+        "cb_person_default_on_file": "category",
+        "cb_person_cred_hist_length": "Int8",
+    },
+    parse_dates=["issue_date"],
+    date_format="%Y-%m-%d",
+    na_values=["", "NA", "null", "n/a"],
+    thousands=",",
+)</code></p>
+    <p>Five parameters earn their keep on every real-world load. <code>dtype</code> fixes column types up front and cuts memory by a factor of four to ten on a typical credit dataset. <code>parse_dates</code> converts date columns at read time rather than as a follow-up call; <code>date_format</code> tells pandas the exact pattern (much faster than letting it infer). <code>na_values</code> declares what counts as missing in this file beyond the defaults (<code>NA</code>, <code>NaN</code>, an empty cell). <code>thousands</code> handles the comma-separated numbers that come out of Excel.</p>
+  </div>
+
+  <p>The same function family covers other file formats. <code>pd.read_parquet</code> for columnar files (which already carry dtype information and need none of the parameters above), <code>pd.read_sql</code> for database extracts via SQLAlchemy, <code>pd.read_excel</code> for spreadsheets, <code>pd.read_json</code> for nested records. Parquet is the default for any dataset that lives longer than a week; CSV is for interchange with non-Python consumers and is otherwise lossy (no dtypes, no compression, no schema).</p>
+
+  <div class="callout warn">
+    <span class="tag">Common error</span>
+    Letting pandas infer dtypes on a large file ("just call <code>read_csv</code> with the path"). On a 30-million-row loan extract this is the difference between a 4 GB and a 28 GB dataframe and the difference between an analysis that fits in RAM and one that swaps. Even on small files, inferred dtypes lose information: a customer ID like "000123" becomes an integer 123, a date column becomes object, a category column becomes object and consumes ten times the memory.
+  </div>
+
+  <h3>Inspection: the five calls you make on every new dataframe</h3>
+
+  <p>The first five lines of every analysis are the same. They confirm that the load did what you intended.</p>
+
+  <div class="worked">
+    <strong>The standard inspection block</strong>
+    <p><code>df.shape          # (32_581, 12): rows, columns
+df.dtypes         # column → dtype mapping
+df.head(10)       # first ten rows; .tail() for last ten
+df.info()         # dtypes + non-null counts + memory usage
+df.describe(include="all")  # summary stats per column</code></p>
+    <p><code>shape</code> tells you the rectangle dimensions; deviate from the expected number of rows and the load went wrong. <code>dtypes</code> confirms every column landed at the type you specified. <code>head</code> and <code>tail</code> show the first and last few rows for a visual sanity check (look for misaligned columns, header rows that became data, trailing summary rows). <code>info</code> combines dtype, non-null count (the inverse of missingness), and memory footprint in one display. <code>describe</code> gives count, mean, std, min, max, and quartiles for numeric columns; with <code>include="all"</code> it also gives count, unique, top, and freq for categorical columns.</p>
+  </div>
+
+  <p>The output of these five calls should match your prior expectations. The number of rows should match the source system's record count. Every non-null count in <code>info</code> should equal the row count except for columns you expect to be missing (an employment length field is typically 1-3 per cent missing). Every dtype should be the one you specified. Every numerical column's <code>describe</code> output should pass a sanity check: ages between 18 and 100, loan amounts positive and below the policy maximum, interest rates between 0 and 100. A single failed check here is cheaper to chase down than the same failure surfacing as a strange aggregation three steps later.</p>
+
+  <h3>Selection: columns, rows, and the loc/iloc distinction</h3>
+
+  <p>Three idioms cover almost all column and row selection. <strong>Square brackets on a column name</strong> return that column as a Series; with a list of names, they return a DataFrame restricted to those columns:</p>
+
+  <div class="worked">
+    <strong>Column selection</strong>
+    <p><code>df["loan_amnt"]                      # Series of loan amounts
+df[["loan_amnt", "loan_grade"]]      # DataFrame with two columns
+df.loan_amnt                         # attribute access; same as df["loan_amnt"]</code></p>
+    <p>The attribute form works only when the column name is a valid Python identifier and is not a method on the dataframe. Square brackets work always. Prefer the bracket form in production code; reserve the attribute form for interactive exploration.</p>
+  </div>
+
+  <p>For rows, the two operators to know are <code>.loc</code> and <code>.iloc</code>. <strong><code>.loc</code> selects by label</strong>; <strong><code>.iloc</code> selects by integer position</strong>. They look similar and behave differently in three ways: the input type, whether the right-hand endpoint is inclusive, and the result type when you pass a scalar.</p>
+
+  <div class="worked">
+    <strong>.loc vs .iloc</strong>
+    <p><code>df.loc[0]                       # row with index label 0  (a Series)
+df.loc[0:5]                     # rows with labels 0 through 5 INCLUSIVE
+df.loc[0:5, ["loan_amnt"]]      # rows 0-5, only the loan_amnt column
+df.loc[df["default"] == 1]      # rows where default is True (boolean mask)
+
+df.iloc[0]                      # row at integer position 0
+df.iloc[0:5]                    # rows at positions 0-4 EXCLUSIVE of 5
+df.iloc[0:5, [3, 4]]            # rows 0-4, columns at positions 3 and 4
+df.iloc[-1]                     # last row</code></p>
+    <p>The inclusive-vs-exclusive endpoint is the trap. <code>df.loc[0:5]</code> returns six rows; <code>df.iloc[0:5]</code> returns five. The same difference applies to columns when you pass a slice. A working memory aid: <code>.loc</code> is for labels (which need not be integers, and an inclusive endpoint makes sense), <code>.iloc</code> is for positions (which are always integers, and Python slice semantics are exclusive).</p>
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The <code>.at</code> and <code>.iat</code> accessors are the scalar versions of <code>.loc</code> and <code>.iloc</code> and are roughly an order of magnitude faster for single-cell access. Most analytical code never needs them; if you find yourself writing a loop that pulls one cell at a time, the loop is usually the bug. Use <code>.at</code>/<code>.iat</code> in two cases: stress-testing a pipeline with row-by-row debug prints, or interfacing with code (a callback, a custom aggregator) that genuinely needs scalar access.
+  </div>
+
+  <h3>Filtering: boolean masks, query, and the convenience methods</h3>
+
+  <p>Filtering rows is the operation you do most often. Three idioms cover almost everything: boolean masks, the <code>.query</code> method, and a handful of named convenience methods (<code>.isin</code>, <code>.between</code>, the string accessor).</p>
+
+  <p>A <strong>boolean mask</strong> is a Series of <code>True</code>/<code>False</code> the same length as the dataframe; passing it to <code>.loc</code> or inside square brackets returns the rows where the mask is true. Masks compose with <code>&amp;</code> (and), <code>|</code> (or), and <code>~</code> (not), each operand wrapped in parentheses because of Python's operator precedence.</p>
+
+  <div class="worked">
+    <strong>Boolean-mask filtering</strong>
+    <p><code>defaulted = df.loc[df["loan_status"] == 1]
+
+high_grade_recent = df.loc[
+    (df["loan_grade"].isin(["A", "B"]))
+    &amp; (df["issue_date"] >= "2022-01-01")
+    &amp; (df["loan_amnt"].between(5_000, 50_000))
+]
+
+non_homeowners = df.loc[df["person_home_ownership"] != "OWN"]
+not_missing_employment = df.loc[df["person_emp_length"].notna()]</code></p>
+    <p><code>.isin</code> tests membership in a list and replaces a chain of <code>==</code> comparisons joined with <code>|</code>. <code>.between</code> tests a closed numeric interval and replaces two-sided inequalities. <code>.notna</code> tests for non-missingness; the inverse <code>.isna</code> tests for missingness.</p>
+  </div>
+
+  <p>The <strong><code>.query</code> method</strong> takes a string expression and is often clearer for multi-condition filters:</p>
+
+  <div class="worked">
+    <strong>Query-based filtering</strong>
+    <p><code>high_grade_recent = df.query(
+    "loan_grade in ['A', 'B'] "
+    "and issue_date >= '2022-01-01' "
+    "and 5_000 &lt;= loan_amnt &lt;= 50_000"
+)</code></p>
+    <p>The advantages: no parentheses, no repeated dataframe name, chained comparisons (<code>5_000 &lt;= x &lt;= 50_000</code>) work as in mathematical notation. The cost: a string expression that linters cannot check until runtime, and a small parsing overhead. Prefer <code>.query</code> for three or more conditions; prefer boolean masks for one or two conditions or where you need to build the mask programmatically.</p>
+  </div>
+
+  <p>For string columns, the <strong><code>.str</code> accessor</strong> exposes the regular Python string methods plus regex patterns:</p>
+
+  <div class="worked">
+    <strong>String filtering</strong>
+    <p><code>df.loc[df["loan_intent"].str.startswith("MED")]
+df.loc[df["person_home_ownership"].str.lower() == "rent"]
+df.loc[df["loan_intent"].str.contains(r"PERSONAL|MEDICAL", regex=True)]
+df.loc[df["loan_intent"].str.match(r"^[A-Z]{4,}$")]   # only uppercase, 4+ chars</code></p>
+    <p>Every <code>.str</code> method propagates missing values as missing (it does not raise). For categorical columns the same operations work via <code>.str</code> but should usually be done by comparing against the categories list directly, which is faster.</p>
+  </div>
+
+  <h3>Adding and transforming columns</h3>
+
+  <p>Four patterns cover essentially all column construction. Each starts from one or more existing columns and produces a new one.</p>
+
+  <p>The <strong>direct assignment</strong> pattern is the simplest: arithmetic on Series broadcasts, and you assign the result to a new column name:</p>
+
+  <div class="worked">
+    <strong>Direct assignment</strong>
+    <p><code>df["interest_payment"] = df["loan_amnt"] * df["loan_int_rate"] / 100
+df["log_income"] = np.log1p(df["person_income"])
+df["loan_to_income"] = df["loan_amnt"] / df["person_income"]
+df["loan_age_days"] = (pd.Timestamp.today() - df["issue_date"]).dt.days</code></p>
+    <p>The <code>.dt</code> accessor on a datetime Series exposes date components (<code>.dt.year</code>, <code>.dt.month</code>, <code>.dt.day_name()</code>, <code>.dt.days</code> on a timedelta). It is the datetime equivalent of <code>.str</code> for strings.</p>
+  </div>
+
+  <p>The <strong><code>.assign</code> method</strong> is the same idea but immutable and chainable. It does not modify <code>df</code> in place; it returns a new dataframe with the additional columns:</p>
+
+  <div class="worked">
+    <strong>Chained assignment</strong>
+    <p><code>enriched = (
+    df
+    .assign(
+        interest_payment=lambda d: d["loan_amnt"] * d["loan_int_rate"] / 100,
+        log_income=lambda d: np.log1p(d["person_income"]),
+        loan_to_income=lambda d: d["loan_amnt"] / d["person_income"],
+    )
+    .query("loan_to_income &lt; 1")
+)</code></p>
+    <p>The lambda form lets a new column reference a column produced earlier in the same chain. The chained style scales much better than a sequence of in-place assignments: there is one variable name (<code>enriched</code>), one pipeline you can read top-to-bottom, and no question about which line ran in which order.</p>
+  </div>
+
+  <p>For <strong>conditional logic</strong>, use <code>np.where</code> for a single condition and <code>np.select</code> for multiple:</p>
+
+  <div class="worked">
+    <strong>Conditional columns</strong>
+    <p><code>import numpy as np
+
+# binary condition
+df["large_loan"] = np.where(df["loan_amnt"] > 25_000, 1, 0)
+
+# multi-way condition
+conditions = [
+    df["loan_amnt"] &lt; 5_000,
+    df["loan_amnt"] &lt; 15_000,
+    df["loan_amnt"] &lt; 30_000,
+]
+choices = ["small", "medium", "large"]
+df["loan_size_bucket"] = np.select(conditions, choices, default="jumbo")</code></p>
+    <p><code>np.select</code> evaluates the conditions in order and picks the first matching <code>choice</code>; rows matching none get the <code>default</code>. It replaces a tower of nested <code>np.where</code> calls or an <code>if</code>/<code>elif</code> chain inside an <code>apply</code>.</p>
+  </div>
+
+  <p>For everything else, <strong><code>.apply</code></strong> with a lambda or a named function applies row-wise or column-wise logic. It is the most general tool and the slowest:</p>
+
+  <div class="worked">
+    <strong>Apply: the escape hatch</strong>
+    <p><code># row-wise apply: f is called once per row, receives a Series
+df["risk_score"] = df.apply(
+    lambda row: row["loan_amnt"] * 0.001 + (10 if row["loan_grade"] == "G" else 0),
+    axis=1,
+)
+
+# column-wise apply: f is called once per column, receives a Series
+df.select_dtypes("number").apply(lambda s: (s - s.mean()) / s.std())</code></p>
+    <p>The same row-wise example written with vectorised arithmetic and <code>np.where</code> runs roughly fifty times faster on a million-row dataframe:</p>
+    <p><code>df["risk_score"] = (
+    df["loan_amnt"] * 0.001
+    + np.where(df["loan_grade"] == "G", 10, 0)
+)</code></p>
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">When apply is the wrong tool</span>
+    Reach for <code>apply</code> only when no vectorised expression exists, the loop is genuinely irreducible (a recursive feature, a third-party non-vectorised function), or the dataset is small enough that the speed difference is invisible. Most uses of <code>apply</code> in junior code can be rewritten as vectorised arithmetic, <code>np.where</code>/<code>np.select</code>, or a string accessor; doing so is the single largest performance win available to a pandas pipeline.
+  </div>
+
+  <h3>Renaming, resetting, and a note on the index</h3>
+
+  <p>Two housekeeping operations close out the core. <strong>Renaming columns</strong> uses a dictionary mapping; you can rename only the columns you want and leave the rest untouched:</p>
+
+  <div class="worked">
+    <strong>Renaming</strong>
+    <p><code>df = df.rename(columns={
+    "loan_amnt": "loan_amount",
+    "person_emp_length": "employment_years",
+    "cb_person_default_on_file": "prior_default_flag",
+})</code></p>
+    <p>For a bulk rewrite (snake_case for everything, lowercasing, stripping whitespace), apply a function via the <code>columns</code> attribute:</p>
+    <p><code>df.columns = df.columns.str.lower().str.replace(" ", "_")</code></p>
+  </div>
+
+  <p>The <strong>index</strong> is the row-label structure. Three operations cover it: <code>set_index</code> promotes a column to be the index, <code>reset_index</code> moves the index back to a column and reverts to the default integer range, and <code>sort_index</code> sorts rows by their index. The default integer index is rarely useful; setting a meaningful index (loan_id, issue_date) before joins and time-series operations is the cleanest pattern.</p>
+
+  <div class="worked">
+    <strong>Index management</strong>
+    <p><code>df = df.set_index("loan_id")        # loan_id becomes the row label
+df.loc["L0007"]                     # look up a loan by ID
+
+df = df.reset_index()               # loan_id becomes a column again
+df = df.set_index("issue_date").sort_index()   # date-indexed and ordered</code></p>
+    <p>A datetime index unlocks the time-series methods (<code>.resample</code>, <code>.rolling</code>, partial-string slicing like <code>df.loc["2022":"2023"]</code>), covered in Lecture 02.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Worked example: from raw file to typed dataframe</h2></div>
+
+  <p>The credit risk dataset referenced throughout this lecture is a publicly available file of 32,581 loan applications with 12 columns (demographics, loan terms, performance flag, prior-default flag). A complete first-pass treatment of the file fits in three blocks: load it correctly, confirm the shape, and derive the first few analytical columns.</p>
+
+  <div class="worked">
+    <strong>Block 1, load with explicit dtypes</strong>
+    <p><code>import pandas as pd
+import numpy as np
+
+df = pd.read_csv(
+    "data/credit_risk_dataset.csv",
+    dtype={
+        "person_age": "Int16",
+        "person_income": "Int64",
+        "person_emp_length": "float32",
+        "person_home_ownership": "category",
+        "loan_intent": "category",
+        "loan_grade": "category",
+        "loan_amnt": "Int32",
+        "loan_int_rate": "float32",
+        "loan_status": "Int8",
+        "loan_percent_income": "float32",
+        "cb_person_default_on_file": "category",
+        "cb_person_cred_hist_length": "Int8",
+    },
+    na_values=["", "NA", "null"],
+)</code></p>
+    <p>The cost of being explicit here is a dozen lines; the benefit is a dataframe ten times smaller than the default load, with every column at a type that supports the right operations (a <code>category</code> for loan_grade preserves the rating order if you want it, an <code>Int8</code> for loan_status takes one byte not eight).</p>
+  </div>
+
+  <div class="worked">
+    <strong>Block 2, inspect and sanity-check</strong>
+    <p><code>print(df.shape)              # (32581, 12)
+print(df.dtypes)
+print(df.info(memory_usage="deep"))
+df.describe(include="all").T</code></p>
+    <p>The <code>memory_usage="deep"</code> argument follows pointers into object columns so the reported footprint is accurate. The transposed <code>describe</code> (one column per statistic, one row per variable) is much easier to scan than the default orientation. Read down the count column: any value below 32,581 means missing entries in that column. The <code>person_emp_length</code> column has roughly 900 missing entries, and the <code>loan_int_rate</code> column has roughly 3,000; both will need a treatment decision in the EDA lecture.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Block 3, derive analytical columns and filter</strong>
+    <p><code>analysis = (
+    df
+    .assign(
+        loan_to_income=lambda d: d["loan_amnt"] / d["person_income"],
+        annual_interest=lambda d: d["loan_amnt"] * d["loan_int_rate"] / 100,
+        is_homeowner=lambda d: d["person_home_ownership"].isin(["OWN", "MORTGAGE"]),
+        amount_bucket=lambda d: pd.cut(
+            d["loan_amnt"],
+            bins=[0, 5_000, 15_000, 30_000, np.inf],
+            labels=["small", "medium", "large", "jumbo"],
+        ),
+    )
+    .query("person_age &gt;= 18 and person_age &lt;= 100")   # drop obvious data errors
+    .query("loan_to_income &lt; 1")                          # drop loans &gt; income
+)
+
+print(analysis.shape)            # (~31_500, 16)
+print(analysis.head())</code></p>
+    <p>Three derived features (loan-to-income, annual interest, homeowner flag), one binned column (<code>pd.cut</code> for fixed-edge bins; use <code>pd.qcut</code> for equal-count bins), and two filters that drop obvious data errors. The pipeline reads top-to-bottom, every transformation is in one expression, and the input <code>df</code> is unchanged. This is the shape every analytical pipeline in pandas should take.</p>
+  </div>
+
+  <p>What you have now: a typed, sanity-checked, lightly-feature-engineered dataframe of about 31,500 loans ready for the aggregation work of Lecture 02 and the EDA of Lecture 04. The single most important property of the result is reproducibility: if a colleague reruns the three blocks against the same source file, they get the same dataframe down to the byte. Bad dtype handling at the load stage destroys this property silently.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Common pitfalls and how to avoid them</h2></div>
+
+  <h3>SettingWithCopyWarning</h3>
+
+  <p>The warning every pandas user sees first and understands last. It triggers when you assign to a slice that pandas cannot determine is a view or a copy; the assignment may or may not propagate to the original dataframe, and the answer depends on internal implementation details you should not depend on. The cure is to avoid chained indexing entirely. Replace <code>df[df["x"] &gt; 0]["y"] = 1</code> (two indexing operations, ambiguous) with <code>df.loc[df["x"] &gt; 0, "y"] = 1</code> (one operation via <code>.loc</code>, unambiguous). The warning is one of pandas's better diagnostic messages; read the URL it prints and use <code>.loc</code> for any combined row-and-column assignment.</p>
+
+  <h3>Integer columns silently becoming floats</h3>
+
+  <p>The classical NumPy integer dtype has no missing-value sentinel; a single <code>NaN</code> forces the entire column to <code>float64</code>. The fix is to use pandas's nullable integer dtype, written with a capital I (<code>Int64</code>, <code>Int32</code>, <code>Int16</code>, <code>Int8</code>). It carries a separate bitmask for missing entries and preserves the integer type. Specify it at <code>read_csv</code> time and the column survives missing values untouched.</p>
+
+  <h3>Comparing strings to numbers and getting silent surprises</h3>
+
+  <p>A column read as <code>object</code> (typically string) compared to a numeric literal returns <code>False</code> for every row, with no error. The filter quietly returns an empty dataframe. The fix is to look at the <code>dtypes</code> output before writing the filter and convert with <code>pd.to_numeric(col, errors="coerce")</code> if the column should be numeric. The <code>errors="coerce"</code> arg turns un-parseable values into <code>NaN</code> rather than raising; this is what you want for diagnostic conversion of a dirty CSV, and not what you want in a production pipeline (where the <code>NaN</code>s become silent missing data).</p>
+
+  <h3>Forgetting that boolean operators are bitwise on Series</h3>
+
+  <p>Python's <code>and</code> and <code>or</code> are short-circuit operators on scalars; they raise a <code>ValueError</code> on Series ("The truth value of a Series is ambiguous"). Pandas uses <code>&amp;</code> and <code>|</code> for elementwise logic on Series, and both operands must be wrapped in parentheses because <code>&amp;</code> has higher precedence than <code>&lt;</code>, <code>&gt;</code>, and <code>==</code>. The two related errors are forgetting the parentheses (which produces an unrelated, confusing exception about ambiguity) and using <code>and</code>/<code>or</code> by reflex from base Python.</p>
+
+  <h3>Chained inplace operations</h3>
+
+  <p>Many pandas methods accept an <code>inplace=True</code> argument that mutates the dataframe and returns <code>None</code>. The argument is seductively named and almost always the wrong choice: it does not save memory in modern pandas, it breaks method chaining (the return value is <code>None</code>, not a dataframe), and it makes diffs harder to read. The pandas core team has signalled that <code>inplace</code> is on the path to deprecation. Default to the non-inplace form (<code>df = df.dropna()</code>) for every method.</p>
+
+  <div class="callout warn">
+    <span class="tag">A subtler trap</span>
+    <code>df["new_column"] = some_series</code> aligns <code>some_series</code> to <code>df</code>'s index before assignment. If the two indexes are different (one is the default integer range, the other was produced by a groupby that re-indexed), most rows in the new column will be missing and you may not notice. The cure is to either reset both indexes to a known common state before assignment, or to assign with <code>.values</code> (which strips the index) when you are confident the order matches. The latter is usually a bug waiting to happen; prefer the former.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the dataframe layer. A dataframe is a typed rectangle: rows are observations, columns carry dtypes, and dtype choice is the single largest determinant of correctness, memory, and speed. The four verbs cover almost all analytical work: load with explicit dtypes and date parsing; inspect with shape, dtypes, info, head, and describe; select with column names plus <code>.loc</code>/<code>.iloc</code>; transform with direct arithmetic, <code>.assign</code> chains, <code>np.where</code>/<code>np.select</code>, and (sparingly) <code>.apply</code>. The five pitfalls (chained indexing, integer-to-float demotion, string-numeric comparisons, bitwise operators, inplace) are the silent ways the layer goes wrong.</p>
+
+  <p>Three things are missing from this lecture and are taken up in the next. The folding operations &mdash; <strong>aggregating</strong> a column to one number, <strong>pivoting</strong> long to wide, and <strong>joining</strong> two tables &mdash; are Lecture 02. The same vocabulary on a faster engine (<strong>Polars</strong>) is Lecture 03. The discipline of <strong>looking at the data</strong> (missing-value diagnosis, outlier review, distributional checks) is Lecture 04. Visualisation is Lecture 05. The dataframe-as-typed-rectangle picture from this lecture is the prerequisite for all four.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>You read a 30-million-row CSV and the resulting dataframe is 28 GB. What is the single biggest lever for reducing it? Name three dtype choices you would change first.</li>
+      <li>Distinguish <code>.loc[0:5]</code> from <code>.iloc[0:5]</code> in two sentences. Why is the difference designed that way?</li>
+      <li>You write <code>df[(df["x"] &gt; 0) and (df["y"] &lt; 10)]</code> and pandas raises a <code>ValueError</code>. State the cause and the fix.</li>
+      <li>An integer column read with the legacy <code>int64</code> dtype contains a missing value. What dtype does the column actually have? Why?</li>
+      <li>You see a <code>SettingWithCopyWarning</code>. State the underlying problem in one sentence and write the corrected idiom.</li>
+      <li>When is <code>.apply</code> the right tool, and when is it the wrong tool? Give one credit-risk example of each.</li>
+      <li>You write a chained pipeline with <code>.assign</code>, <code>.query</code>, and another <code>.assign</code>. The second <code>.assign</code> references a column from the first. How do you express that reference?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 02 (<a href="02-aggregation_pivoting_joining.html">aggregation, pivoting and joining</a>) takes the same rectangle and folds it the three ways every portfolio analysis depends on.</li>
+      <li><strong>Faster:</strong> Lecture 03 (<a href="03-polars.html">Polars and the modern dataframe stack</a>) is the same vocabulary on an Arrow-backed engine that scales an order of magnitude beyond pandas.</li>
+      <li><strong>Where the data comes from:</strong> the <a href="../../../wiki/fundamentals/02_data_engineering/">data engineering</a> track shows how SQL extracts produce the rectangle this lecture consumes.</li>
+      <li><strong>What you do with the rectangle next:</strong> Lecture 04 (<a href="04-exploratory_data_analysis.html">exploratory data analysis</a>) and <a href="../statistics/01-descriptive_statistics.html">descriptive statistics</a> in the statistics course are the natural follow-ons.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data analysis course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 1 of 5</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

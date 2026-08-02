@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 9: the Black-Scholes PDE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>The Black-Scholes PDE</h1>
+  <p class="subtitle">Two independent routes, delta hedging and Feynman-Kac, arrive at the same partial differential equation for the price of any claim written on a lognormal stock. This lecture derives that equation both ways, solves it in closed form for a European call, and turns the closed form into a number you can check against the binomial tree of lecture 4.</p>
+  <div class="meta">
+    <span>Lecture 9 of 13</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Source: <code>UP / 8 - Black Scholes PDE.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The <strong>Black-Scholes PDE</strong> is the equation that any no-arbitrage price of a European claim on a lognormal stock must satisfy. Write the claim's price as a function <code>V(t,S)</code> of time and the current stock price, and no-arbitrage forces</p>
+
+  <p>$$ V_t + rS\,V_S + \tfrac{1}{2}\sigma^2 S^2 V_{SS} - rV = 0, \qquad V(T,S) = \Psi(S). $$</p>
+
+  <p>Solve that terminal value problem for the payoff $\Psi(S) = \max(S-K,0)$ of a European call and out comes the most quoted formula in finance, $C = S_0 N(d_1) - Ke^{-rT}N(d_2)$. The equation itself does not care what $\Psi$ is: change the terminal condition and the same machinery prices a put, a digital, or an exotic payoff on the same underlying.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You are long one call option and you want to hedge it. At every instant you hold $\Delta(t)$ shares of stock against the option, short, financed by borrowing or lending the difference in cash. Choose $\Delta(t)$ so that the combined position, option minus $\Delta$ shares, has no exposure to the next instant's random wiggle in the stock. What is left over is deterministic, and a deterministic, self-financed portfolio that requires no capital of its own can only earn the risk-free rate, otherwise you could borrow against it for free money. Write that single sentence, "the riskless portfolio earns <code>r</code>", as an equation, and the Black-Scholes PDE falls out. Nothing about $\mu$, the stock's real expected return, ever enters the calculation, which is the whole reason the same formula works whether you are wildly bullish or bearish on the stock.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP PDF derives the PDE once, by matching coefficients between an assumed self-financing portfolio and Itô's lemma applied to $V(t,S)$, and it flags the self-financing subtlety honestly in an earlier remark that section 2.2 itself never revisits. It then solves the call price by direct risk-neutral integration of the lognormal payoff, a full page of completing-the-square Gaussian algebra, and states the put by parity without re-deriving it. This lecture adds the alternative Feynman-Kac route from lecture 8 side by side with the hedging route, makes explicit why the two must agree and which is more general, returns to the self-financing subtlety the source raises but does not close, works the change-of-variables route to the heat equation as the second way to reach the closed form, interprets $N(d_1)$ and $N(d_2)$ correctly (the first is not a probability), checks put-call parity against lecture 2, checks the limiting behaviour as $\sigma\to 0$ and $T\to 0$, and cross-checks the closed form numerically against the three-step binomial tree of lecture 4.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Every option-pricing model you will ever meet, however exotic, is built from the same three-line argument this lecture proves once and for all: form a hedge, kill the randomness, and note that whatever is left over must earn the risk-free rate. Local volatility models, stochastic volatility models, and jump-diffusion models all change the dynamics assumed for the underlying and re-run this argument to get a different PDE. None of them change the argument itself. Learn it here, on the simplest possible dynamics, and every later model is a variation rather than a new idea.</p>
+
+  <p>The closed-form call price is also the industry's shared language. No trading desk actually believes the stock follows geometric Brownian motion with constant volatility, and every desk still quotes options in terms of the volatility that would make the Black-Scholes formula match the market price, the <em>implied volatility</em> that lecture 5 built a calibration loop around. Understanding the formula as a quoting convention rather than a physical model is the single most useful piece of judgement this lecture can hand a practitioner, and it is developed properly in section 5.</p>
+
+  <p>For a credit or IFRS 9 modeller the PDE itself will look familiar from an unexpected angle: it is a backward parabolic equation with a terminal condition, structurally identical to Thiele's differential equation for a life insurance reserve. Both equations say the same thing in different clothing, that a value process evolving under uncertainty, discounted at the right rate, must reconcile smoothly with a known terminal payoff.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures carry the lecture. The first lays out the delta-hedging argument as a flow, in the same boxed style as the cash-and-carry figure of lecture 1: three steps, form the hedge, kill the randomness, price the leftover. The second shows what happens to the call price as maturity approaches, a family of smooth curves collapsing onto the kinked payoff, which is the geometric content of the boundary condition $V(T,S)=\Psi(S)$.</p>
+
+  <h3>Picture one: the delta-hedging argument as a flow</h3>
+
+  <p>The argument has exactly three moving parts, and every one of them recurs in every later hedging argument in this course. Build a portfolio long the option and short $\Delta$ shares; apply Itô's lemma to the option leg and choose $\Delta$ to cancel the random term; argue that what remains, being both riskless and self-financed, must grow at the risk-free rate.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The delta-hedging argument as a three-step flow: form the hedge, cancel the randomness, price the riskless remainder">
+      <defs>
+        <marker id="arrowEndBS" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#52525b"/>
+        </marker>
+        <linearGradient id="step1GradBS" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f0fdfa"/>
+          <stop offset="100%" stop-color="#ccfbf1"/>
+        </linearGradient>
+        <linearGradient id="step2GradBS" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fffbeb"/>
+          <stop offset="100%" stop-color="#fef3c7"/>
+        </linearGradient>
+        <linearGradient id="step3GradBS" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#faf5ff"/>
+          <stop offset="100%" stop-color="#f3e8ff"/>
+        </linearGradient>
+        <linearGradient id="outcomeGradBS" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1A2238"/>
+          <stop offset="100%" stop-color="#0A0F1C"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="28" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Three steps from a hedge to a PDE</text>
+
+      <!-- Step 1 -->
+      <g transform="translate(40,50)">
+        <rect x="0" y="0" width="720" height="100" rx="10" fill="url(#step1GradBS)" stroke="#0f766e" stroke-width="1.5"/>
+        <rect x="0" y="0" width="160" height="100" rx="10" fill="#0f766e"/>
+        <text x="80" y="45" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#ffffff">Step 1</text>
+        <text x="80" y="65" text-anchor="middle" font-family="Inter" font-weight="500" font-size="12" fill="#ccfbf1">form the hedge</text>
+        <rect x="190" y="18" width="510" height="64" rx="6" fill="#ffffff" stroke="#a7f3d0" stroke-width="1"/>
+        <text x="205" y="40" font-family="Inter" font-size="11" fill="#115e59">Hold one option, short Delta(t) shares of stock:</text>
+        <text x="205" y="60" font-family="Inter" font-weight="600" font-size="11" fill="#134e4a">Pi(t) = V(t, S(t)) - Delta(t) S(t)</text>
+        <text x="205" y="76" font-family="Inter" font-size="10.5" fill="#115e59">Delta is not yet chosen; it is free at this point.</text>
+      </g>
+
+      <line x1="400" y1="150" x2="400" y2="172" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowEndBS)"/>
+
+      <!-- Step 2 -->
+      <g transform="translate(40,180)">
+        <rect x="0" y="0" width="720" height="110" rx="10" fill="url(#step2GradBS)" stroke="#b45309" stroke-width="1.5"/>
+        <rect x="0" y="0" width="160" height="110" rx="10" fill="#b45309"/>
+        <text x="80" y="48" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#ffffff">Step 2</text>
+        <text x="80" y="68" text-anchor="middle" font-family="Inter" font-weight="500" font-size="12" fill="#FDE68A">kill the dW term</text>
+        <rect x="190" y="16" width="510" height="78" rx="6" fill="#ffffff" stroke="#FDE68A" stroke-width="1"/>
+        <text x="205" y="36" font-family="Inter" font-size="11" fill="#92400e">Apply Ito's lemma to V(t,S), substitute into dPi:</text>
+        <text x="205" y="54" font-family="Inter" font-weight="600" font-size="11" fill="#7c2d12">dPi = (V_t + rSV_S + &#189;sigma&sup2;S&sup2;V_SS - rSV_S)dt + sigma S(V_S - Delta)dW</text>
+        <text x="205" y="72" font-family="Inter" font-size="10.5" fill="#92400e">Choosing Delta(t) = V_S(t,S(t)) makes the dW coefficient vanish exactly.</text>
+        <text x="205" y="88" font-family="Inter" font-size="10.5" fill="#92400e">Pi is now instantaneously riskless.</text>
+      </g>
+
+      <line x1="400" y1="290" x2="400" y2="312" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowEndBS)"/>
+
+      <!-- Step 3 -->
+      <g transform="translate(40,320)">
+        <rect x="0" y="0" width="720" height="100" rx="10" fill="url(#step3GradBS)" stroke="#7b61ff" stroke-width="1.5"/>
+        <rect x="0" y="0" width="160" height="100" rx="10" fill="#6d28d9"/>
+        <text x="80" y="45" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#ffffff">Step 3</text>
+        <text x="80" y="65" text-anchor="middle" font-family="Inter" font-weight="500" font-size="12" fill="#e9d5ff">price the remainder</text>
+        <rect x="190" y="18" width="510" height="64" rx="6" fill="#ffffff" stroke="#e9d5ff" stroke-width="1"/>
+        <text x="205" y="40" font-family="Inter" font-size="11" fill="#5b21b6">A riskless, self-financed portfolio must earn r:</text>
+        <text x="205" y="60" font-family="Inter" font-weight="600" font-size="11" fill="#4c1d95">dPi = r*Pi*dt, with Pi = V - S*V_S</text>
+        <text x="205" y="76" font-family="Inter" font-size="10.5" fill="#5b21b6">Equating the two expressions for dPi gives the PDE.</text>
+      </g>
+
+      <g transform="translate(40,432)">
+        <rect x="0" y="0" width="720" height="24" rx="12" fill="url(#outcomeGradBS)"/>
+        <text x="360" y="17" text-anchor="middle" font-family="Inter" font-weight="700" font-size="12" fill="#a7f3d0">V_t + rS V_S + &#189;sigma&sup2;S&sup2;V_SS - rV = 0</text>
+      </g>
+    </svg>
+    <figcaption>The delta-hedging argument as a flow, in the same style as the cash-and-carry figure of lecture 1. Three steps, each doing exactly one job, land on the Black-Scholes PDE at the bottom.</figcaption>
+  </figure>
+
+  <h3>Picture two: the call price collapsing onto the payoff</h3>
+
+  <p>The terminal condition $V(T,S) = \max(S-K,0)$ is a kinked, non-smooth function of $S$. Away from maturity the price is a smooth curve, strictly above the kinked payoff, because the option always carries some chance of moving further into the money. As $T-t \to 0$ that smooth curve has to fold down onto the kink, and the way it does so is itself informative: the curve loses its curvature fastest near the strike, exactly where the payoff bends.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Call price against spot at several maturities, converging onto the kinked intrinsic-value payoff as time to maturity shrinks to zero">
+      <defs>
+        <marker id="axisArrBS2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Call price versus spot, at falling time to maturity</text>
+
+      <!-- axes -->
+      <line x1="80" y1="360" x2="740" y2="360" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrBS2)"/>
+      <line x1="80" y1="360" x2="80" y2="55" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrBS2)"/>
+      <text x="740" y="380" text-anchor="end" font-family="Inter" font-size="12" fill="#71717a">spot S</text>
+      <text x="55" y="60" text-anchor="middle" font-family="Inter" font-size="12" fill="#71717a">price</text>
+
+      <!-- strike marker -->
+      <line x1="400" y1="355" x2="400" y2="365" stroke="#18181b" stroke-width="2"/>
+      <text x="400" y="378" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#18181b">K</text>
+
+      <!-- kinked intrinsic payoff, bold, dark -->
+      <polyline points="80,360 400,360 740,20" fill="none" stroke="#18181b" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="640" y="95" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#18181b">payoff at T: max(S-K,0)</text>
+
+      <!-- T-t = 1yr, most curved, teal -->
+      <path d="M 80,340 C 250,330 350,260 400,220 C 470,165 600,80 740,40" fill="none" stroke="#0f766e" stroke-width="2.25"/>
+      <text x="140" y="322" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#0f766e">T-t = 1</text>
+
+      <!-- T-t = 0.25yr, amber -->
+      <path d="M 80,356 C 280,352 360,300 400,255 C 460,190 600,60 740,25" fill="none" stroke="#b45309" stroke-width="2.25"/>
+      <text x="200" y="345" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#b45309">T-t = 0.25</text>
+
+      <!-- T-t = 0.02yr, near-kink, purple -->
+      <path d="M 80,359.5 C 330,359 380,340 400,300 C 420,260 470,50 740,21" fill="none" stroke="#7b61ff" stroke-width="2.25"/>
+      <text x="470" y="315" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#7b61ff">T-t &#8594; 0</text>
+
+      <text x="410" y="400" text-anchor="middle" font-family="Inter" font-size="11" fill="#71717a" font-style="italic">Every curve sits above the payoff; the gap is the option's time value, which vanishes only at maturity.</text>
+    </svg>
+    <figcaption>Call price against spot at three maturities. Each curve is smooth and lies strictly above the kinked intrinsic value; as $T-t \to 0$ the curve folds down onto the payoff, fastest near the strike, which is exactly where the terminal condition is non-differentiable.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Setting up the model</h3>
+
+  <p>The source posits a market with a risk-free bond and a single risky stock, each following the dynamics used throughout the course:</p>
+
+  <p>$$ dB(t) = rB(t)\,dt, \qquad dS(t) = \mu S(t)\,dt + \sigma S(t)\,dW(t), $$</p>
+
+  <p>with <code>r</code>, <code>mu</code> and <code>sigma</code> all constant. A contingent claim pays $\Psi(S(T))$ at a fixed maturity <code>T</code>, and the pricing problem is to find $V(t,S)$, the no-arbitrage value at time <code>t</code> when the stock stands at $S(t)=S$.</p>
+
+  <div class="defcard">
+    <div class="term">Model assumptions, and how reality violates each one</div>
+    <div class="def">Five assumptions carry the whole derivation, and every one fails to some degree in a real market. <strong>Constant volatility</strong>: the stock's instantaneous volatility <code>sigma</code> never changes; in practice it is stochastic and mean-reverting, and it visibly differs by strike, the smile of lecture 5. <strong>Continuous trading with no costs</strong>: the hedge can be rebalanced infinitely often at zero cost; real hedging is discrete and bears bid-offer spread, so the theoretical hedge is never exactly replicated. <strong>No jumps</strong>: the stock path is continuous; real prices gap, most visibly around earnings and macro announcements, and a continuous hedge cannot protect against a jump. <strong>Constant, known interest rate</strong>: <code>r</code> is fixed for the life of the trade; real rates are stochastic and, for long-dated options, this matters for both discounting and the funding cost of the hedge. <strong>Unrestricted short selling and borrowing at r</strong>: the hedge can go arbitrarily short the stock and borrow or lend without limit at the same rate used to discount; real markets have borrow costs, margin requirements, and a spread between borrowing and lending rates.</div>
+  </div>
+
+  <h3>Route one: the PDE by delta hedging</h3>
+
+  <p>The source builds a self-financing portfolio $\Pi(t) = \Delta(t)S(t) + \alpha(t)B(t)$, with $\Delta(t)$ shares of stock and $\alpha(t)$ units of bond, and requires this portfolio to replicate the claim: $\Pi(t) = V(t,S(t))$ for every <code>t</code>. Self-financing means the portfolio's value changes only through price moves in its two components, never through an injection or withdrawal of cash:</p>
+
+  <p>$$ d\Pi(t) = \Delta(t)\,dS(t) + \alpha(t)\,dB(t) = \bigl[\mu\Delta(t)S(t) + r\alpha(t)B(t)\bigr]dt + \sigma\Delta(t)S(t)\,dW(t). $$</p>
+
+  <p>Because $\Pi(t)=V(t,S(t))$ at every instant, $d\Pi$ must also equal $dV(t,S(t))$ computed by Itô's lemma (lecture 7):</p>
+
+  <p>$$ dV(t,S(t)) = \Bigl[V_t + \mu S V_S + \tfrac12\sigma^2S^2V_{SS}\Bigr]dt + \sigma S V_S\,dW(t). $$</p>
+
+  <p>Matching the $dW$ coefficients between the two expressions for $d\Pi$ gives $\Delta(t) = V_S(t,S(t))$ directly: hold exactly as many shares as the option's own sensitivity to the stock. This is the same equality the mental model's figure calls "kill the <code>dW</code> term". Matching the $dt$ coefficients gives</p>
+
+  <p>$$ \mu\Delta(t)S(t) + r\alpha(t)B(t) = V_t + \mu S V_S + \tfrac12\sigma^2S^2V_{SS}. $$</p>
+
+  <p>Substitute $\Delta(t)=V_S$ and the term $\mu S V_S$ cancels from both sides exactly. Every trace of the stock's real-world drift <code>mu</code> disappears from the equation. Using $\alpha(t)B(t) = \Pi(t) - \Delta(t)S(t) = V(t,S) - S V_S$ from the portfolio definition and rearranging gives the boxed result:</p>
+
+  <p>$$ \boxed{\, V_t + rS\,V_S + \tfrac{1}{2}\sigma^2 S^2 V_{SS} - rV = 0, \qquad V(T,S) = \Psi(S). \,} $$</p>
+
+  <p>That $\mu$ cancellation is not a footnote, it is the entire economic content of the result. The option's price cannot depend on how bullish or bearish the market is about the stock, because two traders with opposite views on <code>mu</code> can still agree on a hedge ratio $\Delta = V_S$ and on the argument that follows from it. It is also the reason theorem 2.2.2 of the source, discussed as route two below, is entitled to replace <code>mu</code> by <code>r</code> without further comment: the PDE the price must satisfy never mentioned <code>mu</code> in the first place, so any convenient diffusion sharing the same volatility and drift <code>r</code> will do for computing the expectation.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out: the self-financing subtlety</span>
+    The source itself raises, one section earlier, a point most textbook derivations skip past entirely. If $\Delta(t)$ and $\alpha(t)$ are treated as genuine Itô processes, not frozen snapshots, the product rule applied to $\Pi(t)=\Delta(t)S(t)+\alpha(t)B(t)$ gives $d\Pi = \Delta\,dS + \alpha\,dB + \bigl[S\,d\Delta + d\Delta\,dS + B\,d\alpha\bigr]$. Self-financing is precisely the statement that the bracketed term vanishes: every share bought or sold as $\Delta(t)$ moves must be paid for, or funded, entirely out of the bond account, with no extra cash appearing from nowhere. The derivation above never checks this bracket is zero for the specific $\Delta(t)=V_S(t,S(t))$ it produces; it simply <em>posits</em> the self-financing SDE $d\Pi=\Delta\,dS+\alpha\,dB$ from the outset and solves for whichever $\Delta,\alpha$ make that SDE match Itô's expansion of $V$. That is a legitimate way to construct a self-financing pair, but it is doing quiet work: it is valid because $\Delta(t)=V_S(t,S(t))$ is itself a smooth function of the same diffusion, so its own Itô differential $d\Delta = V_{St}\,dt + V_{SS}\,dS$ already carries exactly the second-order information that Itô's lemma folds into $dV$ through the $V_{SS}(dS)^2$ term. The two views, posit self-financing and solve, versus derive $\alpha$ from the product-rule constraint directly, are consistent precisely because both apply Itô's lemma to the one function $V$, not because self-financing can be taken on faith. A reader who has just done lecture 7 should notice that this equivalence is asserted rather than checked line by line in the source, and should be able to reconstruct why it holds.
+  </div>
+
+  <h3>Route two: the PDE by Feynman-Kac</h3>
+
+  <p>Lecture 8 proved that for a diffusion $dX_s = \mu(s,X_s)\,ds+\sigma(s,X_s)\,dW_s$ and a terminal payoff $\Phi$, a function <code>F</code> solving $F_t+\mu F_x+\tfrac12\sigma^2F_{xx}-rF=0$ with $F(T,x)=\Phi(x)$ equals the discounted expectation $e^{-r(T-t)}\mathbb{E}[\Phi(X_T)\mid X_t=x]$, and its own worked example already substituted the risk-neutral GBM $dX_s = rX_s\,ds+\sigma X_s\,dW_s$ and the call payoff $\Phi(x)=\max(x-K,0)$ to arrive at exactly the boxed PDE above. The source's theorem 2.2.2 is the same statement run the other way: it asserts, citing its own companion notes on Feynman-Kac, that the solution of the boxed PDE is</p>
+
+  <p>$$ V(t,x) = e^{-r(T-t)}\,\mathbb{E}_{t,x}\bigl[\Psi(X(T))\bigr], \qquad dX(s) = rX(s)\,ds+\sigma X(s)\,dW(s), \quad X(t)=x. $$</p>
+
+  <p>Notice the drift in this SDE is <code>r</code>, not the stock's real drift <code>mu</code>. That substitution is exactly what route one licenses: since <code>mu</code> cancelled out of the PDE, the PDE's solution can equally be represented as an expectation under <em>any</em> diffusion with volatility <code>sigma</code> and drift <code>r</code>, and the convenient choice, the risk-neutral measure, is drift <code>r</code> applied to the actual stock process. Route one supplies the reason a risk-neutral expectation prices the claim at all; route two supplies the closed-form machinery, Feynman-Kac, for turning that expectation into a number.</p>
+
+  <p>Feynman-Kac is the more general of the two routes. It holds for any diffusion and any sufficiently regular terminal payoff, with no reference to hedging, replication, or a traded market at all: it is a pure statement about PDEs and conditional expectations. Delta hedging, by contrast, is what supplies the economic reason the risk-neutral measure is the right one to use in that expectation, by proving that the price does not depend on the real-world drift. Route one earns the risk-neutral measure; route two is the general engine that turns any risk-neutral diffusion into a price.</p>
+
+  <h3>Solving for the European call</h3>
+
+  <p>The source solves the terminal value problem by direct risk-neutral integration rather than a change of variables, and that route is worked here in full; the change-of-variables route to the heat equation is sketched afterwards as the alternative the source does not take.</p>
+
+  <p><strong>Direct integration.</strong> By theorem 2.2.2, $V(t,x) = e^{-r(T-t)}\mathbb{E}_{t,x}[(X(T)-K)^+]$, where $X(T) = x\,e^{(r-\sigma^2/2)(T-t)+\sigma(W(T)-W(t))}$. Write $Y=(W(T)-W(t))/\sqrt{T-t}\sim N(0,1)$ and $k=(r-\sigma^2/2)(T-t)$, so $X(T)=x\,e^{k+\sigma\sqrt{T-t}\,Y}$. The expectation becomes a Gaussian integral,</p>
+
+  <p>$$ V(t,x) = \frac{e^{-r(T-t)}}{\sqrt{2\pi}}\int_a^\infty \Bigl(x\,e^{k+\sigma\sqrt{T-t}\,y} - K\Bigr)e^{-y^2/2}\,dy, \qquad a = \frac{\ln(K/x)-k}{\sigma\sqrt{T-t}}, $$</p>
+
+  <p>the lower limit <code>a</code> marking where the payoff switches on. Split the integral in two. The <code>K</code> term integrates directly to $K\Phi(-a)$ by symmetry of the standard normal density. The <code>x</code> term needs the exponent $\sigma\sqrt{T-t}\,y - y^2/2$ completed to a square, $-\tfrac12(y-\sigma\sqrt{T-t})^2 + \tfrac12\sigma^2(T-t)$, after which the substitution $z=y-\sigma\sqrt{T-t}$ turns it back into a standard normal integral, giving $x\,e^{k+\sigma^2(T-t)/2}\Phi(-a+\sigma\sqrt{T-t}) = x\,e^{r(T-t)}\Phi(-a+\sigma\sqrt{T-t})$ once <code>k</code> is substituted back in. Recombining and cancelling the discount factor against $e^{r(T-t)}$ leaves</p>
+
+  <p>$$ V(t,x) = x\,\Phi(-a+\sigma\sqrt{T-t}) - Ke^{-r(T-t)}\Phi(-a), $$</p>
+
+  <p>and writing $-a+\sigma\sqrt{T-t}$ and $-a$ back out in terms of $x$, $K$, $r$, $\sigma$ and $T-t$ gives exactly $d_1$ and $d_2$ below. This is the source's own route, in full, and it is the harder of the two: every step is an explicit Gaussian integral rather than a substitution into a known solution.</p>
+
+  <p><strong>Change of variables to the heat equation (sketch).</strong> The alternative, not taken by the source, is to transform the PDE itself before integrating anything. Substitute $S=Ke^x$, $t=T-\tau/(\tfrac12\sigma^2)$, and $V=Ke^{-\alpha x-\beta\tau}u(x,\tau)$ for constants $\alpha,\beta$ chosen to remove the first-derivative and zeroth-order terms. The Black-Scholes PDE becomes exactly the heat equation $u_\tau = u_{xx}$ with an initial condition given by the transformed payoff, and the heat equation has a known solution by convolution with the Gaussian heat kernel. Undoing the three substitutions turns that convolution back into the same $N(d_1)$, $N(d_2)$ expression. The two routes must agree because they solve the same terminal value problem under the same terminal condition, and a linear parabolic PDE with a given terminal condition has at most one solution satisfying the standard growth bound; direct integration is more transparent about where the probability enters, while the heat-equation route is more transparent about why the equation is solvable in closed form at all, being literally a diffusion equation from physics in disguise.</p>
+
+  <p>Either route arrives at the same boxed result:</p>
+
+  <p>$$ \boxed{\, C = S_0N(d_1) - Ke^{-rT}N(d_2), \qquad d_1 = \frac{\ln(S_0/K)+(r+\sigma^2/2)T}{\sigma\sqrt{T}}, \qquad d_2 = d_1 - \sigma\sqrt{T}. \,} $$</p>
+
+  <h3>What $N(d_1)$ and $N(d_2)$ actually mean</h3>
+
+  <p>$N(d_2)$ is the risk-neutral probability that the call finishes in the money, $\mathbb{Q}(S_T > K)$, taken under the same measure that made $X$'s drift equal to <code>r</code> in route two above. That reading is exact and needs no caveat.</p>
+
+  <p>$N(d_1)$ is not a probability under $\mathbb{Q}$, and treating it as $\mathbb{Q}(S_T>K)$ weighted somehow by $S_T$ is a common and understandable mistake. $S_0N(d_1)$ is the expected value, discounted, of receiving the stock conditional on exercise, but that expectation is taken under a different measure, the <strong>stock-price measure</strong> $\mathbb{Q}^S$, obtained from $\mathbb{Q}$ by using the stock itself, rather than the money-market account, as numeraire. Under $\mathbb{Q}^S$ the discounted bond price is the martingale instead of the discounted stock price, and $N(d_1) = \mathbb{Q}^S(S_T>K)$ is the probability of exercise under that measure, not under $\mathbb{Q}$. The two measures agree on which events have positive probability but not on the probabilities themselves, and $d_1$ and $d_2$ differ by exactly $\sigma\sqrt{T}$ because that is the Girsanov shift in drift between the two numeraires. It is entirely fine to use $N(d_1)$ and $N(d_2)$ mechanically without invoking measure changes; it is not fine to call $N(d_1)$ "the probability of exercise" in a sentence that also uses that phrase for $N(d_2)$, since they are probabilities under two different measures.</p>
+
+  <h3>The put, and put-call parity</h3>
+
+  <p>Corollary 2.2.6 of the source gives the put by put-call parity rather than re-deriving it by integration:</p>
+
+  <p>$$ P = Ke^{-rT}N(-d_2) - S_0N(-d_1). $$</p>
+
+  <p>Lecture 2 proved $C - P = S_0 - Ke^{-rT}$ for a non-dividend stock. Substituting the two boxed formulae above,</p>
+
+  <p>$$ C - P = S_0\bigl[N(d_1)-N(-d_1)\bigr] - Ke^{-rT}\bigl[N(d_2)-N(-d_2)\bigr] = S_0\cdot 1 - Ke^{-rT}\cdot 1 = S_0 - Ke^{-rT}, $$</p>
+
+  <p>using $N(x)-N(-x)=2N(x)-1$ collapsing to $1$ only because $N(d)+N(-d)=1$ for any <code>d</code>. Parity holds exactly, for every $S_0$, <code>K</code>, <code>r</code>, <code>sigma</code> and <code>T</code>, which is a useful internal consistency check on any implementation of the two formulae: if a call and put priced from the same inputs fail parity to more than rounding error, one of the two formulae has a sign or discounting error in it.</p>
+
+  <h3>Boundary and limiting behaviour</h3>
+
+  <p>Three limits pin down the formula's sanity. As $\sigma\to 0$, $d_1,d_2\to\pm\infty$ according to the sign of $\ln(S_0/K)+rT$, so $N(d_1),N(d_2)\to 1$ if $S_0e^{rT}>K$ and to $0$ otherwise; the call price collapses to $\max(S_0-Ke^{-rT},0)\cdot$ the appropriate indicator, which is precisely the discounted forward intrinsic value $e^{-rT}\max(F_0-K,0)$ using lecture 1's forward price $F_0=S_0e^{rT}$: with no volatility the option is worth exactly its deterministic, discounted payoff. As $T\to 0$ with $\sigma>0$ fixed, $d_1,d_2\to\pm\infty$ by the same sign logic applied to $\ln(S_0/K)$ alone, and the price collapses to $\max(S_0-K,0)$, the payoff itself, matching the figure in section 3. Deep in the money, $S_0\gg K$, both $d_1$ and $d_2$ are large and positive, $N(d_1),N(d_2)\to 1$, and $C\to S_0-Ke^{-rT}$, the call behaving like a forward. Deep out of the money, $S_0\ll K$, both are large and negative, $N(d_1),N(d_2)\to 0$, and $C\to 0$.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Claim</th><th>Closed-form price at <code>t=0</code></th></tr>
+      </thead>
+      <tbody>
+        <tr><td>European call</td><td>$C = S_0N(d_1) - Ke^{-rT}N(d_2)$</td></tr>
+        <tr><td>European put</td><td>$P = Ke^{-rT}N(-d_2) - S_0N(-d_1)$</td></tr>
+        <tr><td>Cash-or-nothing digital call, pays 1 if $S_T>K$</td><td>$e^{-rT}N(d_2)$</td></tr>
+        <tr><td>Cash-or-nothing digital put, pays 1 if $S_T<K$</td><td>$e^{-rT}N(-d_2)$</td></tr>
+        <tr><td>$d_1$</td><td>$\dfrac{\ln(S_0/K)+(r+\sigma^2/2)T}{\sigma\sqrt{T}}$</td></tr>
+        <tr><td>$d_2$</td><td>$d_1 - \sigma\sqrt{T}$</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Worked numerical example</h3>
+
+  <p>Take $S_0=100$, $K=100$, $r=5\%$, $\sigma=20\%$, $T=1$, the same parameters lecture 4 used for its three-step binomial tree. First the intermediate quantities:</p>
+
+  <div class="worked">d1 = [ln(100/100) + (0.05 + 0.02)*1] / (0.20*1) = 0.07/0.20 = 0.35
+d2 = d1 - 0.20*1 = 0.35 - 0.20 = 0.15
+
+N(d1) = N(0.35) = 0.636831   (approx. 0.6368)
+N(d2) = N(0.15) = 0.559618   (approx. 0.5596)
+
+K*exp(-rT) = 100 * exp(-0.05) = 100 * 0.951229 = 95.1229
+
+Call = 100 * 0.636831 - 95.1229 * 0.559618
+     = 63.6831 - 53.2325
+     = 10.4506
+
+Put, by parity: P = C - S0 + K*exp(-rT) = 10.4506 - 100 + 95.1229 = 5.5735
+Put, direct:    P = K*exp(-rT)*N(-d2) - S0*N(-d1)
+                  = 95.1229 * (1-0.559618) - 100 * (1-0.636831)
+                  = 95.1229 * 0.440382 - 100 * 0.363169
+                  = 41.8905 - 36.3169
+                  = 5.5735
+
+Both put routes agree to the cent, exactly as put-call parity requires.</div>
+
+  <p>The call price is <code>10.4506</code>. Lecture 4's three-step Cox-Ross-Rubinstein tree, on these identical parameters, priced the same call at <code>11.04</code>, roughly five per cent above the continuous-time value. That gap is not an error in either calculation; it is discretisation error, the tree's payoff can only realise one of four terminal stock prices after three steps, and averaging a genuinely continuous lognormal distribution down to four point masses inflates the option's value slightly, because the coarse tree spreads more probability into the most valuable outcomes than the true continuous distribution does. Lecture 4's own convergence figure showed this gap oscillating and shrinking as the step count grows; a hundred-step tree on these same parameters would already be within a few cents of <code>10.4506</code>. The two lectures check each other: the continuous-time limit of the binomial tree is exactly this closed form, and a discrepancy that shrinks in the expected direction as steps increase is itself evidence that both implementations are correct.</p>
+
+  <div class="callout insight">
+    <span class="tag">For the actuary</span>
+    The discounted forward intrinsic value that the $\sigma\to0$ limit collapses onto is precisely the deterministic reserve you would hold if you replaced a stochastic benefit with its best estimate and discounted it, no risk margin. The entire content of the Black-Scholes premium over that deterministic value, $C - e^{-rT}\max(F_0-K,0)$, is compensation for the variance in outcomes the option writer has agreed to absorb, in the same spirit as a risk margin sitting on top of a best-estimate liability, except here the margin is pinned down exactly by no-arbitrage rather than by a capital model.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The formula is a quoting convention, not a belief</h3>
+
+  <p>No trading desk uses the Black-Scholes formula because it believes stock prices are lognormal with constant volatility. It uses the formula because the formula is a bijection between a price and a single number, the implied volatility, and quoting options in implied volatility rather than in currency is simply more convenient: it is roughly stable across small moves in the underlying, and it makes prices comparable across strikes and maturities that would otherwise be dominated by moneyness. Lecture 5's calibration loop backs out a different <code>sigma</code> for every strike and maturity precisely because the market does not believe the constant-volatility assumption either. The smile that lecture found is direct proof, quoted every day in every options market in the world, that the model underlying this lecture's derivation is wrong in a specific, measurable way, and yet the formula built on top of it remains the industry's shared unit of account. Reconciling "the model is wrong" with "the formula is universal" is the single most important piece of intuition this course can hand a practitioner: a pricing formula can be an extremely useful coordinate system without being a correct description of the world.</p>
+
+  <h3>A heat equation running backward, and what that implies about smoothing</h3>
+
+  <p>The change-of-variables sketch in section 4 is more than a computational trick. It says the Black-Scholes PDE, read in the transformed variables, is literally the heat equation, the same equation that describes temperature diffusing through a metal rod. Running the option-pricing PDE from <code>t</code> toward <code>T</code> is running the heat equation <em>backward</em> in time, since the terminal condition sits at <code>T</code> and the unknown sits at <code>t<T</code>. The forward heat equation smooths: sharp temperature gradients dissipate as time moves forward. Read backward, exactly the same operator un-smooths: a smooth price function at $t<T$, run forward to <code>T</code>, sharpens into the kinked, non-differentiable payoff. This is precisely the content of the second figure in section 3, the family of smooth curves folding down onto a kink, and it is also why pricing a barrier or digital option, whose terminal condition is genuinely discontinuous, is numerically delicate close to maturity: a finite-difference grid solving a backward heat equation toward a discontinuity needs a much finer mesh near <code>T</code> than a smooth terminal condition would.</p>
+
+  <h3>Discrete hedging leaves a residual that does not vanish</h3>
+
+  <p>The delta-hedging derivation in section 4 assumes continuous rebalancing. Rebalance only at discrete intervals, weekly rather than continuously, and the hedge is no longer exact: between rebalancing dates the stock moves and $\Delta$ is stale, so the hedged portfolio accumulates a tracking error driven by the difference between the realised quadratic variation of the stock over the interval and the amount the stale $\Delta$ priced in. The expected value of that tracking error is close to zero if the assumed volatility is correct, but its variance is not: it scales, to leading order, with the rebalancing interval, so hedging weekly rather than daily roughly doubles the standard deviation of the hedging error for typical parameters, and no amount of increasing the rebalancing frequency short of continuous trading drives that variance to exactly zero if there is any bid-offer spread, since more frequent rebalancing trades away the discretisation error only by paying more transaction costs. The practical hedging problem is therefore a genuine trade-off, not a limit to be pushed as far as possible, and desks size their rebalancing frequency against realistic transaction costs rather than against the textbook ideal of continuous time.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Every one of the five assumptions in section 4's defcard is violated by real markets in ways that matter for real risk. Constant volatility fails visibly, in the smile. Continuous, costless trading fails, leaving the residual hedging variance just discussed. No jumps fails on every earnings date and every macro surprise, and a jump is precisely the one event a continuously-rebalanced delta hedge cannot protect against, since the hedge is only ever correct for the next infinitesimal move, not for a discontinuous one. Stochastic volatility, in particular, breaks the delta-hedging argument at its foundation, not just its assumptions: with a second source of randomness driving <code>sigma</code> itself, a portfolio hedged only in the stock cannot be made riskless at all, and a second hedging instrument, typically another option, is required to hedge the volatility risk as well as the stock risk. None of this makes the Black-Scholes PDE useless. It makes it the reference model against which every more sophisticated model, local volatility, stochastic volatility, jump-diffusion, is measured, and understanding exactly where and why the reference model fails is what lets a practitioner judge how much a more sophisticated model is actually needed for the trade in front of them.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the five model assumptions behind the Black-Scholes PDE, and for each one, state the direction in which real markets violate it.</li>
+      <li>Derive the Black-Scholes PDE by delta hedging. Be explicit about which coefficients you are matching, dW-terms or dt-terms, at each step, and where the stock's real drift <code>mu</code> disappears from the calculation.</li>
+      <li>State the self-financing subtlety the source raises in its remark on the product rule. Why does positing the self-financing SDE and solving for <code>Delta</code>, rather than deriving <code>Delta</code> and separately verifying the product-rule constraint, still produce a genuinely self-financing hedge?</li>
+      <li>State the Feynman-Kac route to the same PDE. Which of the two routes, delta hedging or Feynman-Kac, is the more general theorem, and what does the other one supply that Feynman-Kac alone does not?</li>
+      <li>Derive the European call price by direct risk-neutral integration of the lognormal payoff. At what point in the calculation does completing the square appear, and what is it accomplishing?</li>
+      <li>Explain precisely what $N(d_1)$ represents. Why is calling it "the risk-neutral probability of exercise" a mistake, and which quantity does deserve that description?</li>
+      <li>Derive the put price by put-call parity and verify algebraically that $C-P=S_0-Ke^{-rT}$ holds exactly for the Black-Scholes call and put formulae.</li>
+      <li>Using $S_0=100$, $K=100$, $r=5\%$, $\sigma=20\%$, $T=1$, compute $d_1$, $d_2$, $N(d_1)$, $N(d_2)$ and the call price by hand. Compare the result to lecture 4's three-step binomial tree and explain the direction and likely magnitude of the discrepancy.</li>
+      <li>Describe the three limiting cases, $\sigma\to0$, $T\to0$, and deep in or out of the money. In each case, state what the call price collapses to and why.</li>
+      <li>A trader claims that because implied volatility varies by strike, the Black-Scholes formula is "wrong" and should be discarded. Explain, in one paragraph, why the formula remains in universal use despite this, and what role it actually plays in a modern options market.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="10-dividends.html">Dividends and other adjustments</a>, which repeats this lecture's hedging argument with a dividend-paying stock and shows exactly where the extra term enters the PDE and the closed form.</li>
+      <li><a href="11-hedging_and_greeks.html">Hedging and the Greeks</a>, which differentiates the closed-form price of this lecture to get delta, gamma, vega, theta and rho, and connects gamma directly to the discrete-hedging residual discussed in section 5.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 8 - Black Scholes PDE.pdf</code> (primary source), section 2, running from page 58: 2.1 sets up self-financing portfolios and flags the product-rule subtlety in a remark; 2.2 derives the PDE by matching coefficients, states it as Theorem 2.2.1, restates it via Feynman-Kac as Theorem 2.2.2, and solves the call by direct integration in Example 2.2.4 and Theorem 2.2.5, with the put given by parity as Corollary 2.2.6. Examples 2.2.7 and 2.2.8 price a share-or-cash claim and a cash-or-nothing digital call by the same method.</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 4 (Black-Scholes theory), which carries the formula summary for this material.</li>
+      <li>Lecture 7, <code>07-sdes_and_itos_lemma.html</code>, for the Itô's lemma expansion used in route one.</li>
+      <li>Lecture 8, <code>08-feynman_kac.html</code>, for the general theorem used in route two and its own worked example already substituting the risk-neutral GBM and the call payoff into the Feynman-Kac PDE.</li>
+      <li>Lecture 2, <code>02-options.html</code>, for the put-call parity identity verified against the closed forms in section 4.</li>
+      <li>Lecture 4, <code>04-binomial_multi_period.html</code>, for the three-step binomial tree cross-checked numerically against the closed form in section 4's worked example.</li>
+      <li>Lecture 5, <code>05-binomial_calibration.html</code>, for the volatility smile discussed in section 5.</li>
+      <li>Björk, <em>Arbitrage Theory in Continuous Time</em>, chapter 7, for the standard treatment of the martingale approach to Black-Scholes, and chapter 6 for the general connection between hedging arguments and the risk-neutral measure.</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The source's own remark on the self-financing product-rule constraint, in section 2.1, is never revisited in section 2.2 to confirm it holds for the specific hedge $\Delta=V_S$ the derivation produces. This lecture closes that gap in the callout on the self-financing subtlety in section 4, but a reader relying on the source alone would not be told the equivalence needs checking at all.</li>
+      <li>The source never contrasts the delta-hedging route and the Feynman-Kac route as two independent derivations of the same PDE, nor states which is more general; it presents Theorem 2.2.2 as a restatement rather than an alternative proof, and never remarks that the drift <code>mu</code> cancelling out of the PDE in route one is what licenses substituting <code>r</code> for <code>mu</code> in route two's SDE.</li>
+      <li>The source solves the call only by direct risk-neutral integration and never mentions the change-of-variables route to the heat equation, nor the fact that the PDE is a heat equation at all, despite that fact being the reason the equation is solvable in closed form.</li>
+      <li>The source never distinguishes $N(d_1)$ from $N(d_2)$ as probabilities under different measures, and never names the stock-price numeraire measure; both quantities are presented purely as outputs of the same Gaussian integral, with no interpretation offered for either.</li>
+      <li>The source's worked examples stop at closed-form pricing and never discuss discrete hedging error, the smile, or the formula's role as a quoting convention; these are added in section 5 as material the source, being a pure mathematics text, has no reason to cover.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 9: the Black-Scholes PDE</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

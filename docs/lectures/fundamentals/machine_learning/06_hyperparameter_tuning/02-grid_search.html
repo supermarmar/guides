@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 31: grid search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Hyperparameter tuning</a></div>
+  <h1>Grid search</h1>
+  <p class="subtitle">Try every combination, pick the winner. The simplest tuning algorithm, the one to reach for when the search space is small, the parameters interact, and reproducibility matters more than efficiency.</p>
+  <div class="meta">
+    <span>Lecture 31 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Grid search</strong> is the brute-force algorithm for hyperparameter tuning. The analyst discretises each hyperparameter into a finite list of candidate values, takes the Cartesian product of those lists to form a grid, evaluates every cell of the grid by cross-validation on the training data, and selects the cell with the best mean validation score. There is no cleverness in the search itself; the only design decisions are which hyperparameters to include, what range to span, and how finely to discretise. The strength is reproducibility: given the same grid and the same data, two runs return the same winner. The weakness is cost: the number of fits grows multiplicatively in the number of hyperparameters, so grid search becomes computationally indefensible the moment the grid contains more than two or three dimensions with non-trivial granularity. The scikit-learn entry point is <code>GridSearchCV</code>, which combines the grid sweep with k-fold cross-validation, exposes a parallel backend through <code>n_jobs</code>, and refits the chosen model on the full training set at the end. Use it when the search space is small and the parameters are known to interact; replace it with <a href="03-random_search.html">random search</a> or a Bayesian optimiser the moment the grid stops fitting on a single overnight job.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine a knob with three settings and a dial with five. You want to find the combination that produces the loudest signal. Grid search is the procedure of trying all fifteen combinations in turn, writing down the measured loudness for each, and keeping the loudest. There is no learning from one trial to the next, no extrapolation between settings, and no shortcut. The only choices are which knobs to vary and which positions to test. The procedure is dumb but honest: if the optimum is anywhere on the grid you laid down, you will find it.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Grid search is the algorithm regulators recognise. When a credit-risk model validation report asks how a hyperparameter was selected, the defensible answer is a grid of values, a documented cross-validation scheme, and a table of out-of-fold scores. The same model tuned by a Bayesian optimiser may achieve a higher AUC, but the validator now needs to explain why the surrogate model converged on those parameters and not others. The hyperparameter tuning method is itself an auditable artefact of the model development process; grid search's appeal is that the artefact fits on one page.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 5 of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>, between model fitting and model evaluation. Grid search consumes a training fold and a validation strategy from lecture 21 on <a href="../02_train_test_split/01-train_test_validation.html">train, test, validation</a> and a candidate estimator from any of the supervised methods in sub-module 03. The companion algorithm in this sub-module is <a href="03-random_search.html">random search</a> (lecture 32), which trades exhaustiveness for budget control. The principles that govern when to tune at all sit in <a href="01-tuning_principles.html">lecture 30</a>.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons grid search remains the default tuning algorithm despite its inefficiency. First, <strong>it is exhaustive on the grid you specify.</strong> Once the candidate values are chosen, no combination is skipped. If the analyst has prior knowledge that the optimum lies between specific bounds, grid search guarantees that every combination inside those bounds is evaluated. Random search can miss a tight optimum by sampling around it; grid search cannot, unless the grid is too coarse to contain it.</p>
+
+  <p>Second, <strong>it is reproducible without seeding.</strong> Random search and Bayesian optimisation depend on a pseudo-random sequence, and a different seed produces a different recommended configuration. Grid search produces the same answer every time given the same grid and the same cross-validation splits. For a regulated model, two analysts running the same notebook a month apart must reach the same conclusion; grid search makes that property automatic.</p>
+
+  <p>Third, <strong>it interacts cleanly with interactions.</strong> When two hyperparameters are not independent (the optimal regularisation strength depends on the kernel choice in an SVM, or on the learning rate in a gradient-booster), an algorithm that varies one at a time misses the interaction. Grid search evaluates every combination of every parameter and therefore captures interactions automatically, at the cost of evaluating combinations that turn out to be irrelevant.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A behavioural PD model used a gradient-boosted tree with eight hyperparameters. The lead developer, mindful of fit time, varied each hyperparameter independently around a sensible baseline (one-at-a-time tuning). The resulting configuration was reported as optimal. A challenger model swept a tighter five-parameter grid jointly and found a combination with lower learning rate, more trees, and shallower depth that scored two points higher on out-of-fold AUC. The one-at-a-time search had missed the configuration because reducing the learning rate is only beneficial if the tree count rises to compensate, and the developer had varied them in separate passes. The lesson generalises: parameters that interact must be searched jointly, and grid search is the simplest algorithm that does so by construction.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. A grid search is a lattice of points laid down across the hyperparameter space, with one cross-validation evaluation per point. The procedure is exhaustive on the lattice and blind to everything off it. A point chosen one step inside the lattice may be better than the lattice winner, and the algorithm has no way to find it.</p>
+
+  <figure>
+    <svg viewBox="0 0 720 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A two-dimensional grid of hyperparameter combinations with the winning cell highlighted">
+      <defs>
+        <radialGradient id="gsHeat" cx="62%" cy="38%" r="55%">
+          <stop offset="0%" stop-color="#0d9488" stop-opacity="0.45"/>
+          <stop offset="55%" stop-color="#0d9488" stop-opacity="0.12"/>
+          <stop offset="100%" stop-color="#0d9488" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <text x="360" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Grid search over two hyperparameters with the winning cell highlighted</text>
+
+      <!-- Plot frame -->
+      <rect x="90" y="50" width="500" height="280" fill="#FAFAF9" stroke="#37352F" stroke-width="1"/>
+
+      <!-- Validation score "heat" -->
+      <rect x="90" y="50" width="500" height="280" fill="url(#gsHeat)"/>
+
+      <!-- Vertical grid lines -->
+      <line x1="170" y1="50" x2="170" y2="330" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+      <line x1="250" y1="50" x2="250" y2="330" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+      <line x1="330" y1="50" x2="330" y2="330" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+      <line x1="410" y1="50" x2="410" y2="330" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+      <line x1="490" y1="50" x2="490" y2="330" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+      <line x1="570" y1="50" x2="570" y2="330" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+
+      <!-- Horizontal grid lines -->
+      <line x1="90" y1="106" x2="590" y2="106" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+      <line x1="90" y1="162" x2="590" y2="162" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+      <line x1="90" y1="218" x2="590" y2="218" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+      <line x1="90" y1="274" x2="590" y2="274" stroke="#d4d4d8" stroke-width="0.75" stroke-dasharray="2 3"/>
+
+      <!-- Grid points (6 x 5 = 30) -->
+      <g fill="#37352F">
+        <circle cx="170" cy="106" r="4"/><circle cx="250" cy="106" r="4"/><circle cx="330" cy="106" r="4"/><circle cx="410" cy="106" r="4"/><circle cx="490" cy="106" r="4"/><circle cx="570" cy="106" r="4"/>
+        <circle cx="170" cy="162" r="4"/><circle cx="250" cy="162" r="4"/><circle cx="330" cy="162" r="4"/><circle cx="410" cy="162" r="4"/><circle cx="490" cy="162" r="4"/><circle cx="570" cy="162" r="4"/>
+        <circle cx="170" cy="218" r="4"/><circle cx="250" cy="218" r="4"/><circle cx="330" cy="218" r="4"/><circle cx="410" cy="218" r="4"/><circle cx="490" cy="218" r="4"/><circle cx="570" cy="218" r="4"/>
+        <circle cx="170" cy="274" r="4"/><circle cx="250" cy="274" r="4"/><circle cx="330" cy="274" r="4"/><circle cx="410" cy="274" r="4"/><circle cx="490" cy="274" r="4"/><circle cx="570" cy="274" r="4"/>
+      </g>
+
+      <!-- Winning cell highlight -->
+      <circle cx="410" cy="162" r="10" fill="none" stroke="#b45309" stroke-width="2"/>
+      <circle cx="410" cy="162" r="5" fill="#b45309"/>
+      <text x="430" y="156" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">best CV score</text>
+      <text x="430" y="170" font-family="Inter" font-size="9" fill="#b45309">selected configuration</text>
+
+      <!-- True optimum marker (off-grid) -->
+      <circle cx="438" cy="146" r="4" fill="#7c3aed"/>
+      <text x="448" y="135" font-family="Inter" font-size="9" font-style="italic" fill="#5b21b6">true optimum (off-grid)</text>
+
+      <!-- Axes -->
+      <text x="340" y="358" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b">hyperparameter 1 (six values)</text>
+      <text x="40" y="190" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b" transform="rotate(-90 40 190)">hyperparameter 2 (five values)</text>
+
+      <!-- Legend -->
+      <g transform="translate(610 60)">
+        <text x="0" y="0" font-family="Inter" font-size="10" font-weight="700" fill="#18181b">Legend</text>
+        <circle cx="6" cy="18" r="4" fill="#37352F"/>
+        <text x="16" y="22" font-family="Inter" font-size="9" fill="#37352F">grid cell</text>
+        <circle cx="6" cy="38" r="5" fill="#b45309"/>
+        <text x="16" y="42" font-family="Inter" font-size="9" fill="#b45309">winner</text>
+        <circle cx="6" cy="58" r="4" fill="#7c3aed"/>
+        <text x="16" y="62" font-family="Inter" font-size="9" fill="#5b21b6">true</text>
+      </g>
+    </svg>
+    <figcaption>A six-by-five grid sweeps thirty configurations. The amber circle is the cell with the highest mean cross-validation score; the violet point is the true optimum, which the grid does not contain. Grid search guarantees the best point on the lattice and nothing more. The fineness of the lattice is the analyst's only lever against the gap between the two.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The grid is a fixed object decided before the search starts, and every cell receives exactly one evaluation. The winner is the grid cell with the highest mean cross-validation score, not necessarily the global optimum of the underlying response surface. The cost of closing the gap to the true optimum is to refine the grid, which multiplies the number of fits and quickly becomes prohibitive in more than two dimensions.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The combinatorial explosion</h3>
+
+  <p>Let $p$ denote the number of hyperparameters and $g_j$ the number of candidate values for the $j$-th hyperparameter. The number of grid cells is the product</p>
+  $$N_{\text{cells}} = \prod_{j=1}^{p} g_j.$$
+  <p>With $k$-fold cross-validation, each cell is fit and evaluated $k$ times. The total number of model fits is</p>
+  $$N_{\text{fits}} = k \cdot \prod_{j=1}^{p} g_j.$$
+  <p>If each fit takes $t$ seconds, the wall-clock cost (ignoring parallelism) is $N_{\text{fits}} \cdot t$. The multiplicative structure is the entire story. A two-parameter grid with five values each under five-fold CV is $5 \cdot 5 \cdot 5 = 125$ fits, comfortable on a laptop for any cheap model. A five-parameter grid with five values each under five-fold CV is $5^5 \cdot 5 = 15{,}625$ fits, an overnight job on a workstation if the fit time is in seconds and a non-starter if it is in minutes. The cost is linear in $k$ and in $t$ but exponential in $p$. Every extra hyperparameter in the search multiplies the cost by the granularity of that parameter; this is the curse of dimensionality applied to tuning.</p>
+
+  <p>The practical consequence is that grid search has a hard ceiling on $p$. Two or three hyperparameters with five to ten values each is the comfortable range. Beyond that, either the grid becomes too coarse to find the optimum or the budget becomes too large to fit in the development timeline. <a href="03-random_search.html">Random search</a> changes the economics by sampling instead of enumerating; a Bayesian optimiser changes them further by sampling adaptively. Grid search is the right baseline against which to measure those alternatives, but not the right algorithm for high-dimensional tuning.</p>
+
+  <h3>Sklearn: GridSearchCV mechanics</h3>
+
+  <p>The scikit-learn entry point is <code>GridSearchCV</code>. Five arguments do most of the work. The first is the estimator (any object with <code>fit</code> and <code>predict</code> methods, including a full pipeline). The second is <code>param_grid</code>, a dictionary mapping parameter names to lists of candidate values, or a list of dictionaries when the grid is conditional. The third is <code>cv</code>, which controls the cross-validation scheme (an integer for $k$-fold, a splitter object for stratified or grouped CV). The fourth is <code>scoring</code>, the metric to optimise (any sklearn scorer name or callable; defaults to the estimator's <code>score</code> method, which is rarely what is wanted in classification). The fifth is <code>refit</code>, a boolean that controls whether the best configuration is re-fitted on the full training set at the end; almost always left as <code>True</code> so the resulting <code>GridSearchCV</code> object can be used directly as a predictor.</p>
+
+  <p>After fitting, three attributes carry the result. <code>best_params_</code> is the dictionary of winning hyperparameter values. <code>best_score_</code> is the mean cross-validation score for that configuration, on the metric specified by <code>scoring</code>. <code>cv_results_</code> is the full table of every configuration with mean and standard deviation of fold scores, ranked by mean test score; this is the audit trail that distinguishes grid search from a single-configuration fit. A reasonable habit is to convert <code>cv_results_</code> into a pandas DataFrame and inspect the top five configurations; if the second-place configuration scores within one standard error of the first, the winner is not robust and a tighter grid or a different metric is warranted.</p>
+
+  <pre><code class="language-python">from sklearn.datasets import load_breast_cancer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
+
+# Load and split, stratifying on the target to preserve class balance
+cancer = load_breast_cancer()
+X_train, X_test, y_train, y_test = train_test_split(
+    cancer.data, cancer.target, stratify=cancer.target, random_state=0
+)
+
+# Estimator with the non-tuned arguments fixed
+lr = LogisticRegression(solver="liblinear", max_iter=1000)
+
+# Grid: two regularisation styles, six strengths each
+param_grid = {"penalty": ["l1", "l2"], "C": [0.01, 0.1, 1, 10, 100, 1000]}
+
+# Five-fold stratified CV, AUC as the scorer, parallel across all cores
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+clf = GridSearchCV(
+    estimator=lr,
+    param_grid=param_grid,
+    cv=cv,
+    scoring="roc_auc",
+    refit=True,
+    n_jobs=-1,
+    return_train_score=True,
+)
+clf.fit(X_train, y_train)
+
+print(clf.best_params_)        # winning configuration
+print(clf.best_score_)         # mean OOF AUC at the winner
+print(clf.score(X_test, y_test))  # held-out AUC of the refit model</code></pre>
+
+  <p>The pattern is the same regardless of estimator. The grid above contains twelve cells; with five-fold CV that is sixty fits. Logistic regression on the breast cancer dataset fits in milliseconds, so the search completes in seconds. The cost only becomes a concern when the cell count rises into the thousands or the fit time into the seconds.</p>
+
+  <h3>Conditional grids and list-of-dicts</h3>
+
+  <p>Some hyperparameters are only meaningful for specific values of others. The gamma parameter of an SVM is used by the RBF and polynomial kernels but not by the linear kernel; the L1 ratio of elastic net is used only when the penalty is "elasticnet". Searching the full Cartesian product wastes fits on combinations that ignore the irrelevant parameter. <code>param_grid</code> accepts a list of dictionaries instead of a single dictionary; each dictionary defines an independent sub-grid that <code>GridSearchCV</code> sweeps in turn.</p>
+
+  <pre><code class="language-python">param_grid = [
+    {"kernel": ["linear"], "C": [0.1, 1, 10]},
+    {"kernel": ["rbf"],    "C": [0.1, 1, 10], "gamma": [0.01, 0.1, 1]},
+    {"kernel": ["poly"],   "C": [0.1, 1, 10], "degree": [2, 3], "gamma": [0.01, 0.1]},
+]</code></pre>
+
+  <p>The total cell count is the sum of the products inside each dictionary ($3 + 9 + 12 = 24$), not a single Cartesian product across kernels and the kernel-specific parameters. This pattern is the right way to express conditional structure; collapsing it into a single dictionary with all parameters and accepting that gamma is ignored when kernel is linear will silently fit the same model multiple times.</p>
+
+  <h3>Plugging into pipelines</h3>
+
+  <p>In a serious workflow the estimator passed to <code>GridSearchCV</code> is rarely a bare model; it is a pipeline that includes preprocessing (see <a href="../02_train_test_split/02-pipelines.html">lecture 30 on pipelines</a>). Tuning preprocessing parameters and model parameters in one call requires referring to them by namespaced names: the dictionary key is <code>"step_name__parameter_name"</code>, with a double underscore between the step name and the parameter name. Pipeline construction names each step (or uses the default lowercase class name from <code>make_pipeline</code>); the names then become the prefix.</p>
+
+  <pre><code class="language-python">from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.svm import SVC
+
+pipe = Pipeline([
+    ("scaler", StandardScaler()),
+    ("pca",    PCA()),
+    ("clf",    SVC(kernel="rbf")),
+])
+
+param_grid = {
+    "pca__n_components": [5, 10, 20],
+    "clf__C":            [0.1, 1, 10],
+    "clf__gamma":        [0.01, 0.1, 1],
+}
+
+search = GridSearchCV(pipe, param_grid, cv=5, scoring="accuracy", n_jobs=-1)
+search.fit(X_train, y_train)</code></pre>
+
+  <p>Two benefits follow from putting the preprocessing inside the pipeline rather than applying it before <code>GridSearchCV</code>. First, the scaler and PCA are now fit on each training fold separately and applied (without re-fitting) to each validation fold, which is the only way to evaluate the pipeline honestly. Fitting them once on the full training set before the search leaks information from each validation fold into the preprocessing of the others; the bias is small but real and shows up at deployment when the leakage is no longer available. Second, hyperparameters of the preprocessing step (the number of PCA components here) are tuned jointly with the model hyperparameters, which can capture interactions the analyst would have missed by fixing the preprocessing in advance.</p>
+
+  <h3>Worked example: tuning a small SVM grid</h3>
+
+  <p>Take a binary classification task with a moderate sample size and a support vector machine with an RBF kernel. Three hyperparameters matter: the kernel choice (kept fixed at "rbf" for this example), the regularisation parameter $C$, and the kernel bandwidth $\gamma$. A defensible starting grid is logarithmic in both, three orders of magnitude wide, with three values per decade. With $C \in \{0.1, 1, 10, 100\}$ and $\gamma \in \{0.001, 0.01, 0.1, 1\}$ the grid has sixteen cells; with stratified five-fold CV the search runs eighty fits. The output is a table of mean OOF AUC for each cell; the winner is read off the maximum. If the winner is at the boundary of the grid (e.g., $C = 100$, the largest value), the grid is too narrow and the search should be re-run with a wider range; if the winner is in the interior with neighbours that score within one standard error, the grid is too coarse and a tighter grid centred on the winner is warranted.</p>
+
+  <p>The interpretation of the SVM hyperparameters reinforces why grid search is appropriate for this problem. $C$ trades off margin width against training-error tolerance; $\gamma$ controls the kernel's locality. The two interact: a small $\gamma$ (wide kernels) needs more regularisation to avoid underfitting, a large $\gamma$ (narrow kernels) needs less. Tuning them one at a time misses the interaction; tuning them jointly on a grid is the textbook recipe. The full mechanics of the kernel and the parameters are in <a href="../03_supervised_learning/03-support_vector_machines.html">lecture 8 on support vector machines</a>; this lecture is concerned only with how the grid is laid out and searched.</p>
+
+  <h3>Parallelisation and warm-starting</h3>
+
+  <p>Every cell in the grid is independent of every other cell, and every fold within a cell is independent of every other fold. The total computation is therefore embarrassingly parallel. <code>GridSearchCV</code> exposes the parallelism through <code>n_jobs</code>: setting <code>n_jobs=-1</code> uses all available CPU cores, and the joblib backend distributes cells across workers automatically. On a typical eight-core workstation the wall-clock cost falls by roughly a factor of seven (perfect linear scaling minus overhead). For larger grids, the joblib parallel backend can be swapped for a distributed backend (dask, ray) without changing the search code.</p>
+
+  <p>A second efficiency lever is warm-starting: when consecutive cells differ only in a hyperparameter that admits incremental refitting (the regularisation path of a coordinate-descent logistic regression, the number of trees in a gradient-booster), the second fit can start from the first fit's parameters rather than from scratch. Scikit-learn supports warm-starting through the <code>warm_start=True</code> argument on the estimator. <code>GridSearchCV</code> does not exploit warm-starting automatically; the analyst has to organise the grid as a single ordered sequence and step through it manually if the speed-up matters. For most practical grids, parallelisation across cores is the bigger lever and warm-starting is a refinement.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every grid-search regret. Each is invisible at search time and obvious in retrospect.</p>
+
+  <div class="callout warn">
+    <span class="tag">The winner sits on the grid boundary</span>
+    The best configuration has $C = 100$, the largest value tried. The implication is that the true optimum is at $C = 100$ or somewhere beyond it, and the grid was too narrow to find out which. The fix is to re-run with an extended grid (add $C \in \{300, 1000, 3000\}$); if the winner is still at the boundary, extend again. Stop only when the winner is an interior point with neighbours on either side. Reporting a boundary winner as the optimal configuration is misleading: the search did not establish that the chosen value is best, only that it is the best of the values that were tried.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Linear grids on a logarithmic parameter</span>
+    Regularisation strengths, learning rates, and kernel bandwidths are typically tuned on a logarithmic axis: the difference between $C = 0.01$ and $C = 0.1$ is meaningful, the difference between $C = 100.01$ and $C = 100.1$ is not. A linearly spaced grid $\{1, 2, 3, \dots, 10\}$ wastes most of its budget in the narrow region near the upper end and never explores the lower decades. The fix is to use geometric spacing: <code>np.logspace(-3, 3, 7)</code> covers seven orders of magnitude with seven cells. The choice of axis matters as much as the choice of range; an inappropriately linear grid on a log-scale parameter usually finds a winner at one end and a boundary warning.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Tuning on the test set</span>
+    The validation scores from <code>cv_results_</code> are computed on the training data's cross-validation folds. The held-out test set is for the final, single, unbiased estimate of generalisation. Looking at the test score, going back to the grid, and refining the search until the test score improves turns the test set into a second training set and the reported generalisation estimate into a fiction. The fix is structural: split off the test set before <code>GridSearchCV</code> runs, score on it once at the end, and resist the temptation to re-tune. If a third evaluation is wanted (a true hold-out that is not used at any point during development), a nested cross-validation or a separate evaluation split is the right tool, not a second pass at the grid.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">A grid too coarse to discriminate</span>
+    The grid has three values per parameter and the chosen winner scores 0.952; the runner-up scores 0.951. The standard error across folds is 0.008. The winner is statistically indistinguishable from at least four of its neighbours, and a different random seed for the CV splits would produce a different winner. Reporting a single "best" configuration in this state is over-confident. The fix is twofold: report the top configurations with their CV mean and standard error, and treat any group of configurations within one standard error of the winner as equivalent. If a single configuration must be selected, prefer the simplest one (lowest variance, smallest model) among the equivalent set; if the search budget allows, refine the grid around the winner and re-run.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Grid search is the simplest hyperparameter tuning algorithm and the one that fits cleanly into a regulated development process. The analyst discretises each hyperparameter into a finite list, takes the Cartesian product, evaluates every cell by cross-validation, and selects the cell with the best mean validation score. The strength is exhaustiveness on the grid and reproducibility without seeding; the weakness is a cost that grows multiplicatively in the number of hyperparameters and the granularity of each. Two or three hyperparameters with five to ten values each is the comfortable range. <code>GridSearchCV</code> packages the algorithm with cross-validation, parallel execution through <code>n_jobs</code>, conditional grids through list-of-dicts <code>param_grid</code>, and pipeline integration through namespaced keys. The four common regrets (boundary winners, linear grids on log-scale parameters, tuning on the test set, and a grid too coarse to discriminate) all stem from underinvesting in the design of the grid relative to the design of the search; an hour spent specifying the right ranges is worth a week of CPU time on the wrong ones.</p>
+
+  <p>What this lecture deliberately did not do. It did not introduce <a href="03-random_search.html">random search</a> (lecture 32), which replaces enumeration with sampling and breaks the curse of dimensionality for grids with more than three or four parameters. It did not introduce Bayesian optimisation, which uses a surrogate model of the response surface to choose the next configuration to evaluate adaptively; the surrogate is a separate model that comes with its own validation burden, and the regulatory acceptance of Bayesian tuning in credit risk modelling is still uneven. It did not derive any of the underlying estimators; the SVM example refers out to <a href="../03_supervised_learning/03-support_vector_machines.html">lecture 8</a> for the kernel mechanics.</p>
+
+  <p>Lecture 32, <a href="03-random_search.html">random search</a>, picks up where this lecture ends. The motivating observation is that on a high-dimensional grid, most cells are far from the optimum and most fits are wasted on the wrong region of the space. Sampling random points instead of enumerating grid cells achieves the same coverage of the most-promising regions with a fraction of the budget, at the cost of giving up reproducibility-without-seeding and of accepting that some cells will be sampled twice while others are missed entirely. The choice between the two is a choice about what the budget buys.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the formula for the total number of model fits in a grid search with $p$ hyperparameters, $g_j$ values per hyperparameter, and $k$-fold cross-validation. Compute the value for $p = 5$, $g_j = 5$, $k = 5$.</li>
+      <li>An analyst reports the best configuration from a grid search as $C = 100$ with $C \in \{0.1, 1, 10, 100\}$. What is the implied action, and why?</li>
+      <li>You tune a kernel SVM. The grid is <code>{"kernel": ["linear", "rbf"], "C": [0.1, 1, 10], "gamma": [0.01, 0.1, 1]}</code>. How many of the eighteen cells fit fundamentally redundant models, and how should the grid be restructured to avoid the waste?</li>
+      <li>In a pipeline with steps named "scaler" and "clf", how is the <code>C</code> parameter of the classifier referred to in <code>param_grid</code>? Explain why putting the scaler inside the pipeline rather than fitting it before the search matters.</li>
+      <li>You run a grid search with five-fold CV. The winner scores 0.943 with a fold standard deviation of 0.009, and the runner-up scores 0.940. Is the winner robust? What action would you take?</li>
+      <li>Why is geometric (logarithmic) spacing the right choice for tuning a regularisation strength like $C$ in logistic regression or an SVM?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 32 (<a href="03-random_search.html">random search</a>) replaces enumeration with sampling and is the right algorithm once the grid stops fitting in budget.</li>
+      <li><strong>Previous:</strong> Lecture 30 (<a href="01-tuning_principles.html">tuning principles</a>) establishes when to tune at all, how to choose the metric, and how to allocate budget across hyperparameters before any specific algorithm is selected.</li>
+      <li><strong>Prerequisite:</strong> Lecture 21 on <a href="../02_train_test_split/01-train_test_validation.html">train, test, and validation</a> defines the cross-validation scheme that grid search consumes; lecture 30 on <a href="../02_train_test_split/02-pipelines.html">pipelines</a> shows how to compose preprocessing and model into a single object so the search can tune both jointly.</li>
+      <li><strong>Outside this course:</strong> The grid-search audit trail is the artefact most often examined in model validation. Recording the full <code>cv_results_</code> table, the chosen metric, the CV scheme, and the final test-set score is the minimum documentation that a validator (internal or supervisory) will expect; without it, the question "why these hyperparameters" has no defensible answer.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Hyperparameter tuning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 31 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

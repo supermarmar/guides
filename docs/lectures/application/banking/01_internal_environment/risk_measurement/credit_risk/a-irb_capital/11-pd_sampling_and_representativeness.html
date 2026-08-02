@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PD sampling and representativeness</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Sampling and representativeness</h1>
+  <p class="subtitle">Choose which rows of the MRD enter the development, calibration and validation samples; then verify that the chosen samples reflect the portfolio the model will be applied to. The two choices are tightly coupled: bad sampling is what representativeness diagnostics are designed to catch.</p>
+  <div class="meta">
+    <span>A-IRB 11 of n &mdash; PD 3 of 7</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Sources: <code>04_feature_engineering/pd/03-sampling.md</code>, <code>03-data-representativeness.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The MRD has every (obligor, facility, snapshot_month) row the bank can possibly use. Sampling decides which of those rows enter the development sample (used to fit the PiT scorecard), the calibration sample (used to compute the LRA), the out-of-sample test set (used to check generalisation), and the out-of-time hold-out (used to check temporal stability). Each sample has a different design rationale and a different supervisory anchor.</p>
+
+  <p>Five sampling decisions matter. <strong>Snapshot window</strong> sets the historical period the development sample is drawn from (typically 10+ years, with distorted periods like COVID excluded). <strong>De-duplication</strong> ensures each facility appears once so observations are statistically independent. <strong>Splitting</strong> chooses how to carve dev / OOS / OOT (typically by time, not random). <strong>Downsampling</strong> handles segments with too many observations (random downsample with proportional weighting). <strong>Calibration sample</strong> is drawn separately from a long-run-average window that includes a downturn.</p>
+
+  <p>Representativeness then asks: does this sample reflect the current portfolio? PSI and chi-square tests compare distributions of key risk drivers (limit, utilisation, balance, delinquency, product, MoB, FICO, segment) between development and application populations. A characteristic-stability index (CDI), the same formula as PSI but applied to individual model features, drills into the variable level. Where representativeness fails, the gap is recorded in the limitations register (lecture 07) and an MoC category-A uplift compensates (covered in lecture 30).</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Sampling is the first place a model goes wrong silently. The mathematics still works perfectly on a bad sample; the model trains, the test metrics look fine, and the failure only emerges in production months later when the supervisor or the realised loss curve says the model under-predicts in a slice that was systematically under-represented in development. Representativeness tests are the audit trail that catches this: the sample is no longer "the data we had" but rather "the slice of data we deliberately chose, on the following grounds, with the following diagnostics passing".
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Two CRR articles and one supervisory statement frame this lecture. CRR Article 174(c) requires that the development sample and the application population be comparable. PRA SS4/24 paragraphs 8.2 to 8.15 set the expectations for assessing comparability statistically (PSI, chi-square, segmentation-level testing). The combination effectively mandates the work in this lecture: choose the sample with explicit criteria, document the criteria, and demonstrate via formal diagnostics that the chosen sample reflects the population to which the model will be deployed.</p>
+
+  <p>The most common operational mistake is to use a random train/test split, treating the rows as independent draws. They are not. A single facility appears in the MRD at every snapshot during its life. A random 70/30 split places different snapshots of the same facility in both sets, so the test-set rows are correlated with the train-set rows; the apparent test performance is inflated. The de-duplication rule (one row per facility) and the temporal-split rule (OOS cohorts are not in dev) exist to break this correlation and produce honest performance estimates.</p>
+
+  <p>The second common mistake is to keep the distorted periods in the development data. The 2020 to 2022 COVID period is the contemporary example: payment holidays, regulatory forbearance, government-supported income, and operational changes to collections processes all distorted observed default rates in ways the bank cannot reproduce in production. Including these snapshots in the development sample trains the model to mispredict in normal conditions. The standard treatment is exclusion of the distorted window, recording in the limitations register, and an MoC overlay to ensure the LRA still reflects a full cycle.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The MRD is a long timeline of monthly snapshots. Three samples are carved out of it by different criteria. The diagram below shows the layout schematically.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The MRD timeline and the four samples">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Carving four samples out of the MRD timeline</text>
+
+      <!-- Time axis -->
+      <line x1="50" y1="290" x2="850" y2="290" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="850,290 842,286 842,294" fill="#475569"/>
+      <text x="855" y="294" font-family="Inter" font-size="10" fill="#64748b">time</text>
+
+      <!-- Timeline anchors -->
+      <g font-family="Inter" font-size="9" fill="#475569">
+        <line x1="60" y1="290" x2="60" y2="295" stroke="#475569"/>
+        <text x="60" y="308" text-anchor="middle">t0</text>
+        <text x="60" y="320" text-anchor="middle" font-style="italic">history start</text>
+
+        <line x1="280" y1="290" x2="280" y2="295" stroke="#475569"/>
+        <text x="280" y="308" text-anchor="middle">tA</text>
+        <text x="280" y="320" text-anchor="middle" font-style="italic">downturn (LRA anchor)</text>
+
+        <line x1="500" y1="290" x2="500" y2="295" stroke="#475569"/>
+        <text x="500" y="308" text-anchor="middle">tB</text>
+        <text x="500" y="320" text-anchor="middle" font-style="italic">COVID start</text>
+
+        <line x1="600" y1="290" x2="600" y2="295" stroke="#475569"/>
+        <text x="600" y="308" text-anchor="middle">tC</text>
+        <text x="600" y="320" text-anchor="middle" font-style="italic">COVID end</text>
+
+        <line x1="720" y1="290" x2="720" y2="295" stroke="#475569"/>
+        <text x="720" y="308" text-anchor="middle">tD</text>
+        <text x="720" y="320" text-anchor="middle" font-style="italic">OOT snapshot</text>
+
+        <line x1="800" y1="290" x2="800" y2="295" stroke="#475569"/>
+        <text x="800" y="308" text-anchor="middle">today</text>
+      </g>
+
+      <!-- Sample bands -->
+      <!-- Development sample: pre-COVID + post-COVID, COVID excluded -->
+      <rect x="60" y="60" width="440" height="30" fill="#eff6ff" stroke="#1e3a8a"/>
+      <rect x="600" y="60" width="120" height="30" fill="#eff6ff" stroke="#1e3a8a"/>
+      <text x="280" y="80" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">Development sample</text>
+      <text x="660" y="80" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#1e3a8a">(post-COVID)</text>
+      <text x="450" y="100" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">used to fit the PiT scorecard; COVID period excluded</text>
+
+      <!-- Calibration sample (LRA) -->
+      <rect x="280" y="120" width="220" height="30" fill="#fef9c3" stroke="#92400e"/>
+      <text x="390" y="140" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">Calibration sample (LRA window)</text>
+      <text x="390" y="159" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">from downturn to next peak; includes the cycle</text>
+
+      <!-- OOS sample (drawn from same window as dev but different cohorts) -->
+      <rect x="60" y="180" width="440" height="14" fill="#DDF1E5" stroke="#0f766e" stroke-dasharray="4,2"/>
+      <rect x="600" y="180" width="120" height="14" fill="#DDF1E5" stroke="#0f766e" stroke-dasharray="4,2"/>
+      <text x="280" y="207" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">OOS test sample (cohorts not in dev)</text>
+
+      <!-- OOT sample (a single snapshot at end of available data) -->
+      <rect x="715" y="180" width="20" height="14" fill="#fee2e2" stroke="#991b1b"/>
+      <text x="725" y="207" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">OOT</text>
+
+      <!-- Application sample -->
+      <rect x="740" y="180" width="60" height="14" fill="#f3f4f6" stroke="#475569" stroke-dasharray="2,2"/>
+      <text x="770" y="207" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#475569">application</text>
+
+      <!-- COVID exclusion stripe -->
+      <rect x="500" y="55" width="100" height="100" fill="#fee2e2" fill-opacity="0.4" stroke="#991b1b" stroke-dasharray="3,3"/>
+      <text x="550" y="50" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#991b1b">excluded (COVID distortions)</text>
+
+      <!-- Bottom legend -->
+      <text x="450" y="350" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">Four samples, four purposes: development fits the model; calibration anchors the LRA; OOS tests generalisation; OOT tests temporal stability; application monitors live performance.</text>
+    </svg>
+    <figcaption>The MRD timeline carved into four samples. The development sample (blue) spans the full history but excludes the COVID stripe; the calibration sample (yellow) covers the LRA window from the previous downturn to the next peak; OOS rows (green dashed) are drawn from the same time period as development but use cohorts not present in the development sample; OOT (red) is a single snapshot at the end of the available history, reserved for temporal validation; application (grey dashed) is the live portfolio the model will be deployed against.</figcaption>
+  </figure>
+
+  <p>Three properties of the layout are worth holding. First, the <strong>development and calibration samples serve different purposes</strong>: development teaches the model to discriminate (who is more risky than whom); calibration teaches it the absolute level (what 2% PD actually means). The two purposes can use different windows. Second, the <strong>OOS sample shares the time period of the development sample but uses different cohorts</strong>: it tests whether the model generalises across facilities, not across time. The OOT sample tests temporal generalisation. Both tests matter, neither replaces the other. Third, the <strong>application sample is not a fixed dataset</strong>: it is the rolling current portfolio that the supervisor expects to see in the monitoring pack.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Snapshot window selection</h3>
+
+  <p>The first decision is which historical snapshots are eligible to enter any of the samples. Three rules apply:</p>
+
+  <ul>
+    <li><strong>Full outcome window required.</strong> A snapshot at month t is eligible only if the bank has 12 months of forward data (default outcomes through t+12) at the time of the model build. If the MRD ends at month T, the latest eligible snapshot is T-12.</li>
+    <li><strong>Distorted periods excluded.</strong> Periods where the observed default rate does not reflect underlying credit risk are removed. The contemporary example is the COVID window (typically December 2018 through June 2022 depending on the portfolio): payment holidays, government income support, regulatory forbearance and operational changes to collections all suppressed observed defaults. Including these snapshots would teach the model that risk drivers do not predict default in distorted conditions, which is not a generalisable lesson.</li>
+    <li><strong>Pre-history excluded.</strong> Snapshots before the bank's current default-definition logic was operational are excluded; trying to back-derive the historical 90 DPD plus UTP indicator can introduce subtle inconsistencies that the model picks up as features.</li>
+  </ul>
+
+  <p>The eligible-snapshot list is the input to the four sample selectors. It is recorded in the limitations register with explicit dates and reasons for each exclusion.</p>
+
+  <h3>De-duplication</h3>
+
+  <p>A single facility appears in the MRD at every snapshot during its life. If the model is trained on all rows treating them as independent, the test-set performance is inflated by correlation: two snapshots of the same facility share features and (usually) target outcomes. The fix is to select <strong>one row per facility</strong> for the development sample. Two conventions:</p>
+
+  <ul>
+    <li>Random sampling: for each facility, pick one snapshot uniformly at random from the eligible window. Simple, defensible, statistically clean.</li>
+    <li>Stratified by snapshot: for each facility, pick the snapshot that places the facility's contribution in a desired time bucket. Better for cycle representation but introduces subjective choice (which bucket).</li>
+  </ul>
+
+  <p>The random approach is the default. The stratified-by-snapshot approach is occasionally used when cycle coverage is weak; when it is used, the criterion has to be documented and defended.</p>
+
+  <h3>Sample-splitting design</h3>
+
+  <p>Three split designs are commonly proposed; only one is standard for IRB.</p>
+
+  <table>
+    <thead>
+      <tr><th>Split design</th><th>What it does</th><th>Verdict for IRB</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Random 70/30 across all rows</td><td>Random sample of rows is held out as test</td><td><strong>Rejected.</strong> Different snapshots of the same facility appear in both sets; test performance inflated by correlation.</td></tr>
+      <tr><td>Random 70/30 across facilities</td><td>Random sample of facilities is held out as OOS test</td><td><strong>Acceptable for OOS only.</strong> Tests generalisation across facilities. Does not test temporal stability.</td></tr>
+      <tr><td>Temporal split (OOT)</td><td>Most recent snapshot reserved entirely for testing</td><td><strong>Required for IRB.</strong> Tests temporal stability and is the supervisory expectation under SS4/24.</td></tr>
+    </tbody>
+  </table>
+
+  <p>The standard combination is: train on the full eligible window minus the OOT snapshot, with OOS rows drawn from facilities not in the training set, plus the OOT snapshot as a final temporal hold-out. Three samples, three different generalisation tests.</p>
+
+  <h3>Random downsampling and weighting</h3>
+
+  <p>Large retail portfolios produce development samples in the tens or hundreds of millions of rows. Most modelling toolkits do not need that volume and the marginal information per row is low. Where a segment has more than a few million observations (5M is a common threshold), <strong>random downsampling</strong> is applied with a <strong>compensating weight</strong>:</p>
+
+  <pre><code>w_segment = total_observations_in_segment / target_sample_size</code></pre>
+
+  <p>Every retained row in the downsampled segment is assigned the same weight, which preserves the segment's contribution to the overall sample even though the row count has been reduced. The weight is used as a <code>sample_weight</code> in the logistic regression fit (or its equivalent in other model classes). The alternative, dropping the segment entirely, is rejected because it biases the sample composition.</p>
+
+  <h3>Why stratified sampling is rejected</h3>
+
+  <p>Stratified random sampling would preserve the distribution of a chosen variable (say utilisation) across the development sample by sampling within strata. It sounds attractive: the development sample looks more representative of the chosen variable. The reason it is rejected is subjectivity: choosing which variable to stratify on, choosing the bin boundaries, and accepting the inevitable distortion of other variables not in the stratification scheme. The supervisor prefers a simple random sample plus explicit weighting plus a representativeness diagnostic, all of which can be reproduced and audited. Stratified sampling moves the choice upstream, hides it, and creates the room for unjustified design decisions.</p>
+
+  <h3>Calibration sample (separate from development)</h3>
+
+  <p>The development sample teaches the model who is more risky than whom. The calibration sample teaches it what an absolute PD level is. The two purposes can use different windows. The calibration sample is drawn from the <strong>LRA window</strong>: from the start of the most recent downturn through to the start of the next peak in risk, so that the observed default rates over the window average out to a long-run-average. The LRA window typically includes the COVID period (it is part of the cycle, even if distorted) but excludes the development sample's COVID exclusion (where the COVID effect would corrupt the discrimination model).</p>
+
+  <p>The construction of the LRA itself, including the 4-step process and the PCA-over-macros approach to downturn identification, is the subject of lecture 14 (risk quantification). This lecture only sets the window choice.</p>
+
+  <h3>Representativeness: PSI, chi-square and CDI</h3>
+
+  <p>Once the samples are selected, representativeness diagnostics check that the chosen development and calibration samples reflect the application portfolio. The two standard tests:</p>
+
+  <h4>Population Stability Index (PSI)</h4>
+
+  <p>PSI compares two distributions of the same variable. For a binned variable with k bins, with proportions p_i in the development sample and q_i in the application portfolio:</p>
+
+  <pre><code>PSI = sum_i (q_i - p_i) * ln(q_i / p_i)
+</code></pre>
+
+  <p>PSI is a symmetric divergence (the Jeffreys variant of KL); standard interpretation:</p>
+
+  <ul>
+    <li>PSI &lt; 0.10: no material shift.</li>
+    <li>0.10 &le; PSI &lt; 0.25: small shift; investigate.</li>
+    <li>PSI &ge; 0.25: material shift; document, justify, and consider MoC.</li>
+  </ul>
+
+  <h4>Chi-square goodness-of-fit</h4>
+
+  <p>For a categorical or binned variable with k bins, chi-square tests whether the observed proportions in the application portfolio differ significantly from the development-sample proportions:</p>
+
+  <pre><code>chi2 = sum_i (n_q_i - n_p_i)^2 / n_p_i
+</code></pre>
+
+  <p>Compared to the chi-square distribution with k-1 degrees of freedom, this yields a p-value. The standard convention: p &lt; 0.05 indicates significant divergence at the 5% level. PSI and chi-square give complementary readings; both should be inspected because PSI is sensitive to magnitude of shift, chi-square is sensitive to statistical significance.</p>
+
+  <h4>Characteristic Stability Index (CDI)</h4>
+
+  <p>CDI is the same formula as PSI but applied to individual model variables rather than the overall population. The standard set for a PD scorecard:</p>
+
+  <ul>
+    <li>Current credit limit bands</li>
+    <li>Current utilisation bands</li>
+    <li>Current balance bands</li>
+    <li>Delinquency buckets</li>
+    <li>Product group</li>
+    <li>Revolver vs transactor status</li>
+    <li>Months on book (MoB)</li>
+    <li>External bureau score bands (e.g. FICO)</li>
+    <li>PiT segmentation</li>
+  </ul>
+
+  <p>CDI is computed for each variable for each segment for each snapshot date, producing a CDI panel. Sustained drift in any cell of the panel is investigated and explained either by a structural break (policy change, product acquisition, market entry) or accommodated by an MoC overlay.</p>
+
+  <h3>Definition-of-default consistency</h3>
+
+  <p>Beyond distributional tests, the DoD itself must be stable across the development and application periods. Time-series plots of the <strong>DoD components</strong> (90 DPD count, bankruptcy count, forbearance count, charge-off count, deceased count, contagion-flagged count, first-party-fraud count) are produced and inspected for structural breaks. Operational changes (write-off-threshold movements, forbearance-policy revisions, collections restructurings) are recorded in the policy timeline established in lecture 08 and reconciled to any breaks observed.</p>
+
+  <h3>Macroeconomic representativeness</h3>
+
+  <p>For the calibration sample only, an additional check confirms that the macroeconomic environment in the calibration window is representative of the cycle the LRA is meant to capture. Quarter-on-quarter observed default rates are plotted against macroeconomic variables (unemployment, GDP growth, interest rates, regional house price index) and the correlations are inspected. The aim is to confirm that the calibration window contains both expansion and contraction periods at empirically observed strengths; if the contraction side is weak (a calibration window with no recession in it), an MoC overlay or downturn LGD borrow is required to compensate.</p>
+
+  <h3>Lending-standards representativeness</h3>
+
+  <p>A qualitative check, but a substantive one. Before the model goes into production, the modelling team confirms with the credit policy team and the collections team that no material policy change is anticipated in the next deployment cycle. A change in underwriting cut-offs, a change in collections strategy, or a change in product mix can all invalidate the development assumption that the application portfolio looks like the development portfolio. Where a change is anticipated, the model build either accommodates it (by including a flag in the feature set) or excludes the affected period (and records the exclusion).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The single most consequential supervisory dialogue around sampling is the <strong>COVID exclusion</strong>. Banks vary in where they place the boundaries; supervisors expect explicit dates, explicit reasons, and explicit MoC compensation. The wrong answer is to keep the entire COVID window in the development data on the grounds that "the model needs to see all available data". The right answer is to exclude the distorted window with documented dates, retain the snapshots either side, and explicitly back-fill the LRA via MoC to ensure cycle coverage. The supervisor's question is not whether the COVID period was distorted (everyone agrees it was), but whether the bank has dealt with the distortion honestly.</p>
+
+  <p>The second hard problem is <strong>the gap between OOS and OOT</strong>. A model that passes OOS but fails OOT has a temporal-stability problem: it generalises across facilities at a point in time but does not generalise across time. The most common cause is policy drift: the underwriting cut-offs changed, the collections strategy changed, the portfolio mix evolved. The OOT failure is the supervisor's signal that the bank has not maintained representativeness over time. The fix is rarely "rebuild the model on more recent data" (which may just delay the next OOT failure); it is "identify the policy drift and decide whether the bank wants to capture it in the model or compensate for it in MoC".</p>
+
+  <p>The third lesson is that <strong>representativeness is a test, not a certificate</strong>. A PSI of 0.07 across all variables is not a guarantee that the model will perform. It is a statement that the bank has not found a systematic shift on the variables it tested. If the next quarter's defaults concentrate in a slice of the portfolio not measured by any of the tested variables, the representativeness diagnostics will still pass and the model will still fail. The mitigation is to widen the diagnostic battery (more variables, more segments, more time slices) and to back-test rigorously in monitoring. The diagnostics in this lecture are necessary but not sufficient.</p>
+
+  <p>The fourth lesson is that the <strong>weighting in downsampling matters more than is widely appreciated</strong>. The standard approach (each retained row weighted to recover the segment's original contribution) is correct in expectation but increases variance. Banks that downsample heavily (say 1 in 100) and then forget to weight produce models that fit the smaller segments well and the larger ones poorly. The fix is mechanical (always weight, always document the weights) but the operational discipline is sometimes weak. Junior modellers should be tested on this.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Distinguish the four samples (development, calibration, OOS, OOT) on three axes: purpose, time-period, and how rows are selected.</li>
+    <li>Why is random row-level 70/30 splitting rejected for IRB PD? What replaces it?</li>
+    <li>State the CRR Article and PRA supervisory statement that anchor the representativeness work in this lecture.</li>
+    <li>A bank is building a PD model in 2026. The MRD ends in December 2025. What is the latest eligible snapshot for the development sample, and why?</li>
+    <li>Write the PSI formula. State the standard interpretation thresholds (0.10, 0.25). What does PSI = 0.30 on the credit-limit variable mean operationally?</li>
+    <li>How is CDI different from PSI? Why is CDI computed at the variable level rather than the population level?</li>
+    <li>Why is the COVID period typically excluded from the development sample? Why is it typically included in the LRA calibration window?</li>
+    <li>The downsampling rule assigns weight w = total_observations / target_sample_size. What goes wrong if the weight is omitted?</li>
+    <li>An OOT test passes but the OOS test fails. What does this combination tell you about the model? Now reverse it: OOS passes but OOT fails. What does that tell you?</li>
+    <li>Representativeness diagnostics on the development sample all pass. The next quarter's defaults concentrate in a segment that none of the tested variables captures. Has the bank done its job?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/pd/03-sampling.md</code> &mdash; development, calibration, OOS and OOT sample design.</li>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/pd/03-data-representativeness.md</code> &mdash; PSI / chi-square / CDI methodology and DoD / lending-standards / macro checks.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="06-data_engineering.html">Data engineering</a> &mdash; the MRD that this lecture samples from.</li>
+      <li><a href="07-governance_and_limitations.html">Governance and limitations</a> &mdash; the limitations register that records exclusions and feeds MoC category A.</li>
+      <li><a href="08-portfolio_description.html">Portfolio description</a> &mdash; the descriptive series and policy timeline that inform the eligibility-window decisions.</li>
+      <li><a href="10-pd_target_and_data.html">Target and data</a> &mdash; the target definition and the eligibility filter for snapshots with a full outcome window.</li>
+    </ul>
+
+    <p><strong>Forward references inside the PD sequence:</strong></p>
+    <ul>
+      <li>12-pd_feature_engineering (planned) &mdash; consumes the development sample defined here.</li>
+      <li>13-pd_risk_differentiation (planned) &mdash; fits the PiT scorecard on the development sample.</li>
+      <li>14-pd_risk_quantification (planned) &mdash; uses the calibration sample to anchor the LRA.</li>
+      <li>15-pd_testing (planned) &mdash; uses OOS and OOT samples for back-testing.</li>
+    </ul>
+
+    <p><strong>Cross-track and forward to MoC:</strong></p>
+    <ul>
+      <li>30-moc (planned) &mdash; the category-A uplift that compensates for representativeness gaps recorded in the limitations register.</li>
+      <li>32-monitoring (planned) &mdash; the same representativeness battery is re-run quarterly to detect drift between deployment and live portfolio.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Article 174(c). The legislative anchor for representativeness.</li>
+      <li>PRA SS4/24, paragraphs 8.2 to 8.15. UK supervisory expectations for representativeness testing.</li>
+      <li>EBA/GL/2017/16, paragraph 5. The European authority's interpretation of the comparability requirement.</li>
+      <li>Wu and Olson, "Credit risk modeling and discrimination" (2010). The classic reference on PSI and CDI.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 11 of n &middot; PD 3 of 7.</span>
+  <span><a href="10-pd_target_and_data.html">Previous: target and data</a> &middot; <a href="12-pd_feature_engineering.html">Next: feature engineering</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

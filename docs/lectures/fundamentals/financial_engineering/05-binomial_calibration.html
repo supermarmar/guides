@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: calibrating the binomial tree</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>Calibrating the binomial tree</h1>
+  <p class="subtitle">A binomial tree needs three numbers before it can price anything: the up-move factor <code>u</code>, the down-move factor <code>d</code>, and the risk-free rate <code>r</code>. The market never hands these over directly. It hands over a history of prices and a grid of option quotes, and calibration is the machinery that turns either of those into tree parameters. The two routes generally disagree, and understanding why is the whole lecture.</p>
+  <div class="meta">
+    <span>Lecture 5 of 13</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Source: <code>UP / 11 - Calibration Binomial.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Calibration is the act of choosing a model's free parameters so that the model reproduces some target data set. For a binomial tree the free parameters are <code>u</code>, <code>d</code> and the step probability, and there are two entirely different targets you could reproduce. Fit the tree to the <em>historical</em> behaviour of the stock and you get a description of the real world: how the price has actually been moving. Fit the tree to <em>observed option prices</em> and you get a description of the risk-neutral world: the volatility the market is charging for that risk today. Both are called "the volatility", both feed into the same formulas for <code>u</code> and <code>d</code>, and they routinely give different numbers.</p>
+
+  <p>The mechanical recipe for historical calibration is moment matching: take a sample of log returns, compute their sample mean and variance, and choose <code>u</code> and <code>d</code> so the tree's one-step log return has that mean and variance. The mechanical recipe for implied calibration is root-finding: take an observed option price, and search for the single volatility that makes the pricing formula reproduce it, using Newton-Raphson with the option's vega as the derivative. Everything in this lecture is either one recipe or the other, plus the uncomfortable fact that a single number cannot make both recipes agree across every strike in the market at once.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Somebody hands you twelve monthly closing prices for a stock and asks: "what volatility should I use in my tree?" There is no single correct answer, because the question is ambiguous. Do you want the volatility that best describes how this stock has actually been wobbling, so you can compute a realistic distribution of terminal prices? Or do you want the volatility that the options market is currently paying for, so your tree prices a new option consistently with the ones already trading? The first is a statistics problem: estimate a parameter from a sample. The second is an inverse problem: given a price, find the input that produces it. They use the same Greek letter <code>sigma</code> and they are not the same number.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP source is narrowly the Cox-Ross-Rubinstein derivation: matching the first two moments of the continuous lognormal model to the two-point binomial model under the <code>ud = 1</code> symmetry assumption, with the alternative <code>p = 1/2</code> assumption left as an unworked exercise (its stated answer is exactly the Jarrow-Rudd formula, though the source never uses that name). It has no historical-volatility estimation, no implied volatility or Newton-Raphson, and no mention of the smile or implied trees. This lecture derives Jarrow-Rudd in full, adds Tian as a third alternative, and builds out everything the source omits: the standard error of a historical volatility estimate, EWMA and GARCH(1,1), the full Newton-Raphson mechanics for implied volatility, the volatility smile, and implied binomial trees (Derman-Kani, Rubinstein) that let the transition probability vary node by node to fit the whole smile at once.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Every tree you have built so far in this course has been handed <code>u</code>, <code>d</code> and <code>r</code> as given numbers, as if they fell from the sky. This lecture is where they stop falling from the sky. Nothing about the no-arbitrage machinery in lectures 3 and 4 tells you what volatility to plug in; it only tells you how to price consistently once you have one. Calibration is the bridge between the abstract tree and an actual market, and it is the step where a modelling choice, not a mathematical derivation, enters the pricing chain.</p>
+
+  <p>The distinction between historical and implied calibration is not academic pedantry. A bank's market risk desk marks its trading book using implied volatilities, because that is the only way to be consistent with what the book could actually be sold for today. The same bank's economic capital and stress-testing functions use historical (or EWMA, or GARCH) volatility, because a capital number has to describe what could plausibly happen, not what is priced in today. Confusing the two, using a historical estimate to mark a derivatives book or an implied volatility as a forecast of realised risk, is a genuine and recurring source of model error, and this lecture is the first place in the course the distinction becomes unavoidable.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures carry this lecture. The first is the calibration loop itself: the generic machine that turns a target (a market price, or a set of historical moments) into a parameter, by comparing a model output against the target and adjusting until they match. The second is the volatility smile: the empirical fact that breaks the comfortable idea of "the" volatility, and the reason the calibration loop has to be run separately, strike by strike, rather than once and for all.</p>
+
+  <h3>Picture one: the calibration loop</h3>
+
+  <p>Whether you are matching historical moments or inverting an option price, the loop has the same four parts: a source of market data, a model that produces an output given a trial parameter, an objective function that measures the gap between model output and market data, and an update rule that proposes the next trial parameter. The loop runs until the gap is small enough to accept.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram of the generic calibration loop: market data, model, objective function, and parameter update, iterating until convergence">
+      <defs>
+        <marker id="arrowCal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#52525b"/>
+        </marker>
+        <linearGradient id="marketBoxGradCal" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f0fdfa"/>
+          <stop offset="100%" stop-color="#ccfbf1"/>
+        </linearGradient>
+        <linearGradient id="modelBoxGradCal" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fffbeb"/>
+          <stop offset="100%" stop-color="#fef3c7"/>
+        </linearGradient>
+        <linearGradient id="objBoxGradCal" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1A2238"/>
+          <stop offset="100%" stop-color="#0A0F1C"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="28" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">The calibration loop</text>
+
+      <!-- Market box -->
+      <rect x="40" y="70" width="330" height="90" rx="10" fill="url(#marketBoxGradCal)" stroke="#0f766e" stroke-width="1.5"/>
+      <text x="55" y="95" font-family="Inter" font-weight="700" font-size="13" fill="#134e4a">Market data</text>
+      <text x="55" y="116" font-family="Inter" font-size="11" fill="#115e59">Historical prices, for moment</text>
+      <text x="55" y="131" font-family="Inter" font-size="11" fill="#115e59">matching. Or an observed option</text>
+      <text x="55" y="146" font-family="Inter" font-size="11" fill="#115e59">price C_market(K,T), for inversion.</text>
+
+      <!-- Model box -->
+      <rect x="430" y="70" width="330" height="90" rx="10" fill="url(#modelBoxGradCal)" stroke="#b45309" stroke-width="1.5"/>
+      <text x="445" y="95" font-family="Inter" font-weight="700" font-size="13" fill="#7c2d12">Model</text>
+      <text x="445" y="116" font-family="Inter" font-size="11" fill="#92400e">The binomial tree (or Black-Scholes)</text>
+      <text x="445" y="131" font-family="Inter" font-size="11" fill="#92400e">built from the trial parameter sigma,</text>
+      <text x="445" y="146" font-family="Inter" font-size="11" fill="#92400e">producing a model price C_model(sigma).</text>
+
+      <!-- diagonal arrows into objective -->
+      <line x1="230" y1="160" x2="320" y2="228" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowCal)"/>
+      <line x1="590" y1="160" x2="490" y2="228" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowCal)"/>
+
+      <!-- Objective box -->
+      <rect x="235" y="230" width="330" height="90" rx="10" fill="url(#objBoxGradCal)"/>
+      <text x="400" y="256" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#f8fafc">Objective function</text>
+      <text x="400" y="278" text-anchor="middle" font-family="Inter" font-size="11" fill="#a7f3d0">gap = C_model(sigma) − C_market</text>
+      <text x="400" y="296" text-anchor="middle" font-family="Inter" font-size="11" fill="#a7f3d0">(or: model moments − sample moments)</text>
+
+      <!-- vertical arrow down to update -->
+      <line x1="400" y1="320" x2="400" y2="366" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowCal)"/>
+
+      <!-- Update box -->
+      <rect x="235" y="370" width="330" height="70" rx="10" fill="#f4f4f5" stroke="#52525b" stroke-width="1.5"/>
+      <text x="400" y="396" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#27272a">Parameter update</text>
+      <text x="400" y="416" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">Newton-Raphson: sigma_(n+1) = sigma_n − gap / vega</text>
+
+      <!-- loop back path along right margin -->
+      <polyline points="565,405 715,405 715,115 760,115" fill="none" stroke="#52525b" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrowCal)"/>
+      <text x="722" y="260" font-family="Inter" font-size="10" fill="#52525b" transform="rotate(90 722 260)">re-price with updated sigma</text>
+
+      <!-- exit pill -->
+      <line x1="565" y1="275" x2="596" y2="275" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowCal)"/>
+      <rect x="600" y="252" width="170" height="46" rx="23" fill="#0f766e"/>
+      <text x="685" y="271" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">|gap| below tolerance:</text>
+      <text x="685" y="286" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11" fill="#ccfbf1">sigma accepted</text>
+    </svg>
+    <figcaption>The calibration loop, in the same boxed-flow style as the cash-and-carry diagram of lecture 1. Moment matching and implied-volatility inversion are the same loop with a different market-data box and a different objective function.</figcaption>
+  </figure>
+
+  <h3>Picture two: the volatility smile</h3>
+
+  <p>Run the loop of picture one separately at every strike traded on a given expiry, and a single flat volatility does not survive the exercise. Plot the resulting implied volatilities against strike (or, more usefully, against moneyness <code>K/S</code>) and equity index options trace out a downward-sloping curve: high implied volatility for low strikes, flattening out for high strikes. This is the <strong>volatility smile</strong>, or for the typically monotonic equity shape, the <strong>volatility skew</strong>.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Volatility smile diagram: implied volatility against moneyness, showing the equity skew shape against a flat single-sigma reference line">
+      <defs>
+        <marker id="arrowSmileCal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+        <linearGradient id="smileAreaGradCal" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fde68a" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#fde68a" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="28" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">The equity volatility skew</text>
+
+      <!-- axes -->
+      <line x1="60" y1="350" x2="760" y2="350" stroke="#71717a" stroke-width="1.5" marker-end="url(#arrowSmileCal)"/>
+      <line x1="80" y1="370" x2="80" y2="60" stroke="#71717a" stroke-width="1.5" marker-end="url(#arrowSmileCal)"/>
+      <text x="755" y="372" text-anchor="end" font-family="Inter" font-size="12" fill="#71717a">moneyness K / S</text>
+      <text x="95" y="72" font-family="Inter" font-size="12" fill="#71717a">implied vol</text>
+
+      <!-- ATM gridline -->
+      <line x1="410" y1="350" x2="410" y2="70" stroke="#d4d4d8" stroke-width="1" stroke-dasharray="3,4"/>
+      <text x="410" y="365" text-anchor="middle" font-family="Inter" font-size="10" fill="#a1a1aa">1.0 (ATM)</text>
+
+      <!-- flat single-sigma reference line -->
+      <line x1="80" y1="262" x2="740" y2="262" stroke="#b45309" stroke-width="1.5" stroke-dasharray="6,5"/>
+      <text x="90" y="253" font-family="Inter" font-size="10" fill="#92400e">single flat sigma used by a one-parameter tree</text>
+
+      <!-- smile/skew curve -->
+      <polyline points="80,120.5 162.5,161 245,201.5 327.5,235.3 410,262.3 492.5,275.8 575,282.5 657.5,285.2 740,286.6"
+                fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <polygon points="80,120.5 162.5,161 245,201.5 327.5,235.3 410,262.3 492.5,275.8 575,282.5 657.5,285.2 740,286.6 740,350 80,350"
+               fill="url(#smileAreaGradCal)"/>
+
+      <!-- labels -->
+      <rect x="90" y="90" width="150" height="26" rx="13" fill="#0f766e"/>
+      <text x="165" y="108" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">market-implied skew</text>
+
+      <text x="150" y="330" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46" font-style="italic">low strikes: crash</text>
+      <text x="150" y="343" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46" font-style="italic">and put-demand premium</text>
+
+      <text x="640" y="330" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46" font-style="italic">high strikes: curve flattens,</text>
+      <text x="640" y="343" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46" font-style="italic">closer to the flat reference</text>
+    </svg>
+    <figcaption>A typical equity index skew: implied volatility falls as strike rises. The dashed line is the single sigma a CRR or Jarrow-Rudd tree would use; the gap between the flat line and the curve at every strike except one is the misspecification that a single-sigma tree cannot avoid.</figcaption>
+  </figure>
+
+  <p>The gap between the curve and the dashed flat line is the whole reason implied trees exist. A binomial tree calibrated with one sigma can match the market price of one option, at one strike and one maturity. It will misprice every other strike on the same underlying by construction, because the market itself is not pricing every strike off one number.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <div class="defcard">
+    <div class="term">Calibration</div>
+    <div class="def">The choice of a model's free parameters so that the model's output matches a target data set. In a binomial tree, calibration fixes <code>u</code>, <code>d</code> and the step probability <code>q</code>. Two distinct targets are in routine use: the historical moments of the underlying's log returns (statistical, or physical-measure, calibration), and observed derivative prices in the market (implied, or risk-neutral, calibration). They generally produce different numbers because they are answering different questions.</div>
+  </div>
+
+  <h3>Moment matching: choosing u and d</h3>
+
+  <p>The tree's one-step log return, <code>ln(S_1/S_0)</code>, takes the value <code>ln u</code> with probability <code>q</code> and <code>ln d</code> with probability <code>1-q</code>. Over a step of length <code>dt</code>, the target is the lognormal model's log return, which has mean $(r - \sigma^2/2)\,dt$ and variance $\sigma^2\, dt$ under the risk-neutral measure. Moment matching means choosing <code>u</code>, <code>d</code> and <code>q</code> so the tree's two-point distribution reproduces these two numbers, at least to the order in <code>dt</code> that matters as the tree is refined.</p>
+
+  <p>The <strong>Cox-Ross-Rubinstein (CRR)</strong> choice imposes a symmetry condition first, <code>ud = 1</code>, so the tree recombines around the starting price in log-space, and then matches the variance of the log return to leading order:</p>
+
+  <p>$$ u = e^{\sigma \sqrt{dt}}, \qquad d = \frac{1}{u} = e^{-\sigma \sqrt{dt}}. $$</p>
+
+  <p>With <code>u</code> and <code>d</code> pinned down by volatility alone, the entire job of matching the mean (and hence the risk-free drift) falls on the probability. Demanding that the tree's expected one-step growth equal $e^{r\,dt}$ gives the familiar risk-neutral probability</p>
+
+  <p>$$ q = \frac{e^{r\,dt} - d}{u - d}. $$</p>
+
+  <p>The <strong>Jarrow-Rudd</strong> choice takes the opposite route: fix the probability at <code>q = 1/2</code>, the "equally likely" convention, and push both the drift and the volatility into <code>u</code> and <code>d</code> directly by matching the mean and variance of the log return exactly:</p>
+
+  <p>$$ u = e^{(r - \sigma^2/2)\,dt + \sigma \sqrt{dt}}, \qquad d = e^{(r - \sigma^2/2)\,dt - \sigma \sqrt{dt}}. $$</p>
+
+  <p>Because both <code>u</code> and <code>d</code> carry the same drift term $(r-\sigma^2/2)\,dt$, the product <code>ud</code> is no longer 1 in general; the tree still recombines (every node is reached by some count of ups and downs regardless of order), it simply is not centred on the starting price in the CRR sense. <strong>Tian's</strong> parameterisation goes one step further and matches the third moment (the skewness) of the log return as well as the first two, solving a small system of three equations for <code>u</code>, <code>d</code> and <code>q</code> jointly rather than fixing one of the three by convention first. It converges to the same continuous-time limit as CRR and Jarrow-Rudd, marginally faster in the third-moment sense, at the cost of a less memorable closed form.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Parameterisation</th><th>u, d</th><th>Probability q</th><th>Matches exactly</th><th>Trade-off</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>CRR</td><td>$u=e^{\sigma\sqrt{dt}}$, $d=1/u$</td><td>$\dfrac{e^{r\,dt}-d}{u-d}$</td><td>Variance, by construction; symmetric recombination in log-space</td><td>Drift is carried entirely by <code>q</code>; for coarse steps or extreme <code>r</code>, <code>dt</code> can push <code>q</code> outside [0,1]</td></tr>
+        <tr><td>Jarrow-Rudd</td><td>$u,d=e^{(r-\sigma^2/2)dt \pm \sigma\sqrt{dt}}$</td><td>$1/2$ fixed</td><td>Mean and variance, both built into <code>u</code> and <code>d</code> directly</td><td><code>ud ≠ 1</code>; the tree is not centred the way CRR is, and extreme drift can distort node spacing</td></tr>
+        <tr><td>Tian</td><td>solved jointly, no closed form as clean as the above</td><td>solved jointly</td><td>Mean, variance and skewness (third moment)</td><td>More algebra for a refinement that only matters materially at small step counts</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Historical volatility: estimating the physical-measure sigma</h3>
+
+  <p>Given a sample of <code>n+1</code> prices $S_0, S_1, \ldots, S_n$ sampled at equal intervals, form the log returns</p>
+
+  <p>$$ r_i = \ln \left( \frac{S_i}{S_{i-1}} \right), \qquad i = 1, \ldots, n, $$</p>
+
+  <p>and compute their sample mean $\bar{r}$ and sample variance</p>
+
+  <p>$$ \hat{\sigma}_{\text{period}}^2 = \frac{1}{n-1} \sum_{i=1}^n (r_i - \bar{r})^2. $$</p>
+
+  <p>Dividing by <code>n-1</code> rather than <code>n</code> is the standard bias correction (Bessel's correction): the sum of squared deviations from the <em>sample</em> mean is systematically smaller than the sum of squared deviations from the true mean, because the sample mean is itself chosen to minimise that sum, and dividing by the smaller count exactly offsets this. Annualising then rescales by the number of periods per year: <code>sqrt(252)</code> for daily data, <code>sqrt(12)</code> for monthly data, and in general <code>sqrt(periods per year)</code>, since variance scales linearly with time under the lognormal model and volatility is its square root.</p>
+
+  <p>The estimate comes with real uncertainty that the point number alone hides. The standard error of the volatility estimator is approximately</p>
+
+  <p>$$ \text{s.e.}(\hat{\sigma}) \approx \frac{\hat{\sigma}}{\sqrt{2n}}. $$</p>
+
+  <p>With eleven monthly returns, $\sqrt{2 \times 11} = \sqrt{22} \approx 4.69$, so the standard error is roughly a fifth of the point estimate itself. A "20% volatility" computed from a year of monthly data is really something closer to "20%, plus or minus 4 percentage points, one standard error either way". Practitioners rarely quote the interval, but it is always there, and it is the reason nobody treats a historical volatility estimate as a fixed constant of nature.</p>
+
+  <p>The window length is a genuine trade-off, not a technical footnote. A longer window shrinks the standard error, since <code>n</code> is larger, but blends together whatever different volatility regimes occurred across the window, so the estimate lags a genuine regime change. A shorter window tracks the current regime more responsively but carries a much wider standard error, and can be dominated by one or two unusual days. <strong>EWMA</strong> (exponentially weighted moving average) softens this trade-off by weighting recent squared returns more heavily than older ones, with a decay parameter (the RiskMetrics convention uses 0.94 for daily data) that controls how quickly old information is forgotten, without the abrupt cutoff of a fixed window. <strong>GARCH(1,1)</strong> goes further and models the variance itself as a process, $h_t = \omega + \alpha r_{t-1}^2 + \beta h_{t-1}$, which captures volatility clustering (a large move today makes a large move tomorrow more likely) and mean-reverts to a long-run variance $\omega/(1-\alpha-\beta)$. Both are the natural econometric upgrade once a single flat historical window feels too crude.</p>
+
+  <h3>Implied volatility: inverting the price</h3>
+
+  <p>Given an observed market price for a European option, the market convention is to quote not the price but the <strong>implied volatility</strong>: the single sigma that, fed into the pricing formula, reproduces that price exactly. This only makes sense as a well-defined operation because the pricing formula is a monotone, strictly increasing function of sigma. The derivative of the Black-Scholes call price with respect to volatility, called <strong>vega</strong>,</p>
+
+  <p>$$ \text{vega} = \frac{\partial C}{\partial \sigma} = S \, \phi(d_1) \, \sqrt{T}, $$</p>
+
+  <p>is a product of strictly positive quantities (the spot price, the standard normal density $\phi$ evaluated anywhere, and $\sqrt{T}$), so it is always strictly positive. A strictly increasing function has a unique inverse wherever it is defined, which guarantees that at most one implied volatility exists for a given price within the no-arbitrage bounds. Finding it is a one-dimensional root-finding problem, and because vega is available in closed form, <strong>Newton-Raphson</strong> is the natural method:</p>
+
+  <p>$$ \sigma_{n+1} = \sigma_n - \frac{C_{\text{model}}(\sigma_n) - C_{\text{market}}}{\text{vega}(\sigma_n)}. $$</p>
+
+  <p>Because the objective function is smooth and monotone, Newton-Raphson typically converges to machine precision in four or five iterations from a sensible starting guess (20% is a common default). The one place it becomes unreliable is deep in or out of the money, where vega is tiny and the update step can overshoot wildly; the robust fallback there is <strong>bisection</strong>, which only needs the sign of the gap at each end of a bracketing interval and converges more slowly but never diverges.</p>
+
+  <div class="worked">WORKED EXAMPLE
+=================================================================
+PART 1: historical volatility from twelve monthly prices
+-----------------------------------------------------------------
+Closing prices (S_0 ... S_11), month-end:
+
+  S_0 = 100.000   S_4 = 108.329   S_8  = 104.080
+  S_1 = 105.127   S_5 = 102.020   S_9  = 109.416
+  S_2 = 102.020   S_6 = 103.045   S_10 = 105.126
+  S_3 = 104.081   S_7 = 106.183   S_11 = 107.250
+
+Log returns  r_i = ln(S_i / S_i-1), i = 1..11:
+
+  r_1  =  0.0500     r_5  = -0.0600     r_9  =  0.0500
+  r_2  = -0.0300     r_6  =  0.0100     r_10 = -0.0400
+  r_3  =  0.0200     r_7  =  0.0300     r_11 =  0.0200
+  r_4  =  0.0400     r_8  = -0.0200
+
+Sample mean:      r_bar = 0.0700 / 11           = 0.006364
+Sum of squared
+deviations:       sum (r_i - r_bar)^2           = 0.014545
+Sample variance:  0.014545 / (11 - 1)           = 0.0014545
+Monthly sigma:    sqrt(0.0014545)               = 0.038019   (3.80%)
+
+Annualised (monthly data, 12 periods per year):
+  sigma_hat = 0.038019 * sqrt(12) = 0.038019 * 3.4641 = 0.13173   (13.17%)
+
+Standard error of the estimate:
+  s.e. = sigma_hat / sqrt(2n) = 0.13173 / sqrt(22) = 0.13173 / 4.6904 = 0.0281
+
+  Result: sigma_hat = 13.17% +/- 2.81% (one standard error)
+
+-----------------------------------------------------------------
+PART 2: CRR tree parameters, n = 4 steps, T = 1 year, r = 4%
+-----------------------------------------------------------------
+Step length:      dt = T / n = 1 / 4 = 0.25
+
+Using the annualised historical estimate sigma = 0.13173:
+
+  sigma * sqrt(dt) = 0.13173 * 0.5             = 0.065867
+
+  u = e^0.065867                               = 1.068084
+  d = 1 / u                                    = 0.936269
+
+  e^(r*dt) = e^(0.04*0.25) = e^0.01            = 1.010050
+
+  q = (e^(r dt) - d) / (u - d)
+    = (1.010050 - 0.936269) / (1.068084 - 0.936269)
+    = 0.073781 / 0.131815
+    = 0.5598
+
+  Result: u = 1.0681, d = 0.9363, q = 0.5598, 1 - q = 0.4402
+
+-----------------------------------------------------------------
+PART 3: implied volatility from a quoted 3-month option
+-----------------------------------------------------------------
+Same stock, S_0 = 100. At-the-money call, K = 100, T = 0.25 (the
+same three-month step used in Part 2), r = 4%. Quoted market
+price: C_market = 5.50. Newton-Raphson, starting guess sigma_0 = 0.20.
+
+Iteration 1 (sigma_0 = 0.20):
+  sigma*sqrt(T) = 0.20*0.5 = 0.10
+  d1 = [0 + (0.04+0.02)*0.25] / 0.10 = 0.015/0.10       = 0.1500
+  d2 = 0.1500 - 0.10                                    = 0.0500
+  N(d1) = 0.5596,  N(d2) = 0.5199   (standard normal table)
+  C_model = 100*0.5596 - 100*e^-0.01*0.5199
+          = 55.96 - 99.005*0.5199 = 55.96 - 51.48        = 4.485
+  phi(d1) = 0.398942 * e^(-0.15^2/2) = 0.398942*0.98881  = 0.394479
+  vega    = S * phi(d1) * sqrt(T) = 100*0.394479*0.5     = 19.724
+
+  sigma_1 = 0.20 + (5.50 - 4.485)/19.724
+          = 0.20 + 1.015/19.724 = 0.20 + 0.05147          = 0.25147
+
+Iteration 2 (sigma_1 = 0.25147):
+  sigma*sqrt(T) = 0.25147*0.5                             = 0.125735
+  d1 = [0 + (0.04 + 0.25147^2/2)*0.25] / 0.125735
+     = [0 + 0.071619*0.25] / 0.125735 = 0.017905/0.125735  = 0.14240
+  d2 = 0.14240 - 0.125735                                  = 0.01667
+  N(d1) = 0.5566,  N(d2) = 0.5067   (standard normal table, interpolated)
+  C_model = 100*0.5566 - 99.005*0.5067
+          = 55.66 - 50.16                                  = 5.500
+
+  Result: after two iterations, C_model = 5.50 = C_market to the cent.
+          Implied volatility  sigma_implied  ~=  25.15%.
+
+-----------------------------------------------------------------
+Compare: trailing historical volatility (Part 1)  = 13.17%
+         market-implied volatility (Part 3)       = 25.15%
+Same stock, same three-month window, nearly double the number.
+This gap is exactly the subject of the grandmaster section below.</div>
+
+  <h3>Implied trees: fitting the whole smile</h3>
+
+  <p>A single sigma, however it is chosen, can only ever match one option price. The <strong>Derman-Kani</strong> and <strong>Rubinstein</strong> implied binomial trees take the opposite approach: instead of one probability per step applied at every node, they solve for a transition probability (and, in the Derman-Kani construction, an implied local volatility) at every individual node, working forward through the tree so that the resulting terminal distribution reproduces the entire observed smile, at every strike and the given maturity, simultaneously. Rubinstein's version works from the terminal side: choose the set of risk-neutral terminal probabilities that best fit the smile at maturity, subject to matching the forward price, and then recover the implied local volatilities and node probabilities that are consistent with those terminal probabilities by working backward.</p>
+
+  <p>The idea is elegant and the practical difficulty is real. Both constructions need option prices across a dense grid of strikes and maturities, and real quotes are noisy, thinly traded away from the money, and occasionally violate no-arbitrage bounds by a whisker because of stale or crossed quotes. Small perturbations in the input prices can produce large, sometimes economically nonsensical swings in the recovered node probabilities, including probabilities that fall outside <code>[0,1]</code> at the edges of the tree. In practice the input smile has to be smoothed and arbitrage-checked before an implied tree is built on top of it, and even then the far wings of the tree are the least reliable part of the construction.</p>
+
+  <h3>Calibrating the risk-free rate</h3>
+
+  <p>Everything above has treated <code>r</code> as a single flat number, but the tree in practice needs a term structure, since the risk-free curve is rarely flat across the maturities a book is pricing. The standard accommodation keeps <code>u</code> and <code>d</code> fixed (so the tree still recombines cleanly) and lets the step-<code>i</code> probability carry the time-varying rate: with $r_i$ the forward rate applicable over step <code>i</code>,</p>
+
+  <p>$$ q_i = \frac{e^{r_i \, dt} - d}{u - d}. $$</p>
+
+  <p>The tree geometry is untouched; only the probability attached to each step changes as you move through time. This mirrors exactly how the CRR construction handled drift in the first place: geometry from volatility, drift from probability, and now term structure from a probability that is allowed to depend on which step of the tree you are standing in.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Calibration chooses the measure, not the model</h3>
+
+  <p>A tree built by moment matching against historical returns and a tree built by inverting option prices have identical algebra: the same formulas for <code>u</code>, <code>d</code> and <code>q</code>, the same recursive pricing rule, the same payoff at the leaves. What differs is which probability measure the tree describes. The historically calibrated tree lives under the real-world (physical) measure and tells you something about how the stock might actually evolve. The implied tree lives under the risk-neutral measure and tells you only what is consistent with today's prices. Swapping one for the other silently, using a historical sigma to mark a book, or an implied sigma as an input to a real-world risk simulation, is not a small error of degree. It is a category error, dressed up in the same Greek letter.</p>
+
+  <h3>A calibrated model is interpolating, not forecasting</h3>
+
+  <p>Fitting a tree, or an implied surface, to today's option prices makes the model consistent with today. It says nothing about tomorrow. Practitioners recalibrate daily, sometimes intraday, and each recalibration can move <code>u</code>, <code>d</code>, and every node's local volatility in an implied tree, even though the underlying model is supposed to be describing one coherent process for the asset. A local-volatility surface fit tightly enough to reproduce every quoted strike on a given day is doing curve-fitting, and curve-fitting a smile with a flexible enough tree buys exact repricing today at the cost of unstable hedge ratios: a small, economically trivial move in one out-of-the-money quote can swing the fitted local volatility at a distant node enough to move the model's delta and vega noticeably, even when the underlying itself has barely moved. Traders who rely on implied trees for hedging live with this instability as a known cost of the method, and it is one of the reasons the course later moves to stochastic-volatility models, which fit the smile with fewer, more stable parameters at the cost of losing an exact match at every single strike.</p>
+
+  <h3>Why risk managers and traders calibrate differently, on purpose</h3>
+
+  <p>A trading desk prices and hedges off implied volatility because that is the only number consistent with what the book could be transacted at right now; a hedge built on a historical sigma would be self-financing against a world that is not the one being traded in. A risk or capital function, computing a stress scenario or an economic capital number, wants a description of how the world could plausibly move over the next quarter or year, which is a real-world question, and so reaches for historical, EWMA, or GARCH estimates instead. This is the same split an actuary or credit modeller already carries around under a different name: point-in-time (PIT) parameters that react to current conditions, versus through-the-cycle (TTC) parameters that describe a longer-run average behaviour. Implied volatility is the market's PIT number, sensitive to today's supply and demand for options; a long historical average is closer to a TTC number, smoothed across regimes. Neither is wrong; using the PIT number where the question calls for a TTC one, or vice versa, is the error.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Do not treat implied volatility as an unbiased forecast of the volatility that will actually be realised over the option's life. The worked example above is not a contrived illustration: a trailing historical volatility of 13.17% sitting alongside a market-implied volatility of 25.15% on the same stock, over overlapping windows, is an entirely ordinary state of affairs. The gap is called the <strong>variance risk premium</strong>: option sellers demand compensation for bearing variance risk, so implied volatility runs persistently above subsequently realised volatility on average, most visibly and most persistently for equity index options. Feeding implied volatility directly into a real-world risk forecast, without adjustment, systematically overstates the variance you should expect to actually see.
+  </div>
+
+  <h3>The discrete-time skeleton beneath everything later</h3>
+
+  <p>Every calibration idea in this lecture reappears in continuous time once the tree limit is taken in lectures 7 and 8. Moment matching becomes the choice of drift and diffusion coefficients in a stochastic differential equation. Implied volatility becomes exactly the same Newton-Raphson inversion against the Black-Scholes formula, since the CRR tree converges to it. Implied trees become local-volatility surfaces, and the instability problem you have just met does not go away, it becomes the primary motivation for the stochastic-volatility models that follow. Nothing here is thrown away; it is all reused with continuous-time notation.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the two economically different questions that historical calibration and implied calibration each answer, and explain in one sentence why they generally produce different values of sigma.</li>
+      <li>Derive the CRR choice of <code>u</code> and <code>d</code> from the symmetry condition <code>ud = 1</code> together with matching the variance of the one-step log return to <code>sigma^2 dt</code>.</li>
+      <li>Given <code>u</code>, <code>d</code> and the risk-free rate, derive the risk-neutral probability <code>q</code> for a CRR tree, and state the condition on the parameters under which <code>q</code> would fall outside <code>[0,1]</code>.</li>
+      <li>A stock has eleven monthly log returns with sample standard deviation 3.80%. Compute the annualised volatility and its one-standard-error band. What does the width of that band tell you about quoting a "20% volatility" as if it were exact?</li>
+      <li>Explain why vega being strictly positive guarantees that a given option price maps to at most one implied volatility.</li>
+      <li>Write the Newton-Raphson update formula for implied volatility, and explain why bisection is kept as a fallback rather than replacing Newton-Raphson entirely.</li>
+      <li>Sketch the shape of a typical equity index volatility skew against strike, and give the two competing economic explanations offered for its shape.</li>
+      <li>Explain, in one paragraph, the practical instability that afflicts implied (local-volatility) trees such as Derman-Kani, and why noisy option quotes make it worse.</li>
+      <li>Explain how a binomial tree accommodates a full term structure of interest rates <code>r(t)</code> while keeping <code>u</code> and <code>d</code> fixed across every time step.</li>
+      <li>What is the variance risk premium, and why does it mean implied volatility is a biased forecast of subsequently realised volatility?</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="index.html">Brownian motion and stochastic integrals (planned)</a>, where the discrete-time moment matching of this lecture becomes the choice of drift and diffusion coefficients for a continuous-time process.</li>
+      <li><a href="index.html">Stochastic differential equations and Ito's lemma (planned)</a>, the machinery that lets the CRR tree limit converge to the Black-Scholes dynamics implicitly used when quoting an implied volatility.</li>
+      <li><a href="index.html">The Black-Scholes PDE and the risk-neutral solution (planned)</a>, where implied volatility inversion against the closed-form price is the same Newton-Raphson exercise carried out in this lecture's worked example.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 11 - Calibration Binomial.pdf</code> (primary source)</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 2: Binomial Trees, for the CRR formula summary this lecture calibrates against</li>
+      <li>Hull, <em>Options, Futures and Other Derivatives</em>, chapters 15 and 20 (volatility estimation, the smile, implied trees)</li>
+      <li>Derman and Kani (1994) and Rubinstein (1994) on implied binomial trees</li>
+      <li>Jarrow and Rudd (1983), Tian (1993) on alternative moment-matching parameterisations; Gatheral, <em>The Volatility Surface</em>, for the arbitrage-free surface conditions</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The source is a short derivation of the Cox-Ross-Rubinstein parameters, matching the first two moments of the continuous lognormal model, <code>E[S(Δt)]</code> and <code>E[(S(Δt))^2]</code>, to the two-point binomial model under the symmetry assumption <code>ud = 1</code>. It leaves the alternative assumption <code>p = 1/2</code> as an unworked exercise, whose stated answer is exactly the Jarrow-Rudd parameterisation, though the source never uses that name. Tian's parameterisation is not mentioned at all. This lecture derives Jarrow-Rudd in full and adds Tian as a third alternative, with a worked comparison of all three.</li>
+      <li>The source has no historical-volatility estimation: no sample log returns, no sample variance formula, no standard error, no window-length discussion, no EWMA or GARCH. Every historical-calibration topic in this lecture, including the <code>sigma_hat / sqrt(2n)</code> standard error and the worked twelve-month example, is new relative to the source.</li>
+      <li>The source does not mention implied volatility, option-price inversion, Newton-Raphson, the volatility smile or skew, or implied-tree constructions (Derman-Kani, Rubinstein). All of section 4's implied-calibration material, and the smile discussion in section 3, is added here.</li>
+      <li>The source does not discuss the variance risk premium or any bias between implied and subsequently realised volatility, since it never introduces implied volatility to begin with. That comparison, in the grandmaster section, is new.</li>
+      <li>One divergence of substance, not notation, is worth holding on to. The source matches moments under the real-world drift <code>&mu;</code>, so its step probability comes out as $p = (e^{\mu \Delta t} - d)/(u - d)$, a physical probability. Lectures 3 and 4 use the risk-neutral probability $q = (e^{r \Delta t} - d)/(u - d)$, with the risk-free rate in place of the drift. Both are correct for their own purpose: the source is fitting the tree to the real-world dynamics of the asset, while the pricing lectures need the measure under which discounted prices are martingales. The two coincide only when <code>&mu; = r</code>. This is the historical-versus-implied distinction of this lecture appearing in the algebra, and confusing the two is the single easiest way to produce a tree that neither describes the world nor prices consistently.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 5: calibrating the binomial tree</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

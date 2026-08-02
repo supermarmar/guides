@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 9: hooks and settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Slash commands, hooks, and settings: automation the model cannot skip</h1>
+  <p class="subtitle">Everything so far has been a request. A hook is not. It is a shell command the harness runs at a fixed point in the lifecycle, and it fires whether or not the model agrees, remembers, or has room in its context to have noticed the instruction.</p>
+  <div class="meta">
+    <span>Lecture 9 of 22</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part II: steering the agent</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>hook</strong> is a handler configured in <code>settings.json</code> under a named lifecycle event. When the event fires, the harness runs the handler, and for the blocking events the handler's exit code or JSON output decides whether the action proceeds. The documented distinction is the whole point: instruction files are advisory, hooks are deterministic and guarantee the action happens. If a requirement must hold every time with no exceptions, it belongs here and nowhere else.</p>
+
+  <p>The event surface is large, and the shape is more useful than the catalogue. Events cluster around the agentic loop (<code>PreToolUse</code>, <code>PostToolUse</code>, <code>PostToolUseFailure</code>, <code>PermissionRequest</code>), the turn (<code>UserPromptSubmit</code>, <code>Stop</code>), the session (<code>SessionStart</code>, <code>SessionEnd</code>), subagents (<code>SubagentStart</code>, <code>SubagentStop</code>), and context (<code>PreCompact</code>, <code>PostCompact</code>). Four of them cover the overwhelming majority of real use: run something before a tool call, run something after a file changes, inject context when a session starts, and refuse to let a turn end until a check passes.</p>
+
+  <p>The blocking mechanism is simple enough to memorise. A command hook exiting <strong>2</strong> blocks the action and feeds its standard error back to the agent as the reason; any other non-zero exit is a non-blocking error; zero is success. For finer control, a hook can emit JSON, and for <code>PreToolUse</code> the field that matters is <code>hookSpecificOutput.permissionDecision</code>, set to <code>allow</code>, <code>deny</code>, or <code>ask</code>. That single field turns a shell script into a policy engine sitting in front of every tool call.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Ask of any requirement: what happens if the model simply does not do it? If the answer is "a slightly worse result", an instruction is fine. If the answer is "a secret leaks", "the build breaks silently", or "we ship untested code", then you have written a hope rather than a control, and a hope in an instruction file will eventually be crowded out by the sixty lines above it.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    A hook is a reference monitor: a component that mediates every access, cannot be bypassed, and is small enough to be verified. That is Anderson's 1972 formulation, and it is the design pattern underneath every operating system kernel and every access-control system since. Its relevance here is exact. You cannot verify a language model, but you can verify a forty-line shell script, and placing the script between the model and the file system gives you a property you can actually reason about. This is also why the argument that better models will remove the need for hooks is confused: hooks are not compensating for the model's unreliability, they are supplying a guarantee that no amount of reliability provides.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that it is the only honest answer to a class of requirement everyone has and most people mis-file. Secrets that must never be read, formatters that must always run, tests that must pass before a claim of completion: each of these gets written into a CLAUDE.md, obeyed for a while, and then quietly dropped once the file grows or the context fills. The failure looks like the model becoming careless. It is actually a design error, made at the moment the requirement was written as a sentence rather than as a script.</p>
+
+  <p>The second reason is that hooks cost nothing in context. An instruction competes for the attention budget on every turn; a hook lives in a configuration file and consumes no tokens at all. For any requirement that can be expressed as a check, moving it from the instruction file to a hook is strictly better on both axes: it becomes reliable <em>and</em> it stops crowding out the instructions that cannot be automated. That is a rare trade with no downside worth naming.</p>
+
+  <p>The third reason is that hooks are the mechanism by which a team's standards stop depending on who is at the keyboard. A project-level <code>settings.json</code> checked into git applies to everyone who clones the repository, including the colleague who has never read the contributing guide and the agent running in CI at three in the morning. That is a different kind of guarantee from a documented convention, and it is the difference between a standard and an aspiration.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Where hooks sit in the loop</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Hook events around the agent loop">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The four events that cover most real use</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <rect x="60" y="46" width="180" height="40" rx="8" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="150" y="70" text-anchor="middle" font-weight="600" fill="#2A3A78">SessionStart</text>
+
+        <rect x="290" y="46" width="180" height="40" rx="8" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="380" y="70" text-anchor="middle" font-weight="600" fill="#3D2EB5">PreToolUse</text>
+
+        <rect x="520" y="46" width="180" height="40" rx="8" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="610" y="70" text-anchor="middle" font-weight="600" fill="#1E9D54">PostToolUse</text>
+
+        <rect x="290" y="150" width="180" height="40" rx="8" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="380" y="174" text-anchor="middle" font-weight="600" fill="#C76B2A">Stop</text>
+
+        <text x="150" y="104" text-anchor="middle" font-size="10.5" fill="#2A3A78">inject context;</text>
+        <text x="150" y="119" text-anchor="middle" font-size="10.5" fill="#2A3A78">cannot block</text>
+
+        <text x="380" y="104" text-anchor="middle" font-size="10.5" fill="#3D2EB5">gate the call: allow,</text>
+        <text x="380" y="119" text-anchor="middle" font-size="10.5" fill="#3D2EB5">deny, ask, or rewrite it</text>
+
+        <text x="610" y="104" text-anchor="middle" font-size="10.5" fill="#1E9D54">format, lint, test;</text>
+        <text x="610" y="119" text-anchor="middle" font-size="10.5" fill="#1E9D54">block and feed back</text>
+
+        <text x="380" y="208" text-anchor="middle" font-size="10.5" fill="#C76B2A">refuse to let the turn end until the check passes</text>
+        <text x="380" y="226" text-anchor="middle" font-size="10.5" font-style="italic" fill="#71717a">the harness overrides after 8 consecutive blocks, so it cannot loop forever</text>
+
+        <line x1="240" y1="66" x2="284" y2="66" stroke="#71717a" stroke-width="1.5" marker-end="url(#hk)"/>
+        <line x1="470" y1="66" x2="514" y2="66" stroke="#71717a" stroke-width="1.5" marker-end="url(#hk)"/>
+        <path d="M610 90 L610 170 L476 170" fill="none" stroke="#71717a" stroke-width="1.5" marker-end="url(#hk)"/>
+      </g>
+
+      <defs>
+        <marker id="hk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>Two of the four gate an action and two do not. Knowing which is which prevents the commonest design error, which is attaching a check to an event that has no power to stop anything.</figcaption>
+  </figure>
+
+  <h3>The configuration shape</h3>
+
+  <p>Hooks live under a <code>hooks</code> object in <code>settings.json</code>, keyed by event name. Each entry has an optional <code>matcher</code> selecting which tools it applies to, and a list of handlers.</p>
+
+  <pre><code class="language-json">{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/scripts/check-house-style.sh",
+            "timeout": 30,
+            "statusMessage": "Checking house style..."
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+
+  <p>The <code>matcher</code> is an exact string when it contains only ordinary characters, and an unanchored regular expression otherwise, which is why <code>Edit|Write</code> matches both tools. MCP tools follow the pattern <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>, so <code>mcp__github__.*</code> matches everything from one server. Beyond command handlers, a hook can be an HTTP call, an MCP tool invocation, a prompt sent to a fast model, or a full subagent, which is a wider range than most people realise: a policy question too fuzzy for a regular expression can be answered by a small model rather than a script.</p>
+
+  <h3>How a hook blocks</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Mechanism</th><th>Effect</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Exit 0</td><td>Success; any JSON on stdout is processed</td></tr>
+      <tr><td>Exit 2</td><td>Blocks. Standard error is fed to the agent as the reason</td></tr>
+      <tr><td>Other non-zero</td><td>Non-blocking error; execution continues, stderr is logged</td></tr>
+      <tr><td><code>"decision": "block"</code> with <code>"reason"</code></td><td>Blocks on the events that support it</td></tr>
+      <tr><td><code>hookSpecificOutput.permissionDecision</code></td><td>On <code>PreToolUse</code>: <code>allow</code>, <code>deny</code>, <code>ask</code>, or <code>defer</code></td></tr>
+      <tr><td><code>hookSpecificOutput.additionalContext</code></td><td>Injects text into the agent's context rather than blocking</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The detail that makes hooks useful rather than merely obstructive is that the block carries a message. Exiting 2 with a diagnostic on standard error does not just refuse the action; it tells the agent <em>why</em>, in terms it can act on. A hook that rejects a write with "line 42 contains an em dash, which house style forbids" produces a corrected write on the next turn. One that exits silently produces confusion and a retry of the same thing.</p>
+
+  <div class="defcard">
+    <strong>Hook.</strong> A handler run by the harness at a named lifecycle event, configured in <code>settings.json</code>. Deterministic, invisible to the context budget, and on blocking events able to refuse an action outright.
+  </div>
+
+  <div class="defcard">
+    <strong>Blocking versus advisory event.</strong> Some events can stop what they observe (<code>PreToolUse</code>, <code>PostToolUse</code>, <code>Stop</code>, <code>UserPromptSubmit</code>); others can only observe and inject (<code>SessionStart</code>, <code>PostCompact</code>, <code>Notification</code>). Attaching a guarantee to a non-blocking event yields a log, not a control.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Four hooks worth having almost everywhere</h3>
+
+  <p><strong>Format and lint after every edit.</strong> A <code>PostToolUse</code> hook matching <code>Edit|Write</code> that runs the project formatter removes an entire category of instruction from CLAUDE.md and an entire category of review comment from pull requests. It is the highest-value first hook for most repositories because the check is fast, the fix is mechanical, and the requirement is genuinely absolute.</p>
+
+  <p><strong>Refuse to end the turn on a failing check.</strong> A <code>Stop</code> hook that runs the test suite and blocks while it fails converts "please run the tests" from a request into a gate. This is the mechanism behind the strongest row of Lecture 6's verification hierarchy, and it is what makes an unattended run trustworthy. The harness overrides the hook after eight consecutive blocks, which is the right design: a genuinely stuck loop terminates rather than spinning.</p>
+
+  <p><strong>Guard the paths that must not be touched.</strong> A <code>PreToolUse</code> hook returning <code>permissionDecision: "deny"</code> for writes matching a pattern protects migration directories, generated files, and vendored code more reliably than a deny rule can when the condition is conditional rather than static. Where the rule is static, the deny list from Lecture 3 is simpler and should be preferred; hooks earn their place when the decision needs logic.</p>
+
+  <p><strong>Inject state at session start.</strong> A <code>SessionStart</code> hook emitting <code>additionalContext</code> can supply the current branch, the open ticket, the last deploy, or anything else that is true now and false next week. This is strictly better than writing volatile facts into an instruction file, where they go stale silently and are re-sent forever.</p>
+
+  <h3>Slash commands are skills now</h3>
+
+  <p>One point of vocabulary that saves confusion. Custom slash commands have been merged into skills: a file at <code>.claude/commands/deploy.md</code> and a skill at <code>.claude/skills/deploy/SKILL.md</code> both produce <code>/deploy</code> and behave the same way. Existing command files keep working. What the skill form adds is a directory for supporting files, frontmatter to control invocation, and the ability for the agent to load it automatically. If you are writing a new one, write it as a skill; there is no reason left to prefer the older form.</p>
+
+  <h3>Two cautions</h3>
+
+  <p>A hook is arbitrary code running automatically on your machine, triggered by a model's actions. That is a meaningful trust boundary, and it is why hook configuration in a project's settings file sits behind a workspace trust dialog. Reviewing hooks in a repository you have just cloned is not paranoia; a <code>PostToolUse</code> handler is a shell command that runs every time a file changes.</p>
+
+  <p>The second caution is about latency. Every blocking hook sits in the critical path of the action it guards, and a slow one is felt on every single edit. A formatter that takes 200 milliseconds is invisible; a full test suite on <code>PostToolUse</code> makes the agent unusable. Put fast checks on the frequent events and slow checks on <code>Stop</code>, which fires once per turn rather than once per tool call.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Writing hooks that block without explaining why. A handler that exits 2 with nothing on standard error refuses the action and gives the agent nothing to act on, so it retries something similar, gets refused again, and burns turns until it gives up or the override fires. The block message is not a courtesy, it is the repair instruction. Every blocking hook should print what failed and, where possible, what would pass.
+  </div>
+
+  <h3>Worked example: making the writing rules real</h3>
+
+  <div class="worked">
+    <strong>Worked example: an advisory rule that a hook would enforce</strong>
+    <p>This machine's global instruction file states two absolute writing rules: British English throughout, and no em or en dashes as punctuation. They appear in the organisation-level instructions, again in the user-level <code>CLAUDE.md</code>, and are referenced in the repository's own style guide. They are stated three times, which is itself a signal.</p>
+    <p><strong>Why they get stated three times.</strong> Because they are advisory, and because the writing rules sit inside a 109-line file that sits inside a 566-line always-loaded stack. Lecture 5 covered what happens to a rule in that position: it is obeyed early in a session and progressively less reliably as the window fills, which is exactly the situation in which someone adds it to a second file. Repetition is the symptom of an enforcement problem being treated as an emphasis problem.</p>
+    <p><strong>What the hook looks like.</strong> Both rules are mechanically checkable, which is the qualifying condition. A <code>PostToolUse</code> handler matching <code>Edit|Write</code>, greping the changed file for the two dash characters and for a short list of American spellings, exiting 2 with the offending line numbers when it finds any:</p>
+    <pre><code class="language-bash">#!/usr/bin/env bash
+# .claude/scripts/check-house-style.sh
+f="$CLAUDE_TOOL_FILE_PATH"
+case "$f" in *.html|*.md) ;; *) exit 0 ;; esac
+
+bad=$(grep -nE '—|–' "$f")
+sp=$(grep -nEi 'behavior|organiz|analyz|color|favor|defense' "$f")
+
+if [ -n "$bad" ] || [ -n "$sp" ]; then
+  echo "House style violations in $f:" >&2
+  [ -n "$bad" ] && echo "Em/en dashes (use commas, colons, or parentheses):" >&2 && echo "$bad" >&2
+  [ -n "$sp" ]  && echo "American spellings (British English required):"     >&2 && echo "$sp"  >&2
+  exit 2
+fi</code></pre>
+    <p><strong>What changes.</strong> The rules now hold on turn sixty as reliably as on turn three, because nothing about them depends on salience. They can be deleted from two of the three places they are currently written, reclaiming context. And the failure mode inverts usefully: instead of a violation shipping silently and being caught in review, the write is refused with the line number, and the agent fixes it before you ever see the file.</p>
+    <p><strong>The honest limitation.</strong> A grep for six American spellings is not a British English checker. It catches the common cases and misses the rest, which means the advisory rule still has a job and cannot be deleted entirely, only shortened. This is the general shape of the trade and worth internalising: hooks convert the mechanically checkable fraction of a requirement into a guarantee and leave the judgement-dependent remainder where it was. That fraction is usually larger than people assume and never all of it, so the right move is almost always to enforce what you can and keep a much shorter instruction for the rest.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Hooks are handlers run at named lifecycle events, configured in <code>settings.json</code>, deterministic where instructions are advisory, and free in context. Four events carry most of the value: <code>PreToolUse</code> to gate, <code>PostToolUse</code> to check what changed, <code>Stop</code> to refuse an incomplete turn, and <code>SessionStart</code> to inject volatile state. Blocking is exit code 2 with the reason on standard error, or JSON for finer control, and the reason matters as much as the block. Put fast checks on frequent events and slow ones on <code>Stop</code>. Review hooks in repositories you did not write, because they are arbitrary code triggered by a model.</p>
+
+  <p>The deeper point is the one this lecture shares with Lecture 3: you cannot verify a language model, but you can verify a small script, so the engineering move is to put the verifiable thing where the guarantee is needed. That completes the enforcement side of the steering layer. The last lecture of Part II turns to the remaining structural lever, which is not about constraining one agent but about running several: what subagents are actually for, why the answer is almost always context rather than speed, and when fanning out costs more than it saves.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the difference between a hook and a CLAUDE.md instruction in one sentence.</li>
+      <li>Name the four highest-value events and what each is for. Which of them cannot block?</li>
+      <li>What does exit code 2 do, and what should accompany it?</li>
+      <li>Which <code>PreToolUse</code> JSON field controls permission, and what values does it take?</li>
+      <li>Why should slow checks go on <code>Stop</code> rather than <code>PostToolUse</code>?</li>
+      <li>Give a requirement that belongs in a hook and one that cannot, and say what distinguishes them.</li>
+      <li>You clone a repository whose <code>.claude/settings.json</code> defines three hooks. What should you do before working in it?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="08-skills.html">Lecture 8 (skills)</a> completed the advisory mechanisms; this lecture crosses to the enforced side.</li>
+      <li><strong>Next:</strong> Lecture 10 (subagents) closes Part II with the structural lever of running more than one agent.</li>
+      <li><strong>Cross-link:</strong> <a href="03-the_harness.html">Lecture 3 (the harness)</a> drew the advisory-versus-enforced distinction and covered permission rules, the simpler sibling of a gating hook.</li>
+      <li><strong>Cross-link:</strong> <a href="06-prompting_for_code.html">Lecture 6 (prompting for code)</a> placed the <code>Stop</code> hook in the verification hierarchy.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/15-ci_cd.html">Software engineering, Lecture 15 (CI/CD)</a> covers the same checks running at a different point in the pipeline.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "Hooks reference" and "Get started with hooks", code.claude.com/docs (event catalogue, configuration schema, exit codes, JSON fields); James P. Anderson, <em>Computer Security Technology Planning Study</em> (USAF, 1972) for the reference monitor concept.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 9 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

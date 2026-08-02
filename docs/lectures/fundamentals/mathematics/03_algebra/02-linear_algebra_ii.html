@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 2: linear algebra II</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Mathematics</a> / <a href="index.html">Algebra</a></div>
+  <h1>Linear algebra II</h1>
+  <p class="subtitle">The previous lecture proved things about $\mathbb{R}^n$ and never used the coordinates. This one removes them. A vector space becomes any set where you can add and scale, which admits polynomials, functions, and random variables as vectors; a linear map becomes an object that exists before any matrix represents it; and the matrix becomes a description relative to a basis you chose. Adding an inner product restores geometry, and the spectral theorem then says that symmetric matrices are exactly the ones with a basis of perpendicular eigenvectors, which is why covariance matrices behave and why principal components are orthogonal.</p>
+  <div class="meta">
+    <span>Lecture 2 of 6</span>
+    <span>Reading time, 65 minutes</span>
+    <span>Source: UP WTW 221 (linear algebra), extended</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>vector space</strong> over a field is a set with addition and scalar multiplication satisfying eight axioms. Polynomials of degree at most <code>n</code>, continuous functions on an interval, and square-integrable random variables are all vector spaces, and every theorem about $\mathbb{R}^n$ that used only the axioms holds for all of them. A <strong>linear map</strong> preserves the two operations; its <strong>kernel</strong> and <strong>image</strong> replace the null space and column space, and rank-nullity holds unchanged.</p>
+
+  <p>Fix a basis and the map acquires a matrix; fix a different basis and it acquires a different one, related by $B = P^{-1}AP$. Quantities unchanged by that transformation, meaning rank, trace, determinant, and eigenvalues, are properties of the map; everything else is bookkeeping. An <strong>inner product</strong> restores lengths and angles, <strong>Gram-Schmidt</strong> converts any basis into an orthonormal one, and the <strong>spectral theorem</strong> states that a real symmetric matrix has real eigenvalues and an orthonormal eigenbasis. <strong>Quadratic forms</strong> $x'Ax$ are then classified by the signs of those eigenvalues, which is what positive definiteness means.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Describe the same rotation to two people, one using a map oriented to true north and the other using a map oriented to the coastline. Every number they write down differs, and the rotation is identical. Ask each what the rotation does and both say the same thing: turns everything ninety degrees about that point. The numbers were about the maps, not about the rotation. A matrix is a set of numbers on a chosen map; a linear map is the rotation itself. Everything worth knowing survives changing maps, which is exactly the list of similarity invariants, and diagonalisation is the search for the map on which the description is simplest.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond a first course</span>
+    A first course states the spectral theorem and drills Gram-Schmidt. This lecture adds the practical consequences that a modelling audience meets and rarely sees explained. A correlation matrix estimated from unequal-length series can fail to be positive semi-definite, which breaks Cholesky factorisation and therefore breaks simulation; the repair is eigenvalue clipping, which is the spectral theorem used as a tool, and it is worked numerically below. Gram-Schmidt as taught is numerically unstable, and the reason and the fix are stated. And the singular value decomposition is introduced, because it exists for every matrix while eigendecomposition does not.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Every covariance and correlation matrix is a symmetric matrix, so the spectral theorem applies to all of them, and three consequences follow directly. They have real eigenvalues, so talking about the variance explained by a component makes sense. Their eigenvectors are orthogonal, which is why principal components are uncorrelated by construction rather than by assumption. And a valid covariance matrix must be positive semi-definite, because $w'\Sigma w$ is the variance of the portfolio with weights <code>w</code> and a variance cannot be negative. That last requirement is a live operational constraint: an estimated correlation matrix built from series of unequal length, or from pairwise-complete observations, frequently violates it, and every downstream simulation that needs a Cholesky factorisation then fails.</p>
+
+  <p>Change of basis is what factor models do. Rotating from individual asset returns to a small set of systematic factors is a change of coordinates chosen so that the covariance matrix becomes nearly diagonal, and the varimax rotations applied to factor loadings are further changes of basis chosen for interpretability rather than for diagonality. Recognising these as coordinate choices, with the underlying map unchanged, clarifies what a rotation can and cannot alter: it cannot change the total variance or the eigenvalues, only how the variance is attributed.</p>
+
+  <p>The abstract framing also pays. In <a href="../02_analysis/08-functional_analysis.html">functional analysis</a>, the vectors are functions and the inner product is an integral, but the projection formula is verbatim the one proved here. In <a href="../../statistics/index.html">statistics</a>, square-integrable random variables form an inner product space with $\langle X, Y\rangle = \mathbb{E}[XY]$, so uncorrelated means orthogonal, variance means squared length, and the regression decomposition is Pythagoras. Learning the axioms once means those settings need no new theory.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Picture one: one map, two descriptions</h3>
+
+  <figure>
+    <svg viewBox="0 0 840 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Commutative diagram showing the same linear map represented by two similar matrices in different bases">
+      <defs>
+        <marker id="cbArr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#3f3f46"/>
+        </marker>
+      </defs>
+      <text x="420" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">The same map, written on two different maps of the territory</text>
+
+      <!-- top row: basis B -->
+      <rect x="90" y="60" width="170" height="60" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="175" y="88" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#115e59">coordinates</text>
+      <text x="175" y="108" text-anchor="middle" font-family="Inter" font-size="11" fill="#0d9488">in basis B</text>
+
+      <rect x="580" y="60" width="170" height="60" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="665" y="88" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#115e59">coordinates</text>
+      <text x="665" y="108" text-anchor="middle" font-family="Inter" font-size="11" fill="#0d9488">in basis B</text>
+
+      <line x1="264" y1="90" x2="574" y2="90" stroke="#3f3f46" stroke-width="2.5" marker-end="url(#cbArr2)"/>
+      <text x="419" y="78" text-anchor="middle" font-family="JetBrains Mono" font-weight="500" font-size="13" fill="#18181b">A</text>
+
+      <!-- bottom row: basis C -->
+      <rect x="90" y="250" width="170" height="60" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="175" y="278" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#5b21b6">coordinates</text>
+      <text x="175" y="298" text-anchor="middle" font-family="Inter" font-size="11" fill="#7c3aed">in basis C</text>
+
+      <rect x="580" y="250" width="170" height="60" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="665" y="278" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#5b21b6">coordinates</text>
+      <text x="665" y="298" text-anchor="middle" font-family="Inter" font-size="11" fill="#7c3aed">in basis C</text>
+
+      <line x1="264" y1="280" x2="574" y2="280" stroke="#3f3f46" stroke-width="2.5" marker-end="url(#cbArr2)"/>
+      <text x="419" y="268" text-anchor="middle" font-family="JetBrains Mono" font-weight="500" font-size="13" fill="#18181b">P&#8315;&#185;AP</text>
+
+      <line x1="175" y1="244" x2="175" y2="126" stroke="#b45309" stroke-width="2.5" marker-end="url(#cbArr2)"/>
+      <text x="150" y="190" text-anchor="end" font-family="JetBrains Mono" font-size="12" fill="#92400e">P</text>
+      <line x1="665" y1="126" x2="665" y2="244" stroke="#b45309" stroke-width="2.5" marker-end="url(#cbArr2)"/>
+      <text x="690" y="190" font-family="JetBrains Mono" font-size="12" fill="#92400e">P&#8315;&#185;</text>
+
+      <text x="420" y="190" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12.5" fill="#3f3f46">the underlying linear map T</text>
+      <text x="420" y="210" text-anchor="middle" font-family="Inter" font-size="11" fill="#71717a">exists before either basis is chosen</text>
+
+      <text x="420" y="344" text-anchor="middle" font-family="Inter" font-size="11.5" fill="#3f3f46">Both routes from bottom-left to bottom-right give the same answer: the diagram commutes.</text>
+      <text x="420" y="366" text-anchor="middle" font-family="Inter" font-style="italic" font-size="11.5" fill="#52525b">Invariant under the change: rank, trace, determinant, eigenvalues, characteristic polynomial. Everything else is coordinates.</text>
+    </svg>
+    <figcaption>Similarity. To apply the map in the new coordinates, translate back to the old ones with <code>P</code>, apply <code>A</code>, and translate forward again: that composition is $P^{-1}AP$. Diagonalisation is the special case where <code>P</code> is chosen so the result is diagonal, and it succeeds exactly when a basis of eigenvectors exists.</figcaption>
+  </figure>
+
+  <h3>Picture two: Gram-Schmidt straightens a basis</h3>
+
+  <figure>
+    <svg viewBox="0 0 820 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two skewed basis vectors being orthogonalised by subtracting the projection of the second onto the first">
+      <defs>
+        <marker id="gsArr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#0d9488"/>
+        </marker>
+        <marker id="gsArrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#b45309"/>
+        </marker>
+      </defs>
+      <text x="410" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Subtract the shadow, keep what is left</text>
+
+      <!-- axes reference -->
+      <line x1="80" y1="270" x2="740" y2="270" stroke="#e4e4e7" stroke-width="1.5"/>
+
+      <!-- v1 -->
+      <line x1="150" y1="270" x2="390" y2="270" stroke="#0d9488" stroke-width="4" marker-end="url(#gsArr2)"/>
+      <text x="270" y="292" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#115e59">v&#8321;  (keep as is)</text>
+
+      <!-- v2 skewed -->
+      <line x1="150" y1="270" x2="470" y2="110" stroke="#71717a" stroke-width="3" marker-end="url(#gsArr2)"/>
+      <text x="330" y="172" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#3f3f46">v&#8322;</text>
+
+      <!-- projection of v2 on v1 -->
+      <line x1="150" y1="270" x2="470" y2="270" stroke="#b45309" stroke-width="4" stroke-dasharray="7 5" marker-end="url(#gsArrB)"/>
+      <text x="560" y="292" font-family="Inter" font-size="11.5" fill="#92400e">proj of v&#8322; onto v&#8321;  (the shadow)</text>
+
+      <!-- the residual, perpendicular -->
+      <line x1="470" y1="270" x2="470" y2="110" stroke="#7c3aed" stroke-width="4" marker-end="url(#gsArr2)"/>
+      <text x="492" y="190" font-family="Inter" font-weight="600" font-size="12" fill="#5b21b6">u&#8322; = v&#8322; &#8722; proj</text>
+      <text x="492" y="210" font-family="Inter" font-size="11" fill="#7c3aed">perpendicular to v&#8321;</text>
+      <path d="M 470 254 L 454 254 L 454 270" fill="none" stroke="#7c3aed" stroke-width="2"/>
+
+      <text x="410" y="316" text-anchor="middle" font-family="Inter" font-style="italic" font-size="11.5" fill="#52525b">Repeat: each new vector has all previous shadows removed. Normalise at the end and the basis is orthonormal.</text>
+    </svg>
+    <figcaption>Gram-Schmidt in one step. The projection of $v_2$ onto $v_1$ is the part of $v_2$ that $v_1$ already accounts for; subtracting it leaves a residual orthogonal to $v_1$. This is the projection theorem from <a href="../02_analysis/08-functional_analysis.html">functional analysis</a> applied repeatedly, and it is also exactly what regression does when a predictor is residualised against those already in the model, which is why sequential sums of squares depend on the order of entry.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Abstract vector spaces</h3>
+
+  <p>A <strong>vector space</strong> over a field <code>F</code> is a set <code>V</code> with addition and scalar multiplication satisfying the usual eight axioms: associativity and commutativity of addition, an additive identity and inverses, and four compatibility conditions for scaling. What matters is the range of examples this admits.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Space</th><th>Vectors are</th><th>Dimension</th><th>Where it appears</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>$\mathbb{R}^n$</td><td>coordinate lists</td><td><code>n</code></td><td>Everything in lecture 1</td></tr>
+        <tr><td>$P_n$</td><td>polynomials of degree at most <code>n</code></td><td>$n+1$</td><td>Spline and basis-function regression</td></tr>
+        <tr><td>$M_{m\times n}$</td><td>matrices</td><td>$mn$</td><td>Matrices as objects to be optimised over</td></tr>
+        <tr><td>$C[a,b]$</td><td>continuous functions</td><td>infinite</td><td>Function approximation</td></tr>
+        <tr><td>$L^2(\Omega)$</td><td>square-integrable random variables</td><td>infinite</td><td>Conditional expectation as projection</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>A <strong>linear map</strong> $T : V \to W$ satisfies $T(u+v) = Tu + Tv$ and $T(\lambda v) = \lambda Tv$. Its <strong>kernel</strong> is $\{v : Tv = 0\}$ and its <strong>image</strong> is $\{Tv\}$; both are subspaces, and rank-nullity holds as $\dim(\ker T) + \dim(\operatorname{im} T) = \dim V$. Differentiation on polynomials is a linear map with kernel the constants; expectation is a linear map from $L^1$ to $\mathbb{R}$; conditional expectation is a linear map from $L^2$ to a subspace. Each inherits every theorem proved from the axioms alone.</p>
+
+  <h3>Coordinates, matrices, and similarity</h3>
+
+  <p>Choose a basis $\{b_1, \ldots, b_n\}$ of <code>V</code> and every vector has a unique coordinate list. Choose bases on both sides and a linear map acquires a matrix whose <code>j</code>-th column is the coordinate list of $T b_j$. Change the basis by an invertible <code>P</code> and the matrix becomes $P^{-1}AP$; matrices related this way are <strong>similar</strong>. The <strong>invariants</strong> under similarity are the genuine properties of the map: rank, trace, determinant, characteristic polynomial, eigenvalues with multiplicities, and the Jordan structure. A useful check when reading a claim about matrices is to ask whether it survives similarity, because if it does not it is a statement about the basis.</p>
+
+  <p>Not every matrix is diagonalisable, as lecture 1 noted. The complete answer is the <strong>Jordan normal form</strong>: over an algebraically closed field, every matrix is similar to a block-diagonal matrix whose blocks have a single eigenvalue on the diagonal and ones just above it. Diagonalisable is the case where every block is $1\times1$. The form matters less for data work than the fact it settles: the obstruction to diagonalisation is always a shortfall of eigenvectors relative to the multiplicity of an eigenvalue.</p>
+
+  <h3>Inner products and orthogonality</h3>
+
+  <p>An <strong>inner product</strong> is symmetric, linear in the first argument, and positive definite, and it induces the norm $\|v\| = \sqrt{\langle v,v\rangle}$. <strong>Cauchy-Schwarz</strong>, $|\langle u,v\rangle| \le \|u\|\|v\|$, gives the angle and, in the probabilistic instance $\langle X,Y\rangle = \mathbb{E}[XY]$, is precisely the statement that a correlation lies in $[-1,1]$. Vectors are <strong>orthogonal</strong> when the inner product vanishes, an <strong>orthonormal</strong> set is orthogonal with unit lengths, and the great convenience of an orthonormal basis is that coordinates become inner products: $v = \sum \langle v, e_i\rangle e_i$, with no system to solve.</p>
+
+  <div class="worked">Gram-Schmidt, worked on three vectors in R^3.
+
+Start with  v1 = (1,1,0),  v2 = (1,0,1),  v3 = (0,1,1).
+
+Step 1.  u1 = v1 = (1,1,0),  ||u1||^2 = 2.
+         e1 = (1,1,0)/sqrt2.
+
+Step 2.  &lt;v2,u1&gt; = 1*1 + 0*1 + 1*0 = 1.
+         proj = (1/2)(1,1,0) = (0.5, 0.5, 0)
+         u2 = v2 - proj = (0.5, -0.5, 1),   ||u2||^2 = 0.25+0.25+1 = 1.5
+         e2 = (0.5,-0.5,1)/sqrt(1.5)
+         Check &lt;u2,u1&gt; = 0.5 - 0.5 + 0 = 0.   Orthogonal.
+
+Step 3.  &lt;v3,u1&gt; = 0 + 1 + 0 = 1,  so proj onto u1 = (0.5, 0.5, 0)
+         &lt;v3,u2&gt; = 0*0.5 + 1*(-0.5) + 1*1 = 0.5,  and ||u2||^2 = 1.5,
+             so proj onto u2 = (0.5/1.5)(0.5,-0.5,1) = (1/6)(1,-1,2)
+                             = (0.1667, -0.1667, 0.3333)
+         u3 = (0,1,1) - (0.5,0.5,0) - (0.1667,-0.1667,0.3333)
+            = (-0.6667, 0.6667, 0.6667)
+         Checks:  &lt;u3,u1&gt; = -0.6667 + 0.6667 + 0 = 0.
+                  &lt;u3,u2&gt; = -0.3333 - 0.3333 + 0.6667 = 0.   Both orthogonal.
+
+The three u vectors are mutually orthogonal and span the same space as the
+originals, which is the point: Gram-Schmidt changes the basis, never the
+subspace.
+
+RELATION TO QR. Writing the original vectors as columns of A and the
+normalised u's as columns of Q, the coefficients computed along the way form
+an upper triangular R with A = QR. Solving least squares via QR avoids
+forming X'X and therefore avoids squaring the condition number, which is the
+numerical point made at the end of lecture 1.</div>
+
+  <h3>The spectral theorem</h3>
+
+  <div class="defcard">
+    <div class="term">Spectral theorem for real symmetric matrices</div>
+    <div class="def">If $A = A'$ then all eigenvalues of <code>A</code> are real, eigenvectors for distinct eigenvalues are orthogonal, and there exists an orthonormal basis of eigenvectors. Equivalently $A = Q\Lambda Q'$ with <code>Q</code> orthogonal and $\Lambda$ diagonal. Note the two gains over general diagonalisation: the change of basis is a rotation, so $Q^{-1} = Q'$ and no inversion is needed, and diagonalisability is guaranteed rather than hoped for.</div>
+  </div>
+
+  <p>Both claims have short proofs. Reality of the eigenvalues: if $Av = \lambda v$ with <code>v</code> possibly complex, then $\bar{v}'Av = \lambda \bar{v}'v$, and taking conjugate transposes of the left side with $A$ real symmetric gives the same quantity equal to $\bar\lambda \bar{v}'v$; since $\bar{v}'v > 0$, we get $\lambda = \bar\lambda$. Orthogonality: for $Av = \lambda v$ and $Aw = \mu w$ with $\lambda \ne \mu$, compute $w'Av$ two ways to get $\lambda w'v = \mu w'v$, forcing $w'v = 0$.</p>
+
+  <h3>Quadratic forms and definiteness</h3>
+
+  <p>A <strong>quadratic form</strong> is $q(x) = x'Ax$ with <code>A</code> symmetric. Substituting the spectral decomposition and writing $y = Q'x$ turns it into $\sum \lambda_i y_i^2$, so the signs of the eigenvalues classify it completely: all positive is <strong>positive definite</strong>, all non-negative is <strong>positive semi-definite</strong>, mixed signs is <strong>indefinite</strong>. Portfolio variance $w'\Sigma w$ is a quadratic form, and the requirement that it never be negative is exactly positive semi-definiteness of $\Sigma$.</p>
+
+  <div class="worked">A correlation matrix that is not a correlation matrix, and how to repair it.
+
+Estimated pairwise from series of unequal length:
+
+    C = [ 1.0   0.9   -0.9 ]
+        [ 0.9   1.0    0.9 ]
+        [-0.9   0.9    1.0 ]
+
+Each entry is a legitimate pairwise correlation. The matrix as a whole is
+not legitimate: A is highly correlated with B, B with C, yet A is strongly
+anti-correlated with C, which no three random variables can achieve.
+
+DETECT. Compute the eigenvalues:
+    lambda = 1.9975,  1.6180,  -0.6155   (to 4 s.f.)
+A negative eigenvalue means some portfolio has negative variance. Take the
+corresponding eigenvector w = (0.4597, -0.7593, 0.4597) roughly; then
+w'Cw = -0.6155 < 0. That portfolio has variance minus 0.6, which is
+impossible, so Cholesky factorisation fails and the simulation cannot run.
+
+REPAIR by eigenvalue clipping (the standard fix):
+  1. Spectral decomposition C = Q L Q'.
+  2. Replace every negative eigenvalue by zero (or a small positive floor):
+       L+ = diag(1.9975, 1.6180, 0)
+  3. Reassemble  C1 = Q L+ Q'.
+  4. Rescale so the diagonal returns to exactly 1:
+       C2 = D^(-1/2) C1 D^(-1/2), with D the diagonal of C1.
+
+The result is positive semi-definite by construction, since its eigenvalues
+are non-negative, and it is the nearest such matrix in the Frobenius norm
+before the rescaling step. Higham's algorithm iterates steps 2 to 4 to get
+the nearest correlation matrix exactly.
+
+WHAT THE REPAIR COSTS. The clipped matrix differs from the estimate, so some
+pairwise correlations move, and the largest moves fall on the pairs
+responsible for the inconsistency. That is informative rather than
+regrettable: it identifies which estimates were mutually incompatible. The
+error to avoid is silently adding a small multiple of the identity until
+Cholesky succeeds, which also works and hides which pairs were the problem.</div>
+
+  <p>The <strong>Cholesky factorisation</strong> $\Sigma = LL'$ with <code>L</code> lower triangular exists exactly when $\Sigma$ is positive definite, and it is both the standard test for definiteness and the standard route to correlated random draws: generate independent standard normals <code>z</code> and form $Lz$, which has covariance $LL' = \Sigma$. Every Monte Carlo engine simulating correlated risk factors does this, which is why the definiteness question above is operational rather than theoretical.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The singular value decomposition is the factorisation that always exists</h3>
+
+  <p>Eigendecomposition needs a square matrix and may fail even then. The <strong>singular value decomposition</strong> $A = U\Sigma V'$, with <code>U</code> and <code>V</code> orthogonal and $\Sigma$ diagonal with non-negative entries, exists for every matrix of every shape, and it subsumes most of this lecture. The columns of <code>V</code> are an orthonormal basis of the input space, the columns of <code>U</code> one of the output space, and the map simply scales the <code>i</code>-th input direction by $\sigma_i$ onto the <code>i</code>-th output direction. The rank is the number of non-zero singular values, the four fundamental subspaces are read off directly from the columns of <code>U</code> and <code>V</code>, the condition number is $\sigma_{\max}/\sigma_{\min}$, and truncating after <code>k</code> terms gives the best rank-<code>k</code> approximation in both the Frobenius and operator norms, which is the Eckart-Young theorem. Principal components are the singular vectors of the centred data matrix, so PCA can be computed without ever forming a covariance matrix, which is both faster and numerically better. If only one matrix factorisation is to be remembered, it should be this one.</p>
+
+  <h3>Classical Gram-Schmidt is unstable, and the fix is nearly free</h3>
+
+  <p>The algorithm as written above subtracts all projections onto the original vectors, computed in advance. In floating point the residuals lose orthogonality progressively, and by the time a dozen vectors have been processed the later ones can be visibly non-orthogonal. <strong>Modified Gram-Schmidt</strong> subtracts each projection immediately, updating the working vector before computing the next projection, which is algebraically identical and numerically far better because each projection is computed against a vector that is already orthogonal to its predecessors. Better still are Householder reflections, which is what production QR routines use. The general lesson recurs across numerical linear algebra: algebraically equivalent formulas can differ enormously in accuracy, and the textbook form is often the worse one.</p>
+
+  <h3>Where the abstraction is actually needed</h3>
+
+  <p>It would be reasonable to ask why coordinates should be abandoned when every computation restores them. Three answers. First, the spaces of <a href="../02_analysis/08-functional_analysis.html">functional analysis</a> have no finite basis at all, so a coordinate-first treatment cannot even state the results. Second, the invariance question is the right one to ask of any claim: a quantity that changes under a change of basis is not describing the phenomenon, which is exactly why factor loadings are unidentified up to rotation while explained variance is not, a distinction that causes recurring confusion in factor analysis. Third, the same axioms hold for spaces of random variables, so the entire geometry transfers to probability with no new work, and conditional expectation becomes a projection rather than a formula. The abstraction is not generality for its own sake; it is what makes one proof serve four settings.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Three practical traps. A matrix of pairwise correlations is not necessarily a correlation matrix, and the failure mode is a negative eigenvalue that surfaces only when a simulation crashes; check the smallest eigenvalue when the estimates come from unequal or incomplete samples. Positive semi-definite is not positive definite: a zero eigenvalue means a portfolio with exactly zero variance, so Cholesky fails even though no variance is negative, and a small floor rather than exact zero is the usual remedy. And symmetry must be checked before the spectral theorem is invoked, since a matrix that is symmetric in theory can lose symmetry through rounding, and forcing it with $(A + A')/2$ before decomposition is cheap insurance.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Verify that the polynomials of degree at most 3 form a vector space, give a basis, and state its dimension. Then show differentiation is a linear map on it and compute its kernel and image.</li>
+      <li>Explain why rank, trace, determinant, and eigenvalues are invariant under $A \mapsto P^{-1}AP$, and give one quantity that is not.</li>
+      <li>Apply Gram-Schmidt to $(1,1,1)$, $(1,1,0)$, $(1,0,0)$ and verify all three pairwise orthogonality conditions.</li>
+      <li>Show how the Gram-Schmidt coefficients assemble into $A = QR$, and explain why solving least squares by QR is preferred to forming $X'X$.</li>
+      <li>Prove that a real symmetric matrix has real eigenvalues, and that eigenvectors for distinct eigenvalues are orthogonal.</li>
+      <li>Diagonalise $\begin{pmatrix} 2 & 1 \\ 1 & 2\end{pmatrix}$ orthogonally, writing it explicitly as $Q\Lambda Q'$ and confirming $Q'Q = I$.</li>
+      <li>Show that portfolio variance $w'\Sigma w$ is a quadratic form, and explain what a negative eigenvalue of $\Sigma$ would imply about some portfolio.</li>
+      <li>Take the three-by-three correlation matrix in the worked example, compute its eigenvalues, and carry out the clipping repair to two decimal places.</li>
+      <li>Explain why the singular value decomposition exists for every matrix while eigendecomposition does not, and state how the four fundamental subspaces are read off from it.</li>
+      <li>A colleague adds $0.01 I$ to a correlation matrix until Cholesky succeeds. State what this achieves, what it hides, and what you would do instead.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="01-linear_algebra_i.html">Lecture 1: linear algebra I</a>, whose concrete results are re-proved here without coordinates, and whose spectral theorem was used there without proof.</li>
+      <li><a href="03-abstract_algebra.html">Lecture 3: groups, rings and fields</a>, which asks what remains when scalars need not have inverses and multiplication need not commute.</li>
+    </ul>
+    <h4>Where this is used later</h4>
+    <ul>
+      <li><a href="../02_analysis/08-functional_analysis.html">Functional analysis</a>: the inner product axioms, Gram-Schmidt, and the projection formula transfer verbatim to infinite dimensions, where the spectral theorem becomes the compact self-adjoint case.</li>
+      <li><a href="../../statistics/index.html">Statistics</a>: covariance matrices as positive semi-definite quadratic forms, PCA as the spectral theorem, and the correlation-matrix repair as a routine data problem.</li>
+      <li><a href="../../machine_learning/index.html">Machine learning</a>: the singular value decomposition behind low-rank approximation, embeddings, and every matrix factorisation method.</li>
+      <li><a href="../../financial_engineering/index.html">Financial engineering</a>: Cholesky factorisation as the mechanism for simulating correlated risk factors.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li>UP WTW 221: abstract vector spaces, change of basis, matrix representation of linear transformations, orthogonality, diagonalisability of symmetric matrices.</li>
+      <li>Axler, <em>Linear Algebra Done Right</em>, for the coordinate-free treatment and the determinant-last approach.</li>
+      <li>Higham (2002), <em>Computing the Nearest Correlation Matrix</em>, for the repair algorithm sketched in the worked example.</li>
+      <li>Trefethen and Bau, <em>Numerical Linear Algebra</em>, lectures 4 to 10, for the SVD and the stability of Gram-Schmidt.</li>
+    </ul>
+    <h4>What this lecture adds beyond a first course</h4>
+    <ul>
+      <li>The non-positive-semi-definite correlation matrix is diagnosed and repaired numerically, which is a routine practical failure that textbooks rarely mention.</li>
+      <li>Similarity invariance is presented as a test to apply to any claim about matrices, which is what separates statements about maps from statements about coordinates.</li>
+      <li>The singular value decomposition is introduced as the factorisation that always exists, with the four subspaces, the condition number, and best low-rank approximation all read off from it.</li>
+      <li>The instability of classical Gram-Schmidt is stated along with the modified version, as an instance of algebraically equivalent formulas differing numerically.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All algebra lectures</a></span>
+  <span>Lecture 2: linear algebra II</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+
+</body>
+</html>

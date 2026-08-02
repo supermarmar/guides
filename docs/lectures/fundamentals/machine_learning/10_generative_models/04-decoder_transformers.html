@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 51: decoder transformers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Generative modelling</a></div>
+  <h1>Decoder transformers</h1>
+  <p class="subtitle">The VAE, GAN, and diffusion model each solved the intractable-density problem with an approximation of some kind, a bound, a game, or an iterative process. For sequential data specifically, a fourth route sidesteps the intractability altogether: factorise the joint distribution exactly as a product of conditionals, one token at a time, and let the transformer's causal-masked attention mechanism model each conditional. This is the architecture, developed here in full, that becomes the engine behind every large language model in the next sub-module.</p>
+  <div class="meta">
+    <span>Lecture 51 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part VIII: generative AI and language models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Any joint distribution over a sequence of tokens $X_1, \ldots, X_n$ factorises exactly, with no approximation whatsoever, via the chain rule of probability, $p(X_1, \ldots, X_n) = \prod_{i=1}^n p(X_i \mid X_1, \ldots, X_{i-1})$. A <strong>decoder transformer</strong> is a neural network that models each conditional term $p(X_i \mid X_1, \ldots, X_{i-1})$ directly, using the multi-head self-attention mechanism from the deep-learning sub-module's transformer lecture, but with one crucial restriction, <strong>causal masking</strong>, which prevents position $i$'s attention computation from ever looking at positions after it. The network outputs a vector of unnormalised scores (<strong>logits</strong>) over the vocabulary at every position, converted to a probability distribution via the <strong>softmax</strong> function, from which the next token is sampled (or the most likely token is greedily chosen); a <strong>temperature</strong> parameter rescales the logits before the softmax, controlling how sharply the model commits to its most likely guess. Training uses <strong>teacher forcing</strong>, feeding the true previous tokens as input regardless of what the model itself would have predicted, which is computationally efficient but creates a train-test mismatch called <strong>exposure bias</strong>, developed in the pitfalls below.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine an actuary reserving a claims-development triangle one diagonal at a time: the payment expected in development year three depends on everything observed in years one and two, never on year four, which has not happened yet and cannot be allowed to leak backwards into an earlier estimate. A decoder transformer treats a sequence of tokens exactly the same way, predicting each next token from everything that came before it and nothing that comes after, and causal masking is the specific mechanical device (blocking attention to future positions) that enforces this same forward-only discipline inside the network's own internal computation, not just in how the training data happens to be laid out.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture closes the generative-modelling sub-module by returning to an architecture already built in the deep-learning sub-module (the transformer) and adding exactly one constraint (causal masking) to turn it from a general sequence model into a generative one with an exact, tractable likelihood, the only architecture in this entire sub-module for which that is true. This is also the direct, necessary bridge into the next sub-module: every large language model in current use is, at its core, a decoder transformer trained at a much larger scale than anything discussed so far in this course.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this lecture's exact-likelihood factorisation earns a dedicated treatment rather than being folded into the earlier transformer lecture.</p>
+
+  <p>First, <strong>an exact, tractable likelihood is a genuinely rare property among the architectures in this sub-module</strong>, and it has a direct practical payoff: the model's own token-level probabilities can be used to compute a calibrated, comparable measure of how surprising a given sequence is (perplexity, developed below), a diagnostic none of the VAE, GAN, or diffusion model can offer in anything like as direct a form.</p>
+
+  <p>Second, <strong>claims-narrative and other free-text actuarial data are precisely the sequential structure this architecture is built for</strong>: a decoder transformer trained (or fine-tuned) on a corpus of accident reports or claims narratives can score how typical a new narrative is against the learned distribution, a genuinely useful anomaly-detection signal that complements the density-based methods flagged in the sub-module's opening lecture.</p>
+
+  <p>Third, <strong>understanding exactly what teacher forcing does, and does not, guarantee at training time is the single most important piece of context for interpreting any large language model's behaviour</strong> in the next sub-module; the exposure-bias gap developed in this lecture's pitfalls is the root cause of several of the well-known failure modes (compounding errors, repetition loops) discussed there.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A claims-handling team fine-tuned a small decoder transformer on a corpus of historical accident-report narratives, intending to use its token-level probabilities as an automated flag for narratives that might warrant manual review because they described an unusual or atypical scenario. Early testing flagged an unexpectedly large number of entirely ordinary claims as "unusual", and inspection traced the cause to the causal-masking window: several flagged narratives used late-appearing phrasing (a specific injury type, mentioned only in the final sentence) that was statistically rare in that particular sentence position across the training corpus, even though the identical phrasing was common earlier in other narratives. The model's per-token probability at that position was genuinely low, exactly as designed, but "genuinely rare at this specific sequence position" was not the same claim as "an unusual accident", a distinction the team had to build an explicit downstream check for rather than trusting the raw per-token score alone.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a sequence of tokens processed left to right, each position's attention computation blocked from ever seeing positions to its right, with the final position's output converted to a probability distribution over the entire vocabulary for the next token.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Causal masking blocks attention to future positions in a decoder transformer">
+      <defs>
+        <marker id="dtArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Causal masking: position $i$ attends only to positions $\le i$</text>
+
+      <g font-family="JetBrains Mono" font-size="11">
+        <rect x="60" y="60" width="80" height="36" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="100" y="83" text-anchor="middle" fill="#115e59">"the"</text>
+        <rect x="180" y="60" width="80" height="36" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="220" y="83" text-anchor="middle" fill="#115e59">"claim"</text>
+        <rect x="300" y="60" width="80" height="36" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="340" y="83" text-anchor="middle" fill="#115e59">"was"</text>
+        <rect x="420" y="60" width="80" height="36" rx="6" fill="#FEF3C7" stroke="#a16207" stroke-width="1.5"/>
+        <text x="460" y="83" text-anchor="middle" fill="#713f12">"filed"</text>
+      </g>
+
+      <text x="460" y="130" text-anchor="middle" font-family="Inter" font-size="10" fill="#713f12">predicting position 4 attends back over 1-3</text>
+      <path d="M 460 96 L 460 115 L 460 60" stroke="#a16207" stroke-width="1" fill="none"/>
+      <path d="M 100 96 Q 280 145 440 108" stroke="#a16207" stroke-width="1.5" fill="none" marker-end="url(#dtArrow)"/>
+      <path d="M 220 96 Q 330 130 440 105" stroke="#a16207" stroke-width="1.5" fill="none" marker-end="url(#dtArrow)"/>
+      <path d="M 340 96 Q 400 108 440 102" stroke="#a16207" stroke-width="1.5" fill="none" marker-end="url(#dtArrow)"/>
+
+      <g font-family="Inter" font-size="10" fill="#dc2626" opacity="0.85">
+        <rect x="540" y="60" width="90" height="36" rx="6" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 2"/>
+        <text x="585" y="83" text-anchor="middle">"?" (future)</text>
+      </g>
+      <path d="M 460 78 L 535 78" stroke="#dc2626" stroke-width="2" stroke-dasharray="2 2"/>
+      <line x1="497" y1="60" x2="497" y2="96" stroke="#dc2626" stroke-width="2"/>
+      <text x="585" y="45" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">masked: attention forbidden</text>
+
+      <rect x="60" y="180" width="740" height="90" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="430" y="205" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">logits over the vocabulary → softmax → probability distribution → sample or greedy pick</text>
+      <g font-family="JetBrains Mono" font-size="9" fill="#5b21b6">
+        <rect x="100" y="220" width="60" height="30" fill="#c4b5fd" opacity="0.4"/><text x="130" y="240" text-anchor="middle">low</text>
+        <rect x="170" y="215" width="60" height="35" fill="#a78bfa" opacity="0.7"/><text x="200" y="240" text-anchor="middle">med</text>
+        <rect x="240" y="200" width="60" height="50" fill="#7c3aed"/><text x="270" y="240" text-anchor="middle" fill="#fff">high</text>
+        <rect x="310" y="222" width="60" height="28" fill="#c4b5fd" opacity="0.4"/><text x="340" y="240" text-anchor="middle">low</text>
+      </g>
+      <text x="640" y="235" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">temperature rescales sharpness before softmax</text>
+    </svg>
+    <figcaption>Predicting the token after "filed" is allowed to attend back to every earlier position ("the", "claim", "was", "filed") but is structurally forbidden from attending to anything after it, since nothing after it exists yet at generation time. The final position's output becomes a vector of logits over the whole vocabulary, converted to a probability distribution via softmax, from which the next token is chosen.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>The factorisation is exact; only the conditional model is approximate.</strong> Unlike the VAE's bound or the GAN's implicit density, the chain-rule decomposition itself introduces no error at all, every approximation lives entirely inside how well the network models each conditional term. <strong>Causal masking is a structural guarantee, not a training convention.</strong> It is enforced inside the attention computation itself, which is what makes the same trained network usable for token-by-token generation, not just for scoring already-complete sequences.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The autoregressive factorisation</h3>
+
+  <p>The chain rule of probability gives, with no approximation,</p>
+  $$p(X_1, \ldots, X_n) = \prod_{i=1}^n p(X_i \mid X_{<i}), \qquad X_{<i} := (X_1, \ldots, X_{i-1}).$$
+  <p>A decoder transformer parameterises every conditional term on the right with a single shared network, $p_\theta(X_i \mid X_{<i})$, rather than fitting $n$ separate models; the same network, applied at every position, is what makes training on sequences of varying length practical at all. Training maximises the exact log-likelihood of the training data directly, $\sum_i \log p_\theta(X_i \mid X_{<i})$, with no lower bound, no adversarial approximation, and no denoising surrogate standing between the objective and the quantity actually being optimised.</p>
+
+  <h3>Causal masking inside multi-head attention</h3>
+
+  <p>Recall the scaled dot-product attention computation from the deep-learning sub-module, $\mathrm{Attention}(Q, K, V) = \mathrm{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right)V$. An unmasked transformer lets every position attend to every other position, including ones later in the sequence, which is exactly right for a task like the tabular transformer's classification token but exactly wrong for autoregressive generation, since at generation time those later positions genuinely do not exist yet. <strong>Causal masking</strong> adds a mask matrix to the pre-softmax scores that sets every entry corresponding to a later position to $-\infty$ before the softmax is applied, so those positions receive exactly zero attention weight, structurally enforcing that position $i$'s representation can only ever depend on positions $1, \ldots, i$.</p>
+
+  <h3>Logits, softmax, and sampling</h3>
+
+  <p>At each position, the network's final layer produces a vector of <strong>logits</strong>, one unnormalised score per vocabulary token, converted to a probability distribution via the <strong>softmax</strong> function, $p(X_i = v \mid X_{<i}) = \exp(\ell_v) / \sum_{v'} \exp(\ell_{v'})$. Generation proceeds by sampling from this distribution (or taking the single highest-probability token, greedy decoding) and appending the result to the sequence before repeating the process for the next position, exactly the sequential, one-step-at-a-time procedure the causal mask was built to support.</p>
+
+  <h3>Temperature</h3>
+
+  <p>A <strong>temperature</strong> parameter $\tau &gt; 0$ rescales the logits before the softmax, $p(X_i = v) \propto \exp(\ell_v / \tau)$. A temperature below one sharpens the distribution, making the model's output more deterministic and concentrated on its most likely guesses; a temperature above one flattens it, increasing sample diversity at the cost of coherence. Temperature is the direct control knob behind the informal notion of a language model's output being "more creative" or "more conservative", and it is exactly the same mechanism, applied to output token probabilities, that the calibration sub-module's discussion of miscalibration (systematically over- or under-confident probabilities) warns against when a model's raw logits are trusted without any check.</p>
+
+  <h3>Teacher forcing and exposure bias</h3>
+
+  <p>During training, the network predicts $p_\theta(X_i \mid X_{<i})$ using the true, ground-truth tokens $X_{<i}$ from the training data as input, regardless of what the network itself would have predicted at each earlier position, a technique called <strong>teacher forcing</strong>. This is computationally efficient (every position's loss can be computed in a single forward pass, in parallel, rather than sequentially) and stabilises training, since the network is never asked to condition on its own, potentially wrong, earlier guesses. The cost is <strong>exposure bias</strong>: at generation time, the network conditions on its own previously generated (and possibly imperfect) tokens, a distribution of inputs it was never actually trained against, creating a systematic train-test mismatch that is the root cause of several practical generation failure modes developed next.</p>
+
+  <h3>Perplexity</h3>
+
+  <p>Because the likelihood is exact and tractable, the model's quality can be summarised by <strong>perplexity</strong>, $\mathrm{PPL} = \exp\!\left(-\frac{1}{n}\sum_i \log p_\theta(X_i \mid X_{<i})\right)$, interpretable as the effective number of equally likely choices the model is, on average, choosing among at each position; a lower perplexity indicates a better-fitting model. This is the standard, comparable held-out evaluation metric for autoregressive sequence models, playing a role directly analogous to the AIC and deviance metrics from the model-evaluation sub-module, and it is available here specifically because the likelihood is exact, unlike anywhere else in this sub-module.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Compounding errors from exposure bias</span>
+    Because generation conditions on the model's own imperfect earlier outputs rather than the ground truth it trained against, a single early mistake can push the sequence into a region of input space the model handles poorly, and errors compound rather than self-correct; longer generated sequences are structurally more exposed to this effect than shorter ones.</div>
+
+  <div class="callout warn">
+    <span class="tag">Repetition loops at low temperature</span>
+    Greedy or low-temperature decoding routinely gets stuck repeating a short phrase indefinitely, because once the model's own repeated output dominates the recent context, the highest-probability next token is often simply "repeat the phrase again"; this is a direct, observable symptom of exposure bias interacting with an overly deterministic sampling strategy, not a separate, unrelated bug.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating a low per-token probability as automatically meaning "anomalous"</span>
+    Developed directly in the vignette: a low probability at a specific sequence position reflects the training corpus's statistics at that exact position, which can differ from a phrase's overall rarity across the whole corpus; a genuinely useful anomaly flag needs a check against the full range of positions the phrase can appear in, not the raw per-token score at one specific point in the sequence.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating logits as calibrated probabilities without checking</span>
+    The softmax output is a mathematically valid probability distribution over the vocabulary, but "valid" is not the same as "calibrated" in the sense the calibration sub-module develops; a language model's stated confidence in its own next-token choice is well known to drift from true correctness rates, particularly after temperature adjustment or fine-tuning, and this recurring caveat is central to the responsible-use lecture in the next sub-module.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A decoder transformer models a sequence's joint distribution via the chain rule's exact factorisation into one-step-ahead conditionals, using causal masking to structurally forbid the attention mechanism from ever looking at future positions, both during training and at generation time. Softmax converts the network's logits into a probability distribution at each position, temperature controls how sharply that distribution commits to its most likely guesses, and perplexity, available here specifically because the likelihood is exact, is the standard held-out evaluation metric. Teacher forcing makes training efficient and stable but creates exposure bias, a systematic train-test mismatch that is the direct root cause of compounding errors and repetition loops at generation time.</p>
+
+  <p>This closes the deep generative modelling sub-module: four architecturally distinct answers (VAE, GAN, diffusion, decoder transformer) to the shared problem of an intractable data distribution, each with its own approximation strategy and its own failure modes. The next sub-module scales this lecture's architecture up by orders of magnitude and asks what changes, in kind and not just in degree, once a decoder transformer is trained on internet-scale text: in-context learning, emergent capability, and the governance concerns that follow from deploying a model whose training data and failure modes are far harder to fully characterise than anything in this course so far.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the chain-rule factorisation of a joint distribution over a sequence, and explain why this factorisation introduces no approximation error.</li>
+      <li>Explain what causal masking does inside the attention computation, and why it is necessary for autoregressive generation specifically.</li>
+      <li>Define temperature, and explain the effect of a value below one versus above one.</li>
+      <li>Define teacher forcing and exposure bias, and explain the causal link between the two.</li>
+      <li>Explain why perplexity is available as an evaluation metric for a decoder transformer but not for a VAE, GAN, or diffusion model.</li>
+      <li>In the accident-report vignette, explain precisely why a low per-token probability at the flagged position did not mean the underlying claim was unusual.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 3 (<a href="03-gans_and_diffusion.html">GANs and diffusion</a>) developed two further implicit-density alternatives.</li>
+      <li><strong>Built on:</strong> The deep-learning sub-module's <a href="../05_deep_learning/08-transformers.html">transformers</a> lecture is the direct architectural prerequisite; this lecture adds exactly one constraint, causal masking.</li>
+      <li><strong>Next:</strong> The <a href="../11_large_language_models/index.html">large language models</a> sub-module scales this architecture up and develops in-context learning, foundation models, and responsible-use governance.</li>
+      <li><strong>Outside this course:</strong> The model-evaluation sub-module's AIC and deviance metrics play a directly analogous role to perplexity, both are held-out, likelihood-based measures of model fit.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Generative modelling course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 51 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

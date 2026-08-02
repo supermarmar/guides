@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 12: causal models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Supervised learning</a></div>
+  <h1>Causal models</h1>
+  <p class="subtitle">Prediction asks what is correlated. Decision-making asks what would happen if. The two questions have different answers, and credit underwriting (where every decision is an intervention) is increasingly required to answer the second.</p>
+  <div class="meta">
+    <span>Lecture 12 of 62</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part II: supervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>causal model</strong> is a model whose output remains valid when the input distribution is changed by an intervention rather than passively observed. The distinction matters because a model trained to predict $P(Y \mid X)$ from historical data is correct on the data it was trained on but silent on the question "what happens to $Y$ if I change $X$". Pearl's <strong>ladder of causation</strong> distinguishes three levels of question. <strong>Association</strong> asks $P(Y \mid X)$, the answer a standard supervised classifier gives. <strong>Intervention</strong> asks $P(Y \mid \operatorname{do}(X))$, the distribution of $Y$ when $X$ is set by the modeller rather than observed in the wild. <strong>Counterfactuals</strong> ask what would have happened to a specific unit if its $X$ had been different, holding everything else equal. Climbing the ladder requires assumptions a flat dataset does not contain, encoded as a <strong>directed acyclic graph</strong> (DAG) that names the variables and the direction of cause. From the DAG, identification rules (the back-door and front-door criteria) say which adjustments allow an observational dataset to answer an interventional question. In credit risk the relevance is concrete: monotonic constraints on tree ensembles encode a causal prior that higher loan-to-value should never reduce predicted default probability, regardless of what spurious correlations the data contain, and counterfactual fairness checks ask whether a decision would have flipped had the applicant's protected attribute been different. The pay-off is defensibility under SR 11-7 and SS3-24: a high-AUC model whose mechanism is unexplained is harder to approve than a slightly weaker model whose causal structure is documented.</p>
+
+  <div class="callout insight">
+    <span class="tag">Beyond the source</span>
+    The wiki source for this topic (<code>03_supervised_learning/06-casual-models.ipynb</code>) is a 29-line stub linking only to a single Medium article on monotonic constraints. This lecture is written to fill that gap because causal interpretation is no longer optional for any model that drives a regulated decision. SR 11-7 requires firms to demonstrate that a model's predictions correspond to the economic relationship it claims to capture, and SS3-24 paragraph 3.42 onward extends the same expectation to machine learning, asking specifically how non-monotonic or implausible relationships are detected and constrained. A model that scores well on test data but encodes the relationship "more savings means higher default" will fail validation regardless of its AUC, and the language a validator uses to ask the question is the language of causal inference.
+  </div>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A bank has historical data showing that customers who use their overdraft default more often. A logistic regression on this data will assign a positive coefficient to overdraft usage and predict that overdraft users are higher risk. That coefficient is a correct statement about correlation. It is not a statement that taking away a customer's overdraft would lower their default rate, because overdraft usage is a symptom of cash-flow stress, not a cause of default. The same data, viewed through a causal lens, says: overdraft usage and default share a common cause (cash-flow stress), and intervening on overdraft usage without addressing the underlying stress will not change the default rate. The predictive model and the causal model agree on what to predict; they disagree on what to do.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Lecture 11 (<a href="05-ensemble_learning.html">ensemble learning</a>) showed how stacking and boosting deliver the best predictive performance available; lecture 13 (<a href="07-conformal_prediction.html">conformal prediction</a>) covers calibrated prediction intervals. This lecture is the bridge between predictive accuracy and decision validity: the same XGBoost model from lecture 11 can be made causally defensible by adding monotonic constraints without losing its predictive edge. The statistical foundations sit one folder up at <a href="../../statistics/12-causal_inference.html">statistics lecture 12 on causal inference</a>; the interpretation tooling sits one folder down at <a href="../08_model_interpretation/03-model_agnostic_methods.html">model interpretation lecture 3 on model-agnostic methods</a>. This lecture is the ML-specific connective tissue between the two.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons causal thinking is non-negotiable for any model that drives a regulated decision. First, <strong>every credit decision is an intervention.</strong> The model does not merely observe applicants and forecast their default; it sets a credit limit, an interest rate, or a binary accept-reject that itself changes the applicant's future. The training data was generated under a different policy (the previous limits, rates, and acceptance rules), and the deployed model's outputs are used to choose a new policy. A purely correlational model is being asked a question its training distribution cannot answer: how will outcomes look under a policy the data has not seen?</p>
+
+  <p>Second, <strong>spurious correlations are silently encoded by unconstrained models.</strong> A gradient-boosted tree can fit any pattern in the data, including patterns that exist only because of historical sampling. If past underwriters happened to approve more applications from a particular postal code during a particular economic episode, the model will learn that postal code as predictive even where the true causal effect is zero. Without a causal frame, there is no principled basis for distinguishing a real economic relationship from a sample artefact. With one, the modeller can specify the relationships that should hold (loan-to-value monotone in default risk, income monotone in repayment capacity) and enforce them in the fit.</p>
+
+  <p>Third, <strong>fairness and accountability questions are causal questions.</strong> "Would this customer have been approved if they were a different gender, holding everything else equal?" is a counterfactual. It cannot be answered by inspecting the model's outputs on the actual data; it requires a model of what the customer's other features would have been under the alternative gender, which is a model of the causal structure. The Equality Act, the FCA's Consumer Duty, and the PRA's expectations under SS3-24 all push firms toward this question whether or not the modellers framed it that way.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A challenger bank built a behavioural PD model that included "average monthly balance" as a feature. The model was rejected at validation. The coefficient on average balance was positive: higher balances predicted higher defaults. The data was right (the feature had genuine positive correlation with default in the training window, because customers with cash-flow problems sometimes held large compensation lump sums in their current account just before defaulting), but the relationship was uninterpretable as causal and the model could not be defended to the PRA. The fix was a monotonic constraint forcing the relationship to be non-positive, accepting a 0.6-point AUC loss in exchange for a model whose every marginal effect could be explained in a sentence.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. A causal model is a graph plus a dataset. The graph (a DAG) declares which variables are causes of which others; the dataset estimates the strength of those causes. The same dataset, read through different graphs, gives different answers, and the graph is not in the data. It comes from domain knowledge.</p>
+
+  <p>Three small graph structures cover most of the bias mechanisms encountered in practice. A <strong>confounder</strong> is a common cause of both the treatment and the outcome; if it is not adjusted for, the estimated effect of the treatment includes its share. A <strong>collider</strong> is a common effect of both the treatment and the outcome; conditioning on it opens a spurious dependence between them that did not exist marginally. A <strong>mediator</strong> sits on the causal path from treatment to outcome; conditioning on it removes the indirect effect and leaves only the direct one. The three structures look superficially similar but their adjustment implications are opposite.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three DAG structures: confounder, collider, and mediator">
+      <defs>
+        <marker id="cmArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#37352F"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three small DAGs and the biases they induce</text>
+
+      <!-- Confounder panel -->
+      <g>
+        <rect x="20" y="48" width="240" height="220" rx="10" fill="#FFFFFF" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="140" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">CONFOUNDER</text>
+
+        <!-- Z at top -->
+        <circle cx="140" cy="110" r="20" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="140" y="115" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Z</text>
+
+        <!-- X bottom-left -->
+        <circle cx="70" cy="200" r="20" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="70" y="205" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#18181b">X</text>
+
+        <!-- Y bottom-right -->
+        <circle cx="210" cy="200" r="20" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="210" y="205" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#18181b">Y</text>
+
+        <!-- Arrows Z to X and Z to Y -->
+        <line x1="127" y1="127" x2="82" y2="183" stroke="#37352F" stroke-width="1.5" marker-end="url(#cmArrow)"/>
+        <line x1="153" y1="127" x2="198" y2="183" stroke="#37352F" stroke-width="1.5" marker-end="url(#cmArrow)"/>
+        <!-- Arrow X to Y -->
+        <line x1="93" y1="200" x2="187" y2="200" stroke="#37352F" stroke-width="1.5" marker-end="url(#cmArrow)"/>
+
+        <text x="140" y="248" text-anchor="middle" font-family="Inter" font-size="10" fill="#0d9488">Common cause Z of X and Y.</text>
+        <text x="140" y="261" text-anchor="middle" font-family="Inter" font-size="10" fill="#0d9488">Adjust for Z to recover the X-Y effect.</text>
+      </g>
+
+      <!-- Collider panel -->
+      <g>
+        <rect x="290" y="48" width="240" height="220" rx="10" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="410" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">COLLIDER</text>
+
+        <!-- X top-left -->
+        <circle cx="340" cy="110" r="20" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="340" y="115" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#18181b">X</text>
+
+        <!-- Y top-right -->
+        <circle cx="480" cy="110" r="20" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="480" y="115" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#18181b">Y</text>
+
+        <!-- C bottom-middle -->
+        <circle cx="410" cy="200" r="20" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="410" y="205" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">C</text>
+
+        <!-- Arrows X to C and Y to C -->
+        <line x1="353" y1="127" x2="398" y2="183" stroke="#37352F" stroke-width="1.5" marker-end="url(#cmArrow)"/>
+        <line x1="467" y1="127" x2="422" y2="183" stroke="#37352F" stroke-width="1.5" marker-end="url(#cmArrow)"/>
+
+        <text x="410" y="248" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c3aed">X and Y both cause C.</text>
+        <text x="410" y="261" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c3aed">Do not condition on C.</text>
+      </g>
+
+      <!-- Mediator panel -->
+      <g>
+        <rect x="560" y="48" width="240" height="220" rx="10" fill="#FFFFFF" stroke="#b45309" stroke-width="1.5"/>
+        <text x="680" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">MEDIATOR</text>
+
+        <!-- X left -->
+        <circle cx="600" cy="160" r="20" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="600" y="165" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#18181b">X</text>
+
+        <!-- M middle -->
+        <circle cx="680" cy="160" r="20" fill="#FFF8EC" stroke="#b45309" stroke-width="1.5"/>
+        <text x="680" y="165" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">M</text>
+
+        <!-- Y right -->
+        <circle cx="760" cy="160" r="20" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="760" y="165" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#18181b">Y</text>
+
+        <!-- Arrows X to M to Y -->
+        <line x1="623" y1="160" x2="657" y2="160" stroke="#37352F" stroke-width="1.5" marker-end="url(#cmArrow)"/>
+        <line x1="703" y1="160" x2="737" y2="160" stroke="#37352F" stroke-width="1.5" marker-end="url(#cmArrow)"/>
+
+        <text x="680" y="218" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">M is on the path from X to Y.</text>
+        <text x="680" y="231" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">Conditioning on M removes</text>
+        <text x="680" y="244" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">the indirect effect.</text>
+      </g>
+
+      <!-- Footer -->
+      <line x1="40" y1="290" x2="780" y2="290" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="308" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">Same three variables, three different graphs, three opposite adjustment decisions</text>
+    </svg>
+    <figcaption>Three structures, three opposite adjustment decisions. The confounder requires adjustment (or the estimated X-Y effect absorbs Z's share). The collider must not be adjusted for, because conditioning on a common effect opens a spurious correlation. The mediator may or may not be adjusted for depending on whether the total effect or the direct effect is wanted. The structure is in the DAG, not in the data; two datasets that look identical can come from any of these three.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The structure is not visible in summary statistics: the marginal correlation between X and Y can be identical across all three panels. The adjustment that fixes the confounder bias is the same adjustment that introduces the collider bias, so blindly conditioning on every available covariate is not a safe default. The mediator distinction (total versus direct effect) is the one question the diagram does not answer; the modeller has to declare which effect the decision needs.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Correlation, intervention, counterfactuals</h3>
+
+  <p>The starting point is the distinction between three increasingly demanding questions about a variable $X$ and an outcome $Y$. The first, <strong>association</strong>, asks for $P(Y \mid X = x)$: given that we observe $X = x$, what is the conditional distribution of $Y$. This is the quantity any supervised classifier estimates. It is symmetric in the sense that $P(Y \mid X)$ and $P(X \mid Y)$ are both well-defined and computable from the same joint distribution; neither is a statement about causation.</p>
+
+  <p>The second, <strong>intervention</strong>, asks for $P(Y \mid \operatorname{do}(X = x))$: what is the distribution of $Y$ when an external agent sets $X$ to the value $x$, rather than $X$ taking that value because of its usual causes. The $\operatorname{do}$-operator is a notational convenience for the difference. Under intervention, all incoming arrows to $X$ in the causal DAG are severed (the usual causes of $X$ are overridden by the modeller), and the resulting distribution of $Y$ is read off the surgically-modified graph. In credit, this is the relevant question for any policy change: what is the default rate if we lower the loan-to-value threshold to 80 per cent.</p>
+
+  <p>The third, <strong>counterfactuals</strong>, asks a question about a specific unit: given that this borrower had $X = x$ and outcome $Y = y$, what would $Y$ have been if $X$ had been $x'$ instead, holding the borrower's other characteristics fixed. The answer is denoted $Y_{X = x'} \mid (X = x, Y = y)$. Counterfactuals are the strongest claim on the ladder and require the strongest assumptions: a structural equation model that maps the unit's exogenous noise terms to its observed outcome, so that the same noise terms can be re-run with a different input.</p>
+
+  <p>The ladder is hierarchical. Counterfactual queries imply interventional ones (set everyone's $X$ to $x'$ and average), and interventional queries imply associational ones (under the observational policy, the intervention distribution equals the conditional distribution). The reverse implications fail. No amount of observational data identifies an interventional query without further structural assumptions, and no interventional query identifies a counterfactual query without yet more structural assumptions. This is the formal statement of the maxim "correlation is not causation": correlation lives at rung one of the ladder, and decision-making lives at rung two.</p>
+
+  <h3>DAGs and identification</h3>
+
+  <p>A <strong>directed acyclic graph</strong> is a set of nodes (variables) and directed edges (causal arrows), with the constraint that following the arrows never returns to the starting node. The graph encodes a factorisation of the joint distribution as a product of conditionals: each variable's distribution conditional on its parents. The graph also encodes a list of conditional independences via <strong>d-separation</strong>, the graphical criterion that says two nodes are independent given a conditioning set if every path between them is "blocked" by that set.</p>
+
+  <p>The point of a DAG in causal inference is identification. Given a query (the effect of $X$ on $Y$) and a graph (the assumed causal structure), is the query identifiable from observational data, and if so what is the adjustment formula. Two criteria cover most cases.</p>
+
+  <p>The <strong>back-door criterion</strong> says: a set of variables $Z$ blocks all "back-door" paths from $X$ to $Y$ (paths that start with an arrow into $X$) and contains no descendant of $X$. If such a $Z$ exists, the causal effect of $X$ on $Y$ is identified by</p>
+  $$P(Y \mid \operatorname{do}(X = x)) = \sum_z P(Y \mid X = x, Z = z) \cdot P(Z = z).$$
+  <p>In words: condition on $Z$, take the conditional distribution of $Y$ given $X$ and $Z$, and average over the marginal distribution of $Z$. This is the formal justification for "controlling for confounders" in regression: when the controls satisfy the back-door criterion, the regression coefficient on $X$ is the causal effect.</p>
+
+  <p>The <strong>front-door criterion</strong> handles cases where the back-door is blocked by an unobserved confounder. If there is a mediator $M$ on the path from $X$ to $Y$ that is itself unconfounded with $Y$ given $X$, the effect can be identified by chaining two adjustments through $M$. The front-door is less common in practice but theoretically important: it shows that unobserved confounding does not always defeat identification.</p>
+
+  <p>Beyond back-door and front-door, the <strong>do-calculus</strong> of Pearl gives three rules that mechanically transform $\operatorname{do}$-expressions into observational ones. Any query expressible in the do-calculus that reduces fully to observational quantities is identified; queries that cannot be so reduced are not identified from the assumed graph and require either a richer graph (with more measured variables) or experimental data.</p>
+
+  <h3>Confounders, colliders, mediators</h3>
+
+  <p>The three structures shown in the diagram cover most of the practical mistakes in applied work. A <strong>confounder</strong> is a variable that causally affects both the treatment and the outcome. Cash-flow stress confounds the relationship between overdraft usage and default. Macroeconomic regime confounds the relationship between loan vintage and default. Failing to adjust for a confounder produces an estimated effect that absorbs the confounder's share; in regression this is omitted-variable bias.</p>
+
+  <p>A <strong>collider</strong> is a variable that is causally affected by both the treatment and the outcome (or by two variables that share a confounder). Conditioning on a collider opens a spurious dependence between its causes, even when they are marginally independent. The textbook example is Berkson's bias: among hospitalised patients (the collider), two unrelated diseases will appear negatively correlated because patients with neither disease are absent from the sample. In credit, conditioning on "applied for the loan" can induce spurious correlations between features that are otherwise unrelated in the population, because the application decision is itself a collider.</p>
+
+  <p>A <strong>mediator</strong> is a variable on the causal path from treatment to outcome. The treatment causes the mediator, and the mediator causes the outcome. Conditioning on a mediator partitions the total effect of the treatment into a direct effect (not through the mediator) and an indirect effect (through the mediator), and reports only the direct effect. Whether that is what is wanted depends on the question. If a regulator asks "what is the effect of approving the loan on default", the total effect is wanted and the mediator (the customer's subsequent behaviour) must not be conditioned on. If the question is "what is the residual effect of approval after accounting for the customer's spending response", the direct effect is wanted and the mediator must be conditioned on.</p>
+
+  <h3>Monotonic constraints in tree ensembles</h3>
+
+  <p>The most operationally useful causal idea in supervised learning is the monotonic constraint, available in <strong>XGBoost</strong>, <strong>LightGBM</strong>, and <strong>CatBoost</strong>. A monotonic constraint forces the model's predicted output to be monotone (increasing or decreasing) in a chosen feature, holding all other features fixed. The constraint is enforced during tree construction: a candidate split that would violate the monotone direction is either rejected or modified so the resulting leaf values respect the ordering.</p>
+
+  <p>The interface is uniform across the libraries. In XGBoost,</p>
+  <pre><code>params = {
+    "objective": "binary:logistic",
+    "monotone_constraints": "(1, 0, -1, 0)",
+}</code></pre>
+  <p>where the tuple has one entry per feature: $1$ for monotone increasing, $-1$ for monotone decreasing, $0$ for unconstrained. In LightGBM the parameter is <code>monotone_constraints</code> with the same convention; in CatBoost it is <code>monotone_constraints</code> taking either a list or a dict keyed by feature name.</p>
+
+  <p>The causal content of a monotonic constraint is a domain prior about the sign of the partial effect. In credit, higher loan-to-value should never reduce predicted default probability, holding everything else constant. The data may contain spurious local patches where high-LTV loans appear safer (perhaps because they were originated under tighter rules and the sample is small in that region); without the constraint, a flexible tree ensemble will fit those patches. With the constraint, the model is forced to respect the causal direction even where the sample is locally misleading. The cost is a small loss of predictive performance on the historical data; the gain is a model whose marginal effects are explainable in one sentence each, and whose extrapolation behaviour outside the training distribution is bounded by the constraint rather than by whatever the trees happened to fit.</p>
+
+  <p>Monotonic constraints are not the only way to inject causal structure into a tree ensemble, but they are by far the most practical. They require no additional data, no new model class, and no change to the training pipeline beyond a configuration parameter. They map directly onto the kind of domain knowledge a credit analyst can write down ("higher debt-service ratio increases default risk; higher tenure decreases it"), and they survive every standard model-validation test except the rare case where the historical data itself is non-monotonic for good reason.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why this is causal, not just regularisation</span>
+    A monotonic constraint is not L1 or L2 regularisation under a different name. Regularisation shrinks coefficients toward zero in a way that is symmetric in the sign of the effect; the constraint is asymmetric, allowing arbitrary magnitude in the prior direction and zero in the other. The constraint encodes a structural claim ("the partial effect of LTV on default is non-negative") that is identical to what a structural equation model would assert, and that survives any reweighting of the sample. Regularisation would not survive a reweighting that made the spurious pattern dominant; the constraint would.
+  </div>
+
+  <h3>Causal forests</h3>
+
+  <p>Where monotonic constraints encode a known causal direction, <strong>causal forests</strong> (Athey and Wager, 2019) estimate one. They are an extension of the random forest from lecture 11 to the problem of estimating the <strong>conditional average treatment effect</strong>,</p>
+  $$\tau(x) = E[Y(1) - Y(0) \mid X = x],$$
+  <p>the expected difference in outcomes for units with covariates $X = x$ between being treated and not treated. The challenge is that for any individual unit only one of $Y(1)$ or $Y(0)$ is observed; the other is the counterfactual. The causal forest sidesteps the direct prediction problem by recasting the estimation as a local moment-condition problem and using the forest to define the local neighbourhood.</p>
+
+  <p>Three modifications distinguish a causal forest from a standard regression forest. First, the splitting criterion targets heterogeneity in treatment effect rather than heterogeneity in outcome: leaves are chosen to group units whose $\tau$ is similar, not units whose $Y$ is similar. Second, each tree uses an <strong>honest</strong> sample split: half the data chooses the tree's structure, the other half estimates the leaf values, eliminating the upward bias that arises when the same data does both. Third, the forest is built to support valid confidence intervals on $\tau(x)$ via the infinitesimal jackknife, which a standard random forest does not provide.</p>
+
+  <p>Causal forests come into their own when the treatment effect is plausibly heterogeneous across customers. A bank running an A/B test on a fee-reduction offer wants to know which segments respond most: not the average effect, but the conditional average effect as a function of tenure, balance, and product mix. A causal forest answers that question with confidence intervals; a standard regression forest answers a different question (predicting which customers will churn under the offer condition) and has no calibrated uncertainty on the treatment effect itself.</p>
+
+  <h3>Instrumental variables</h3>
+
+  <p>When the back-door criterion fails because of an unobserved confounder, an <strong>instrumental variable</strong> $Z$ can sometimes recover the effect. $Z$ qualifies as an instrument if it causally affects $X$, has no direct causal effect on $Y$ (except through $X$), and shares no confounders with $Y$. The estimator is two-stage least squares: regress $X$ on $Z$ to obtain $\hat{X}$, then regress $Y$ on $\hat{X}$. The coefficient on $\hat{X}$ is the causal effect of $X$ on $Y$ under the instrument's assumptions.</p>
+
+  <p>Credit examples are rare but exist. A random change in the underwriting threshold (an exogenous policy shift) is an instrument for the acceptance decision, and applications close to the old threshold are a natural experiment for estimating the causal effect of acceptance on subsequent default. The assumptions are strong: the threshold change must not have been driven by something else that also affects default, and it must not affect default except through the acceptance decision. Where these hold, an IV estimator gives a causal effect from purely observational data; where they do not, the estimator is biased in ways the data cannot detect.</p>
+
+  <h3>Counterfactual fairness</h3>
+
+  <p>Counterfactual fairness, introduced by Kusner et al. (2017), defines a decision as fair with respect to a protected attribute $A$ if, for every individual, the decision would have been the same had $A$ been different, holding the non-descendants of $A$ fixed. The definition is causal because it requires a model of what the individual's other features would have been under the alternative $A$; this is itself a counterfactual claim and must be supported by a structural equation model.</p>
+
+  <p>Operationally, counterfactual fairness can be approximated even without a full structural model by removing descendants of $A$ from the feature set or by using only features whose conditional distribution given $A$ is the same across $A$ levels. The relevance for credit is direct. A model that does not use gender as a feature can still be unfair if it uses features that are descendants of gender (occupation, income, account history), because changing $A$ would have changed those features, and the model's prediction with them. The counterfactual-fairness frame makes the question explicit and identifies which features carry the indirect effect.</p>
+
+  <p>The regulatory pressure on this question is increasing. The FCA's Consumer Duty asks firms to demonstrate fair outcomes, and the PRA's SS3-24 paragraph 3.42 onward extends the same expectation to machine-learning models. A bank that can produce a documented causal graph for its credit model and explain which features are descendants of which protected attributes is in a strong position; one that cannot is exposed to a line of questioning it has no answer to.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every causal-modelling incident in practice. Each is invisible at validation time on a held-out test sample drawn from the same distribution.</p>
+
+  <div class="callout warn">
+    <span class="tag">Treating predictive features as causal</span>
+    A flexible model fits the joint distribution of features and outcome and gets credit for any feature with predictive power, regardless of its causal role. Reading the model's coefficients or feature importances as causal effects is a category error. Overdraft usage is predictive of default not because using an overdraft causes default, but because both are downstream of cash-flow stress. A policy that removes overdrafts will not reduce defaults; it will move the indicator from one place to another and leave the underlying rate unchanged. The fix is to declare which features are causal and which are merely predictive, and to limit causal claims to the former.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Adjusting for a collider or a mediator</span>
+    "Control for everything" is a recipe for collider bias. If $X$ is the treatment, $Y$ is the outcome, and $C$ is a downstream consequence of both, conditioning on $C$ in the regression (or in the model's feature set) opens a spurious path between $X$ and $Y$ that did not exist marginally. The same applies to mediators if the total effect is wanted but the mediator is conditioned on by accident. The fix is to write down the assumed DAG before fitting and check each variable's role; "throw everything in" is not a defensible methodology.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Believing monotonic constraints make a model causal</span>
+    A monotonic constraint encodes one causal claim per feature: the sign of its marginal effect. The model is not thereby a causal model in any deeper sense. Interaction effects, confounding by unmodelled variables, and counterfactual queries all remain open. The constraint is a useful regulariser of the predictive model against violating known causal direction; it is not a substitute for a structural model when the question requires one. Marketing the constraint as "causal AI" oversells what it does and underdelivers when the regulator asks what the model would predict under intervention.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming the DAG is the data</span>
+    A DAG is a set of assumptions, not a discovered structure. Causal discovery algorithms exist (PC, GES, NOTEARS) and produce candidate graphs from observational data, but the output is constrained by Markov-equivalence: many DAGs imply the same conditional independences and the data alone cannot distinguish them. The choice of which DAG to use must come from domain knowledge. Using a discovery algorithm's output as the truth, then estimating a causal effect from it, is double-counting the data: the same observations selected the graph and estimated the effect, and the resulting confidence intervals are too narrow.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Causal modelling is the language used to defend a supervised classifier when the classifier's outputs drive a regulated decision. The three rungs of Pearl's ladder (association, intervention, counterfactuals) separate the question a standard classifier answers from the questions a decision-maker actually wants answered. DAGs provide the syntax for stating which variables cause which others, and identification criteria (back-door, front-door, do-calculus) say when observational data is sufficient to answer an interventional question. The three small graph structures (confounder, collider, mediator) account for most of the practical adjustment mistakes. In supervised learning specifically, monotonic constraints on tree ensembles give the most operationally tractable way to inject causal priors into an otherwise flexible model, and causal forests give a forest-based estimator of conditional treatment effects when the question is heterogeneous treatment response. Counterfactual fairness recasts the bias-and-discrimination question as a counterfactual query, and instrumental variables provide a backup when the back-door criterion fails. None of this replaces a careful causal graph; all of it depends on one.</p>
+
+  <p>What this lecture deliberately did not do. It did not derive a structural equation model from data, which is the province of econometrics and is covered in the statistics module. It did not cover causal discovery algorithms (PC, GES, NOTEARS) in any detail; the output of those algorithms is a candidate graph, not an answer, and the user still has to do the domain work this lecture describes. It did not work through the do-calculus rules with examples; for that, see Pearl's "Causality" or the more applied "Causal Inference: What If" by Hernan and Robins. The aim here was the bridge between supervised learning as a predictive discipline (where lectures 7 through 11 lived) and supervised learning as a decision-support tool (which the rest of this part of the course assumes).</p>
+
+  <p>Lecture 13, <a href="07-conformal_prediction.html">conformal prediction</a>, picks up the predictive thread by adding calibrated prediction intervals to any base model. The intervals are valid under exchangeability of training and test data, which is itself a (weak) causal assumption: it says the data-generating process is the same in both samples. A causally-defensible model with calibrated intervals is the practical target for any credit-risk classifier in production.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the three rungs of Pearl's ladder of causation and give one example of a question that lives on each rung.</li>
+      <li>Define the back-door criterion in your own words. Why is "controlling for everything available" not a valid back-door adjustment?</li>
+      <li>In the confounder DAG with $Z$ causing both $X$ and $Y$, give the formula for $P(Y \mid \operatorname{do}(X = x))$ in terms of observational conditionals.</li>
+      <li>A behavioural PD model uses average monthly balance, which appears positively associated with default in the training data. Explain why a monotonic constraint forcing a non-positive marginal effect of balance on PD is causally defensible even though it costs AUC.</li>
+      <li>Describe the two structural differences between a causal forest and a standard regression forest. What quantity does the causal forest estimate that the regression forest does not?</li>
+      <li>A bank's underwriting model does not use gender as a feature but does use occupation, income, and account history. Why might this model still fail a counterfactual-fairness check, and what would a credible mitigation look like?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 13 (<a href="07-conformal_prediction.html">conformal prediction</a>) adds calibrated prediction intervals to any base classifier, including the causally-constrained ones built in this lecture.</li>
+      <li><strong>Previous:</strong> Lecture 11 (<a href="05-ensemble_learning.html">ensemble learning</a>) covered the bagging and boosting machinery that monotonic constraints sit on top of; the constraint is a configuration parameter on the same XGBoost or LightGBM model that lecture trained.</li>
+      <li><strong>Prerequisite:</strong> Statistics lecture 12 (<a href="../../statistics/12-causal_inference.html">causal inference</a>) introduces DAGs, the back-door and front-door criteria, and the do-calculus at the level of generality used here.</li>
+      <li><strong>Related interpretation tooling:</strong> Model interpretation lecture 3 (<a href="../08_model_interpretation/03-model_agnostic_methods.html">model-agnostic methods</a>) covers SHAP, LIME, and partial-dependence plots, which visualise the marginal effects that monotonic constraints control directly.</li>
+      <li><strong>Pipeline context:</strong> Feature engineering lecture 1 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the machine learning landscape</a>) introduced the six-stage pipeline; causal interpretation belongs to the modelling and validation stages and is what makes the difference between a model that ships and one that does not.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Supervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 12 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

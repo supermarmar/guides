@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 3: anatomy of a harness</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Anatomy of a harness: tools, permissions, sessions</h1>
+  <p class="subtitle">The model chooses; the harness decides what choosing means. It defines the action space, gates every action against a permission model, assembles the context, and owns the session. Almost every complaint that begins "the model did X" turns out on inspection to be a statement about one of those four responsibilities.</p>
+  <div class="meta">
+    <span>Lecture 3 of 22</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>harness</strong> is the program that turns a model into an agent. It has four jobs. It <em>assembles the context</em>: system prompt, instruction files, tool schemas, history. It <em>defines the action space</em>: which tools exist, what arguments they take, and what they return. It <em>gates every action</em>: the permission model that decides whether a proposed tool call runs, prompts, or is refused. And it <em>owns the session</em>: persistence, resumption, checkpoints, compaction, and clearing. Claude Code is one such harness; the model inside it is the same model available through the API, and almost none of what follows is a property of the weights.</p>
+
+  <p>The permission model is the piece worth studying hardest, because it is the only genuine control surface you have. Everything you write in an instruction file is <em>advisory</em>: the model reads it, weighs it against everything else in the window, and usually complies. A permission rule is <em>enforced</em>: the harness checks it before the tool runs, and no amount of persuasion in the conversation changes the outcome. That distinction, advisory versus enforced, recurs throughout the course, and choosing the wrong side of it is the most common design mistake in agent configuration.</p>
+
+  <p>One caveat before the detail. This is the most version-sensitive lecture in the course. Mode names, flag spellings, and default behaviours change between releases, and the specifics below reflect the documentation at the time of writing. The structure is stable and worth learning; the spellings are not. Where the current documentation disagrees with this page, the documentation is right.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Before every tool call, the harness asks a single question: may this run? The answer comes from a fixed decision order, your explicit rules first, then a small set of always-safe actions, then whatever the current mode says about everything else. If you can state where a given command lands in that order, you can predict whether you will be interrupted, and you can stop being interrupted without giving anything away.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The interesting design question is who the permission model is protecting you from. It is not primarily the model's malice, which is not the failure mode in practice. It is protecting you from two other things: the model's confident errors, and content it reads. The second is the deeper problem. A file, a web page, or an issue comment can contain text engineered to read as an instruction, and the model has no reliable way to distinguish data from directive. Every serious agent security architecture is a variation on the same answer: constrain the action space so that following a hostile instruction is not catastrophic, because detecting the hostile instruction cannot be relied upon. Lecture 20 takes this properly.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is diagnostic. When something goes wrong, knowing the harness's four responsibilities tells you where to look, and the answer is rarely the model. The agent ignored an instruction: that is context assembly, and the instruction is probably buried in a file too long to be salient. The agent could not do something obvious: that is the action space, and the tool it needed is not connected. The agent stopped to ask about something trivial: that is the permission model, and the rule is missing. The agent forgot a decision from earlier: that is session management, and the context has been compacted. Four symptoms, four different fixes, none of them "use a better model".</p>
+
+  <p>The second reason is that permission configuration is where convenience and safety trade against each other explicitly, and the trade is easy to get wrong in both directions. Configure nothing and you approve so many prompts that you stop reading them, which is strictly worse than approving none, because you have the illusion of oversight without the substance. Configure a blanket allow on shell access and you have removed the last enforced boundary between a confidently wrong model and your file system. The right configuration is neither: a specific allowlist covering the commands you genuinely run all day, and prompts preserved for everything else.</p>
+
+  <p>The third reason is that the harness is where your team's practice becomes portable. An instruction file, a settings file with an allowlist, a hook that runs the linter, a subagent definition: these are text files that live in the repository and apply to whoever opens it. That is the difference between one engineer having a good workflow and a team having one. It also means the configuration is reviewable, which is worth insisting on, because a settings file that grants broad execution rights is a security change and should be treated like one.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The action space</h3>
+
+  <p>Tools are the agent's verbs, and they fall into three classes with very different risk profiles. <strong>Read-only tools</strong>, reading a file, globbing, grepping, listing, cost context and nothing else; a wrong call wastes tokens. <strong>Mutating tools</strong>, editing a file, writing a file, running a shell command, change your machine; a wrong call costs work. <strong>External tools</strong>, web fetches, MCP calls to a service, network requests, change or reveal things outside your machine; a wrong call can be irreversible and can involve other people. The permission model exists almost entirely to draw a line between the first class and the other two, which is why read-only actions are auto-approved in every mode and everything else is negotiated.</p>
+
+  <p>Two properties of tool design matter enough to state now, because they explain configuration choices later. First, every connected tool's schema occupies context on every turn, whether or not it is ever called, which is the argument for connecting servers per project rather than globally. Second, a tool's description is the only thing the model has to decide when to use it, so a vague or overlapping description produces exactly the failure you would expect: the wrong tool, called confidently. Anthropic's guidance on writing tools reduces to making each one self-contained, unambiguous about its purpose, and robust when misused.</p>
+
+  <h3>The permission decision order</h3>
+
+  <p>Every proposed tool call runs through a fixed sequence, and the first matching step wins. Holding this order in mind is what makes permission behaviour predictable.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The permission decision order">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">How a proposed tool call is resolved</text>
+
+      <g font-family="Inter" font-size="12">
+        <rect x="250" y="38" width="260" height="34" rx="8" fill="#f4f4f5" stroke="#a1a1aa"/>
+        <text x="380" y="60" text-anchor="middle" font-weight="600" fill="#3f3f46">Model proposes a tool call</text>
+
+        <rect x="230" y="94" width="300" height="42" rx="8" fill="#E4ECFB" stroke="#4A6BD1"/>
+        <text x="380" y="110" text-anchor="middle" font-weight="600" fill="#2A3A78">1. Your explicit rules</text>
+        <text x="380" y="127" text-anchor="middle" font-size="11" fill="#2A3A78">deny, then ask, then allow. Deny always wins.</text>
+
+        <rect x="230" y="156" width="300" height="42" rx="8" fill="#DDF1E5" stroke="#1E9D54"/>
+        <text x="380" y="172" text-anchor="middle" font-weight="600" fill="#1E9D54">2. Read-only and in-scope edits</text>
+        <text x="380" y="189" text-anchor="middle" font-size="11" fill="#1E9D54">auto-approved, except protected paths</text>
+
+        <rect x="230" y="218" width="300" height="42" rx="8" fill="#FBF1D4" stroke="#C76B2A"/>
+        <text x="380" y="234" text-anchor="middle" font-weight="600" fill="#C76B2A">3. Everything else: the mode decides</text>
+        <text x="380" y="251" text-anchor="middle" font-size="11" fill="#C76B2A">prompt, classifier, auto-deny, or run</text>
+
+        <line x1="380" y1="72"  x2="380" y2="88"  stroke="#71717a" stroke-width="1.5" marker-end="url(#pd)"/>
+        <line x1="380" y1="136" x2="380" y2="150" stroke="#71717a" stroke-width="1.5" marker-end="url(#pd)"/>
+        <line x1="380" y1="198" x2="380" y2="212" stroke="#71717a" stroke-width="1.5" marker-end="url(#pd)"/>
+
+        <text x="545" y="118" font-size="11" fill="#71717a">resolved</text>
+        <text x="545" y="180" font-size="11" fill="#71717a">resolved</text>
+        <text x="545" y="242" font-size="11" fill="#71717a">resolved</text>
+
+        <text x="60" y="118" font-size="11" font-style="italic" fill="#71717a">enforced,</text>
+        <text x="60" y="133" font-size="11" font-style="italic" fill="#71717a">not advisory</text>
+        <text x="60" y="242" font-size="11" font-style="italic" fill="#71717a">the dial you</text>
+        <text x="60" y="257" font-size="11" font-style="italic" fill="#71717a">actually turn</text>
+      </g>
+
+      <defs>
+        <marker id="pd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>Step 1 is the only enforced layer you author. Step 3 is where the permission mode does its work, and it only ever sees calls that steps 1 and 2 did not resolve.</figcaption>
+  </figure>
+
+  <p>A small set of paths sits outside this order entirely. Writes to <code>.git</code>, to shell configuration files, to hook and package-manager configuration, and to the agent's own <code>.claude</code> directory are treated as <strong>protected paths</strong> and are never auto-approved by an allow rule, because a rule granting the agent permission to edit the file that defines its permissions is a rule that grants everything. The design principle is worth taking away even if the specific list changes: the configuration that constrains the agent must not itself be inside the agent's unconstrained reach.</p>
+
+  <div class="defcard">
+    <strong>Advisory versus enforced.</strong> Instruction files are advisory: they influence the model's choice. Permission rules and hooks are enforced: they act on the call after the choice is made. If a requirement must hold every time without exception, it belongs on the enforced side, and putting it in an instruction file is a category error.
+  </div>
+
+  <div class="defcard">
+    <strong>Permission mode.</strong> The default disposition towards calls that no explicit rule resolved. It sets the baseline; rules layer on top and are evaluated first.
+  </div>
+
+  <div class="defcard">
+    <strong>Protected path.</strong> A file or directory whose modification is never auto-approved, because it governs repository state or the agent's own configuration. Allow rules do not override the protection.
+  </div>
+
+  <h3>Configuration precedence</h3>
+
+  <p>Settings come from four scopes, and the precedence runs from organisation-managed policy at the top, through command-line arguments, then local repository settings, then shared project settings, and finally your user-level settings at the bottom. The mental model is the familiar one from any layered configuration system: the more specific and the more authoritative the source, the later it is applied. Permission rules are the exception that catches people out. They <em>merge</em> across scopes rather than overriding, and a deny anywhere in the stack beats an allow everywhere else. That is the correct behaviour for a safety mechanism: a project cannot quietly grant itself a permission your user settings withheld.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Scope</th><th>Typical location</th><th>Applies to</th><th>Shared with the team</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Managed</td><td>Deployed by IT policy</td><td>Everyone in the organisation</td><td>Yes, and cannot be overridden</td></tr>
+      <tr><td>User</td><td><code>~/.claude/settings.json</code></td><td>You, in every project</td><td>No</td></tr>
+      <tr><td>Project</td><td><code>.claude/settings.json</code></td><td>Everyone who clones the repository</td><td>Yes, via git</td></tr>
+      <tr><td>Local</td><td><code>.claude/settings.local.json</code></td><td>You, in this repository only</td><td>No, gitignored</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The split that matters in daily use is between project and local. Project settings are a team artefact and should be reviewed like code: they are the place for the linter hook everyone should run and the allowlist covering the repository's own build commands. Local settings are a scratchpad: they are where the harness records the one-off approvals you granted during a session. Treating the second as if it were the first is how allowlists rot, which is the subject of this lecture's worked example.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The permission modes</h3>
+
+  <p>Modes sit on a spectrum from reviewing everything to reviewing nothing. The names below are current at the time of writing; the shape is what to remember.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Mode</th><th>Runs without asking</th><th>Use it for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>default</code> (shown as Manual)</td><td>Reads only</td><td>Unfamiliar repositories, anything touching production</td></tr>
+      <tr><td><code>acceptEdits</code></td><td>Reads, file edits in scope, common filesystem commands</td><td>Iterating on code you will read as a diff afterwards</td></tr>
+      <tr><td><code>plan</code></td><td>Reads and exploration; edits blocked until you approve a plan</td><td>Understanding before changing. The default for anything non-trivial</td></tr>
+      <tr><td><code>auto</code></td><td>Most things, with a separate classifier model vetting each action</td><td>Long tasks where prompt fatigue is the bigger risk</td></tr>
+      <tr><td><code>dontAsk</code></td><td>Only what your allow rules pre-approve; everything else is denied</td><td>CI and scripts, where there is nobody to prompt</td></tr>
+      <tr><td><code>bypassPermissions</code></td><td>Everything</td><td>Isolated containers and virtual machines, and nowhere else</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Two of these deserve comment. <strong>Plan mode</strong> is the one to make habitual, because it enforces the separation between research and execution that Lecture 1 argued for: the agent explores and proposes, you argue with the proposal, and only then does anything get written. The documentation is honest that it adds overhead and is not worth it for a typo, and the test it offers is a good one: if you could describe the diff in one sentence, skip the plan.</p>
+
+  <p><strong>Auto mode</strong> is a different design idea and worth understanding rather than merely using. Rather than asking you about each action, a separate classifier model reviews the proposed action against the conversation and blocks the categories that constitute escalation: downloading and executing code, sending sensitive data outward, destroying things that existed before the session, force-pushing, touching production. Notably, it also treats boundaries you state in conversation as blocks, so telling the agent "do not push until I have reviewed" is honoured by the classifier and not merely by the model's good intentions. The honest limitation is stated in the documentation and worth repeating: it reduces prompts, it does not guarantee safety, and it is not a substitute for reviewing sensitive operations.</p>
+
+  <h3>Permission rules</h3>
+
+  <p>Rules are patterns matched against tool calls, sorted into three lists. An <code>allow</code> entry runs the matching call silently. An <code>ask</code> entry forces a prompt even in permissive modes. A <code>deny</code> entry refuses outright, in every mode, including the permissive ones. The syntax names the tool and, optionally, constrains its argument.</p>
+
+  <pre><code class="language-json">{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(pytest -q:*)",
+      "WebFetch(domain:docs.python.org)"
+    ],
+    "ask": [
+      "Bash(git push:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Bash(curl:*)"
+    ]
+  }
+}</code></pre>
+
+  <p>The deny list is the part people underuse. It is the only mechanism that holds in every mode, so it is where secrets belong: environment files, credential directories, key material. Writing <code>Read(./.env)</code> into a deny list costs one line and removes an entire category of accident, including the accident where a well-meaning agent reads a credential in order to help and thereby writes it into a transcript that syncs somewhere. That is worth doing in a repository long before it is worth tuning anything else.</p>
+
+  <h3>Sessions, checkpoints, and the reset habit</h3>
+
+  <p>The session is the fourth responsibility, and it is context management wearing different clothes. Four controls do most of the work. <strong>Clearing</strong> resets the window between unrelated tasks and is the single most underused command in the interface: a session carrying an hour of unrelated history starts every new task already impaired. <strong>Compacting</strong> summarises rather than discards, and takes an instruction, so you can tell it what to preserve. <strong>Rewinding</strong> restores a previous conversation and code state, which converts risky experiments into cheap ones, though it only tracks changes made through the editing tools and is therefore not a substitute for git. <strong>Resuming</strong> reopens a named session later, which makes long-running work survivable across days.</p>
+
+  <p>The habit worth building from these is the reset. The documented failure pattern is exact and recognisable: you correct the agent, it is still wrong, you correct again, and the context is now full of failed approaches that make the next attempt worse. After two failed corrections, clearing and rewriting the initial prompt with what you learned beats a third correction almost every time. This feels like giving up and is actually the cheapest available move, because it removes the accumulated wrong turns rather than adding to them.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    The most consequential misconfiguration is running in <code>bypassPermissions</code> on a machine that matters, usually adopted after a frustrating afternoon of approvals. It removes every enforced boundary at once, and it offers no protection against the failure mode that boundaries exist for: content the agent reads containing text that reads as an instruction. If prompt fatigue is the problem, the proportionate answers are a specific allowlist for the commands you actually run, or auto mode with its classifier, or a sandbox. If you genuinely need everything permitted, the correct venue is a container or virtual machine with nothing in it you would miss.
+  </div>
+
+  <h3>Worked example: how an allowlist rots</h3>
+
+  <div class="worked">
+    <strong>Worked example: the local settings file in this repository</strong>
+    <p>The <code>docs/lectures/</code> folder in this repository carries a <code>.claude/settings.local.json</code> with about fifteen allow entries, accumulated over many sessions by approving prompts as they appeared. It is a good specimen because it is real, and because almost every entry in it is useless.</p>
+    <p><strong>What is in it.</strong> Entries such as a PDF text extraction naming one specific input file and one specific output file, both by absolute path. A Python one-liner that imports three libraries and prints their versions, recorded character for character. A directory listing with a hardcoded substring operation on a hardcoded path. Each was granted once, in one session, to unblock one command.</p>
+    <p><strong>Why they are dead.</strong> A rule earns its keep by matching a future call. An entry naming a specific file that was converted once will never match again, because the next PDF has a different name. The allowlist has grown by fifteen entries and reduced future prompting by approximately zero, while becoming long enough that nobody will read it to check what it grants.</p>
+    <p><strong>What the same file should contain.</strong> The pattern the sessions actually repeat, which is reading anything under the docs tree and running the ordinary read-only git commands. Three or four entries of the form <code>Read(docs/**)</code> and <code>Bash(git log:*)</code> would have covered the great majority of the prompts that the fifteen specific entries were each approved to silence. Generality is the whole point of an allowlist: a rule that matches one historical invocation is a record of the past, not a permission for the future.</p>
+    <p><strong>The wider lesson, and the honest cost.</strong> Approving prompts as they arrive produces an allowlist optimised for what already happened. Periodically rewriting it towards the patterns you repeat, and moving the genuinely shared ones up into a reviewed project settings file, is a five-minute maintenance job that nobody ever schedules. The cost of not doing it is not primarily security, since the dead entries grant nothing reachable; it is that the file becomes unreadable, and an unreadable permission file cannot be audited, which means that when a broad entry does eventually appear in it, nobody notices.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The harness assembles context, defines the action space, gates every action, and owns the session, and those four responsibilities account for nearly everything people attribute to the model. Permission resolution follows a fixed order: your explicit rules first, then the automatic approval of reads and in-scope edits, then whatever the mode says about the remainder, with protected paths sitting outside the order entirely. Rules are enforced and instructions are advisory, so anything that must hold every time belongs in a rule or a hook. Settings layer across four scopes, with permissions merging rather than overriding and deny beating allow. And the session controls, clear, compact, rewind, resume, are context management by another name, with clearing after two failed corrections the highest-value habit among them.</p>
+
+  <p>The wider point is that configuring a harness is the act of deciding, in advance and in writing, what you are prepared not to look at. That is a genuine engineering decision with a genuine cost on both sides, and it deserves the same care as any other. The next lecture takes the last of the four foundational choices: which model to put inside the harness, and how much thinking to buy, given that the answer changes with the phase of the work rather than with your budget.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the harness's four responsibilities, and give a symptom that points at each.</li>
+      <li>Explain the difference between advisory and enforced constraints. Which side does a CLAUDE.md rule sit on, and what follows?</li>
+      <li>State the permission decision order. Where does a deny rule take effect, and in which modes does it hold?</li>
+      <li>What is a protected path, and why must allow rules not override the protection?</li>
+      <li>Four settings scopes exist. Which one wins, and what is the exception in how permission rules combine?</li>
+      <li>Contrast plan mode and auto mode. What problem does each solve, and what does auto mode explicitly not guarantee?</li>
+      <li>An allowlist has thirty entries and you are still approving prompts constantly. Diagnose the likely cause and state the fix.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="02-context_engineering.html">Lecture 2 (context engineering)</a> covered the first of the four responsibilities, context assembly, in its own right.</li>
+      <li><strong>Next:</strong> Lecture 4 (choosing the model and the effort) completes the foundations by asking what goes inside the harness.</li>
+      <li><strong>Cross-link:</strong> Lecture 9 (hooks and settings) returns to the enforced side of the advisory-versus-enforced distinction introduced here.</li>
+      <li><strong>Cross-link:</strong> Lecture 20 (security and confidentiality) develops the prompt-injection threat model that the permission architecture is built against.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/12-project_setup.html">Software engineering, Lecture 12 (project setup)</a> covers the wider question of what configuration belongs in a repository and what belongs on a machine.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "Best practices for Claude Code", "Choose a permission mode", and "Configuration reference", code.claude.com/docs; Anthropic, "Writing effective tools for AI agents" and "Effective harnesses for long-running agents", anthropic.com/engineering.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 3 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

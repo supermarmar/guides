@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 13: systematic debugging</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Systematic debugging: hypothesis before fix</h1>
+  <p class="subtitle">An agent shown an error will produce a fix within seconds, and it will be the fix that error usually needs. Usually is the problem. Debugging discipline is the practice of refusing to act on a diagnosis you have not yet earned, and it matters more now precisely because the unearned diagnosis arrives so fast and so plausibly.</p>
+  <div class="meta">
+    <span>Lecture 13 of 22</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part III: verification</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The discipline is four steps and the order is the whole of it. <strong>Reproduce</strong>: make the failure happen on demand, because a bug you cannot summon is a bug you cannot confirm you have fixed. <strong>Isolate</strong>: narrow it until the failing surface is small, by bisection, by deletion, by binary search through the input. <strong>Explain</strong>: state the mechanism in a sentence that accounts for every observed symptom. <strong>Then fix</strong>, and verify by watching the reproduction stop failing.</p>
+
+  <p>The agent's characteristic failure is to compress all four into one. It reads the stack trace, recognises the shape, and emits the fix that shape normally requires. Often that is right, which is exactly what makes it dangerous: a technique that works most of the time trains you to skip the check that catches the rest. The documented framing puts it as addressing root causes rather than symptoms, and pairs the instruction with an explicit prohibition on suppressing the error, because suppression is the most available wrong fix.</p>
+
+  <p>The counter-discipline is a rule you can state in one line and enforce with a prompt: <strong>no fix without an explanation that predicts the symptoms</strong>. If the account of the mechanism does not explain why the failure is intermittent, or why it only happens on that one machine, or why the log line appears twice, then the account is incomplete and the fix built on it is a guess wearing a diagnosis.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Before applying any fix, answer: what did I believe about this system that was wrong? A real diagnosis always identifies a false belief. If you can describe the fix but cannot name the misconception it corrects, you have found a change that makes the symptom go away, which is a different and much weaker thing.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    This is the scientific method with a shorter feedback loop, and the failure mode is the one Popper cared about: a hypothesis that cannot fail is not doing any work. "There is a race condition somewhere" is unfalsifiable and therefore useless; "the cache is read before the write completes, which is why it only fails under load and always on the first request after a deploy" makes predictions you can test. The reason agents are prone to the unfalsifiable version is structural rather than a defect of reasoning: they are trained to produce the most probable continuation, and the most probable explanation for a stack trace is the one that most often accompanies it, not the one that is true this time.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that a symptom fix does not merely fail to solve the problem; it conceals it. A clamp on an out-of-range value, a retry around a flaky call, a broadened exception handler: each removes the evidence that something is wrong while leaving the wrongness in place. The next person to encounter the underlying defect will find it harder, because the signal that would have led them to it has been suppressed by a change that looks like a fix and passes review.</p>
+
+  <p>The second reason is that speed inverts the usual economics of care. When a fix took an hour to write, the ten minutes spent confirming the diagnosis were obviously worth it. When a fix takes twenty seconds, the same ten minutes feel disproportionate, and the temptation is to try the fix and see. Trying is sometimes right, but it is a different activity from debugging and it needs to be a decision rather than a drift.</p>
+
+  <p>The third reason is that intermittent failures are exactly where the shortcut fails and exactly where they are most common. A bug that reproduces every time survives a bad diagnosis, because the wrong fix visibly does not work. A bug that fails one run in five will be declared fixed after one clean run, and the declaration will be sincere. Any debugging practice that does not explicitly handle intermittency will keep producing confident wrong conclusions about the hardest bugs you have.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Four steps, and the gate between three and four</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four debugging steps with a gate before the fix">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The shortcut jumps from symptom straight to fix</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <rect x="30"  y="50" width="140" height="50" rx="9" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="100" y="71" text-anchor="middle" font-weight="600" fill="#2A3A78">1. Reproduce</text>
+        <text x="100" y="89" text-anchor="middle" font-size="10.5" fill="#2A3A78">on demand</text>
+
+        <rect x="195" y="50" width="140" height="50" rx="9" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="265" y="71" text-anchor="middle" font-weight="600" fill="#3D2EB5">2. Isolate</text>
+        <text x="265" y="89" text-anchor="middle" font-size="10.5" fill="#3D2EB5">shrink the surface</text>
+
+        <rect x="360" y="50" width="140" height="50" rx="9" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="430" y="71" text-anchor="middle" font-weight="600" fill="#C76B2A">3. Explain</text>
+        <text x="430" y="89" text-anchor="middle" font-size="10.5" fill="#C76B2A">mechanism, in a sentence</text>
+
+        <rect x="560" y="50" width="140" height="50" rx="9" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="630" y="71" text-anchor="middle" font-weight="600" fill="#1E9D54">4. Fix and verify</text>
+        <text x="630" y="89" text-anchor="middle" font-size="10.5" fill="#1E9D54">watch the red go green</text>
+
+        <line x1="170" y1="75" x2="189" y2="75" stroke="#71717a" stroke-width="1.5" marker-end="url(#db)"/>
+        <line x1="335" y1="75" x2="354" y2="75" stroke="#71717a" stroke-width="1.5" marker-end="url(#db)"/>
+        <line x1="500" y1="75" x2="554" y2="75" stroke="#C76B2A" stroke-width="2.5" marker-end="url(#db2)"/>
+        <text x="527" y="42" text-anchor="middle" font-size="10.5" font-weight="600" fill="#C76B2A">gate</text>
+
+        <path d="M100 106 Q 360 165 620 106" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#db3)"/>
+        <text x="360" y="160" text-anchor="middle" font-size="11" font-weight="600" fill="#dc2626">the shortcut: plausible, fast, and right most of the time</text>
+        <text x="360" y="192" text-anchor="middle" font-size="11" font-style="italic" fill="#71717a">The gate asks one question: does your explanation account for every symptom?</text>
+        <text x="360" y="212" text-anchor="middle" font-size="11" font-style="italic" fill="#71717a">If a symptom is unexplained, the diagnosis is incomplete, whatever the fix does.</text>
+      </g>
+
+      <defs>
+        <marker id="db" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+        <marker id="db2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#C76B2A"/>
+        </marker>
+        <marker id="db3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>The dashed path is not always wrong, which is what makes it hard to give up. The gate is cheap: one sentence, checked against the symptom list.</figcaption>
+  </figure>
+
+  <h3>Where the agent genuinely helps</h3>
+
+  <p>Three parts of this are much faster with an agent, and it is worth being specific so the discipline does not read as a general slowdown.</p>
+
+  <p><strong>Reproduction.</strong> Turning a vague report into a failing test is mechanical, tedious, and exactly the sort of thing to delegate. "Users say login fails after session timeout" becomes a test that logs in, advances the clock, and asserts the failure. This is the highest-value delegation in debugging because the artefact it produces is the thing everything else depends on.</p>
+
+  <p><strong>Isolation.</strong> Bisection is a search, and searches are cheap to automate. <code>git bisect</code> against a reproduction script finds the introducing commit in a logarithmic number of steps, and an agent can drive the whole loop. Equally, narrowing an input by repeated halving until the smallest failing case remains is pure mechanism.</p>
+
+  <p><strong>Surveying the surface.</strong> "Every place this value can be written" is a search across the codebase with a short answer, which is the delegation shape from Lecture 10. What comes back is not a diagnosis, it is the candidate list a diagnosis will be chosen from.</p>
+
+  <p>What the agent should not do unsupervised is step three, and the reason is not competence. It is that step three is where a wrong answer is indistinguishable from a right one until much later, so it is the step that most needs a second party.</p>
+
+  <div class="defcard">
+    <strong>Root cause versus symptom.</strong> A root-cause fix changes the thing that was wrong; a symptom fix changes what you observe. The test is whether the fix would still be needed if you could see the system perfectly. A clamp would not be; a corrected transform would.
+  </div>
+
+  <div class="defcard">
+    <strong>Bisection.</strong> Binary search over a dimension that separates working from broken: commits, inputs, configuration, or code paths. Converts an unbounded search into a logarithmic one, and requires only a reliable reproduction and an ordering.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Prompts that enforce the order</h3>
+
+  <p>The discipline can be built into the request, which is more reliable than intending to apply it afterwards.</p>
+
+  <pre><code class="language-text">Do not propose a fix yet.
+
+1. Write a test that reproduces this failure. Run it and show me the output.
+2. Tell me the mechanism: what is happening, in one or two sentences, and
+   why that explains (a) why it is intermittent and (b) why it only affects
+   the batch path.
+3. Wait for me to agree before changing anything outside tests/.</code></pre>
+
+  <p>The numbered structure matters less than the two constraints inside it. Naming the specific symptoms the explanation must account for is what converts a plausible story into a falsifiable one, because a generic race-condition answer cannot satisfy a demand to explain why only the batch path is affected. And the explicit hold before implementation prevents the compression of steps three and four, which is the failure this whole lecture is about.</p>
+
+  <h3>Intermittency, handled honestly</h3>
+
+  <p>Intermittent bugs need a different verification standard and it is worth stating numerically rather than by feel. If a bug reproduces one run in five, a single clean run after a fix is close to no evidence: you would expect that outcome four times in five with no fix at all. Twenty clean runs is evidence. The rule is to know your base rate and require enough passes that the observed result would be unlikely under the null hypothesis of no change, which is the same logic as any other test of a proportion.</p>
+
+  <p>The related discipline is to state up front what result would count. "Run the reproduction fifty times and report the failure count before and after" is a specification an agent can execute and you can read. "Check it is fixed" is an invitation to a single run and a confident conclusion.</p>
+
+  <h3>Knowing when to stop</h3>
+
+  <p>Debugging has a failure mode of its own, which is the loop that will not terminate: attempt, fail, adjust, fail, adjust. Two rules cut it short. The first is Lecture 6's counting rule, applied here: after two failed corrections the context is full of dead ends, and clearing it and restarting with what you learned beats a third attempt. The second is escalation by kind rather than by effort. If three attempts have failed, the next move is not a fourth attempt but a change of approach: a different tool, a fresh pair of eyes, a subagent with a clean context, or a decision that the bug is not worth this today.</p>
+
+  <p>Recognising a non-terminating loop is a skill and the signal is specific: you are trying variations rather than testing hypotheses. Variations mean you have run out of theory and are searching, and searching by hand is the least efficient available method.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    "It works now" after a change you do not fully understand is the most expensive sentence in debugging. Sometimes the change fixed it. Sometimes it perturbed the timing, or the ordering, or the cache state, and the bug is still there and will return in a worse place. The distinguishing question is whether you can explain why the change fixed it. If not, you have not fixed it, you have moved it, and the honest record is a note saying so rather than a commit message claiming a fix.
+  </div>
+
+  <h3>Worked example: a failure in this session that was not debugged</h3>
+
+  <div class="worked">
+    <strong>Worked example: the browser render check, and the decision to stop</strong>
+    <p>Verifying the first four lectures included opening them in a browser to confirm the stylesheet resolved and the inline SVG figures rendered. The Chrome extension timed out twice on the first call, with an error suggesting the page might be loading, unresponsive, or waiting on a permission prompt. After the second attempt the browser check was abandoned and the limitation reported: everything structural verified, the visual render unconfirmed.</p>
+    <p><strong>Why stopping was defensible.</strong> The tooling guidance is explicit that repeated browser-automation failures should end in a report rather than a third attempt, and there was a real cost to continuing: the failure was in someone else's process, the diagnosis would have involved a permission dialog nobody could see, and the remaining risk was low because the path and class checks cover the plausible causes of a broken render. Reporting the gap rather than papering over it was the right call.</p>
+    <p><strong>Why it was still not debugging.</strong> No step of the four was performed. The failure was never reproduced deliberately, never isolated, and never explained. The error message offered three distinct hypotheses, loading, unresponsive, or awaiting a permission prompt, and no attempt was made to distinguish them, which would have cost one lighter call to a different tool as the error message itself suggested. What happened was a decision to abandon, correctly made, and it should not be mistaken for a diagnosis. The honest statement is "unknown cause, accepted risk", not "the extension was unavailable".</p>
+    <p><strong>What the systematic version would have cost.</strong> Two or three minutes. Reproduce: call the tool a third time and observe whether the failure is consistent. Isolate: call a lighter operation on the same connection, which separates "extension unreachable" from "this operation is heavy". Explain: if the light call succeeds, the hypothesis is a heavy operation timing out and the fix is a different verification route entirely rather than a retry of the same one. That path might well have produced a render check by a different means, which is the thing that was actually wanted.</p>
+    <p><strong>The general lesson.</strong> There is a real difference between <em>stopping</em> and <em>concluding</em>, and reports blur them constantly. Stopping is a resource decision and is often correct. Concluding requires the four steps. When a report says a thing failed because of some named cause, ask which of the two happened, because an accepted unknown that has been quietly written up as a known cause is how a recurring problem becomes invisible.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Reproduce, isolate, explain, then fix, with the gate between the third and fourth steps carrying the discipline. Delegate reproduction, bisection, and surveying, which are mechanical and fast; keep explanation supervised, because a wrong explanation is indistinguishable from a right one until much later. Demand that the account predict every symptom, especially intermittency and specificity of scope, since a generic story cannot. Set the verification bar by the base rate rather than by feel. And distinguish stopping from concluding, because a resource decision written up as a diagnosis is how a problem gets lost.</p>
+
+  <p>The wider point is that all three lectures in this part are the same argument in different settings: the model produces plausible output at high speed, plausibility no longer tracks correctness, and the remedy is a procedure that does not depend on the output looking right. Tests provide it mechanically, review provides it deliberately, and debugging provides it by demanding an explanation. The last lecture in this part turns the argument on the conversation itself, where the same fluency problem appears as agreement, and where the thing you need checking is your own reasoning.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the four steps. Where does the shortcut cut across, and why is it tempting?</li>
+      <li>What must an explanation do before it licenses a fix?</li>
+      <li>Distinguish a root-cause fix from a symptom fix. Give the test that separates them.</li>
+      <li>Which parts of debugging should be delegated, and which should not? Say why for the exception.</li>
+      <li>A bug reproduces one run in five. Why is one clean run after a fix almost no evidence?</li>
+      <li>What signal tells you a debugging session has become a non-terminating loop, and what should you do?</li>
+      <li>Explain the difference between stopping and concluding, and why reports confuse them.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="12-reviewing_agent_output.html">Lecture 12 (reviewing agent output)</a> covered catching problems before they ship; this covers those that got through.</li>
+      <li><strong>Next:</strong> Lecture 14 (anti-sycophancy) turns the verification question on the conversation itself.</li>
+      <li><strong>Cross-link:</strong> <a href="11-tdd_with_agents.html">Lecture 11 (TDD with agents)</a> supplies the reproduction-as-test discipline this lecture depends on.</li>
+      <li><strong>Cross-link:</strong> <a href="06-prompting_for_code.html">Lecture 6 (prompting for code)</a> introduced the two-correction rule that also bounds a debugging loop.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/06-debugging_and_profiling.html">Software engineering, Lecture 6 (debugging and profiling)</a> covers the tooling, including <code>git bisect</code>, in its own right.</li>
+      <li><strong>Outside this course:</strong> David Agans, <em>Debugging: The 9 Indispensable Rules</em> (Amacom, 2002); Anthropic, "Best practices for Claude Code", code.claude.com/docs/en/best-practices (address root causes, do not suppress the error).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 13 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

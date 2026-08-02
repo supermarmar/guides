@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 8: skills</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Skills: when a folder of instructions beats a prompt</h1>
+  <p class="subtitle">A skill is a procedure that lives in a file and loads only when it is needed. That last clause is the whole design: the description is always in context, the body is not, and the difference is what lets a machine carry fifty procedures without carrying fifty procedures' worth of tokens.</p>
+  <div class="meta">
+    <span>Lecture 8 of 22</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part II: steering the agent</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>skill</strong> is a directory containing a <code>SKILL.md</code> with YAML frontmatter and a markdown body, plus any supporting files it needs. The frontmatter's <code>description</code> sits in context from the start of the session so the agent knows the skill exists and when it applies. The body loads only when the skill is invoked, either by you typing <code>/name</code> or by the agent judging it relevant. This is <strong>progressive disclosure</strong>, and it is the mechanism that makes a large library of procedures affordable.</p>
+
+  <p>The documented trigger for creating one is a good test: <em>when you keep pasting the same instructions, checklist, or multi-step procedure into chat, or when a section of CLAUDE.md has grown into a procedure rather than a fact.</em> Both symptoms point at the same thing. The material is real, it is not needed every turn, and it is currently either being retyped or paying rent it does not earn. A skill is where it belongs.</p>
+
+  <p>One property matters more than any other and is routinely missed: <strong>once a skill is invoked, its rendered content stays in context for the rest of the session.</strong> Skills are not paid for per use; they are paid for once and then carried. That reframes the design constraint completely. The body is not a document you visit, it is a document you adopt, and every line in it becomes a recurring cost from the moment of invocation. The same conciseness test that applies to CLAUDE.md applies here, just deferred.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Three tiers, three costs. The description is cheap and always present, so it must be excellent at answering "does this apply?". The body is expensive from the moment it loads and permanent thereafter, so it must be short and prescriptive. Supporting files are free until read, so that is where anything long belongs. Put material in the wrong tier and you either pay for what you do not use or fail to be found when you are needed.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Progressive disclosure is an old interface principle, from Nielsen's usability work and before that from technical writing: show the summary, let the reader descend. What is new is that the reader is a system with a hard budget and a documented recall decay, which turns a courtesy into an architecture. Notice also that skills follow an open standard rather than a vendor format, which changes what you are writing when you author one. A well-written skill is a portable artefact describing how your team does something, and that is a more durable thing to own than a configuration file for one tool.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that it resolves the tension Lecture 5 left open. Instruction files decay because people put procedures in them, and procedures are long, conditional, and relevant to a small fraction of sessions. There was previously nowhere else to put them. Skills are that place, and moving procedural content out of CLAUDE.md is usually the single largest available reduction in always-loaded context.</p>
+
+  <p>The second reason is that a skill is executable institutional knowledge. The deployment checklist that lives in one person's head, the review process nobody wrote down, the eight steps for cutting a release: as a skill, each becomes something the agent performs consistently rather than something a human remembers imperfectly. It is checked into the repository, reviewable, and versioned, which is more than can be said for the wiki page it replaces.</p>
+
+  <p>The third reason is that skills are where the model's own judgement gets to participate in retrieval. You do not have to know that a procedure applies; the agent reads the descriptions and decides. That is a genuine capability, and it fails in a specific and diagnosable way when the description is written for a human index rather than for a matching decision. Most skill problems are description problems, which is why the description gets a section of its own below.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Three tiers</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The three tiers of a skill and when each is paid for">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">What is in context, and from when</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <rect x="70" y="44" width="620" height="44" rx="9" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="92" y="64" font-weight="600" fill="#2A3A78">1. name + description</text>
+        <text x="300" y="64" fill="#2A3A78">in context from session start, for every installed skill</text>
+        <text x="300" y="80" font-size="10.5" fill="#2A3A78">must answer: does this apply to what the user just asked?</text>
+
+        <rect x="70" y="100" width="620" height="44" rx="9" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="92" y="120" font-weight="600" fill="#C76B2A">2. SKILL.md body</text>
+        <text x="300" y="120" fill="#C76B2A">loads on invocation, then stays for the whole session</text>
+        <text x="300" y="136" font-size="10.5" fill="#C76B2A">not per-use: paid once, carried thereafter — keep it short</text>
+
+        <rect x="70" y="156" width="620" height="44" rx="9" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="92" y="176" font-weight="600" fill="#1E9D54">3. supporting files</text>
+        <text x="300" y="176" fill="#1E9D54">read only if the body points at them and they are needed</text>
+        <text x="300" y="192" font-size="10.5" fill="#1E9D54">where reference tables, long examples, and scripts belong</text>
+
+        <text x="380" y="228" text-anchor="middle" font-size="11" font-style="italic" fill="#71717a">Long material in tier 2 is the common design error. It belongs in tier 3.</text>
+      </g>
+    </svg>
+    <figcaption>The tiers are not about importance but about how often the content is needed. A critical rule used in every invocation belongs in the body; a comprehensive reference consulted once in ten belongs in a file the body names.</figcaption>
+  </figure>
+
+  <h3>Where skills live</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Scope</th><th>Path</th><th>Applies to</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Enterprise</td><td>Managed settings location</td><td>Everyone in the organisation</td></tr>
+      <tr><td>Personal</td><td><code>~/.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>You, in every project</td></tr>
+      <tr><td>Project</td><td><code>.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>This repository, shared via git</td></tr>
+      <tr><td>Plugin</td><td><code>&lt;plugin&gt;/skills/&lt;name&gt;/SKILL.md</code></td><td>Wherever the plugin is enabled</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>On a name collision, enterprise beats personal beats project, and any of them overrides a bundled skill of the same name, which is how you replace a built-in with your own. Plugin skills are namespaced as <code>plugin:skill</code> and so cannot collide. Skills also load from nested <code>.claude/skills/</code> directories below the working directory, appearing under a directory-qualified name such as <code>apps/web:deploy</code>, which lets a monorepo package carry procedures that apply only when working inside it.</p>
+
+  <h3>The frontmatter that matters</h3>
+
+  <p>The field list is long; six fields account for nearly all practical use.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Field</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>description</code></td><td>What the skill does and when to use it. The matching signal. Put the key use case first</td></tr>
+      <tr><td><code>disable-model-invocation</code></td><td><code>true</code> stops the agent triggering it automatically. For side-effectful workflows you want to fire yourself</td></tr>
+      <tr><td><code>allowed-tools</code></td><td>Tools pre-approved for the turn that invokes the skill. Clears on your next message</td></tr>
+      <tr><td><code>paths</code></td><td>Globs limiting automatic activation to sessions touching matching files</td></tr>
+      <tr><td><code>context: fork</code></td><td>Runs the skill in its own subagent context rather than inline</td></tr>
+      <tr><td><code>model</code>, <code>effort</code></td><td>Override the model or effort level while the skill is active</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Two of these deserve emphasis. <code>disable-model-invocation: true</code> is the right default for anything with side effects, because a deployment skill that the model may invoke on its own judgement is a deployment that can happen without you asking. And <code>context: fork</code> is the answer to the lifecycle problem: a forked skill runs in a separate context and returns a result, so its body never enters your window at all, which makes it the correct choice for long procedures whose output you want but whose steps you do not need to carry.</p>
+
+  <div class="defcard">
+    <strong>Progressive disclosure.</strong> Loading a description always, a body on invocation, and reference material only on demand. The pattern that lets a skill library scale without its token cost scaling with it.
+  </div>
+
+  <div class="defcard">
+    <strong>Skill lifecycle.</strong> Invoked content enters the conversation once and persists for the session. Re-invoking with identical content adds a note rather than a second copy; compaction re-attaches recent skills within a bounded budget, so older ones can be dropped entirely.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Writing a description that gets matched</h3>
+
+  <p>The description is doing retrieval, not documentation, and the two are written differently. It has to answer one question from the agent's position: <em>given what the user just said, does this apply?</em> That means naming the situation rather than the artefact.</p>
+
+  <pre><code class="language-yaml"># Weak: describes what it is
+description: Deployment documentation
+
+# Better: describes what it does
+description: Deploys the application to production
+
+# Best: names the situations that should trigger it
+description: Use when deploying to production, cutting a release, or promoting
+  a build from staging. Covers the pre-flight checks, the migration order, and
+  the rollback procedure.</code></pre>
+
+  <p>Two documented constraints shape this. The combined description text is truncated at 1,536 characters in the skill listing, so the key use case must come first or it may not survive. And the two failure modes are opposite and both diagnosable: a skill that never triggers has a description that does not name the user's actual words, while a skill that triggers too often has one that is too broad. Both are fixed in the same place, and neither is fixed by editing the body.</p>
+
+  <h3>Keeping the body short, and where the rest goes</h3>
+
+  <p>Because the body persists for the session, length is a recurring cost rather than a one-off. The documented guidance is to state what to do rather than narrating how or why. Rationale is for humans reading the file; the agent needs the steps.</p>
+
+  <p>Anything long goes into supporting files that the body references by path. A reference table of forty error codes, a worked example that runs to two pages, a script the procedure invokes: all of these belong beside the <code>SKILL.md</code> rather than inside it. The body then says "for the full error mapping see <code>references/errors.md</code>", and that file costs nothing until the situation arises. This is the same map-and-territory split from Lecture 2, applied one level down.</p>
+
+  <h3>Choosing between a skill, a rule, and a hook</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Use</th><th>When</th><th>Cost profile</th><th>Enforcement</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>CLAUDE.md</td><td>A fact true in every session in scope</td><td>Every turn, forever</td><td>Advisory</td></tr>
+      <tr><td>Path-scoped rule</td><td>A fact true for part of the codebase</td><td>Every turn once matched</td><td>Advisory</td></tr>
+      <tr><td>Skill</td><td>A procedure, invoked sometimes</td><td>Description always, body once invoked</td><td>Advisory</td></tr>
+      <tr><td>Hook</td><td>Something that must happen every time</td><td>None in context</td><td>Enforced</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The row people misuse is the third. A skill is not a way to make something happen reliably; the agent still has to decide to invoke it, and the documentation is explicit that if a skill seems to stop influencing behaviour, the content is usually still present and the model is simply choosing otherwise. If reliability is the requirement, the answer is the fourth row, which is the next lecture.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Invoking a large skill early in a session for a small piece of information costs you that skill's entire body for the remainder of the session. Because the content persists, a reference-heavy skill consulted once at turn three is still occupying the window at turn sixty, competing with everything since. Where you only need a fact, read the underlying file directly; where you need the procedure, invoke the skill; and where the procedure is long but its output is small, put <code>context: fork</code> in the frontmatter so the body runs elsewhere and only the conclusion comes back.
+  </div>
+
+  <h3>Worked example: two skills on this machine, and one loaded in this session</h3>
+
+  <div class="worked">
+    <strong>Worked example: anti-sycophancy, save-memory, and the cost of a large skill</strong>
+    <p>This machine carries two personal skills, and this session invoked a third that ships with the tool. All three illustrate different points.</p>
+    <p><strong>save-memory is the pattern working correctly.</strong> Its description names the triggering situations in the user's own likely words: "asks to save, remember, capture, record, or persist takeaways, lessons, decisions, or session findings". That is a retrieval description rather than a documentation one, and it will match. The content is genuinely a procedure, with a file format, a directory convention, and curation rules, so it is the right kind of material for a skill rather than a rule. And it is invoked rarely, so the deferred cost is the correct trade.</p>
+    <p><strong>anti-sycophancy shows the boundary problem.</strong> The same content exists twice: as a 51-line always-loaded rule file and as a skill. The rule file says the split is deliberate, with the skill carrying the worked examples. But as Lecture 5 argued, the division sits in the wrong place. The skill's own description already identifies exactly when the behaviour is load-bearing, "when the user shares a decision, plan, opinion, or piece of their own work" — which is precisely the condition under which the rule's forty lines of detail matter. Almost all of the rule could move into the skill and be paid for only when the situation arises.</p>
+    <p><strong>The claude-api skill shows the cost side honestly.</strong> Writing Lecture 4 required accurate model names and prices, so this session invoked the bundled <code>claude-api</code> skill. It returned an enormous body: the model table, per-language SDK documentation for seven languages, migration guides, caching guidance, managed-agents reference. It answered the question precisely, and under the lifecycle rule every line of it has been resident in this session's context ever since, through six subsequent lectures that have nothing to do with the API.</p>
+    <p><strong>What that costs, and what would have been better.</strong> This is not a criticism of the skill, which is well built and whose tiering is mostly right. It is an illustration of the pitfall above: the need was one table of four model prices, and the invocation delivered a reference manual. Reading the model table directly, or a version of the skill with <code>context: fork</code> so the lookup happened elsewhere and returned four rows, would have cost a small fraction of the same session. The general rule is worth stating plainly: <em>match the granularity of the invocation to the granularity of the need</em>, because with skills the invocation is the commitment, and there is no way to un-invoke one.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A skill is a folder with a <code>SKILL.md</code>, disclosed in three tiers: a description always in context, a body that loads on invocation and then persists for the session, and supporting files read only on demand. Create one when a procedure is being retyped or when a CLAUDE.md section has stopped being a fact. Write the description to answer a matching question rather than to document, and keep the body prescriptive because its cost recurs. Put length in supporting files. Use <code>disable-model-invocation</code> for anything with side effects and <code>context: fork</code> when the procedure is long but the answer is short. And remember what a skill is not: it is advisory, so it cannot make anything reliable.</p>
+
+  <p>Which is the seam this part of the course has been running along since Lecture 3. Instruction files, prompts, plans, and skills are all ways of asking well, and asking well is most of the practice. But some requirements are not requests: the linter that must run, the secret that must never be read, the test that must pass before a turn can end. The next lecture crosses to the other side of the line and covers the mechanisms the model does not get a vote on.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the three tiers of a skill and say when each enters context.</li>
+      <li>What happens to a skill's body after it is invoked? What design constraint follows?</li>
+      <li>Give the two documented triggers for creating a skill.</li>
+      <li>Rewrite "description: Deployment documentation" as a retrieval description, and say what makes it better.</li>
+      <li>A skill never triggers. A different one triggers constantly. Where is the fix in each case?</li>
+      <li>When should a skill carry <code>disable-model-invocation: true</code>, and when <code>context: fork</code>?</li>
+      <li>Why can a skill not be used to make something happen reliably, and what should be used instead?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="07-plan_mode_and_specs.html">Lecture 7 (plan mode and specs)</a> moved design decisions earlier; this lecture moves procedures out of chat.</li>
+      <li><strong>Next:</strong> Lecture 9 (hooks and settings) crosses from advisory to enforced.</li>
+      <li><strong>Cross-link:</strong> <a href="05-claude_md.html">Lecture 5 (CLAUDE.md)</a> supplies the four-way choice this lecture completes.</li>
+      <li><strong>Cross-link:</strong> <a href="02-context_engineering.html">Lecture 2 (context engineering)</a> introduced progressive disclosure as a general pattern.</li>
+      <li><strong>Cross-link:</strong> Lecture 10 (subagents) covers what <code>context: fork</code> is actually doing.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "Extend Claude with skills", code.claude.com/docs/en/skills (frontmatter reference, locations, lifecycle, troubleshooting); Anthropic, "Equipping agents for the real world with Agent Skills", anthropic.com/engineering; the Agent Skills open standard at agentskills.io.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 8 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

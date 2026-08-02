@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 2: Aggregation, pivoting and joining</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data analysis</a></div>
+  <h1>Aggregation, pivoting and joining</h1>
+  <p class="subtitle">Once you can load and select, the next move is folding the rectangle: many rows into one summary (groupby), tall into wide (pivot), or stitching two tables together (merge). These three verbs account for the bulk of analytical pandas work in production: every portfolio dashboard, every regulatory submission, every monitoring report is a groupby followed by a merge. The lecture closes with the time-series operations a date-indexed dataframe unlocks.</p>
+  <div class="meta">
+    <span>Lecture 2 of 5</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Part I: the dataframe layer</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Three verbs fold a dataframe. <strong>Groupby</strong> takes one rectangle and a key column, splits the rectangle into one piece per key value, applies an aggregation to each piece, and returns one row per group. <strong>Pivot</strong> takes the same rectangle and rearranges it from long format (one row per observation) to wide format (one column per category). <strong>Merge</strong> takes two rectangles sharing a key and produces a third rectangle with rows from one or both, depending on the join type. Almost every analytical question above the row level is a sequence of these three operations.</p>
+
+  <p>The discipline this lecture trains is <strong>knowing the cardinality of every join before you run it</strong>. A merge between two tables where each side has unique keys returns the join you expect. A merge where one side has duplicate keys multiplies rows; one where both sides have duplicates produces a Cartesian explosion. The bug is silent and only visible if you check the row count of the result. Half the wrong numbers in a junior analyst's portfolio deck come from an unchecked join cardinality.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A groupby is a SQL <code>GROUP BY</code>. A pivot is an Excel pivot table. A merge is a SQL <code>JOIN</code>. Pandas just gives you all three in one syntax, with the rectangle as a first-class object you can pass around. If you can already write the SQL, you can write the pandas; the only thing to learn is the spelling.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits</span>
+    Lecture 01 covered the load-and-shape verbs (load, inspect, select, transform). This lecture covers the fold-and-combine verbs. Together they cover roughly 80 per cent of every analytical pipeline. Lecture 03 reproduces both in Polars. Lectures 04 and 05 leave shape alone and start asking what the data <em>says</em>.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Every regulatory submission a bank makes is a groupby followed by a merge. The COREP capital templates report exposure-weighted risk parameters by asset class; that is a groupby on asset class with an exposure-weighted mean of PD, LGD, and EAD. The IFRS 9 staging dashboard reports loan counts and balances by stage and segment; that is a groupby on (stage, segment) with a sum and a count, presented as a pivot. The model monitoring pack compares this month's portfolio against last month's; that is a merge on segment of two groupby outputs. None of the substantive risk-modelling decisions in those documents work without the folding layer underneath, and silent errors in the folding layer corrupt every number a regulator sees.</p>
+
+  <p>The second reason is that <strong>most data lives in two or more tables and needs to be joined to answer any interesting question</strong>. A typical credit data warehouse has a customer table (one row per customer), a loan table (one row per loan, many per customer), a payment table (one row per payment, many per loan), and a default events table (one row per default event). Every analytical question crosses two or more of those tables. Getting the join wrong, on either the key or the cardinality, returns a number with no obvious sign that it is wrong.</p>
+
+  <p>The third reason is that the same operations, applied to the time axis, unlock a different question class: drift, trend, and seasonality. The <code>.resample</code>, <code>.rolling</code>, and <code>.shift</code> methods convert a date-indexed dataframe into the monthly default rate, the twelve-month rolling average loss, and the month-on-month change in originations. These are the building blocks of every credit risk monitoring report.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Three pictures, one per verb. <strong>Groupby</strong> is a split-apply-combine pattern: one input table becomes several mini-tables (one per key value), an aggregation is applied to each, and the per-group results are stacked into one output table. <strong>Pivot</strong> is a reshape: one column's values become column headers in the output, and another column's values become the cell contents, aggregated by a chosen function when several rows fall into the same cell. <strong>Merge</strong> is a join: two tables aligned on a shared key produce a third table whose columns are the union and whose rows depend on the join type (inner, left, right, outer).</p>
+
+  <figure>
+    <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three folding operations">
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three folding operations</text>
+
+      <!-- Groupby panel -->
+      <g>
+        <rect x="20" y="50" width="260" height="240" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="150" y="78" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#115e59">GROUPBY</text>
+        <text x="150" y="94" text-anchor="middle" font-family="Inter" font-size="10" fill="#0d9488">split &middot; apply &middot; combine</text>
+
+        <!-- input rect (many rows) -->
+        <g font-family="Inter" font-size="9" text-anchor="middle" fill="#115e59">
+          <rect x="50" y="110" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="80" y="120">A &middot; 5</text>
+          <rect x="50" y="124" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="80" y="134">A &middot; 7</text>
+          <rect x="50" y="138" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="80" y="148">B &middot; 3</text>
+          <rect x="50" y="152" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="80" y="162">A &middot; 9</text>
+          <rect x="50" y="166" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="80" y="176">B &middot; 6</text>
+          <rect x="50" y="180" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="80" y="190">C &middot; 4</text>
+        </g>
+
+        <!-- arrow -->
+        <text x="140" y="210" text-anchor="middle" font-family="Inter" font-size="14" fill="#0d9488">↓ mean</text>
+
+        <!-- output rect (few rows) -->
+        <g font-family="Inter" font-size="9" text-anchor="middle" fill="#115e59">
+          <rect x="170" y="220" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="200" y="230">A &middot; 7</text>
+          <rect x="170" y="234" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="200" y="244">B &middot; 4.5</text>
+          <rect x="170" y="248" width="60" height="14" fill="#fff" stroke="#0d9488"/><text x="200" y="258">C &middot; 4</text>
+        </g>
+
+        <text x="150" y="280" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">n rows → k rows (one per group)</text>
+      </g>
+
+      <!-- Pivot panel -->
+      <g>
+        <rect x="305" y="50" width="270" height="240" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="440" y="78" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#92400e">PIVOT</text>
+        <text x="440" y="94" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">long → wide reshape</text>
+
+        <!-- long input -->
+        <g font-family="Inter" font-size="9" text-anchor="middle" fill="#92400e">
+          <rect x="320" y="115" width="100" height="14" fill="#fff" stroke="#b45309"/><text x="370" y="125">A &middot; Jan &middot; 5</text>
+          <rect x="320" y="129" width="100" height="14" fill="#fff" stroke="#b45309"/><text x="370" y="139">A &middot; Feb &middot; 7</text>
+          <rect x="320" y="143" width="100" height="14" fill="#fff" stroke="#b45309"/><text x="370" y="153">B &middot; Jan &middot; 3</text>
+          <rect x="320" y="157" width="100" height="14" fill="#fff" stroke="#b45309"/><text x="370" y="167">B &middot; Feb &middot; 9</text>
+        </g>
+
+        <text x="440" y="190" text-anchor="middle" font-family="Inter" font-size="14" fill="#b45309">→ reshape</text>
+
+        <!-- wide output -->
+        <g font-family="Inter" font-size="9" text-anchor="middle" fill="#92400e">
+          <rect x="450" y="205" width="105" height="14" fill="#fef3c7" stroke="#b45309"/><text x="502" y="215" font-weight="600">id &middot; Jan &middot; Feb</text>
+          <rect x="450" y="219" width="105" height="14" fill="#fff" stroke="#b45309"/><text x="502" y="229">A &middot; 5 &middot; 7</text>
+          <rect x="450" y="233" width="105" height="14" fill="#fff" stroke="#b45309"/><text x="502" y="243">B &middot; 3 &middot; 9</text>
+        </g>
+
+        <text x="440" y="280" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">column values become column headers</text>
+      </g>
+
+      <!-- Merge panel -->
+      <g>
+        <rect x="600" y="50" width="260" height="240" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="730" y="78" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#5b21b6">MERGE</text>
+        <text x="730" y="94" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c3aed">two tables → one, on a key</text>
+
+        <!-- two input rects side-by-side -->
+        <g font-family="Inter" font-size="9" text-anchor="middle" fill="#5b21b6">
+          <rect x="615" y="115" width="80" height="14" fill="#fff" stroke="#7c3aed"/><text x="655" y="125" font-weight="600">id &middot; name</text>
+          <rect x="615" y="129" width="80" height="14" fill="#fff" stroke="#7c3aed"/><text x="655" y="139">1 &middot; A</text>
+          <rect x="615" y="143" width="80" height="14" fill="#fff" stroke="#7c3aed"/><text x="655" y="153">2 &middot; B</text>
+
+          <rect x="755" y="115" width="80" height="14" fill="#fff" stroke="#7c3aed"/><text x="795" y="125" font-weight="600">id &middot; amt</text>
+          <rect x="755" y="129" width="80" height="14" fill="#fff" stroke="#7c3aed"/><text x="795" y="139">1 &middot; 50</text>
+          <rect x="755" y="143" width="80" height="14" fill="#fff" stroke="#7c3aed"/><text x="795" y="153">2 &middot; 70</text>
+        </g>
+
+        <text x="730" y="180" text-anchor="middle" font-family="Inter" font-size="14" fill="#7c3aed">⨝ on id</text>
+
+        <!-- output -->
+        <g font-family="Inter" font-size="9" text-anchor="middle" fill="#5b21b6">
+          <rect x="640" y="200" width="180" height="14" fill="#ede9fe" stroke="#7c3aed"/><text x="730" y="210" font-weight="600">id &middot; name &middot; amt</text>
+          <rect x="640" y="214" width="180" height="14" fill="#fff" stroke="#7c3aed"/><text x="730" y="224">1 &middot; A &middot; 50</text>
+          <rect x="640" y="228" width="180" height="14" fill="#fff" stroke="#7c3aed"/><text x="730" y="238">2 &middot; B &middot; 70</text>
+        </g>
+
+        <text x="730" y="278" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#5b21b6">rows depend on inner / left / right / outer</text>
+      </g>
+    </svg>
+    <figcaption>Groupby reduces rows (n → k); pivot keeps the same information but reshapes the axes (long → wide); merge combines columns from two tables aligned on a shared key. Almost every analytical question above the row level is a sequence of these three.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Groupby: split-apply-combine</h3>
+
+  <p>The <code>.groupby</code> method takes a key (a column name, a list of column names, or a function of the index) and returns a <code>GroupBy</code> object. The object is lazy: nothing happens until you apply an aggregation. The three families of aggregation are <strong>reductions</strong> (one number per group: mean, sum, count, std, min, max, nunique, first, last), <strong>transformations</strong> (one value per row, broadcasted from the group: <code>transform("mean")</code> returns the group mean repeated for every row in the group), and <strong>filtrations</strong> (some groups kept and the rest dropped: <code>filter(lambda g: len(g) &gt; 100)</code>).</p>
+
+  <div class="worked">
+    <strong>Single-key groupby with one aggregation</strong>
+    <p><code>by_grade = df.groupby("loan_grade", observed=True)["loan_status"].mean()
+# loan_grade
+# A    0.10
+# B    0.16
+# C    0.21
+# D    0.29
+# E    0.42
+# F    0.55
+# G    0.79
+# Name: loan_status, dtype: float64</code></p>
+    <p>The <code>observed=True</code> argument suppresses categorical levels that are not present in the data; without it, an unused grade level appears in the output with <code>NaN</code> values. For categorical groupby keys this is almost always what you want; the argument default will flip to <code>True</code> in a future pandas version, and explicit is better than implicit.</p>
+  </div>
+
+  <p>Most real aggregations want more than one statistic per group. The <strong><code>.agg</code></strong> method takes a dict mapping column to aggregation, or a list of (output_name, source_column, aggregation) tuples for named aggregations:</p>
+
+  <div class="worked">
+    <strong>Named aggregations: the modern idiom</strong>
+    <p><code>portfolio = df.groupby("loan_grade", observed=True).agg(
+    n_loans=("loan_amnt", "count"),
+    total_exposure=("loan_amnt", "sum"),
+    mean_amount=("loan_amnt", "mean"),
+    default_rate=("loan_status", "mean"),
+    pd_weighted=("loan_status", lambda s: (s * df.loc[s.index, "loan_amnt"]).sum() / df.loc[s.index, "loan_amnt"].sum()),
+)</code></p>
+    <p>Each keyword argument names a new column; the tuple <code>(source_col, agg)</code> specifies which column to aggregate and how. Mixing built-in strings (<code>"mean"</code>, <code>"sum"</code>) and lambdas in the same call is allowed and idiomatic. The output is a dataframe with one row per group and one column per named aggregation.</p>
+  </div>
+
+  <p>For <strong>multi-key groupby</strong>, pass a list of column names. The output has a MultiIndex (one level per key) on the rows:</p>
+
+  <div class="worked">
+    <strong>Multi-key groupby</strong>
+    <p><code>by_grade_intent = (
+    df.groupby(["loan_grade", "loan_intent"], observed=True)
+      .agg(n=("loan_amnt", "count"), default_rate=("loan_status", "mean"))
+      .sort_values("default_rate", ascending=False)
+)</code></p>
+    <p>If you want the keys as columns rather than as a MultiIndex, append <code>.reset_index()</code>. If you want a wide layout (one column per <code>loan_intent</code>) instead, use <code>.unstack("loan_intent")</code> on the result, which is equivalent to a pivot.</p>
+  </div>
+
+  <p>The <strong><code>.transform</code></strong> family returns one value per input row rather than one per group. It is the natural way to compute "the group mean for this row's group" without an explicit merge back:</p>
+
+  <div class="worked">
+    <strong>Transform: broadcast group statistics to row level</strong>
+    <p><code># annotate every loan with its grade's mean amount
+df["grade_mean_amount"] = (
+    df.groupby("loan_grade", observed=True)["loan_amnt"]
+      .transform("mean")
+)
+
+# standardise loan_amnt within each grade
+df["loan_amnt_zscore"] = (
+    df.groupby("loan_grade", observed=True)["loan_amnt"]
+      .transform(lambda s: (s - s.mean()) / s.std())
+)</code></p>
+    <p>The output Series is the same length as the input dataframe, indexed identically, so the assignment is safe. This is the right tool whenever a per-row analysis needs a group-level statistic as an input. The same effect can be achieved with a groupby + merge but is uglier and slower.</p>
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">agg vs apply vs transform</span>
+    Three groupby methods, three different output shapes. <code>.agg</code> returns one row per group. <code>.transform</code> returns one row per input row, with group statistics broadcasted. <code>.apply</code> is the escape hatch: it accepts any function from group to anything (a scalar, a Series, a DataFrame) and returns whatever shape pandas can stitch together. <code>.apply</code> is the most flexible and the slowest; reach for it only when the operation does not fit <code>.agg</code> or <code>.transform</code>.
+  </div>
+
+  <h3>Pivot tables: long to wide</h3>
+
+  <p>The <code>pivot_table</code> function takes a long-format dataframe (one row per observation, with category columns identifying what kind of observation each row is) and produces a wide-format dataframe (one column per category value). It is the pandas equivalent of an Excel pivot table.</p>
+
+  <div class="worked">
+    <strong>The standard pivot</strong>
+    <p><code>pivot = df.pivot_table(
+    values="loan_amnt",                # the cells
+    index="loan_grade",                # the rows
+    columns="loan_intent",             # the columns
+    aggfunc="mean",                    # how to combine multiple rows per cell
+    fill_value=0,                      # what to put in empty cells
+    margins=True,                      # add totals row and column
+    margins_name="all",
+    observed=True,
+)</code></p>
+    <p>The arguments are mechanical. <code>values</code> is the column to aggregate. <code>index</code> and <code>columns</code> are the two grouping keys whose unique values become the row and column labels of the output. <code>aggfunc</code> is how to combine multiple input rows that fall into the same output cell; <code>"mean"</code> is the default, common alternatives are <code>"sum"</code>, <code>"count"</code>, <code>"median"</code>, or a list (<code>["mean", "std"]</code>) for multiple statistics per cell. <code>margins=True</code> adds a "total" row and column, useful for reporting.</p>
+  </div>
+
+  <p>Pivot tables and multi-key groupby are different views of the same operation: <code>df.pivot_table(values="x", index="a", columns="b", aggfunc="mean")</code> produces the same numbers as <code>df.groupby(["a", "b"])["x"].mean().unstack("b")</code>. The pivot form is more readable when the output is meant for human consumption (a report, a dashboard). The groupby form is more flexible when the output feeds another computation. Use the pivot form for one-shot reports; use groupby for pipelines.</p>
+
+  <p>Two related operations complete the reshape family. <strong><code>melt</code></strong> is the inverse of <code>pivot</code>: it converts wide to long. <strong><code>stack</code> and <code>unstack</code></strong> move levels between the row MultiIndex and the column MultiIndex without changing the underlying values. In practice you reach for <code>pivot_table</code> for the forward direction and <code>melt</code> for the inverse; <code>stack</code> and <code>unstack</code> are the surgical alternatives when you already have a MultiIndex.</p>
+
+  <h3>Merge: joining two tables on a key</h3>
+
+  <p>The <code>pd.merge</code> function (also available as a method, <code>df1.merge(df2, ...)</code>) joins two dataframes on a shared key. Three arguments do the work: <code>on</code> (the key, a column name or a list), <code>how</code> (the join type: <code>"inner"</code>, <code>"left"</code>, <code>"right"</code>, <code>"outer"</code>), and <code>validate</code> (a cardinality assertion that catches the silent bugs).</p>
+
+  <div class="worked">
+    <strong>A standard left join</strong>
+    <p><code>joined = pd.merge(
+    loans,                  # left table
+    customers,              # right table
+    on="customer_id",       # the shared key column
+    how="left",             # keep all rows from loans
+    validate="m:1",         # many loans per customer; exactly one customer per loan
+    indicator=True,         # add a column showing where each row came from
+)</code></p>
+    <p>The <code>validate</code> argument is the most important and the most underused. It tells pandas the expected cardinality (<code>"1:1"</code>, <code>"1:m"</code>, <code>"m:1"</code>, <code>"m:m"</code>) and raises if the data violates it. A <code>m:1</code> validation catches the case where the customer table has duplicate IDs (which would multiply loan rows); a <code>1:m</code> validation catches the case where the loan table has duplicate IDs (which would duplicate customer attributes). Every production merge should declare its cardinality.</p>
+  </div>
+
+  <p>The four join types map directly to SQL. <strong>Inner</strong> keeps only rows where the key matches in both tables. <strong>Left</strong> keeps all rows from the left table, filling missing right-side columns with <code>NaN</code> where the key did not match. <strong>Right</strong> is the mirror. <strong>Outer</strong> keeps all rows from both tables, filling both sides with <code>NaN</code> where one is missing.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four join types as Venn diagrams">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The four join types</text>
+
+      <!-- Inner -->
+      <g transform="translate(40, 50)">
+        <text x="80" y="0" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#0d9488">Inner</text>
+        <circle cx="50" cy="80" r="40" fill="none" stroke="#0d9488" stroke-width="1.5"/>
+        <circle cx="110" cy="80" r="40" fill="none" stroke="#0d9488" stroke-width="1.5"/>
+        <path d="M 80 50 A 40 40 0 0 1 80 110 A 40 40 0 0 1 80 50 Z" fill="#0d9488" fill-opacity="0.5"/>
+        <text x="80" y="140" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">keys in both</text>
+      </g>
+
+      <!-- Left -->
+      <g transform="translate(220, 50)">
+        <text x="80" y="0" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#b45309">Left</text>
+        <circle cx="50" cy="80" r="40" fill="#b45309" fill-opacity="0.5" stroke="#b45309" stroke-width="1.5"/>
+        <circle cx="110" cy="80" r="40" fill="none" stroke="#b45309" stroke-width="1.5"/>
+        <text x="80" y="140" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">all of left; matching right</text>
+      </g>
+
+      <!-- Right -->
+      <g transform="translate(400, 50)">
+        <text x="80" y="0" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#7c3aed">Right</text>
+        <circle cx="50" cy="80" r="40" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+        <circle cx="110" cy="80" r="40" fill="#7c3aed" fill-opacity="0.5" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="80" y="140" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">all of right; matching left</text>
+      </g>
+
+      <!-- Outer -->
+      <g transform="translate(580, 50)">
+        <text x="80" y="0" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#be185d">Outer</text>
+        <circle cx="50" cy="80" r="40" fill="#be185d" fill-opacity="0.5" stroke="#be185d" stroke-width="1.5"/>
+        <circle cx="110" cy="80" r="40" fill="#be185d" fill-opacity="0.5" stroke="#be185d" stroke-width="1.5"/>
+        <text x="80" y="140" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">union of both</text>
+      </g>
+
+      <!-- Annotation row -->
+      <text x="380" y="200" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">For credit-risk work, left joins dominate: you have a master table (loans) and enrich it with reference tables (customers, scores, segments).</text>
+      <text x="380" y="220" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">A left join with a row count that changes is a join with a cardinality bug.</text>
+    </svg>
+    <figcaption>The four join types and what each preserves. The shaded region is what survives the merge; the empty region is dropped. In credit-risk pipelines, left joins from a master table dominate; the row count of the result should equal the row count of the left table if the cardinality is correct.</figcaption>
+  </figure>
+
+  <p>Three smaller arguments to know. <code>left_on</code> and <code>right_on</code> are used when the key columns have different names in the two tables. <code>suffixes</code> controls how name collisions in non-key columns are resolved (the default <code>("_x", "_y")</code> is rarely what you want; specify them as <code>("_loan", "_customer")</code> for readability). <code>indicator=True</code> adds a <code>_merge</code> column showing whether each row came from <code>"left_only"</code>, <code>"right_only"</code>, or <code>"both"</code>; this is the fastest diagnostic when a join returns the wrong row count.</p>
+
+  <div class="callout warn">
+    <span class="tag">The cardinality bug</span>
+    A merge between a 10,000-row loan table and a 10,000-row customer table can return 10,000 rows or 30,000,000 rows depending on whether the customer key is unique. The bug never raises; it just multiplies rows. The protection is to call <code>validate="m:1"</code> on every merge with a master table on the left, and to check the row count of the result. The protection costs one line and prevents the single most common silent corruption in pandas pipelines.
+  </div>
+
+  <h3>Concat: stacking dataframes</h3>
+
+  <p>The <code>pd.concat</code> function stacks two or more dataframes along an axis. With <code>axis=0</code> (the default), it stacks rows: the dataframes are concatenated vertically and the column unions become the result columns. With <code>axis=1</code>, it stacks columns: the dataframes are aligned by index and joined side-by-side. The two cases serve different purposes.</p>
+
+  <div class="worked">
+    <strong>Concatenating monthly extracts</strong>
+    <p><code>monthly_frames = [
+    pd.read_parquet(f"data/loans_{m}.parquet")
+    for m in ["2024-01", "2024-02", "2024-03"]
+]
+all_loans = pd.concat(monthly_frames, ignore_index=True)</code></p>
+    <p><code>ignore_index=True</code> resets the row index in the result; without it, the result has duplicate index values from each input file. Use <code>keys=</code> if you want a MultiIndex that records which input each row came from (the natural choice for snapshot data where the snapshot date is itself a label).</p>
+  </div>
+
+  <p>The columns of the inputs do not need to match: <code>concat</code> takes the union of column names by default and fills missing columns with <code>NaN</code>. To require exact column match, pass <code>join="inner"</code>. The case where the columns differ is usually a bug (a schema change between months); the <code>indicator</code> approach for merges has no direct analogue for concat, so check the column lists before stacking.</p>
+
+  <h3>Time-series operations: resample, rolling, shift</h3>
+
+  <p>A dataframe with a datetime index unlocks three operations that have no clean equivalent on a default integer index. <strong><code>resample</code></strong> is groupby on the time axis: it groups rows by a date frequency (month, week, business day) and applies an aggregation. <strong><code>rolling</code></strong> is a windowed reduction: for each row, it aggregates the previous <em>n</em> rows. <strong><code>shift</code></strong> moves the values up or down by <em>k</em> rows, the natural building block for "previous period" comparisons.</p>
+
+  <div class="worked">
+    <strong>Monthly default rate and twelve-month rolling default rate</strong>
+    <p><code># promote issue_date to the index and sort
+ts = df.set_index("issue_date").sort_index()
+
+# monthly: rebase to month-end frequency, mean of loan_status
+monthly_default_rate = (
+    ts["loan_status"]
+      .resample("ME")     # ME = month-end; "QE", "YE" for quarter/year
+      .mean()
+)
+
+# twelve-month rolling: mean of the prior twelve monthly values
+rolling_12m = monthly_default_rate.rolling(window=12, min_periods=6).mean()
+
+# month-on-month change
+mom = monthly_default_rate.diff()                # absolute change
+mom_pct = monthly_default_rate.pct_change()      # relative change
+
+# year-on-year using shift
+yoy = monthly_default_rate - monthly_default_rate.shift(12)</code></p>
+    <p>The pandas frequency strings (<code>"D"</code>, <code>"W"</code>, <code>"ME"</code>, <code>"QE"</code>, <code>"YE"</code>, <code>"B"</code> for business day) parameterise the time bucket. The <code>min_periods</code> argument to <code>rolling</code> avoids returning <code>NaN</code> for the first few rows when fewer than <code>window</code> observations are available; set it to roughly half the window length for reporting. The <code>shift</code> operator is also the natural way to compute lag features for a model: <code>ts["loan_status"].shift(1)</code> is "the default flag in the previous row", which becomes the lag-1 default rate after a groupby.</p>
+  </div>
+
+  <p>Resample, rolling, and shift together cover most credit risk monitoring needs. The twelve-month rolling default rate is the basis of every monitoring chart. The month-on-month change in originations is the basis of every volume-tracking dashboard. The shift operator is how lag features enter every regression model that uses time-series data.</p>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Two refinements deserve names. <code>.rolling</code> with <code>window="365D"</code> (a string offset rather than an integer count) gives a calendar-time window rather than a row-count window: the right tool when observations are unevenly spaced. <code>.ewm</code> (exponentially-weighted moving) gives a smooth that weights recent observations more than older ones, with a single tuning parameter (<code>alpha</code> or <code>halflife</code>); the right tool when the recent past matters more than the distant past. Both are direct generalisations of <code>.rolling</code> and read identically.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Worked example: a portfolio analytics pipeline</h2></div>
+
+  <p>A typical analytical question for a credit risk team: "for each loan grade, report the count, total exposure, default rate, and a comparison against the portfolio benchmark." Building this in pandas is a four-step pipeline using every operation in this lecture.</p>
+
+  <div class="worked">
+    <strong>Step 1: load the loan table and a customer reference table</strong>
+    <p><code>loans = pd.read_csv("data/credit_risk_dataset.csv", dtype={...})
+customers = pd.read_csv("data/customers.csv", dtype={"customer_id": "Int64", "region": "category"})
+</code></p>
+    <p>Use the explicit-dtype pattern from Lecture 01. The customer table has one row per customer; the loan table has many loans per customer. We will need a many-to-one merge.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 2: enrich loans with customer attributes</strong>
+    <p><code>enriched = pd.merge(
+    loans,
+    customers,
+    on="customer_id",
+    how="left",
+    validate="m:1",
+    indicator=True,
+)
+
+assert (enriched["_merge"] == "both").all(), "some loans have no matching customer"
+enriched = enriched.drop(columns="_merge")</code></p>
+    <p>The <code>validate="m:1"</code> catches the case where the customer table has duplicate IDs. The assertion on <code>_merge</code> catches the case where some loans belong to customers not in the reference table; either keep them with explicit handling or fail loudly.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 3: aggregate to the grade level</strong>
+    <p><code>by_grade = enriched.groupby("loan_grade", observed=True).agg(
+    n_loans=("loan_amnt", "count"),
+    total_exposure=("loan_amnt", "sum"),
+    mean_amount=("loan_amnt", "mean"),
+    default_rate=("loan_status", "mean"),
+)
+
+# portfolio-level benchmark
+portfolio_dr = enriched["loan_status"].mean()
+by_grade["vs_portfolio"] = by_grade["default_rate"] - portfolio_dr</code></p>
+    <p>Four aggregations in one named-agg call. The benchmark is a scalar (the portfolio-wide default rate) broadcasted into a new column. The <code>vs_portfolio</code> column is the difference between each grade's default rate and the portfolio mean: positive for grades that are worse than average, negative for grades that are better.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 4: pivot to a reporting layout</strong>
+    <p><code>by_grade_intent = enriched.pivot_table(
+    values="loan_status",
+    index="loan_grade",
+    columns="loan_intent",
+    aggfunc="mean",
+    margins=True,
+    margins_name="all_intents",
+    observed=True,
+)</code></p>
+    <p>The pivot turns the two-dimensional groupby (grade × intent) into a wide table suitable for a report: one row per loan grade, one column per loan intent, default rate in each cell, with totals along the bottom and the right. This is the table you put in a slide.</p>
+  </div>
+
+  <p>What you have at the end: a portfolio summary by grade with a benchmark comparison (<code>by_grade</code>), and a default-rate heat map by grade and intent (<code>by_grade_intent</code>). The whole pipeline is twenty lines of pandas. The same questions in SQL would take roughly the same number of lines; the advantage of pandas is that the intermediate dataframes are inspectable, the chain is reproducible, and the result feeds directly into matplotlib for visualisation in Lecture 05.</p>
+
+  <div class="worked">
+    <strong>Step 5 (bonus): twelve-month rolling default rate</strong>
+    <p><code>ts = (
+    enriched.set_index("issue_date").sort_index()
+            ["loan_status"]
+            .resample("ME").mean()
+            .rolling(12, min_periods=6).mean()
+)</code></p>
+    <p>A four-line pipeline: index by date, sort, resample to monthly mean, then twelve-month rolling. The output is a date-indexed Series suitable for a line plot. This is the basis of every credit risk monitoring chart.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Common pitfalls and how to avoid them</h2></div>
+
+  <h3>The Cartesian merge</h3>
+
+  <p>A merge where both sides have duplicate keys returns the Cartesian product of the matching rows. Two tables of ten thousand rows each with even modest duplication can produce a result of millions of rows. The fix is <code>validate=</code> on every merge. If <code>validate="m:1"</code> raises, the right-side key is not unique; either deduplicate it (with <code>customers.drop_duplicates("customer_id")</code>) or investigate why duplicates exist.</p>
+
+  <h3>Mismatched key dtypes</h3>
+
+  <p>A merge between a table where <code>customer_id</code> is <code>Int64</code> and one where it is <code>object</code> (string) returns zero matched rows, silently. Pandas does not coerce key dtypes; the comparison <code>123 == "123"</code> is <code>False</code>. The fix is to harmonise key dtypes before merging, ideally at load time via the <code>dtype</code> argument to <code>read_csv</code>.</p>
+
+  <h3>Aggregating a categorical with the wrong function</h3>
+
+  <p>Computing the mean of a categorical column (a string column with a small vocabulary read as <code>category</code>) raises a <code>TypeError</code>; computing the mean of an ordinal-coded column read as integer returns a number that has no physical meaning. Use <code>"mode"</code> (via <code>lambda s: s.mode().iloc[0]</code>) for categoricals, and check that the dtype of the column you are aggregating actually supports the aggregation.</p>
+
+  <h3>Forgetting reset_index after groupby</h3>
+
+  <p>The result of <code>groupby(...).agg(...)</code> has the group keys as the index, not as columns. Plotting libraries and downstream merges usually want the keys as columns. The fix is to call <code>.reset_index()</code> immediately after the aggregation, or to pass <code>as_index=False</code> to <code>groupby</code>, which produces the same result in one step.</p>
+
+  <h3>Resample without a sorted index</h3>
+
+  <p><code>.resample</code> requires the index to be sorted; if it is not, the result is silently wrong (some buckets get the wrong observations). Call <code>.sort_index()</code> before any <code>.resample</code> or <code>.rolling</code> chain. Better, sort once at the top of the pipeline and assert the sort order, so subsequent operations can rely on it.</p>
+
+  <h3>Default sort behaviour changing the row order</h3>
+
+  <p><code>groupby</code> sorts the keys in the output by default. If you have a categorical with an explicit ordering (loan grade A-G), the alphabetic sort happens to coincide; if you have a non-monotone ordering (regions in a custom order), the result is sorted alphabetically and not in the order you wanted. Pass <code>sort=False</code> to preserve insertion order, or set the categorical to be ordered (<code>pd.Categorical(values, ordered=True)</code>) and use <code>sort=True</code> with the categorical sort.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Synthesis
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the folding layer. Groupby splits a rectangle by a key, applies an aggregation per group, and combines the results; <code>.agg</code> with named aggregations is the modern idiom, <code>.transform</code> is the way to broadcast group statistics back to row level. Pivot reshapes long-to-wide, with <code>pivot_table</code> as the most powerful version. Merge joins two rectangles on a key; <code>validate=</code> and <code>indicator=True</code> are the defences against silent cardinality bugs. Concat stacks rectangles along an axis. Resample, rolling, and shift are the time-axis versions of groupby and the basis of every credit risk monitoring report.</p>
+
+  <p>Two things are missing from this lecture. First, the same vocabulary runs roughly an order of magnitude faster on Polars, the Arrow-backed dataframe library that is the natural step up when pandas hits its single-machine ceiling: that is Lecture 03. Second, none of this lecture asks what the data <em>says</em>: descriptive analysis, missing-value diagnosis, outlier review, and the question of whether the dataset is fit for the modelling question are the subject of Lecture 04.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Distinguish <code>.agg</code>, <code>.transform</code>, and <code>.apply</code> on a GroupBy in one sentence each. Give one credit-risk example where you would use each.</li>
+      <li>You merge two tables and the result has more rows than the left table. Name the two most likely causes and the diagnostic argument that would have caught both.</li>
+      <li>You want a default-rate-by-grade-and-intent table for a slide. Write the one-line pivot. Then write the equivalent groupby with an unstack.</li>
+      <li>What does <code>validate="m:1"</code> assert? Name a credit-risk pipeline where you would use <code>"1:m"</code> instead, and why.</li>
+      <li>You compute a twelve-month rolling default rate but the first eleven months are missing. State the cause and the one-argument fix.</li>
+      <li>The result of <code>groupby</code> has the group key as the index. Two ways to get it as a column instead?</li>
+      <li>A merge between a string ID and an integer ID returns zero rows. Why? What is the smallest fix that prevents this for a whole pipeline?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 01 (<a href="01-pandas_core.html">DataFrames and the pandas core</a>) covered the load/inspect/select/transform layer that produces the rectangles this lecture folds.</li>
+      <li><strong>Next:</strong> Lecture 03 (<a href="03-polars.html">Polars and the modern dataframe stack</a>) runs the same vocabulary on a faster engine; the verb names change but the pattern is identical.</li>
+      <li><strong>SQL parallels:</strong> the <a href="../../../wiki/fundamentals/02_data_engineering/">data engineering track</a> covers <code>GROUP BY</code>, <code>JOIN</code>, and window functions; this lecture is their pandas equivalent.</li>
+      <li><strong>Where these aggregations land:</strong> the <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/">credit risk modelling lifecycle</a> uses every aggregation here at the data engineering, portfolio description, and monitoring stages.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data analysis course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 2 of 5</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

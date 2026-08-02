@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 8: the Feynman-Kac theorem</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>The Feynman-Kac theorem</h1>
+  <p class="subtitle">A theorem that lets you swap between two languages for describing the same number: a conditional expectation of a diffusion, and the solution of a deterministic partial differential equation. Feed it a diffusion, a terminal payoff and a discount rate, and it hands you a PDE whose solution equals that expectation, and equally an expectation whose value equals the PDE's solution. Every pricing formula from Black-Scholes onward is this one theorem, run in one direction or the other.</p>
+  <div class="meta">
+    <span>Lecture 8 of 13</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Source: <code>UP / 7 - Feynman-Kac.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The <strong>Feynman-Kac theorem</strong> states that solving a certain parabolic partial differential equation and computing a certain conditional expectation of a diffusion process are the same problem, seen from two directions. Solve the PDE and the expectation comes for free. Compute the expectation and you have verified the PDE's solution for free. Two languages, one object, and the theorem is the dictionary between them.</p>
+
+  <p>Take a diffusion $dX_s = \mu(s,X_s)\,ds + \sigma(s,X_s)\,dW_s$ started at $X_t = x$, and a payoff $\Phi$ applied at a fixed horizon $T$. Feynman-Kac says that if a function <code>F(t,x)</code> solves the backward equation $F_t + \mu F_x + \frac{1}{2}\sigma^2 F_{xx} - rF = 0$ with terminal condition $F(T,x) = \Phi(x)$, then <code>F(t,x)</code> also equals the discounted expected payoff $e^{-r(T-t)}\,\mathbb{E}[\Phi(X_T) \mid X_t = x]$. Read forwards, it turns a PDE into a probabilistic average. Read backwards, it turns an average you can simulate into an equation you can solve on a grid. Every result later in this course, starting with the Black-Scholes PDE in lecture 9, is this theorem applied to one specific choice of <code>mu</code>, <code>sigma</code> and <code>Phi</code>.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You are asked to value a contract that pays $\Phi(S_T)$ at time $T$, where $S$ wanders randomly between now and then. There are two completely different ways to attack this. Route one: forget the randomness, write down a deterministic equation that the price must obey at every point in time and in the underlying's level, and solve it the way you would solve a heat-conduction problem in physics. Route two: embrace the randomness, simulate ten thousand possible futures for <code>S</code>, evaluate the payoff on each, average, and discount. The Feynman-Kac theorem is the fact that these two calculations, one deterministic and analytic, one random and numerical, must produce exactly the same number. That is not obvious on its face. It is also the single most useful fact in derivatives pricing, because it means you can always pick whichever calculation happens to be cheaper for the problem in front of you.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP PDF proves the theorem's forward direction, a PDE solution gives an expectation, entirely through worked examples, using an auxiliary ordinary differential equation to handle the discounting term. It never names the theorem's two directions, the infinitesimal generator, the martingale property it relies on throughout, or the result's origin in mathematical physics. This lecture keeps the source's notation and its running examples, but adds one clean proof using the discounted process directly, states the regularity conditions honestly instead of assuming them away, gives the converse direction and explains why it is harder, defines the generator, extends to the running-payoff case, and builds the PDE-versus-Monte-Carlo comparison that turns the theorem into a piece of computational judgement rather than an algebra exercise.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Every option-pricing number you meet after this lecture is computed one of two ways: by solving a PDE, or by taking an expectation. Feynman-Kac is the theorem that makes those two computations legitimate substitutes for each other. Without it there would be no guarantee that the PDE grid used by a bank's finite-difference pricing library and the simulated paths used by its structured-products desk are pricing the same contract. They are, and this lecture is why.</p>
+
+  <p>The Black-Scholes PDE, the subject of lecture 9, is nothing more than the Feynman-Kac PDE with a specific <code>mu</code>, <code>sigma</code> and terminal payoff. Understanding lecture 9 without this one means memorising a formula instead of recognising an instance of a general theorem. A model validator asked whether a bank's exotic-payoff pricer should give the same answer from its PDE grid and its Monte Carlo engine, to within basis points, is really being asked whether Feynman-Kac's regularity conditions hold for that particular payoff. That is exactly the kind of question this lecture equips you to answer rather than wave at.</p>
+
+  <p>For an actuary the duality will feel familiar before it is even named. Valuing a policy by solving Thiele's differential equation and valuing it by discounting expected future cashflows are the same duality in actuarial clothing, and the reason the two methods must agree is structurally identical to the reason a PDE price and a Monte Carlo price must agree here.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures carry the whole lecture. The first shows the two routes to the same price sitting side by side, one running backward from a known terminal condition, one running forward through simulated paths, meeting at the same number. The second zooms into the PDE route alone and shows what "backward" actually means: the terminal condition lives on the right edge of the time axis, and the solution is built leftward from it, one time-slice at a time.</p>
+
+  <h3>Picture one: two routes, one price</h3>
+
+  <p>Both routes are computing the same quantity, <code>F(t,x)</code>, the value of the contract today given that the underlying is at <code>x</code>. Route A treats the terminal condition <code>Φ(x)</code> as the known starting point and works backward to <code>t</code> by satisfying a differential equation at every grid node. Route B treats <code>X_t = x</code> as the known starting point and works forward to <code>T</code> by simulating the diffusion, then discounts the average payoff back to <code>t</code>. The two arrows point in opposite directions across the same time axis and land on the same number.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two routes to the same derivative price: solving the PDE backward from the terminal condition, and simulating paths forward from today">
+      <defs>
+        <marker id="arrowEndFK" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#52525b"/>
+        </marker>
+        <linearGradient id="routePdeGradFK" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f0fdfa"/>
+          <stop offset="100%" stop-color="#ccfbf1"/>
+        </linearGradient>
+        <linearGradient id="routeMcGradFK" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fffbeb"/>
+          <stop offset="100%" stop-color="#fef3c7"/>
+        </linearGradient>
+        <linearGradient id="outcomeGradFK" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1A2238"/>
+          <stop offset="100%" stop-color="#0A0F1C"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="28" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Two routes, one price</text>
+
+      <text x="120" y="60" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#71717a">t (today, the unknown)</text>
+      <text x="680" y="60" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#71717a">T (maturity, the known)</text>
+
+      <!-- Route A: PDE, backward -->
+      <g transform="translate(40,80)">
+        <rect x="0" y="0" width="720" height="110" rx="10" fill="url(#routePdeGradFK)" stroke="#0f766e" stroke-width="1.5"/>
+        <rect x="0" y="0" width="160" height="110" rx="10" fill="#0f766e"/>
+        <text x="80" y="50" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#ffffff">Route A</text>
+        <text x="80" y="72" text-anchor="middle" font-family="Inter" font-weight="500" font-size="12" fill="#ccfbf1">the PDE</text>
+
+        <rect x="190" y="20" width="225" height="70" rx="6" fill="#ffffff" stroke="#a7f3d0" stroke-width="1"/>
+        <text x="205" y="42" font-family="Inter" font-weight="600" font-size="11" fill="#134e4a">at t</text>
+        <text x="205" y="62" font-family="Inter" font-size="11" fill="#115e59">Read F(t,x) off the grid.</text>
+        <text x="205" y="78" font-family="Inter" font-size="11" fill="#115e59">This is the unknown.</text>
+
+        <line x1="490" y1="55" x2="425" y2="55" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowEndFK)"/>
+        <text x="457" y="42" text-anchor="middle" font-family="Inter" font-size="10" fill="#52525b" font-style="italic">backward</text>
+
+        <rect x="500" y="20" width="200" height="70" rx="6" fill="#ffffff" stroke="#a7f3d0" stroke-width="1"/>
+        <text x="515" y="42" font-family="Inter" font-weight="600" font-size="11" fill="#134e4a">at T</text>
+        <text x="515" y="62" font-family="Inter" font-size="11" fill="#115e59">Terminal condition F(T,x)</text>
+        <text x="515" y="78" font-family="Inter" font-size="11" fill="#115e59">= Φ(x) is known.</text>
+      </g>
+
+      <!-- Route B: expectation, forward -->
+      <g transform="translate(40,210)">
+        <rect x="0" y="0" width="720" height="130" rx="10" fill="url(#routeMcGradFK)" stroke="#b45309" stroke-width="1.5"/>
+        <rect x="0" y="0" width="160" height="130" rx="10" fill="#b45309"/>
+        <text x="80" y="55" text-anchor="middle" font-family="Inter" font-weight="700" font-size="14" fill="#ffffff">Route B</text>
+        <text x="80" y="77" text-anchor="middle" font-family="Inter" font-weight="500" font-size="12" fill="#FDE68A">the expectation</text>
+
+        <rect x="190" y="20" width="225" height="90" rx="6" fill="#ffffff" stroke="#FDE68A" stroke-width="1"/>
+        <text x="205" y="42" font-family="Inter" font-weight="600" font-size="11" fill="#7c2d12">at t</text>
+        <text x="205" y="62" font-family="Inter" font-size="11" fill="#92400e">Every simulated path</text>
+        <text x="205" y="78" font-family="Inter" font-size="11" fill="#92400e">starts at X_t = x.</text>
+
+        <line x1="425" y1="65" x2="490" y2="65" stroke="#52525b" stroke-width="1.5" marker-end="url(#arrowEndFK)"/>
+        <text x="457" y="52" text-anchor="middle" font-family="Inter" font-size="10" fill="#52525b" font-style="italic">forward</text>
+
+        <rect x="500" y="20" width="200" height="90" rx="6" fill="#ffffff" stroke="#FDE68A" stroke-width="1"/>
+        <text x="515" y="42" font-family="Inter" font-weight="600" font-size="11" fill="#7c2d12">at T</text>
+        <text x="515" y="62" font-family="Inter" font-size="11" fill="#92400e">Evaluate Φ(X_T) on each</text>
+        <text x="515" y="78" font-family="Inter" font-size="11" fill="#92400e">path, average, discount by</text>
+        <text x="515" y="94" font-family="Inter" font-size="11" fill="#92400e">exp(-r(T-t)).</text>
+      </g>
+
+      <g transform="translate(40,360)">
+        <rect x="0" y="0" width="720" height="48" rx="24" fill="url(#outcomeGradFK)"/>
+        <text x="360" y="22" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#f8fafc">Both routes, computed at (t,x), must agree on one number:</text>
+        <text x="360" y="39" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#a7f3d0">F(t,x) = exp(-r(T-t)) · E[Φ(X_T) | X_t = x]</text>
+      </g>
+    </svg>
+    <figcaption>The two routes to a derivative price. Route A treats the terminal payoff as known and propagates backward through a PDE. Route B treats today's state as known and simulates forward, then discounts. Feynman-Kac is the guarantee that the two arrows land on the same number.</figcaption>
+  </figure>
+
+  <h3>Picture two: the PDE runs backward in time</h3>
+
+  <p>Route A deserves its own picture because "backward" is easy to say and easy to misread as a diagram drawn right to left. The time axis still runs left to right, from <code>t</code> to <code>T</code>, exactly as you would draw it anywhere else. What is backward is the direction of <em>computation</em>: the terminal slice at <code>T</code> is filled in first, because it is simply <code>Φ(x)</code>, and every earlier slice is computed from the slice immediately to its right, never the other way round.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Feynman-Kac PDE solved backward: the terminal condition sits on the right edge and the solution propagates leftward to today">
+      <defs>
+        <marker id="axisArrFK" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+        <marker id="backArrFK" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b5cf6"/>
+        </marker>
+        <linearGradient id="payoffFillFK" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#ccfbf1" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#ccfbf1" stop-opacity="0.8"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Known at T, solved at t</text>
+
+      <!-- grid panel -->
+      <rect x="80" y="55" width="650" height="270" fill="#fafafa" stroke="#e4e4e7" stroke-width="1"/>
+      <line x1="80" y1="55" x2="80" y2="325" stroke="#d4d4d8" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="210" y1="55" x2="210" y2="325" stroke="#d4d4d8" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="340" y1="55" x2="340" y2="325" stroke="#d4d4d8" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="470" y1="55" x2="470" y2="325" stroke="#d4d4d8" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="600" y1="55" x2="600" y2="325" stroke="#d4d4d8" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="730" y1="55" x2="730" y2="325" stroke="#0f766e" stroke-width="1.5"/>
+
+      <!-- terminal payoff curve, bulging right of the T line as state x rises -->
+      <polygon points="730,325 730,190 790,80 790,325" fill="url(#payoffFillFK)"/>
+      <polyline points="730,325 730,190 790,80" fill="none" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round"/>
+      <text x="800" y="70" text-anchor="end" font-family="Inter" font-weight="600" font-size="11" fill="#115e59">Φ(x) known at T</text>
+
+      <!-- backward arrows -->
+      <line x1="705" y1="130" x2="115" y2="130" stroke="#8b5cf6" stroke-width="1.75" marker-end="url(#backArrFK)"/>
+      <line x1="705" y1="190" x2="115" y2="190" stroke="#8b5cf6" stroke-width="1.75" marker-end="url(#backArrFK)"/>
+      <line x1="705" y1="250" x2="115" y2="250" stroke="#8b5cf6" stroke-width="1.75" marker-end="url(#backArrFK)"/>
+      <text x="410" y="270" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#6d28d9">backward induction, one time-slice at a time</text>
+
+      <!-- t marker -->
+      <circle cx="80" cy="220" r="5" fill="#18181b"/>
+      <rect x="30" y="235" width="100" height="24" rx="4" fill="#18181b"/>
+      <text x="80" y="251" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">F(t,x) sought</text>
+
+      <!-- axes -->
+      <line x1="80" y1="340" x2="795" y2="340" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrFK)"/>
+      <line x1="80" y1="340" x2="80" y2="45" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrFK)"/>
+      <text x="80" y="358" text-anchor="middle" font-family="Inter" font-size="12" fill="#71717a">t</text>
+      <text x="730" y="358" text-anchor="middle" font-family="Inter" font-size="12" fill="#71717a">T</text>
+      <text x="450" y="380" text-anchor="middle" font-family="Inter" font-size="12" fill="#71717a">time</text>
+      <text x="45" y="60" text-anchor="middle" font-family="Inter" font-size="12" fill="#71717a">state x</text>
+    </svg>
+    <figcaption>The Feynman-Kac PDE is a terminal value problem. The payoff curve $\Phi(x)$ is known on the right edge at $T$; every other value is filled in by working leftward, one time-slice at a time, until the desired point $(t,x)$ is reached.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Setting up the diffusion</h3>
+
+  <p>The object being priced is a function of a diffusion $X_s$, following the SDE machinery of lecture 07:</p>
+
+  <p>$$ dX_s = \mu(s,X_s)\,ds + \sigma(s,X_s)\,dW_s, \qquad X_t = x, \qquad s \in [t,T]. $$</p>
+
+  <p>A terminal condition <code>Φ(x)</code> fixes the payoff at the fixed horizon <code>T</code>, and a constant <code>r</code> plays the role of a continuously compounded discount rate applied to that payoff, exactly as in lecture 1's spot-forward parity. In more general treatments <code>r</code> can itself be a function <code>r(t,x)</code>, in which case it is usually called a <strong>killing rate</strong> rather than a discount rate: it can represent an interest rate, a default intensity, or any other exponential decay applied to the value as time passes. This lecture keeps <code>r</code> constant, matching the UP source's own worked examples, and notes where the state-dependent generalisation would change the argument.</p>
+
+  <div class="defcard">
+    <div class="term">Terminal value problem</div>
+    <div class="def">A partial differential equation posed on $[0,T]\times\mathbb{R}$ together with a condition fixing the solution at the terminal time <code>T</code> rather than at $t=0$: $F(T,x)=\Phi(x)$. This is the UP source's own term for the Feynman-Kac equation, chosen because option and bond pricing PDEs are naturally specified by what happens at maturity, not at inception, so the equation must be solved backward in time from a known terminal slice to an unknown earlier one, exactly as pictured in section 3.</div>
+  </div>
+
+  <h3>The theorem, stated carefully</h3>
+
+  <p>Suppose <code>F(t,x)</code> is continuous on $[0,T]\times\mathbb{R}$, once continuously differentiable in <code>t</code> and twice in <code>x</code> on $[0,T)\times\mathbb{R}$, and solves the terminal value problem</p>
+
+  <p>$$ F_t(t,x) + \mu(t,x)\,F_x(t,x) + \tfrac{1}{2}\sigma^2(t,x)\,F_{xx}(t,x) - r\,F(t,x) = 0, \qquad F(T,x) = \Phi(x). $$</p>
+
+  <p>Suppose further that <code>F</code> and $\sigma F_x$ satisfy a growth condition in <code>x</code>, uniform in <code>t</code>, sufficient to guarantee that a certain stochastic integral appearing in the proof below is a true martingale rather than merely a local one. Then <code>F(t,x)</code> also equals the discounted conditional expectation of the terminal payoff along the diffusion started at <code>x</code>:</p>
+
+  <p>$$ F(t,x) = e^{-r(T-t)}\ \mathbb{E}\bigl[\Phi(X_T) \mid X_t = x\bigr]. $$</p>
+
+  <p>The growth condition is usually glossed over in a first pass, including in the UP source, which states only that <code>F</code> should be "sufficiently differentiable" and moves straight to examples. It is not a technicality that can be waved away in general: without it, the argument below still shows that a certain process is a <em>local</em> martingale, and a local martingale need not have equal expectations at two different times. The clean cases (polynomial payoffs, bounded payoffs, or payoffs with at most exponential growth against a diffusion with linear growth coefficients) all satisfy the condition comfortably, which is why the theorem feels unconditional in practice. Karatzas and Shreve give the precise sufficient conditions in full.</p>
+
+  <h3>The proof</h3>
+
+  <p>The proof is short, and the entire argument is contained in one observation: the PDE is exactly the condition that makes the drift of a certain discounted process vanish.</p>
+
+  <div class="worked">Proof that a PDE solution gives the expectation.
+
+Assume F(t,x) solves the PDE on [0,T) x R with F(T,x) = Phi(x), and
+that F is regular enough for the stochastic integral below to be a
+true martingale.
+
+Define, for s in [t,T], the discounted process:
+
+    Y_s = exp(-r(s-t)) F(s, X_s)
+
+Apply Ito's lemma (lecture 07) to F(s,X_s), then carry the discount
+factor through:
+
+    dY_s = exp(-r(s-t)) [ (F_t + mu F_x + (1/2) sigma^2 F_xx - r F) ds
+                            + sigma F_x dW_s ]
+
+The PDE says the entire ds-coefficient in brackets is identically
+zero, at every (s, X_s), by construction. So:
+
+    dY_s = exp(-r(s-t)) sigma(s,X_s) F_x(s,X_s) dW_s        (driftless)
+
+A driftless Ito process, under the growth condition stated above, is
+a true martingale. Hence its value at t equals its expected value at
+any later time, in particular at T:
+
+    Y_t = E[ Y_T | X_t = x ]
+
+Y_t = F(t,x)                              (discount factor is 1 at s=t)
+Y_T = exp(-r(T-t)) F(T,X_T) = exp(-r(T-t)) Phi(X_T)
+
+    F(t,x) = exp(-r(T-t)) * E[ Phi(X_T) | X_t = x ]
+
+Q.E.D. The PDE kills the drift of the discounted price process; a
+driftless process is a martingale; a martingale's value today is the
+expectation of its value at T. Nothing else is used.</div>
+
+  <p>$$ \boxed{\, F(t,x) = e^{-r(T-t)}\ \mathbb{E}\bigl[\Phi(X_T) \mid X_t = x\bigr] \,} $$</p>
+
+  <p>Compare this with the UP source's own route through Examples 3 and 4. It reaches the same conclusion by defining $g(u) = \mathbb{E}_{t,x}[F(u,X_u)]$, observing that $g'(u) = r\,g(u)$, and solving that ordinary differential equation for $g$. That works, but it treats the discount factor as an afterthought bolted onto the martingale argument rather than folded into it. Building the discount factor directly into the process, as $Y_s$ above, makes the martingale property hold outright and shortens the proof by a full page of algebra. Both routes are correct; the shorter one is standard in Björk, <em>Arbitrage Theory in Continuous Time</em>, chapter 5, and in Shreve, <em>Stochastic Calculus for Finance II</em>, chapter 6.</p>
+
+  <h3>The converse direction</h3>
+
+  <p>The proof above assumes a solution to the PDE exists and derives the expectation from it. The converse, that the expectation $F(t,x) := e^{-r(T-t)}\mathbb{E}[\Phi(X_T)\mid X_t=x]$ actually solves the PDE, is the harder direction, and it is one the UP source never attempts: every one of its worked examples opens with "assume that <code>F(t,x)</code> is a solution of the TVP", never with "define <code>F</code> as this expectation and show it solves the TVP".</p>
+
+  <p>The standard route uses the Markov property of the diffusion. For $t < u < T$, the tower property of conditional expectation combined with the diffusion's Markov property gives $F(t,x) = e^{-r(u-t)}\,\mathbb{E}[F(u,X_u)\mid X_t=x]$: the value today is the discounted expected value at any intermediate date, a restatement of the martingale property proved above but now taken as the starting point rather than the conclusion. Subtracting <code>F(t,x)</code> from both sides, dividing by $u - t$, and letting $u \downarrow t$ turns the limit, after a Taylor expansion of $F(u,X_u)$ around $(t,x)$, into exactly $F_t + \mu F_x + \tfrac{1}{2}\sigma^2 F_{xx} - rF = 0$.</p>
+
+  <p>That limit is not free. It needs <code>F</code> to be differentiable enough for the Taylor expansion to be valid, and that differentiability is not assumed, it is produced by two further ingredients: <code>mu</code> and <code>sigma</code> Lipschitz with linear growth, so the SDE has a unique strong solution in the first place (Karatzas and Shreve, <em>Brownian Motion and Stochastic Calculus</em>, give the existence and uniqueness theory in full), and enough non-degeneracy in <code>sigma</code> for the diffusion's transition density to be smooth, which is what actually supplies the missing smoothness of <code>F</code> rather than assuming it outright. Øksendal, <em>Stochastic Differential Equations</em>, chapter 8, states both directions together with the conditions each one needs.</p>
+
+  <h3>The infinitesimal generator</h3>
+
+  <p>The three terms $\mu F_x + \tfrac{1}{2}\sigma^2 F_{xx}$ reappear so often that it is worth giving them a name rather than writing them out every time.</p>
+
+  <div class="defcard">
+    <div class="term">Infinitesimal generator</div>
+    <div class="def">For the diffusion $dX_s = \mu(s,X_s)\,ds + \sigma(s,X_s)\,dW_s$, the operator $\mathcal{A}$ acting on a twice-differentiable function <code>f</code> of <code>x</code> by $(\mathcal{A}f)(t,x) = \mu(t,x)\,f'(x) + \tfrac{1}{2}\sigma^2(t,x)\,f''(x)$. It is exactly the deterministic part of Itô's lemma applied to $f(X_s)$: <code>A</code> collects every term that survives after taking an expectation, since the $dW_s$ term does not. Every diffusion carries its own generator, and the generator is the single object that determines both the PDE and the process's transition law.</div>
+  </div>
+
+  <p>With the generator, the Feynman-Kac PDE compresses from a wall of partial derivatives into one line:</p>
+
+  <p>$$ F_t + \mathcal{A}F - rF = 0, \qquad F(T,x) = \Phi(x). $$</p>
+
+  <p>Nothing new has been said. The generator notation is useful precisely because it separates the part of the equation that depends on the specific diffusion (<code>A</code>, built from <code>mu</code> and <code>sigma</code>) from the part that is always the same (a time derivative, a discount term, and a terminal condition), which is what makes the theorem a template rather than a one-off calculation.</p>
+
+  <h3>Discounted, undiscounted, and running-payoff versions</h3>
+
+  <p>Three variants of the same statement cover everything used later in the course. Setting $r=0$ removes discounting entirely and gives the purely probabilistic statement $F_t + \mathcal{A}F = 0$, $F(T,x)=\Phi(x)$, with solution $F(t,x)=\mathbb{E}[\Phi(X_T)\mid X_t=x]$; this undiscounted case is named explicitly in section 5. Keeping <code>r</code> constant gives the financial version proved above. Allowing the equation to carry a running source term <code>k(t,x)</code>, so that</p>
+
+  <p>$$ F_t + \mathcal{A}F - rF + k(t,x) = 0, \qquad F(T,x) = \Phi(x), $$</p>
+
+  <p>prices a stream of cashflows rather than a single terminal payoff. The proof is the same trick with one extra term: define $Y_s = e^{-r(s-t)}F(s,X_s) + \int_t^s e^{-r(u-t)}k(u,X_u)\,du$. The <code>ds</code> term in $dY_s$ picks up $e^{-r(s-t)}(F_t+\mathcal{A}F-rF)\,ds$ from the first piece and $e^{-r(s-t)}k(s,X_s)\,ds$ from the second; the inhomogeneous PDE says the first equals $-k(s,X_s)\,ds$, so the two cancel exactly, leaving <code>Y</code> driftless once again. Equating $Y_t$ and $\mathbb{E}[Y_T]$ gives</p>
+
+  <p>$$ F(t,x) = e^{-r(T-t)}\,\mathbb{E}\bigl[\Phi(X_T)\mid X_t=x\bigr] + \int_t^T e^{-r(u-t)}\,\mathbb{E}\bigl[k(u,X_u)\mid X_t=x\bigr]\,du, $$</p>
+
+  <p>the terminal payoff discounted back as before, plus the present value of every intermediate cashflow $k(u,X_u)\,du$. This is precisely Exercise 3.6.5 of the UP source, stated there without discounting; adding the $r$ term is the natural generalisation used throughout the rest of this course, since a coupon-paying bond or a swap is priced as exactly this kind of integral of expected cashflows.</p>
+
+  <h3>The financial reading: two routes to a price</h3>
+
+  <p>Every number a derivatives desk quotes is produced by the PDE route or the expectation route, and the choice between them is not a matter of taste. Each has a genuine comparative advantage, and knowing which is which is worth more to a practitioner than either method's derivation.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Dimension</th><th>PDE route (finite differences)</th><th>Expectation route (Monte Carlo)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Number of state variables</td><td>Grid cost grows exponentially in the number of factors; two or three underlyings is close to the practical ceiling.</td><td>Cost is roughly independent of dimension; pricing a five-asset basket costs the same order as pricing one vanilla.</td></tr>
+        <tr><td>Early exercise (American, Bermudan)</td><td>Natural: compare continuation value to exercise value at every grid node, working backward.</td><td>Awkward: needs a regression-based method (Longstaff-Schwartz) to estimate the continuation value from simulated paths.</td></tr>
+        <tr><td>Path dependence (Asian, barrier, lookback)</td><td>Hard: the state space must be extended with path-dependent variables, which multiplies the dimensionality problem above.</td><td>Natural: path dependence is simply a function applied to the simulated trajectory.</td></tr>
+        <tr><td>Greeks (delta, gamma, vega)</td><td>Close to free: read derivatives directly off the mesh, or bump the grid.</td><td>Needs care: naive re-simulation is noisy; pathwise or likelihood-ratio estimators are needed for stable Greeks.</td></tr>
+        <tr><td>Computational cost, single low-dimensional price</td><td>Cheap and fast; a fine one-dimensional grid solves in milliseconds.</td><td>Error falls as $1/\sqrt{M}$ in the number of paths <code>M</code>, so high accuracy is expensive, though it parallelises trivially.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Worked example: from Feynman-Kac to the Black-Scholes PDE</h3>
+
+  <p>Take the risk-neutral geometric Brownian motion that lecture 9 will use for the underlying, $dS_s = rS_s\,ds + \sigma S_s\,dW_s$, so that $\mu(t,x)=rx$ and $\sigma(t,x)=\sigma x$ in Feynman-Kac's notation, and take the terminal payoff of a European call, $\Phi(x) = \max(x-K,0)$. Substituting directly into the boxed PDE of this lecture gives</p>
+
+  <p>$$ F_t + rx\,F_x + \tfrac{1}{2}\sigma^2 x^2 F_{xx} - rF = 0, \qquad F(T,x) = \max(x-K,0). $$</p>
+
+  <p>This is the Black-Scholes PDE, unchanged in every symbol from the general theorem above. Nothing about the derivation of this lecture depended on the payoff being a call: the same PDE, with <code>Φ</code> replaced by a put payoff, a digital payoff, or any other terminal function, prices whatever claim <code>Φ</code> describes. Lecture 9 solves this specific terminal value problem in closed form; this lecture has already done the only genuinely new piece of mathematics, which is recognising that the option-pricing PDE is nothing but an instance of Feynman-Kac.</p>
+
+  <h3>Worked example: verifying Feynman-Kac against a closed form</h3>
+
+  <p>To see the theorem work in both directions on a case simple enough to check by hand, take the same risk-neutral GBM and the terminal condition $\Phi(x) = x$: the contract that simply pays out the underlying at <code>T</code>.</p>
+
+  <p><strong>The PDE route.</strong> The terminal value problem is $F_t + rxF_x + \tfrac{1}{2}\sigma^2x^2F_{xx} - rF = 0$, $F(T,x)=x$. Try the ansatz $F(t,x) = x\,e^{c(T-t)}$ for a constant <code>c</code>, chosen to match the linear terminal condition. Then $F_t = -c\,x\,e^{c(T-t)}$, $F_x = e^{c(T-t)}$, and $F_{xx}=0$. Substituting:</p>
+
+  <p>$$ -c\,x\,e^{c(T-t)} + rx\,e^{c(T-t)} + 0 - rx\,e^{c(T-t)} = 0 \ \Longrightarrow\ -c\,x\,e^{c(T-t)} = 0 \ \text{for all } x, $$</p>
+
+  <p>which forces $c=0$. The PDE route gives $F(t,x) = x$, exactly, independent of time.</p>
+
+  <p><strong>The expectation route.</strong> Under the risk-neutral GBM, $X_T = x\,e^{(r-\sigma^2/2)(T-t)+\sigma(W_T-W_t)}$, the same solution form the UP source derives (its equation 3.71). Taking expectations and using $\mathbb{E}[e^{aW}] = e^{a^2/2\cdot\text{Var}(W)}$ for a normal increment,</p>
+
+  <p>$$ \mathbb{E}[X_T \mid X_t = x] = x\,e^{(r-\sigma^2/2)(T-t)}\cdot\mathbb{E}\bigl[e^{\sigma(W_T-W_t)}\bigr] = x\,e^{(r-\sigma^2/2)(T-t)}\cdot e^{\frac{1}{2}\sigma^2(T-t)} = x\,e^{r(T-t)}. $$</p>
+
+  <p>Discounting this back at rate <code>r</code>,</p>
+
+  <p>$$ F(t,x) = e^{-r(T-t)}\cdot \Bigl[x\,e^{r(T-t)}\Bigr] = x, $$</p>
+
+  <p>the discount factor $e^{-r(T-t)}$ cancelling exactly against the growth factor $e^{r(T-t)}$ inside the brackets, leaving <code>x</code>. Both routes agree, and the intermediate step $x\,e^{r(T-t)}$ discounted back to <code>x</code> is precisely the risk-neutral pricing identity $S(t) = e^{-r(T-t)}\,\mathbb{E}^{\mathbb{Q}}[S(T)\mid S(t)]$ from lecture 1, now recovered as a special case of Feynman-Kac rather than asserted directly. The forward price of the underlying is what Feynman-Kac produces when the payoff is simply "deliver the asset".</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Why Monte Carlo wins in high dimension, and PDEs win with early exercise</h3>
+
+  <p>A finite-difference grid with <code>N</code> points along each state variable and <code>d</code> state variables needs on the order of $N^d$ nodes. A single underlying with $N=100$ points needs 100 nodes to visit at each time step; a basket of five correlated underlyings, or a multi-factor interest rate model with five state variables, needs $100^5 = 10^{10}$, which is not a slow computation, it is an infeasible one on ordinary hardware. Monte Carlo's standard error, by contrast, scales as $\sigma/\sqrt{M}$ in the number of simulated paths <code>M</code>, essentially independent of <code>d</code>. That single fact is why every multi-underlying, multi-factor product in practice, basket options, CVA calculations, multi-curve models, is priced by simulation, while low-dimensional products with early exercise features, American and Bermudan options on a single underlying, are priced on a lattice or a PDE grid, because comparing exercise value to continuation value at each grid node is trivial, whereas doing the analogous comparison on simulated paths needs the Longstaff-Schwartz regression machinery precisely because a simulated path has no natural "continuation value" sitting inside it the way a grid node does.</p>
+
+  <h3>Where the name comes from</h3>
+
+  <p>Richard Feynman's 1948 path-integral formulation of quantum mechanics expresses a wavefunction solving the Schrödinger equation as a sum over every possible particle path, each weighted by $e^{iS/\hbar}$ for the classical action <code>S</code> of that path. Mark Kac showed, the following year, that the analogous trick works rigorously for the heat equation, a close mathematical relative of the Schrödinger equation reached by a substitution into imaginary time, once the formal "sum over paths" is replaced by a genuine probability measure over Brownian paths, Wiener measure, which converges as an honest expectation rather than only as a formal oscillatory sum. That is the entire content of the name: Feynman supplied the path-integral idea for a quantum wave equation, Kac supplied the rigorous probabilistic version for the heat equation, and financial engineering inherited Kac's version because the Black-Scholes PDE is, after a change of variables, a heat equation.</p>
+
+  <h3>The Kolmogorov backward equation</h3>
+
+  <p>Set $r=0$ and remove discounting altogether, and the PDE $F_t + \mathcal{A}F = 0$, $F(T,x)=\Phi(x)$, with solution $F(t,x)=\mathbb{E}[\Phi(X_T)\mid X_t=x]$, is exactly the <strong>Kolmogorov backward equation</strong> for the diffusion's transition semigroup. Kolmogorov's equation predates Kac's 1949 paper by roughly two decades and was never stated with pricing in mind; it simply describes how the transition density of a diffusion evolves. Feynman-Kac's contribution on top of Kolmogorov's equation is exactly the discount term <code>rF</code> and the running source term <code>k(t,x)</code> introduced in section 4, both of which have an obvious financial reading, discounting a future cashflow, pricing a stream, but no natural place in Kolmogorov's original, purely probabilistic question.</p>
+
+  <h3>Martingale pricing is the same fact</h3>
+
+  <p>The proof in section 4 showed that the discounted process $e^{-r(s-t)}F(s,X_s)$ being driftless, hence a martingale under the pricing measure $\mathbb{Q}$, is precisely equivalent to the PDE holding. That equivalence is not a coincidence adjacent to the fundamental theorem of asset pricing, it is the same statement viewed from the PDE side rather than the measure-theoretic side. "The discounted price process is a $\mathbb{Q}$-martingale" and "the price function solves the Feynman-Kac PDE" are two descriptions of one fact, and the risk-neutral forward pricing identity from lecture 1, $F(t) = \mathbb{E}^{\mathbb{Q}}[S(T)\mid \mathcal{F}_t]$, is the linear, undiscounted special case of exactly this equivalence, with $\Phi(x)=x$ and $\mu(t,x)=rx$, as the worked example above made explicit.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Feynman-Kac does not licence differentiating an expectation under a discontinuous payoff without care. If <code>Φ</code> has a jump, a digital or barrier-indicator payoff, the function <code>F(t,x)</code> is nonetheless smooth for every <code>t</code> strictly before <code>T</code>, because the diffusion's transition density itself acts as a smoothing kernel, provided <code>sigma</code> does not degenerate. What is not automatically smooth is the limit as $t \to T$, where <code>F</code> must converge back to the discontinuous <code>Φ</code>, and any argument that swaps a limit, a derivative and an expectation around that limit needs its own justification, typically a dominated convergence or uniform integrability argument, not a blanket appeal to the theorem. If <code>sigma</code> is allowed to degenerate toward zero, the smoothing effect disappears and the discontinuity of <code>Φ</code> can survive into <code>F(t,x)</code> even for <code>t</code> strictly before <code>T</code>.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the Feynman-Kac theorem precisely: the SDE, the PDE, the terminal condition, and the resulting expectation, being explicit about where the discount factor enters.</li>
+      <li>Prove the forward direction: show that if <code>F</code> solves the PDE, the process $e^{-r(s-t)}F(s,X_s)$ is a martingale, and conclude. Which single feature of the PDE makes this process's drift vanish?</li>
+      <li>Why is the converse direction, that the expectation actually solves the PDE, harder to establish than the direction proved in this lecture? Name the two extra ingredients it requires.</li>
+      <li>Define the infinitesimal generator <code>A</code> of the diffusion $dX_s = \mu\,ds + \sigma\,dW_s$, and rewrite the Feynman-Kac PDE using it.</li>
+      <li>Starting from the risk-neutral GBM $dS_s = rS_s\,ds + \sigma S_s\,dW_s$ and the call payoff $\Phi(x)=\max(x-K,0)$, write down the PDE that Feynman-Kac produces. What is this PDE called in lecture 9?</li>
+      <li>Verify Feynman-Kac directly for $\Phi(x)=x$: solve the PDE with an ansatz, compute the expectation route using the GBM solution for $X_T$, and confirm the two agree. What result from lecture 1 does this recover?</li>
+      <li>Derive the version of Feynman-Kac with a running payoff term $k(t,x)$, an inhomogeneous PDE. What financial quantity does the extra integral term represent?</li>
+      <li>Complete a comparison of the PDE route and the expectation route on dimensionality, early exercise, path dependence, Greeks and computational cost. Which route would you choose to price a Bermudan swaption in a one-factor short-rate model, and why?</li>
+      <li>Set $r=0$ in the Feynman-Kac PDE. What classical equation from probability theory do you recover, and roughly how much earlier was it discovered than Kac's 1949 result?</li>
+      <li>A trader asks whether it is safe to differentiate $\mathbb{E}[\Phi(X_T)\mid X_t=x]$ with respect to <code>x</code>, to obtain an option's delta, when <code>Φ</code> is a digital payoff (discontinuous). What does Feynman-Kac actually guarantee here, and where does the argument need extra care?</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="09-black_scholes.html">Black-Scholes PDE (planned)</a>, which the worked example in section 4 has already derived as Feynman-Kac's PDE for a risk-neutral GBM and a call payoff; lecture 9 solves it in closed form.</li>
+      <li>Numerical PDE and Monte Carlo methods (planned), the direct implementation of the two routes compared in section 4's table.</li>
+      <li>American and exotic payoffs (planned), where the early-exercise and path-dependence rows of that table decide which route is workable at all.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 7 - Feynman-Kac.pdf</code> (primary source). The excerpt is section 3.6 of a stochastic calculus text, running from page 43, with the terminal-value problem and the worked examples numbered 3.47 to 3.50.</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 3 (stochastic calculus) and Unit 4 (Black-Scholes theory), which carry the formula summary for this material</li>
+      <li><code>UP / Notes.pdf</code> is <em>not</em> the parent document for this excerpt, despite the name. It is a companion to Luenberger, <em>Investment Science</em>, chapters 6 to 9, its sections run from 6.1 to 9.11, and it contains no stochastic calculus. <code>UP / WTW 365 Formulas.pdf</code> is likewise a portfolio-theory and CAPM formula sheet with no Feynman-Kac content. Neither is a source for this lecture.</li>
+      <li>Björk, <em>Arbitrage Theory in Continuous Time</em>, chapter 5, for the standard financial statement of the theorem</li>
+      <li>Shreve, <em>Stochastic Calculus for Finance II</em>, chapter 6, for the proof structure used in section 4</li>
+      <li>Øksendal, <em>Stochastic Differential Equations</em>, chapter 8, for both directions of the theorem stated together</li>
+      <li>Karatzas and Shreve, <em>Brownian Motion and Stochastic Calculus</em>, for the technical existence, uniqueness and martingale conditions this lecture states honestly rather than assumes</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The UP PDF proves only the direction "a PDE solution gives the expectation representation". Every worked example opens with "assume that <code>F(t,x)</code> satisfies the PDE"; it never establishes, or even flags, that the converse, the expectation defines a function that actually solves the PDE, requires separate and harder arguments about the diffusion's transition density.</li>
+      <li>No regularity or growth condition is stated anywhere in the source. The phrase "sufficiently differentiable" appears once, and the martingale property used in every example, $\mathbb{E}_{t,x}[F(u,X_u)] = F(t,x)$, is applied throughout without ever being named as a martingale property or flagged as needing the underlying stochastic integral to be a true martingale rather than merely a local one.</li>
+      <li>The source never names the infinitesimal generator, never uses the term Kolmogorov backward equation, and gives no indication of the result's origin in the Feynman path integral and the heat equation, despite its own Exercise 3.6.4 being precisely the one-dimensional heat equation transformed to fit the Feynman-Kac template. It also never contrasts the PDE and expectation routes as competing computational methods, treating the theorem purely as a device for solving specific terminal value problems rather than as the theoretical basis for a genuine modelling choice between finite differences and Monte Carlo.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 8: the Feynman-Kac theorem</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

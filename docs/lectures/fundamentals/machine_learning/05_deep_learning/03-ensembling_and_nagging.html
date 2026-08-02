@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 23: ensembling and nagging</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Deep learning</a></div>
+  <h1>Ensembling and nagging</h1>
+  <p class="subtitle">The previous lecture established that a network's fitted parameters are not identified by a finite sample: different random seeds land in different, nearly-equally-good corners of a non-convex loss surface. This lecture turns that instability into a variance-reduction tool. Averaging several independently trained networks, a technique specific enough to have its own name in the actuarial literature, nagging, is not a hack bolted onto neural networks; it is the direct, provable consequence of treating the fitting procedure's own randomness as a source of estimation error and applying the law of large numbers to it.</p>
+  <div class="meta">
+    <span>Lecture 23 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part IV: deep learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Given a sequence of independent, unbiased predictors $(\hat\mu_j)_{j\ge1}$ for a true predictor $\mu$, the <strong>aggregated predictor</strong> $\hat\mu^{(M)} = \frac{1}{M}\sum_{j=1}^M \hat\mu_j$ has estimation variance $\text{Var}(\hat\mu^{(M)}) = \text{Var}(\hat\mu_1)/M$, shrinking toward zero as $M$ grows, by the ordinary law of large numbers. Applied to bootstrap resamples of the training data, this recipe is <strong>bagging</strong> ("bootstrap aggregating", covered for trees in the supervised-learning sub-module). Applied instead to repeated, independently seeded fits of the identical network architecture on the identical training data, varying only the random initialisation and the stochastic minibatch order, the recipe is <strong>nagging</strong> ("network aggregating", Richman and Wüthrich), and it exploits precisely the non-identifiability the previous lecture established: because a single fit is one arbitrary draw from a set of nearly-equally-good solutions, $M$ independent draws, averaged, converge to the conditional expectation the fitting procedure itself defines, and the empirical evidence across actuarial pricing datasets consistently shows this reduces prediction fluctuation substantially, with $M$ between 10 and 20 the standard, diminishing-returns-justified recommendation.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You already know that averaging repeated noisy measurements of the same quantity gives a more precise estimate than any single measurement, the same principle behind why an actuary trusts a portfolio-level loss ratio more than a single policy's outcome. Nagging applies the identical logic to a neural network's own training randomness: each fitted network is a "measurement" of the true relationship, corrupted by the noise of which local optimum the optimiser happened to find. Fit the network ten or twenty times with different random seeds, average the resulting predictions, and the averaging noise shrinks exactly as it would for any other repeated measurement, because that is precisely what it is.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the direct payoff of the previous one: non-identifiability under finite data is the premise, and nagging is the response. It also connects backward to bagging in the supervised-learning sub-module, sharing the aggregation mathematics while differing in what is resampled (bootstrap rows for bagging, random seeds for nagging), and forward to the calibration sub-module, where the balance-correction step this lecture closes with is developed in full.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons nagging earns a place in production deep-learning pipelines rather than staying a research curiosity.</p>
+
+  <p>First, <strong>the accuracy improvement is not marginal on real actuarial data</strong>. Comparisons on claims-frequency and claims-severity datasets consistently show average fluctuations across independently seeded fits of around 10 per cent in the well-populated body of the covariate distribution, and up to 40 per cent in sparse regions, exactly the instability the previous lecture's vignette illustrated; nagging with $M$ in the 10-to-20 range closes most of this gap at a fixed, modest computational cost.</p>
+
+  <p>Second, <strong>nagging is orthogonal to, and compatible with, every other regularisation technique already in the toolkit</strong>. It does not replace weight decay, dropout, or early stopping; it sits on top of a fixed, already-regularised training recipe, repeated $M$ times, and combines cleanly with any of the architectures in this sub-module, from a plain MLP through a tabular transformer.</p>
+
+  <p>Third, <strong>a validator asking "how sensitive is this model to retraining" now has a direct, quantitative answer</strong>: the spread of the $M$ individual fits before averaging is itself the empirical estimate of that sensitivity, and reporting it alongside the nagging predictor's point estimate is a complete, honest answer to a question a single fitted network cannot answer at all.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    Following the seed-instability finding in the previous lecture's vignette, the fraud-detection team retrained the network 15 times with independent seeds and reported the nagging predictor (the average of the 15 fits) as the production model, alongside the standard deviation across the 15 individual fits as a per-transaction confidence measure. On the thin merchant-category segment that had shown 15-percentage-point disagreement between single seeds, the nagging predictor's out-of-sample loss was materially lower than any individual seed's, and the reported standard deviation gave the fraud-review team a principled basis for routing high-disagreement transactions to manual review rather than an automated decision, a use of the ensembling spread that a single point estimate could never have supported.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: $M$ independently seeded fits, each landing in a different valley of the loss surface from the previous lecture's figure, averaged into a single prediction whose fluctuation shrinks as $1/\sqrt{M}$ on the standard-deviation scale.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nagging: averaging independently seeded network fits">
+      <defs>
+        <marker id="nagArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Nagging: M independent seeds, one averaged prediction</text>
+
+      <g font-family="Inter" font-size="10">
+        <rect x="40" y="50" width="130" height="60" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="105" y="75" text-anchor="middle" fill="#92400e">seed 1</text>
+        <text x="105" y="92" text-anchor="middle" fill="#92400e">μ̂₁(X)</text>
+
+        <rect x="40" y="125" width="130" height="60" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="105" y="150" text-anchor="middle" fill="#92400e">seed 2</text>
+        <text x="105" y="167" text-anchor="middle" fill="#92400e">μ̂₂(X)</text>
+
+        <text x="105" y="215" text-anchor="middle" fill="#92400e">⋮</text>
+
+        <rect x="40" y="230" width="130" height="60" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="105" y="255" text-anchor="middle" fill="#92400e">seed M</text>
+        <text x="105" y="272" text-anchor="middle" fill="#92400e">μ̂_M(X)</text>
+      </g>
+
+      <line x1="170" y1="80" x2="360" y2="160" stroke="#71717a" stroke-width="1.5" marker-end="url(#nagArrow)"/>
+      <line x1="170" y1="155" x2="360" y2="165" stroke="#71717a" stroke-width="1.5" marker-end="url(#nagArrow)"/>
+      <line x1="170" y1="260" x2="360" y2="175" stroke="#71717a" stroke-width="1.5" marker-end="url(#nagArrow)"/>
+
+      <rect x="370" y="120" width="180" height="90" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="460" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">nagging predictor</text>
+      <text x="460" y="170" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#115e59">μ̂_nagg = (1/M) Σ μ̂ⱼ</text>
+      <text x="460" y="190" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#115e59">Var shrinks by factor M</text>
+
+      <line x1="550" y1="165" x2="700" y2="165" stroke="#71717a" stroke-width="1.5" marker-end="url(#nagArrow)"/>
+
+      <rect x="710" y="120" width="130" height="90" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="775" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">production</text>
+      <text x="775" y="168" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">prediction +</text>
+      <text x="775" y="184" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">spread as an</text>
+      <text x="775" y="198" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">uncertainty flag</text>
+    </svg>
+    <figcaption>Each of $M$ independently seeded fits is a separate, valid draw from the fitting procedure's own randomness. Averaging them, exactly as any repeated noisy measurement is averaged, reduces the variance of the resulting prediction by a factor of $M$; the spread across the $M$ individual fits, discarded by the average itself, is retained separately as a per-instance signal of how much the fitting procedure disagrees with itself at that point in the covariate space.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Aggregating is a law-of-large-numbers argument, nothing more exotic.</strong> The mathematics is identical to averaging repeated noisy measurements of any quantity; the only novelty is recognising that a network's own training randomness is a legitimate source of "measurement noise" to average away. <strong>The discarded spread is not waste, it is a diagnostic.</strong> Where the $M$ fits disagree most is exactly where the previous lecture's non-identifiability argument bites hardest, and that disagreement is worth reporting alongside the averaged prediction, not thrown away.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Aggregating: the law of large numbers applied to predictors</h3>
+
+  <p>Consider a sequence of square-integrable predictors $(\hat\mu_j)_{j\ge1}$, each unbiased for the true predictor $\mu$ in the sense $E[\hat\mu_j] = \mu$. A single predictor $\hat\mu_j$ carries estimation error $\hat\mu_j - \mu$, with average magnitude (estimation uncertainty) $\text{Var}(\hat\mu_j)$. Given $M$ such predictors, the <strong>aggregated (ensemble) predictor</strong> is</p>
+  $$\hat\mu^{(M)} = \frac{1}{M}\sum_{j=1}^{M} \hat\mu_j,$$
+  <p>with estimation uncertainty</p>
+  $$\text{Var}\big(\hat\mu^{(M)}\big) = \frac{1}{M}\text{Var}(\hat\mu_1) \to 0 \quad \text{as } M \to \infty,$$
+  <p>provided the $\hat\mu_j$ are independent. This is the entire mathematical content behind both bagging (introduced for regression trees in the supervised-learning sub-module) and nagging; the two techniques differ only in where the independent draws $(\hat\mu_j)$ come from.</p>
+
+  <h3>Where do the independent, unbiased predictors come from, for a neural network?</h3>
+
+  <p>Two questions have to be answered before the aggregating mathematics applies to networks specifically, and neither has a fully satisfying answer, which is worth stating honestly rather than glossing over. First, where do genuinely independent predictors come from? Second, how do we know they are unbiased? For bagging, the bootstrap answers the first question directly: resampling the training data with replacement generates genuinely different (though dependent, since they share the original sample) training sets. For a fixed training sample, nagging instead varies every source of randomness internal to the fitting procedure itself, the random weight initialisation, the order in which minibatches are drawn, and (where relevant) the dropout masks, holding the training data fixed. This produces $M$ conditionally independent fits, conditional on the training sample $L$, denoted $\hat\mu_j \mid L$ for $j = 1, \ldots, M$, using an identical training procedure but an independent random seed for each.</p>
+
+  <p>Neither question has a clean answer for a network specifically, because the true model is unknown and the sample cannot be regenerated independently: we can only manipulate the conditional randomness of the fitting procedure given the one sample in hand, and ask whether the resulting analysis is useful, which the empirical track record across actuarial pricing studies answers in the affirmative even without a full theoretical unbiasedness guarantee.</p>
+
+  <h3>The nagging predictor</h3>
+
+  <p>Fit the identical network architecture $M$ times on the identical training sample $L$, using independent random seeds for initialisation and minibatch order each time, producing $M$ conditionally independent fitted networks $(\hat\mu_j)_{j=1}^M$ given $L$. The <strong>nagging predictor</strong> (Richman and Wüthrich; "network aggregating") is</p>
+  $$\hat\mu^{\text{nagg}}_M(X) = \frac{1}{M}\sum_{j=1}^{M} \hat\mu_j(X).$$
+  <p>By the aggregating argument above, the nagging predictor's fluctuation shrinks by a factor of $\sqrt{M}$ on the standard-deviation scale relative to any single fit, and the limit as $M \to \infty$, almost surely, is the conditional expectation $E[\hat\mu_1(X) \mid L, X]$: the mean behaviour of the fitting procedure itself, given the training sample and the covariate. Any remaining gap between this limit and the true regression function $\mu(X)$ reflects genuine features of the problem, the particular training sample drawn, the chosen architecture, the specific optimiser and its stopping rule, and the initialisation distribution, none of which nagging can fix; nagging only removes the extra, avoidable variability contributed by an arbitrary single choice of random seed.</p>
+
+  <div class="defcard tint-mint">
+    <div class="term">How large should $M$ be?</div>
+    <div class="def">Empirical studies on claims-frequency and claims-severity actuarial datasets (comparing out-of-sample loss as a function of $M$) consistently show diminishing returns after $M$ somewhere between 10 and 20: the out-of-sample loss of the nagging predictor decreases steeply for the first several ensemble members and then flattens, so that fitting more than roughly 20 networks buys little further improvement for a substantial further computational cost. The standard recommendation, absent a specific reason to deviate, is $M = 10$ to $M = 20$.</div>
+  </div>
+
+  <h3>Nagging versus a two-step boosting correction</h3>
+
+  <p>It is worth being precise about what nagging is not. Ensembling (averaging $M$ independent fits of the identical model) is a fundamentally different operation from boosting (fitting a second model to the residuals of a first, letting the second model specifically target the first's weaknesses). Nagging averages; it never lets one fit compete with or correct another. A combined GLM-plus-network architecture (developed in the actuarial-applications module later in this course) is a boosting-style construction and is not a substitute for nagging; the two techniques are complementary and are frequently applied together, nagging the network component of a combined architecture in exactly the way a stand-alone network would be nagged.</p>
+
+  <h3>Balance correction after nagging</h3>
+
+  <p>A nagging predictor, being an average of $M$ individually fitted networks, does not automatically satisfy the balance property developed in the calibration sub-module (the exposure-weighted sum of predictions equalling the exposure-weighted sum of observed responses, exactly, on the training sample), because none of the individual fits was fitted by maximum likelihood under a canonical link. The standard closing step, after computing the nagging predictor, is precisely the intercept-shift balance correction from the calibration sub-module's opening lecture, applied once to the averaged prediction rather than to each of the $M$ individual fits separately.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Varying the training data instead of the random seed</span>
+    Nagging specifically holds the training sample fixed and varies only the fitting procedure's internal randomness; resampling the training data as well conflates nagging with bagging and makes it harder to isolate which source of variability (data resampling or optimiser randomness) is responsible for any observed improvement. Keep the two techniques and their diagnostic purposes distinct, even though nothing prevents combining them deliberately.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Discarding the spread across the $M$ fits</span>
+    Reporting only the nagging predictor's point estimate, and discarding the individual fits once the average is computed, throws away the single most informative by-product of the whole exercise: the spread across fits is a direct, empirical measure of exactly where the fitting procedure is unstable, and is worth retaining as a per-instance uncertainty signal, as the vignette's fraud-review routing illustrates.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing $M$ without checking the diminishing-returns curve</span>
+    Fitting only two or three networks and averaging captures only a small fraction of the available variance reduction, while fitting far more than 20 spends compute for negligible further gain. Plotting out-of-sample loss against $M$ on the actual dataset at hand, rather than assuming the 10-to-20 rule of thumb transfers unchanged, is a cheap check worth doing once per model class and dataset combination.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting the balance correction after averaging</span>
+    A nagging predictor inherits no automatic guarantee of the balance property from any of its individual members, and skipping the final intercept-shift correction can leave a well-averaged, low-variance predictor that is nonetheless mis-calibrated in aggregate, exactly the failure mode the calibration sub-module's opening lecture developed at length.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Aggregating independent, unbiased predictors reduces estimation variance by a factor of $M$, an ordinary law-of-large-numbers argument. Bagging applies this to bootstrap-resampled training data; nagging applies it instead to independently seeded fits of the identical network on the identical data, directly exploiting the non-identifiability the previous lecture established. The recommended range, $M$ between 10 and 20, reflects consistent empirical diminishing returns across actuarial pricing datasets, and the spread across the $M$ individual fits, rather than being discarded, is worth retaining as a per-instance measure of fitting-procedure instability. A balance correction, applied once to the averaged prediction, is the standard closing step before deployment.</p>
+
+  <p>The next two lectures leave the training-stability question behind and turn to a different one: how to get covariate information, especially high-cardinality categorical information and unstructured text, into a network in the first place. Tensors and entity embedding come first, followed by the unsupervised word-embedding methods (word2vec, GloVe) that let a network make sense of text without any labelled target at all.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the aggregating formula and its variance-reduction property for $M$ independent, unbiased predictors.</li>
+      <li>Distinguish bagging from nagging: what is resampled or varied in each, and what stays fixed?</li>
+      <li>Why can nagging's independence assumption not be verified directly, and why does the empirical track record across actuarial datasets substitute for a full theoretical guarantee?</li>
+      <li>State the standard recommended range for $M$ and the empirical justification behind it.</li>
+      <li>Explain why the spread across the $M$ individually fitted networks is worth reporting rather than discarding, with reference to the fraud-detection vignette.</li>
+      <li>Why does a nagging predictor still need a balance correction after averaging, even though averaging reduces variance?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 2 (<a href="02-universality_and_kan.html">universality and non-identifiability</a>) established the premise this lecture's variance-reduction argument depends on.</li>
+      <li><strong>Next:</strong> Lecture 4 (<a href="04-tensors_and_embeddings.html">tensors and embeddings</a>) turns to getting covariate information, particularly high-cardinality categorical data, into a network.</li>
+      <li><strong>Built on:</strong> Bagging, introduced for regression trees in <a href="../03_supervised_learning/05-ensemble_learning.html">the ensemble learning lecture</a>, shares the identical aggregating mathematics this lecture applies to networks instead.</li>
+      <li><strong>Used by:</strong> The balance-correction step this lecture closes with is developed in full in <a href="../09_forecast_evaluation/01-statistical_bias_and_balance.html">the calibration sub-module's opening lecture</a>.</li>
+      <li><strong>Outside this course:</strong> Nagging is a standard step in production actuarial pricing pipelines that use neural-network components, applied identically whether the network is a stand-alone model or one part of a combined GLM-and-network architecture.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Deep learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 23 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

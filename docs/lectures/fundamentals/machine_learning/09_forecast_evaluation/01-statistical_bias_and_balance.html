@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 42: statistical bias and the balance property</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Calibration</a></div>
+  <h1>Statistical bias and the balance property</h1>
+  <p class="subtitle">An RMSE or an AUC computed over the whole test set can look excellent while the model quietly overcharges half the portfolio and undercharges the other half by an offsetting amount, or while the entire book is priced a few per cent too low in aggregate. Neither failure shows up in an average-error metric computed the usual way. This lecture introduces the property, the balance property, that a defensible pricing model checks for directly, and explains why a maximum-likelihood GLM with a canonical link gets it for free while a gradient-boosted tree or a neural network does not.</p>
+  <div class="meta">
+    <span>Lecture 42 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part VII: calibration and forecast evaluation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A regression function $X \mapsto \mu(X)$ is <strong>globally unbiased</strong> for $(Y, X, v)$ if $E[v\,\mu(X)] = E[vY]$: the average predicted premium, weighted by exposure, matches the average actual claim, weighted by exposure, over the population the model will price. This is a population statement, and it is practically unverifiable, because an insurer or lender has exactly one realised history to check it against, not a population it can resample. The <strong>balance property</strong> is the practically checkable substitute: a fitting procedure $L \mapsto \mu_L$ satisfies it if, for almost every realisation of the learning sample, $\sum_i v_i \mu_L(X_i) = \sum_i v_i Y_i$ exactly, in-sample, on the data actually used to fit the model. Maximum-likelihood-fitted GLMs under the <strong>canonical link</strong> satisfy the balance property automatically, a consequence of the score equation vanishing at the intercept; almost every other fitting procedure, non-canonical links, regularised GLMs, gradient boosting, neural networks, does not, and needs an explicit correction if aggregate pricing accuracy matters, which in a regulated portfolio it always does.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine the total claim the whole portfolio actually paid this year is a fixed pot of money. The balance property asks: does your model's total predicted premium, summed over every policyholder, land on that exact pot, on the data you fitted it to? A canonical-link GLM does this by construction, the same way a weighted average always reproduces the total it was computed from. A gradient-boosted tree does not make this promise at all; it was built to minimise a loss function locally, tree split by tree split, and nothing in that construction forces the grand total to reconcile. Checking the balance property is checking whether the grand total actually does reconcile, and fixing it when it doesn't is usually a one-line intercept shift, not a re-fit.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This is the opening lecture of the calibration sub-module, which sits after <a href="../07_model_evaluation/index.html">model evaluation</a> in the pipeline. That sub-module asked "how good is this model, on average, across the whole test set"; this sub-module asks a sharper question that an average metric cannot answer on its own: is the model's predicted level correct everywhere it needs to be, not just on average. The balance property is the coarsest, cheapest version of that question, checked at the level of the whole portfolio; the next lecture, <a href="02-auto_calibration.html">auto-calibration</a>, asks the same question at the level of every price cohort.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons a model-evaluation report that stops at RMSE and AUC is not enough.</p>
+
+  <p>First, <strong>aggregate mispricing is invisible to an average-error metric but is exactly what a solvency regulator asks about first</strong>. A model can have excellent RMSE and excellent Gini while its total predicted premium across the book differs from the total claim actually paid by several per cent, because RMSE penalises the size of individual errors, not their sign, and can be small even when errors are systematically one-sided in aggregate. The balance property is the direct, one-number check for exactly this failure mode, and it is the reconciliation an actuarial reserving or pricing sign-off is built around.</p>
+
+  <p>Second, <strong>the property is free for the model class regulated credit and insurance pricing has used for decades, and is not free for the model classes now being proposed to replace it</strong>. A canonical-link GLM's balance is a mathematical consequence of maximum likelihood, not a design choice anyone made; a gradient-boosted tree or neural network offers no equivalent guarantee, and a validator moving a book from a GLM to a machine-learning model needs to know this is a genuine, checkable gap to close, not an oversight to apologise for after the fact.</p>
+
+  <p>Third, <strong>the fix, when the property fails, is almost always cheap</strong>. A single intercept (bias-term) shift restores balance without touching the rest of the fitted function, which is the standard remedy this lecture develops and the one every later lecture in this sub-module assumes has already been applied before finer-grained calibration checks begin.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A motor insurer replaced its GLM tariff with a LightGBM model that improved out-of-sample Gini by four points. Six months after launch, finance flagged that earned premium was running 3 per cent below the actuarial central estimate used in the business plan. The root cause was not the model's discrimination, which was genuinely better, but that the GBM had never been checked for the balance property: its total predicted premium on the pricing dataset was 3 per cent below total historical claims, a gap the GLM it replaced had never had because MLE with a canonical link enforced it automatically. A single multiplicative intercept correction, computed once and applied to every quote, closed the gap without touching the model's ranking of risks.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a seesaw with the total predicted premium on one side and the total actual claim on the other. For a canonical-link MLE-fitted GLM, the seesaw is bolted level by construction. For any other fitting procedure, nothing holds the seesaw level, and it is the analyst's job to check, and if necessary to shim.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The balance property as a seesaw between total predicted premium and total actual claim">
+      <defs>
+        <marker id="balArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The balance property: does the total reconcile, in-sample?</text>
+
+      <g transform="translate(60, 60)">
+        <rect x="0" y="0" width="330" height="200" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="165" y="26" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">MLE-fitted GLM, canonical link</text>
+        <line x1="30" y1="130" x2="300" y2="130" stroke="#0d9488" stroke-width="4"/>
+        <circle cx="165" cy="130" r="8" fill="#0d9488"/>
+        <text x="90" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#115e59">Σ vᵢ μ(Xᵢ)</text>
+        <text x="240" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#115e59">Σ vᵢ Yᵢ</text>
+        <text x="165" y="160" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">exactly equal, guaranteed</text>
+        <text x="165" y="176" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">by the score equation at MLE</text>
+      </g>
+
+      <g transform="translate(470, 60)">
+        <rect x="0" y="0" width="330" height="200" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="165" y="26" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">GBM, FNN, regularised GLM, non-canonical link</text>
+        <line x1="30" y1="130" x2="300" y2="130" stroke="#b45309" stroke-width="4" transform="rotate(-8 165 130)"/>
+        <circle cx="165" cy="130" r="8" fill="#b45309"/>
+        <text x="90" y="150" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#92400e">Σ vᵢ μ(Xᵢ)</text>
+        <text x="240" y="105" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#92400e">Σ vᵢ Yᵢ</text>
+        <text x="165" y="176" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">no guarantee either way;</text>
+        <text x="165" y="192" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">check, then correct if it tips</text>
+      </g>
+    </svg>
+    <figcaption>The balance property is an in-sample identity: the exposure-weighted sum of predictions equals the exposure-weighted sum of observed responses, on the data the model was fitted to. Maximum likelihood with a canonical link delivers this by construction, because the score equation for the intercept is exactly the balance identity set to zero. Every other fitting procedure needs the identity checked, and corrected with an intercept shift if it fails.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Balance is an in-sample property, not a population guarantee.</strong> It says the model reconciles on the data you fitted it to; it says nothing about whether that data is representative of next year's portfolio, which is a separate concept-drift question addressed in section 5. <strong>Balance is coarser than calibration.</strong> A model can satisfy balance in aggregate while still cross-subsidising badly between rating grades or risk deciles, the finer-grained failure the next lecture's auto-calibration property is built to catch.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Four things "bias" can mean, and which one this lecture is about</h3>
+
+  <p>The word bias does real damage in cross-disciplinary conversation because it means four genuinely different things. <strong>In-sample bias</strong> in model selection, covered in the model-evaluation sub-module, is the optimism a model shows when validated on the data it was fitted to. The <strong>bias term</strong> in a neural network is simply the intercept, a piece of vocabulary, not a statistical property. <strong>Unfair discrimination bias</strong> concerns whether the model treats protected groups fairly, an important but separate topic belonging with the interpretation and governance material rather than here. This lecture is about the fourth meaning, <strong>statistical (regression) bias</strong>: whether the fitted regression function's average prediction matches the average of what actually happened, at the population or the sample level.</p>
+
+  <h3>Global unbiasedness: the population statement, and why you cannot check it directly</h3>
+
+  <p>A regression function $\mu: \mathcal{X} \to \mathbb{R}$ is <strong>globally unbiased</strong> for $(Y, X, v)$ if</p>
+
+  $$E[v\,\mu(X)] = E[vY],$$
+
+  <p>where the expectation runs over the population distribution of $(Y, X, v)$. This is the statement that, averaged (exposure-weighted) over the entire population the model will be used on, the predicted premium level covers the actual claim level. It is the property an actuary means informally by "the pricing is right on average", and it would be the natural thing to test directly, except that it cannot be: the population distribution is never observed, only one realised sample from it, and repeating the experiment (observing a fresh, independent portfolio history under the identical population) is not something an insurer or a lender gets to do.</p>
+
+  <h3>The balance property: the checkable, in-sample substitute</h3>
+
+  <p>The <strong>balance property</strong> replaces the unobservable population statement with a statement about the one sample actually in hand. A fitting procedure $L \mapsto \mu_L$, mapping a learning sample to a fitted regression function, satisfies the balance property if, for almost every realisation of the learning sample $L = (Y_i, X_i, v_i)_{i=1}^n$,</p>
+
+  $$\sum_{i=1}^n v_i \, \mu_L(X_i) = \sum_{i=1}^n v_i \, Y_i.$$
+
+  <p>Read this as: the total exposure-weighted prediction, summed over every row the model was trained on, exactly reproduces the total exposure-weighted observed response, on that same data. This is the sense in which the balance property "re-allocates" the total observed claim to every policyholder: the collective, as a whole, is charged exactly the total claim it actually generated, which is the solidarity-pool idea at the core of insurance pricing made into a checkable identity.</p>
+
+  <div class="defcard tint-mint">
+    <div class="term">Why MLE with the canonical link satisfies balance automatically</div>
+    <div class="def">For a GLM fitted by maximum likelihood under the canonical link, the score equation for the intercept coefficient $\beta_0$ is, up to a constant, exactly $\sum_i v_i (Y_i - \mu(X_i)) = 0$. This is not a coincidence of a particular distribution; it is a structural feature of the canonical link (Nelder and Wedderburn, 1972) that holds across the whole exponential dispersion family covered in the statistics track's lecture on that topic. Any MLE-fitted GLM using its canonical link therefore satisfies the balance property exactly, on every fitted sample, with no extra step required. Switch to a non-canonical link (probit for a binomial response, identity for a Poisson response), and the score equation no longer has this form, and balance is no longer guaranteed.</div>
+  </div>
+
+  <h3>Balance correction: the standard remedy</h3>
+
+  <p>When a fitting procedure does not deliver balance automatically, gradient boosting, a neural network, a regularised GLM, or a GLM under a non-canonical link, the standard remedy is a single correction to the intercept (or, on the response scale, a single multiplicative or additive constant applied uniformly to every prediction):</p>
+
+  $$\hat\beta_0^{\text{corrected}} = \hat\beta_0 + \delta, \qquad \delta \text{ chosen so that } \sum_i v_i \, \mu^{\text{corrected}}(X_i) = \sum_i v_i \, Y_i.$$
+
+  <p>The correction touches only the overall level of the fitted function; it leaves every relative comparison between covariate combinations (the model's ranking and its discrimination, addressed in the discrimination and Gini lecture later in this sub-module) completely unchanged. This is the reason the correction is cheap: it is a post-hoc calibration adjustment applied once, not a re-fit of the model, and it is standard practice to apply it as a final step before a model is signed off, regardless of which model class produced the underlying fit.</p>
+
+  <h3>Balance under concept drift</h3>
+
+  <p>The balance property is checked, and holds, on the learning sample. It says nothing about whether the total claim level next year will match this year's; inflation, a changing product mix, or a shift in the macroeconomic environment can all move the true aggregate claims level away from what the fitted model, however well-balanced in-sample, currently predicts. This is <strong>concept drift</strong>, and the practical response is the identical intercept-shift mechanism used for the initial balance correction: periodically re-estimate the intercept against the most recent experience, holding the rest of the fitted function (the relative pricing structure) fixed, rather than re-fitting the whole model from scratch every cycle. This is exactly the discipline behind an actuarial "central estimate" true-up between full model redevelopments.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming an approximate match is the balance property</span>
+    A gradient-boosted model whose average training-set prediction happens to sit within half a per cent of the average training-set response has not demonstrated the balance property; it has demonstrated a numerical coincidence for one fitted instance, on one sample, with one random seed. The balance property is a guarantee that holds by construction for MLE under the canonical link; for any other model class, the gap must be checked explicitly on every refit and corrected if it is material, not waved through because it happened to look small once.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating an in-sample check as an out-of-sample guarantee</span>
+    Balance, once achieved, is a property of the fitted model on the sample it was fitted to. It does not imply the same model will reconcile against next year's experience, because the population the model prices may have moved. Confusing "balanced in-sample" with "will remain accurate going forward" is the mistake that concept drift, section 4's closing point, exists to correct: balance needs periodic re-checking against fresh experience, not a one-time sign-off.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Confusing balance with calibration</span>
+    A model can satisfy the balance property in aggregate, total predicted premium equals total actual claim across the whole book, while systematically overcharging young drivers and undercharging old ones by an exactly offsetting amount. Balance is silent on this, because it is a single, portfolio-wide sum; catching cross-subsidy between price cohorts is precisely what the next lecture's auto-calibration property, and the actual-versus-predicted plot that tests for it, are built to do. Reporting "the model is balanced" as if that settles the pricing-fairness question conflates a coarse, aggregate check with a much finer one.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Applying the correction without diagnosing why it was needed</span>
+    An intercept shift restores the aggregate total but does not explain why the uncorrected model was off, and sometimes the reason matters: a systematic imbalance can be the first visible symptom of a genuine specification problem (a missing interaction, a mis-specified link, an under-fitted tail) rather than a harmless byproduct of a non-MLE fitting procedure. Applying the shift as a matter of routine, without first checking whether the gap is large enough to warrant investigating the underlying model, risks papering over a real problem rather than fixing a cosmetic one.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Global unbiasedness is the population statement an actuary means by "the pricing is right on average", and it cannot be checked directly because the population is never observed, only one realised sample. The balance property is its practical, in-sample substitute: an exact reconciliation between total exposure-weighted prediction and total exposure-weighted observed response, on the data actually fitted. Maximum-likelihood GLMs under the canonical link deliver this for free, a consequence of the intercept's score equation; every other model class, and every non-canonical link, needs the property checked and, if it fails, corrected with a single intercept shift that leaves the model's discrimination untouched.</p>
+
+  <p>Balance is the coarsest calibration check available, a single number for the whole portfolio. The next lecture sharpens the question to the level of individual price cohorts, introducing auto-calibration and the actual-versus-predicted plot that is the standard way to test for it.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the difference between global unbiasedness and the balance property. Why is only the second one directly checkable from data you actually have?</li>
+      <li>Explain why a maximum-likelihood-fitted GLM under its canonical link satisfies the balance property automatically. What breaks this guarantee if you switch to a non-canonical link?</li>
+      <li>You fit a LightGBM frequency model and find its total predicted claim count on the training set is 2 per cent below the total observed count. What is the standard correction, and what does it leave unchanged?</li>
+      <li>Explain why a portfolio can satisfy the balance property in aggregate while still being badly miscalibrated between rating grades. Which later lecture in this sub-module is built to catch that failure?</li>
+      <li>Why does satisfying the balance property on this year's data not guarantee the model will still balance against next year's experience? What is the standard remedy, and why is it cheaper than a full model redevelopment?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 2 (<a href="02-auto_calibration.html">auto-calibration</a>) sharpens the balance property from a single, portfolio-wide sum to a condition that must hold at every price cohort.</li>
+      <li><strong>Previous:</strong> This sub-module follows <a href="../07_model_evaluation/index.html">model evaluation</a>, which covers the average-performance metrics (AIC, RMSE, AUC) this lecture assumes as background.</li>
+      <li><strong>Prerequisite:</strong> The canonical-link theory this lecture leans on is developed in the statistics track's lecture on <a href="../../statistics/05-generalised_linear_models.html">generalised linear models</a> and, for the exposure-weighting notation, <a href="../../statistics/13-exponential_dispersion_family.html">the exponential dispersion family</a>.</li>
+      <li><strong>Outside this course:</strong> In credit and insurance pricing, the balance property is exactly the reconciliation an actuarial sign-off or a reserving true-up is built around; in A-IRB validation it is the portfolio-level central-tendency check that sits alongside, and is distinct from, discrimination testing.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Calibration course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 42 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

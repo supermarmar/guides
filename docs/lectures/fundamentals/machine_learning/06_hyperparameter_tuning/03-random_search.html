@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 32: random search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Hyperparameter tuning</a></div>
+  <h1>Random search</h1>
+  <p class="subtitle">Replace the grid with random samples and, counterintuitively, do better on the same budget. The Bergstra-Bengio paper made the case in 2012; a decade of practice has agreed.</p>
+  <div class="meta">
+    <span>Lecture 32 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Random search</strong> replaces the dense Cartesian product of a grid with $n_{\text{iter}}$ independent draws from a distribution defined over each hyperparameter. The user specifies a distribution per dimension (uniform over a bounded interval, log-uniform for scale parameters, discrete uniform over a list of categories) and a budget; the algorithm samples that many points, cross-validates each, and returns the best. The change looks cosmetic and is not. <strong>Bergstra and Bengio (2012)</strong> showed that for any fixed compute budget, random search outperforms grid search whenever a small subset of the hyperparameters drives most of the score, which is the empirical norm. The intuition is geometric: a grid wastes evaluations on dimensions that do not matter (every value of the irrelevant axis is tried at every level of the relevant one), while random draws cover the influential axis more densely for the same number of fits. The procedural change is one scikit-learn class swap, from <code>GridSearchCV</code> to <code>RandomizedSearchCV</code>, with <code>param_grid</code> becoming <code>param_distributions</code> and an explicit <code>n_iter</code> controlling cost.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine tuning two knobs, only one of which does anything useful. A grid that tries five settings of each knob fits 25 models, but only five of the 25 are distinct on the knob that matters. Random search drawing 25 points instead gives you 25 distinct values on the useful knob, because no two random samples coincide. You have spent the same compute and learned five times as much about the dimension that matters. Generalise this from two knobs to ten and the case for random search writes itself.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Bergstra and Bengio's paper is one of the rare hyperparameter-tuning results that has aged well. The argument does not require any tuning at all on the part of the random search itself: no kernel, no acquisition function, no surrogate. It is a structural statement about coverage. The result is what makes random search the right baseline against which to evaluate any cleverer scheme (Bayesian, Hyperband, BOHB); if your fancy optimiser does not beat random search on the same budget, the fanciness is not paying for itself.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 5 of the pipeline. Lecture 30 on <a href="01-tuning_principles.html">tuning principles</a> framed the bias-variance and budget questions this lecture answers; lecture 31 on <a href="02-grid_search.html">grid search</a> gave the dense-baseline alternative; lecture 33 on <a href="04-bayesian_optimisation.html">Bayesian optimisation</a> uses random search as both its starting points and its honest comparator. The pipeline machinery from <a href="../02_train_test_split/02-pipelines.html">lecture 9</a> still applies: any transformer with parameters learned from data must be fit inside the cross-validation loop, not before it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons random search is the workhorse default rather than a curiosity. First, <strong>most hyperparameter spaces are sparse in their effective dimensionality.</strong> A typical gradient-boosted tree has eight or ten tunable hyperparameters, but on any given dataset the score is dominated by two or three of them (learning rate, number of estimators, maximum depth in most configurations). A grid wastes its budget exploring the seven or eight dimensions that the score is flat in. Random search spends the same budget but distributes its samples across the active dimensions in proportion to how the model actually responds.</p>
+
+  <p>Second, <strong>random search scales gracefully with dimensionality.</strong> A grid with five values per hyperparameter and ten hyperparameters needs $5^{10}$, about ten million fits, which is unaffordable. The same ten million budget under random search gives ten million independent samples across the ten-dimensional space, each one distinct on every axis. The user does not have to discretise in advance, does not have to decide how many levels per dimension, and does not have to anticipate which dimensions warrant fine resolution. The budget is the only knob.</p>
+
+  <p>Third, <strong>random search is trivially parallel and trivially interruptible.</strong> Each draw is independent of every other, so $n_{\text{iter}}$ fits run on $n_{\text{iter}}$ cores with no coordination overhead. If the budget is exhausted halfway through, the partial result is still a valid random sample of the space, with confidence intervals that depend only on the number of samples completed, not on which ones. A grid stopped halfway through has scanned the first half of the space densely and the second half not at all, which is a worse partial result for the same compute.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team tuning an XGBoost PD model defended a grid of $4 \times 4 \times 4 \times 4 = 256$ configurations on the grounds that it was reproducible and exhaustive. Two competing teams ran random search with 256 samples each. The grid found a configuration with AUC 0.768. Both random searches found configurations with AUC 0.774 and 0.776 respectively, on the same compute budget and the same data. Inspecting the grid revealed the cause: three of the four hyperparameters were near-flat across the chosen range, so the grid had effectively tested four learning rates and called it a day. The random searches sampled 256 distinct learning rates each. The grid was reproducible, but it was reproducibly worse.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. In two dimensions, where one axis matters and the other does not, a 25-point grid projects onto five distinct values along the important axis; a 25-point random sample projects onto 25 distinct values. The grid wastes a factor of five on the inactive dimension. Generalise: in $d$ dimensions where $k$ matter, a grid with $m$ levels per axis spends $m^{d-k}$ of its evaluations on duplicates along the active axes, while a random sample of the same size spends none.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Grid versus random coverage of a hyperparameter space where the score depends mostly on one axis">
+      <defs>
+        <linearGradient id="rsScoreGrad" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0%" stop-color="#fee2e2"/>
+          <stop offset="50%" stop-color="#fef3c7"/>
+          <stop offset="100%" stop-color="#bbf7d0"/>
+        </linearGradient>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Grid versus random sampling when only the horizontal axis drives the score</text>
+
+      <!-- Grid panel -->
+      <g>
+        <text x="180" y="50" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#37352F">Grid search, 25 points</text>
+
+        <!-- Score band along x-axis -->
+        <rect x="60" y="68" width="240" height="240" fill="url(#rsScoreGrad)" opacity="0.45"/>
+        <rect x="60" y="68" width="240" height="240" fill="none" stroke="#37352F" stroke-width="1"/>
+
+        <!-- Grid points 5x5 -->
+        <g fill="#1d4ed8">
+          <circle cx="84"  cy="92"  r="4"/><circle cx="138" cy="92"  r="4"/><circle cx="192" cy="92"  r="4"/><circle cx="246" cy="92"  r="4"/><circle cx="290" cy="92"  r="4"/>
+          <circle cx="84"  cy="146" r="4"/><circle cx="138" cy="146" r="4"/><circle cx="192" cy="146" r="4"/><circle cx="246" cy="146" r="4"/><circle cx="290" cy="146" r="4"/>
+          <circle cx="84"  cy="200" r="4"/><circle cx="138" cy="200" r="4"/><circle cx="192" cy="200" r="4"/><circle cx="246" cy="200" r="4"/><circle cx="290" cy="200" r="4"/>
+          <circle cx="84"  cy="254" r="4"/><circle cx="138" cy="254" r="4"/><circle cx="192" cy="254" r="4"/><circle cx="246" cy="254" r="4"/><circle cx="290" cy="254" r="4"/>
+          <circle cx="84"  cy="290" r="4"/><circle cx="138" cy="290" r="4"/><circle cx="192" cy="290" r="4"/><circle cx="246" cy="290" r="4"/><circle cx="290" cy="290" r="4"/>
+        </g>
+
+        <!-- Marginal projection on x-axis (5 distinct values) -->
+        <line x1="60" y1="320" x2="300" y2="320" stroke="#37352F" stroke-width="1"/>
+        <g fill="#1d4ed8"><circle cx="84"  cy="320" r="5"/><circle cx="138" cy="320" r="5"/><circle cx="192" cy="320" r="5"/><circle cx="246" cy="320" r="5"/><circle cx="290" cy="320" r="5"/></g>
+        <text x="180" y="345" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">5 distinct values on the axis that matters</text>
+
+        <text x="180" y="365" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">important hyperparameter</text>
+        <text x="42" y="188" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a" transform="rotate(-90 42 188)">unimportant hyperparameter</text>
+      </g>
+
+      <!-- Random panel -->
+      <g>
+        <text x="600" y="50" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#37352F">Random search, 25 points</text>
+
+        <rect x="480" y="68" width="240" height="240" fill="url(#rsScoreGrad)" opacity="0.45"/>
+        <rect x="480" y="68" width="240" height="240" fill="none" stroke="#37352F" stroke-width="1"/>
+
+        <!-- Random points (handcrafted spread, 25) -->
+        <g fill="#0d9488">
+          <circle cx="495" cy="83"  r="4"/><circle cx="517" cy="252" r="4"/><circle cx="528" cy="125" r="4"/><circle cx="544" cy="295" r="4"/><circle cx="552" cy="178" r="4"/>
+          <circle cx="563" cy="74"  r="4"/><circle cx="575" cy="220" r="4"/><circle cx="582" cy="142" r="4"/><circle cx="594" cy="270" r="4"/><circle cx="606" cy="98"  r="4"/>
+          <circle cx="615" cy="201" r="4"/><circle cx="624" cy="155" r="4"/><circle cx="633" cy="285" r="4"/><circle cx="641" cy="112" r="4"/><circle cx="649" cy="232" r="4"/>
+          <circle cx="657" cy="78"  r="4"/><circle cx="666" cy="170" r="4"/><circle cx="673" cy="246" r="4"/><circle cx="681" cy="135" r="4"/><circle cx="688" cy="195" r="4"/>
+          <circle cx="694" cy="289" r="4"/><circle cx="700" cy="89"  r="4"/><circle cx="707" cy="215" r="4"/><circle cx="713" cy="158" r="4"/><circle cx="718" cy="265" r="4"/>
+        </g>
+
+        <!-- Marginal projection on x-axis (25 distinct) -->
+        <line x1="480" y1="320" x2="720" y2="320" stroke="#37352F" stroke-width="1"/>
+        <g fill="#0d9488"><circle cx="495" cy="320" r="3"/><circle cx="517" cy="320" r="3"/><circle cx="528" cy="320" r="3"/><circle cx="544" cy="320" r="3"/><circle cx="552" cy="320" r="3"/><circle cx="563" cy="320" r="3"/><circle cx="575" cy="320" r="3"/><circle cx="582" cy="320" r="3"/><circle cx="594" cy="320" r="3"/><circle cx="606" cy="320" r="3"/><circle cx="615" cy="320" r="3"/><circle cx="624" cy="320" r="3"/><circle cx="633" cy="320" r="3"/><circle cx="641" cy="320" r="3"/><circle cx="649" cy="320" r="3"/><circle cx="657" cy="320" r="3"/><circle cx="666" cy="320" r="3"/><circle cx="673" cy="320" r="3"/><circle cx="681" cy="320" r="3"/><circle cx="688" cy="320" r="3"/><circle cx="694" cy="320" r="3"/><circle cx="700" cy="320" r="3"/><circle cx="707" cy="320" r="3"/><circle cx="713" cy="320" r="3"/><circle cx="718" cy="320" r="3"/></g>
+        <text x="600" y="345" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">25 distinct values on the axis that matters</text>
+
+        <text x="600" y="365" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">important hyperparameter</text>
+        <text x="462" y="188" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a" transform="rotate(-90 462 188)">unimportant hyperparameter</text>
+      </g>
+    </svg>
+    <figcaption>The score depends only on the horizontal axis (green is better). A 5x5 grid projects onto five distinct values along that axis, no matter how many points it spends. A 25-point random sample projects onto 25 distinct values. Both panels use the same compute budget; the right panel learns five times as much about the dimension that actually drives the score.</figcaption>
+  </figure>
+
+  <p>Three things to read off the figure. The vertical axis is wasted compute in both panels, but the grid commits to wasting it in regular columns while the random sample wastes it incidentally. The marginal projection along the horizontal axis is what the model's score actually depends on, and the count of distinct projected values is the resolution at which the optimiser can locate the optimum. The argument is not that the grid is wrong; it is that the grid pays a $d-1$-dimensional cost for a one-dimensional answer.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The procedure</h3>
+
+  <p>Given a model with hyperparameters $\theta = (\theta_1, \ldots, \theta_d)$, the user defines a distribution $p_j(\cdot)$ over each $\theta_j$ and a budget $n_{\text{iter}}$. The algorithm draws $n_{\text{iter}}$ independent samples $\theta^{(1)}, \ldots, \theta^{(n_{\text{iter}})}$, where $\theta^{(i)}_j \sim p_j$ independently across $i$ and $j$. For each sample, it runs $k$-fold cross-validation on the training set and records the mean validation score. The returned configuration is</p>
+  $$\hat{\theta} = \arg\max_{i \in \{1, \ldots, n_{\text{iter}}\}} \frac{1}{k} \sum_{f=1}^{k} \operatorname{score}(\theta^{(i)}, \text{fold } f).$$
+  <p>Two things differ from grid search. The candidate set is drawn rather than enumerated, and the budget $n_{\text{iter}}$ is a free parameter rather than a derived consequence of the grid resolution. A grid of five values across four hyperparameters is locked at 625 fits; random search lets the user decide whether they can afford 100, 250, or 5000.</p>
+
+  <h3>The Bergstra-Bengio result</h3>
+
+  <p>The 2012 paper "Random Search for Hyper-Parameter Optimization" makes a precise version of the intuition above. Assume the score function depends only on $k$ of the $d$ hyperparameters (the others are inert) and that the optimum sits in the top fraction $\alpha$ of the space along each active dimension. The probability that a single random sample lands in the joint top region is at least $\alpha^k$ (and not $\alpha^d$, because the inactive dimensions do not constrain the win). With $n_{\text{iter}}$ samples, the probability of finding at least one good configuration is</p>
+  $$1 - (1 - \alpha^k)^{n_{\text{iter}}}.$$
+  <p>For typical settings ($k=2$, $\alpha=0.05$), 60 random samples give a 95 per cent chance of landing in the top 5 per cent on each active dimension. A grid would need at least $20 \times 20 = 400$ samples to guarantee similar coverage on the two active dimensions, and many more if the user does not know in advance which two are active and so grids over all $d$.</p>
+
+  <p>The empirical claim of the paper, tested across neural-network and SVM benchmarks, is that random search matches or beats grid search at the same budget in every case examined, often dramatically so when $d$ is large. The result has held up over a decade of replication.</p>
+
+  <h3>Choosing distributions</h3>
+
+  <p>The choice of distribution per hyperparameter matters more than the choice of $n_{\text{iter}}$. Three families cover almost every case in practice. For a <strong>bounded continuous</strong> parameter (a dropout probability, a subsample fraction, a column-sample fraction in gradient boosting), a uniform distribution on the bounded interval is the right default,</p>
+  $$\theta \sim \operatorname{Uniform}(a, b).$$
+  <p>For a <strong>scale parameter</strong> (a learning rate, a regularisation strength, an L2 weight decay), a log-uniform distribution is correct: the score typically depends on the order of magnitude of the parameter, not its absolute value, and a uniform sampler will spend almost all of its draws in the largest decade. A log-uniform draw is</p>
+  $$\theta = 10^u, \quad u \sim \operatorname{Uniform}(\log_{10} a, \log_{10} b),$$
+  <p>so that draws are uniform on the log scale and spread evenly across decades. scipy provides this directly as <code>scipy.stats.loguniform(a, b)</code>. For a <strong>discrete</strong> parameter (number of estimators in increments, maximum depth, choice of solver), a list of permitted values is passed and <code>RandomizedSearchCV</code> samples uniformly from the list. The same syntax handles categorical parameters such as <code>penalty=["l1", "l2"]</code> in logistic regression.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why uniform on a learning rate is wrong</span>
+    A learning rate of $10^{-4}$ and a learning rate of $10^{-1}$ produce radically different training dynamics; a learning rate of $0.05$ and $0.06$ are practically indistinguishable. A uniform draw on $[10^{-4}, 10^{-1}]$ spends 99.9 per cent of its mass in the largest decade and 0.001 per cent in the smallest. A log-uniform draw on the same interval spends a quarter of its mass in each of the four decades. If you do not know which decade contains the optimum, the log-uniform sampler will find out in a handful of draws; the uniform sampler may never sample low enough to notice.
+  </div>
+
+  <h3>RandomizedSearchCV in scikit-learn</h3>
+
+  <p>The scikit-learn implementation is <code>sklearn.model_selection.RandomizedSearchCV</code>. The interface mirrors <code>GridSearchCV</code> with three substantive changes: <code>param_grid</code> becomes <code>param_distributions</code> and accepts either lists (for discrete parameters) or scipy.stats distributions (for continuous); <code>n_iter</code> sets the number of draws, defaulting to 10; and <code>random_state</code> seeds the sampler so the same run can be reproduced exactly. A worked example, tuning a support vector classifier on the same problem as the grid-search lecture:</p>
+
+  <pre><code>from scipy.stats import loguniform
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=0, stratify=y
+)
+
+pipe = Pipeline([
+    ("scaler", StandardScaler()),
+    ("svc", SVC()),
+])
+
+param_distributions = {
+    "svc__C":      loguniform(1e-2, 1e+2),
+    "svc__gamma":  loguniform(1e-4, 1e+0),
+    "svc__kernel": ["rbf"],
+}
+
+search = RandomizedSearchCV(
+    pipe,
+    param_distributions=param_distributions,
+    n_iter=25,
+    cv=5,
+    scoring="roc_auc",
+    random_state=0,
+    n_jobs=-1,
+)
+search.fit(X_train, y_train)
+
+print(search.best_params_)
+print(search.best_score_)
+print(search.score(X_test, y_test))</code></pre>
+
+  <p>Three pieces of this are worth dwelling on. The <code>Pipeline</code> wraps the scaler and the SVC, so the scaler is fit inside each cross-validation fold rather than once on all the training data, avoiding the leakage failure mode flagged in <a href="../02_train_test_split/02-pipelines.html">lecture 9</a>. The hyperparameter names use the double-underscore convention (<code>svc__C</code>, <code>svc__gamma</code>) to address the SVC step inside the pipeline. The <code>loguniform</code> distributions are scipy.stats objects with <code>.rvs()</code> methods that scikit-learn calls internally; the user never sees the sample, only the chosen configuration.</p>
+
+  <p>The accessor attributes are identical to <code>GridSearchCV</code>: <code>best_estimator_</code> returns the refit pipeline with the winning configuration, <code>best_params_</code> the dictionary of chosen values, <code>best_score_</code> the mean cross-validated score on the winning configuration, and <code>cv_results_</code> a dictionary that converts cleanly to a pandas DataFrame for plotting and inspection.</p>
+
+  <h3>When random beats grid empirically</h3>
+
+  <p>Three conditions tilt the comparison toward random search. <strong>High-dimensional spaces</strong> are the canonical case: with five or more hyperparameters under joint tuning, the grid grows combinatorially and the budget is overwhelmingly spent on dimensions that are flat. <strong>Unknown sensitivity</strong> is the second: when the user cannot say in advance which hyperparameters matter, the grid's per-dimension level count is a guess, and a wrong guess (too coarse on the active axis, too fine on an inactive one) wastes the budget. Random search makes no per-dimension commitment. <strong>Expensive fits</strong> are the third: when a single fit takes minutes or hours, the budget is small enough that the grid cannot afford to be dense, and random search's better coverage per sample becomes decisive.</p>
+
+  <h3>When grid still wins</h3>
+
+  <p>Three conditions tilt the comparison the other way. <strong>Low-dimensional spaces</strong> (one or two hyperparameters) are the case where the grid's cost is small and its enumeration is exhaustive; for tuning a single regularisation strength, a grid of fifteen values is fine. <strong>Critical interactions</strong> are the second: when the score depends on a fine-grained joint structure between two hyperparameters (for instance, a learning rate that must be matched to a number of iterations), the grid's regular sampling makes that interaction easy to visualise as a heat map, while random samples produce a scatter that is harder to read. <strong>Reproducibility against prior results</strong> is the third: a regulator or a co-author who tuned with a specific grid will expect that grid to be reproduced. Random search at the same budget is a stronger optimiser but a different one, and switching mid-project breaks comparability.</p>
+
+  <h3>Worked example: SVM on breast cancer, 25 budget</h3>
+
+  <p>Take the same support-vector classifier tuned over $C$ and $\gamma$ on the breast cancer dataset. A grid of five values for each gives 25 configurations; a random search with $n_{\text{iter}}=25$ uses the same compute. On a representative run with the code above, the grid's best ROC-AUC sits around 0.992 on cross-validation, and random search around 0.994; the test-set scores are within a thousandth of each other. The interesting difference is not the headline number but the diagnostic: random search's <code>cv_results_</code> contains 25 distinct $(C, \gamma)$ pairs spread across the log-uniform interval, so the user can plot AUC as a function of $\log C$ and $\log \gamma$ and read off the response surface; the grid plots a 5-by-5 heat map at the chosen levels and nothing in between.</p>
+
+  <p>The practical takeaway is not that random search always wins, but that random search loses very rarely. For the same budget, the expected score is at least as good, and the diagnostic plot is at least as informative, in every case examined here. The default for a new tuning problem should be <code>RandomizedSearchCV</code> with log-uniform distributions over the scale parameters and a budget large enough that the user can afford to be wrong about which hyperparameters matter.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every random-search incident. Each is easy to introduce and easy to miss without explicit inspection.</p>
+
+  <div class="callout warn">
+    <span class="tag">Uniform on a scale parameter</span>
+    The most common mistake. A user defines <code>"C": uniform(0, 100)</code> for an SVM and finds that nothing below $C = 1$ is ever sampled, because uniform draws on $[0, 100]$ put 99 per cent of the mass above 1. The optimum, which may sit at $C = 0.05$, is never visited. The fix is <code>loguniform(1e-3, 1e+3)</code> for any parameter that lives on a multiplicative scale (learning rate, regularisation strength, kernel bandwidth, weight decay). If you do not know whether a parameter is multiplicative, ask whether doubling it twice has the same effect as doubling it once and again. If yes, use a log-uniform.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting to set random_state</span>
+    Two runs with the same code and the same data produce different best configurations because the sampler was not seeded. The difference is usually within the noise of cross-validation, but it makes the run irreproducible: a colleague cannot rerun the search and get the same answer, and a regulator cannot audit the trail. Pass <code>random_state=0</code> (or any fixed integer) to <code>RandomizedSearchCV</code>. The same seed also fixes the order in which the draws are evaluated, which matters when running in parallel because the partial results at a given timestamp are then deterministic.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Budget too small for the dimensionality</span>
+    Eight hyperparameters tuned with $n_{\text{iter}}=10$ samples is statistically meaningless; the active dimensions are barely covered and the search is closer to a random guess than an optimisation. A rule of thumb is at least $20 \times d_{\text{active}}$ samples, where $d_{\text{active}}$ is the number of hyperparameters the user expects to matter. If $d_{\text{active}}$ is unknown, default to budgets of 100 to 250 for typical tabular problems and inspect the diagnostic scatter afterwards. If the response surface in the diagnostic is still flat in some dimension, that dimension was not worth tuning and can be fixed for future runs.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating random search as a benchmark for itself</span>
+    A team reports that their Bayesian optimiser found AUC 0.812 after 100 iterations and that random search "could not reach this". On inspection, random search reached 0.811 after 90 iterations and 0.813 after 200. The Bayesian optimiser was compared to a random search run for less than half the budget. The correct baseline is random search at the same total compute, which for a sequential method means the same wall-clock time and for a parallel method the same total fits. Any claim that a fancier optimiser beats random search must be honest about the budget on both sides.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Random search swaps the dense Cartesian product of a grid for $n_{\text{iter}}$ independent draws from a user-specified distribution per hyperparameter. The Bergstra-Bengio result, both theoretical and empirical, is that this swap is free or beneficial for any fixed compute budget whenever the score depends mostly on a small subset of the hyperparameters, which is the empirical norm. The procedural translation from grid search is one class swap, one renaming of the parameter dictionary, and one explicit budget. The distributional choice matters more than the budget: uniform for bounded continuous parameters, log-uniform for scale parameters, lists for discrete ones. The pipeline machinery from <a href="../02_train_test_split/02-pipelines.html">lecture 9</a> still applies; any data-fitted transformer must live inside the cross-validation loop.</p>
+
+  <p>What this lecture deliberately did not do. It did not introduce response-surface modelling or surrogate-based search; that is <a href="04-bayesian_optimisation.html">lecture 33</a>, where Gaussian processes and tree-structured Parzen estimators learn the score surface as they sample. It did not introduce successive halving or Hyperband, which start with random search but allocate progressively more compute to the surviving configurations. It did not address evolutionary or population-based methods. The point of this lecture is that the simplest improvement on a grid is already enough to be the default, and that any cleverer method has to beat random search at the same budget to be worth its complexity.</p>
+
+  <p>Lecture 33, <a href="04-bayesian_optimisation.html">Bayesian optimisation</a>, picks up where this lecture ends. If random search treats every draw as independent, Bayesian optimisation uses each completed fit to inform the next: a surrogate model of the score-vs-hyperparameter surface is fit after every evaluation, and the next configuration is chosen to maximise an acquisition function balancing exploration and exploitation. The promise is faster convergence on the same budget; the cost is one more layer of machinery to configure and audit. As with all hyperparameter machinery, random search at the same budget is the comparator that decides whether the extra cleverness paid for itself.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the Bergstra-Bengio (2012) claim about random search versus grid search and explain the geometric intuition in one sentence.</li>
+      <li>You are tuning a gradient-boosted tree with hyperparameters learning rate, number of estimators, maximum depth, subsample fraction, column-sample fraction. State the appropriate distribution family (uniform, log-uniform, or discrete) for each.</li>
+      <li>Define $\operatorname{RandomizedSearchCV}$'s <code>n_iter</code>, <code>param_distributions</code>, and <code>random_state</code> arguments in one sentence each.</li>
+      <li>A user defines <code>"learning_rate": uniform(0.0001, 0.1)</code> and finds the best configuration always has a learning rate above 0.05. Diagnose the problem and suggest the fix.</li>
+      <li>Random search with $n_{\text{iter}}=100$ on a problem with eight hyperparameters produces a diagnostic plot in which the score is flat in four of the eight dimensions. What action should the next iteration of the search take, and why?</li>
+      <li>A colleague claims random search "did not converge" after 25 iterations on a five-dimensional space, justifying a switch to a more sophisticated optimiser. State the budget rule of thumb that this claim violates and the minimum budget you would defend before drawing a conclusion.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 33 (<a href="04-bayesian_optimisation.html">Bayesian optimisation</a>) replaces independent random draws with sequential decisions informed by a surrogate of the score surface, trading parallelism for sample efficiency.</li>
+      <li><strong>Previous:</strong> Lecture 31 (<a href="02-grid_search.html">grid search</a>) gave the dense enumeration baseline whose weaknesses random search addresses; the comparison in section 4 reuses its worked SVM example.</li>
+      <li><strong>Prerequisite:</strong> Lecture 30 (<a href="01-tuning_principles.html">tuning principles</a>) framed the bias-variance and compute-budget questions that make random search a sensible default; lecture 9 (<a href="../02_train_test_split/02-pipelines.html">pipelines</a>) is required reading because every transformer fit from data must live inside the cross-validation loop that <code>RandomizedSearchCV</code> wraps.</li>
+      <li><strong>Outside this course:</strong> Bergstra and Bengio (2012), "Random Search for Hyper-Parameter Optimization", Journal of Machine Learning Research 13, is short, readable, and the source of every claim in this lecture's section 2. It remains the standard citation for justifying a random-search baseline in any tuning protocol.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Hyperparameter tuning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 32 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

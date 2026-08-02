@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 13: the exponential dispersion family</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Statistics</a></div>
+  <h1>The exponential dispersion family</h1>
+  <p class="subtitle">Lecture 05 introduced the exponential family as the engine behind GLMs and gave the mean and variance identities $E[Y] = b'(\theta)$, $\text{Var}(Y) = b''(\theta) a(\phi)$. This lecture asks three questions that lecture 05 left implicit. What exactly is inside $a(\phi)$ when observations carry a known exposure (loan-years, claim count, sum insured), as opposed to an unknown nuisance dispersion? What goes wrong at the boundary of the response's support, and why does it matter for a defaulted loan with zero loss? And what is the exact, closed-form loss function that MLE inside each exponential-family member is secretly minimising, the "unit deviance" that reappears unchanged as the objective function of every gradient boosting library in the machine-learning track. Opening this parcel out is what turns the exponential family from "the thing that makes <code>glm()</code> work" into "the thing that tells you which loss function to hand a neural network or a boosted tree".</p>
+  <div class="meta">
+    <span>Lecture 13 of 14</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Part VI: foundations for machine learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The <strong>exponential dispersion family</strong> (EDF) is the reproductive form of the exponential family that lecture 05 introduced, written with an explicit <strong>case weight</strong> $v > 0$: $Y \mid v \sim \text{ED}(\theta, \phi/v)$, with density $f(y; \theta, \phi, v) = \exp\{v(y\theta - b(\theta))/\phi + c(y, \phi, v)\}$. The weight $v$ is a known <em>volume</em>, exposure, loan-years, sum insured, claim count, and it enters the model differently from the unknown <em>dispersion</em> $\phi$: $v$ rescales both a case's contribution to the mean formula (through an offset) and its contribution to the variance ($\text{Var}(Y) = \phi V(\mu)/v$), while $\phi$ rescales only the variance, uniformly across all cases. Confusing the two is a routine and consequential error. Two further facts follow directly from the reproductive form. First, the cumulant function $b$ must be <strong>steep</strong> at the boundary of its effective domain for the MLE to behave sensibly there, which is exactly the case an actuary meets whenever a loss observation sits at the edge of its support (a fully recovered defaulted loan, zero claims in a period). Second, translating the exponential-family density into a loss function via $L(y, \mu) = 2[\ell(y; y) - \ell(y; \mu)]/\ldots$ gives the <strong>unit deviance</strong>, a closed-form loss for each named distribution that is, without any further derivation, the objective function selected by <code>objective = "poisson"</code> or <code>"gamma"</code> in every gradient boosting library.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A GLM software package asks you for two very different-looking things: a <code>weights</code> argument and an <code>offset</code> argument. Both are numbers you supply per row of data, both come from "how much exposure did this row have", and for one specific case (Poisson regression with a log link) they turn out to give the identical fitted model whichever one you use. That coincidence is not an accident of software design; it is a theorem about the exponential dispersion family, and this lecture proves it. Once you have the proof, you also know exactly when the coincidence stops holding (almost every other distribution and link), which is the mistake analysts make when they copy a Poisson habit onto a gamma severity model.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Where this sits in the stats world
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Where this sits in the stats world</h2></div>
+
+  <div class="callout insight">
+    <span class="tag">Foundations for machine learning, the actuarial reading of the exponential family</span>
+    This lecture opens <strong>Part VI</strong>, added to the course to carry pillar 4 (statistical modelling) forward into the machine-learning track. It does not introduce a new pillar; it deepens lecture 05's treatment of the exponential family along exactly the two axes an actuary needs and a general statistics course usually skips: exposure-weighted data, and the closed-form loss functions that let the same distributional reasoning drive a neural network or a boosted tree instead of a GLM.
+  </div>
+
+  <p>Two structural links. To <strong>lecture 05 (generalised linear models)</strong>: this lecture assumes the exponential-family form, the variance function $V(\mu)$, the canonical link, and the six-distribution table of section 5.2 as already known, and builds forward from there; nothing here re-derives what lecture 05 already covers, and a reader who has not read lecture 05 should do so first. To the <strong>machine-learning track</strong> (<code>fundamentals/machine_learning</code>): the unit-deviance table in section 5.4 below is, without modification, the loss function menu offered by every gradient boosting library and every neural network training loop that models a claims frequency, a claim severity, or a loss-given-default target. The machine-learning course's model-evaluation and ensembling lectures assume this table; this lecture is where it is derived.</p>
+
+  <p>One scoping note. This lecture treats $v$ as known and fixed by design (an exposure you observe, not a parameter you estimate) and $\phi$ as either known or estimated by the Pearson method of section 5.6. Models where the dispersion itself varies systematically with covariates (double GLMs) are previewed in section 8 but developed at length only where the machine-learning track's gradient-boosting extensions need them.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this distinction earns a lecture of its own. First, <strong>exposure-weighted data is the default, not the exception, in credit and insurance</strong>. A default-count model is fitted on loan-years of exposure, not on loans; a claims-frequency model is fitted on policy-years, not on policies; an operational-risk loss model is fitted on business-line-years. Every one of these is a case where the case weight $v_i$ is not a precision correction (as "weights" are usually taught in an introductory regression course) but a volume that changes what the fitted mean formula literally represents. Treating it as the former produces standard errors that are wrong in a specific, diagnosable direction; treating the offset and the weight as interchangeable outside the one setting where they are (Poisson, log link) produces a silently mis-specified model.</p>
+
+  <p>Second, <strong>the boundary of the support is not a corner case in credit risk, it is routine</strong>. A defaulted loan with full recovery has loss given default $y = 0$ exactly. A performing loan in a given quarter has zero claims exactly. Both sit at the boundary of the response's support, and whether the maximum-likelihood machinery behaves well there is not automatic; it depends on a property of the cumulant function called steepness that lecture 05 did not need to invoke because its worked examples avoided the boundary. An LGD model or a claims-frequency model that is fitted and validated without checking this property can produce degenerate canonical-parameter estimates at exactly the observations that matter most for capital.</p>
+
+  <p>Third, <strong>the unit deviance is the actual bridge between GLMs and machine learning</strong>. When the machine-learning track asks "which loss function should this gradient boosting model use for a Tweedie severity target", the honest answer is not a heuristic; it is the unit deviance of the Tweedie member of the EDF, derived in exactly the way this lecture derives it for the other five named members. An analyst who understands section 5.4 below can read off the correct <code>objective</code> string for any regulated target (PD, LGD, EAD, claim frequency, claim severity) without consulting a library's documentation, and can recognise when a library's default objective is wrong for the data at hand.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a single canonical density $f(y; \theta, \phi)$ splits into two independent knobs once you introduce the case weight $v$, and the two knobs turn different things.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dispersion versus exposure in the exponential dispersion family">
+      <defs>
+        <marker id="edfArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">One density, two knobs: dispersion φ and exposure v</text>
+
+      <g transform="translate(310, 50)">
+        <rect x="0" y="0" width="240" height="70" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="120" y="28" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#5b21b6">Y ~ ED(θ, φ / v)</text>
+        <text x="120" y="48" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">canonical parameter θ, dispersion φ, weight v</text>
+      </g>
+
+      <line x1="380" y1="120" x2="180" y2="170" stroke="#71717a" stroke-width="1.5" marker-end="url(#edfArrow)"/>
+      <line x1="480" y1="120" x2="680" y2="170" stroke="#71717a" stroke-width="1.5" marker-end="url(#edfArrow)"/>
+
+      <g transform="translate(30, 175)">
+        <rect x="0" y="0" width="330" height="140" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="165" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">φ · dispersion (unknown nuisance)</text>
+        <text x="165" y="50" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e">Same for every row. Estimated,</text>
+        <text x="165" y="66" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e">not observed (section 5.6).</text>
+        <text x="165" y="92" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">Turns: Var(Y) only</text>
+        <text x="165" y="112" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">Point estimates of β unaffected;</text>
+        <text x="165" y="128" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">standard errors scale by √φ.</text>
+      </g>
+
+      <g transform="translate(500, 175)">
+        <rect x="0" y="0" width="330" height="140" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="165" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">v · exposure (known volume)</text>
+        <text x="165" y="50" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59">Varies row by row. Observed:</text>
+        <text x="165" y="66" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59">loan-years, policy-years, sum insured.</text>
+        <text x="165" y="92" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#115e59">Turns: Var(Y) AND, via an offset,</text>
+        <text x="165" y="108" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#115e59">the mean formula itself</text>
+        <text x="165" y="128" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">Getting this wrong changes β̂, not just its SE.</text>
+      </g>
+    </svg>
+    <figcaption>The reproductive exponential dispersion form separates two quantities that an introductory regression course usually conflates under the single word "weight". Dispersion $\phi$ is a single unknown number shared by every observation; it rescales variance only, so it affects inference (standard errors) but not the point estimate of $\boldsymbol{\beta}$. Exposure $v_i$ is a known, row-varying volume; because the mean of a count or an aggregate response scales with volume, $v_i$ changes what the fitted mean formula represents and, for the Poisson-log-link case, is exactly recoverable as an offset (section 5.3).</figcaption>
+  </figure>
+
+  <p>Two slogans carry the lecture. <strong>Dispersion is shared, exposure is per-row.</strong> If a quantity is the same for every observation and only rescales variance, it is dispersion; if it varies row by row and represents a volume the mean genuinely scales with, it is exposure, and it belongs where lecture 05's <code>a(\phi) = \phi/w_i</code> notation already has a slot: $w_i = v_i$. <strong>Steepness is what makes the boundary well-behaved.</strong> The single-observation MLE $\hat\theta = h(y)$ recovers $y$ exactly for interior points of the support; steepness is the condition on $b$ that extends this good behaviour, in the appropriate limiting sense, to the boundary of the support, which is precisely where LGD and claims-frequency data routinely sit.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The detail</h2></div>
+
+  <h3>5.1 The reproductive form: exposure inside the density</h3>
+
+  <p>Lecture 05 wrote the exponential-family density as $f(y; \theta, \phi) = \exp\{(y\theta - b(\theta))/a(\phi) + c(y,\phi)\}$ and noted that "weights account for unequal precision: $a(\phi)$ becomes $\phi/w_i$". This lecture makes that substitution the object of study rather than a footnote. Write $w_i = v_i$ to emphasise that, in actuarial and credit data, the row-varying quantity is almost always a genuine <strong>volume</strong> rather than a generic precision correction, and the density becomes</p>
+
+  $$f(y; \theta, \phi, v) = \exp\left\{\frac{v(y\theta - b(\theta))}{\phi} + c(y, \phi, v)\right\}, \qquad Y \sim \text{ED}(\theta, \phi/v).$$
+
+  <p>The mean and variance identities of lecture 05 carry over with $a(\phi) \to \phi/v$:</p>
+
+  $$E[Y] = b'(\theta) = \mu, \qquad \text{Var}(Y) = \frac{\phi}{v} V(\mu).$$
+
+  <p>Read the variance identity carefully: variance is <em>inversely</em> proportional to exposure. A claims-frequency observation aggregated over 500 policy-years is far more precise than one aggregated over 5 policy-years, exactly as intuition demands, and the $1/v$ factor is what encodes that intuition inside the likelihood rather than leaving it to be bolted on afterwards. This is the formal content of "exposure is a case weight": it is not that some rows are measured more carefully than others (the generic textbook meaning of a regression weight), it is that some rows aggregate more underlying volume than others.</p>
+
+  <h3>5.2 Steepness and the effective domain</h3>
+
+  <p>The cumulant function $b$ is defined on an open interval $\Theta \subseteq \mathbb{R}$ called the <strong>effective domain</strong> of the canonical parameter, and it is smooth and strictly convex on $\Theta$'s interior. The <strong>mean parameter space</strong> is the image $M = b'(\Theta)$; because $b'$ is a strictly increasing bijection between $\Theta$ and $M$ (strict convexity of $b$ makes $b'$ strictly increasing), every mean value $\mu \in M$ corresponds to a unique canonical parameter $\theta = h(\mu)$, the canonical link.</p>
+
+  <p>A member of the EDF is <strong>steep</strong> if, as $\theta$ approaches the boundary of $\Theta$, $b'(\theta)$ approaches the boundary of the closure of the support of $Y$. Steepness is what makes the single-observation MLE well-behaved: for a sample of size one, $\hat\theta_{\text{MLE}} = h(y)$, so $\hat\mu_{\text{MLE}} = y$ exactly, self-consistently, whenever $y$ is an interior point of the support. At the boundary of the support, this identity requires steepness to hold in the limiting sense; without it, the mean estimate $\hat\mu = y$ can remain finite while the corresponding canonical parameter estimate $\hat\theta = h(y)$ diverges or is undefined, a degenerate fit that a naive residual check will not flag because the fitted mean looks perfectly reasonable.</p>
+
+  <div class="callout warn">
+    <span class="tag">Where the boundary bites</span>
+    Every one of the six standard EDF members used in credit and insurance modelling is steep, so the degeneracy above is a limit, not a live failure, for Gaussian, Poisson, gamma, inverse Gaussian, binomial, and Tweedie compound Poisson-gamma responses. The practical payoff is narrower but still real: it tells you exactly what "the model is well-defined at $y=0$" requires (the Poisson and Tweedie deviances below both need the convention $0 \log 0 := 0$, which steepness licenses), and it tells you that a gamma or inverse Gaussian response can never legitimately take the value zero, a constraint that is violated in practice whenever an LGD or severity target is coded as exactly 0 for a fully recovered exposure. The fix used throughout the industry, and formalised in lecture 05's discussion of beta and Tweedie responses for LGD, is either to switch to a Tweedie compound Poisson-gamma response (which has a genuine point mass at zero) or to model the zero-versus-positive split separately from the positive-severity distribution.
+  </div>
+
+  <h3>5.3 Weights versus offsets: when they are the same model</h3>
+
+  <p>Lecture 05 introduced weights and offsets as two separate "practical extensions"; this section proves that, for one specific and very common combination, they are not extensions to two different models but two parametrisations of the identical one.</p>
+
+  <p>Consider claim or default counts $N_i$ observed over exposure $v_i$ (loan-years, policy-years), with rate $\mu(\mathbf{x}_i) = \exp(\boldsymbol{\beta}^\top \mathbf{x}_i)$ per unit exposure. Two ways to set this up.</p>
+
+  <p><strong>Route A: rate response with exposure weight.</strong> Let $Y_i = N_i / v_i$ be the observed rate, and fit $Y_i \sim \text{ED}(\theta_i, \phi/v_i)$ with canonical link $\theta_i = \log \mu(\mathbf{x}_i)$ (the Poisson canonical link is the log link), passing $v_i$ to the software as a <code>weights</code> argument.</p>
+
+  <p><strong>Route B: count response with log-exposure offset.</strong> Let $N_i \sim \text{Poisson}(v_i \mu(\mathbf{x}_i))$ directly, and fit the log-link GLM $\log E[N_i] = \log v_i + \boldsymbol{\beta}^\top \mathbf{x}_i$, passing $\log v_i$ to the software as an <code>offset</code> (a regressor with coefficient fixed at one).</p>
+
+  <p>The log-likelihood contributions differ only by a term that does not involve $\boldsymbol{\beta}$: Route A's Poisson-rate log-likelihood for row $i$ is $v_i[Y_i \theta_i - e^{\theta_i}] + c(Y_i, v_i)$, and substituting $Y_i = N_i/v_i$ gives $N_i \theta_i - v_i e^{\theta_i} + c'(N_i, v_i)$, which is exactly the log-likelihood of Route B's $N_i \sim \text{Poisson}(v_i e^{\theta_i})$ up to the same additive constant. The two routes therefore share an identical score equation in $\boldsymbol{\beta}$, hence an identical MLE $\hat{\boldsymbol{\beta}}$.</p>
+
+  <div class="defcard tint-sky">
+    <div class="term">Why this equivalence is special to Poisson with a log link</div>
+    <div class="def">The algebra above relies on two facts holding simultaneously: the canonical link is the log link, so $\theta = \log \mu$ appears linearly inside the exponential; and the count-to-rate transformation $Y = N/v$ divides by exactly the quantity, $v$, that multiplies the mean in the count parametrisation. Neither holds for gamma severity (canonical link is the inverse, and a severity is not a count divided by an exposure in the same structural sense) or for a binomial response (the natural "exposure" is the trial count $n$, which enters the variance function $V(\mu) = \mu(1-\mu)/n$ directly rather than through an offset). Weight and offset remain distinct, non-interchangeable tools in every other combination; the Poisson-log-link case is a genuine special case, not the general rule, and treating it as the general rule is the pitfall in section 7.</div>
+  </div>
+
+  <h3>5.4 The unit deviance: one loss function per distribution</h3>
+
+  <p>Lecture 05 defined deviance generically, as twice the difference between the saturated log-likelihood (one parameter per observation, perfect fit) and the fitted log-likelihood. The <strong>unit deviance</strong> $d(y, \mu)$ is the per-observation contribution to that difference, stripped of dispersion and exposure, and it has a closed form for every named EDF member. It is exactly the quantity a gradient boosting library minimises when you set its <code>objective</code> string, and exactly the quantity lecture 14 will show is the unique loss function (up to the choice of member) that is strictly consistent for mean estimation within that response family.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Distribution</th><th>Unit deviance $d(y, \mu)$</th><th>Typical target</th></tr></thead>
+      <tbody>
+        <tr><td>Gaussian</td><td>$(y - \mu)^2$</td><td>continuous, symmetric residuals</td></tr>
+        <tr><td>Poisson</td><td>$2\left[y \log(y/\mu) - (y - \mu)\right]$</td><td>default or claim counts</td></tr>
+        <tr><td>Bernoulli / binomial</td><td>$2\left[y \log(y/\mu) + (1-y)\log\!\left(\frac{1-y}{1-\mu}\right)\right]$</td><td>default indicator, PD</td></tr>
+        <tr><td>Gamma</td><td>$2\left[\dfrac{y - \mu}{\mu} - \log(y/\mu)\right]$</td><td>positive severity, LGD (no zeros)</td></tr>
+        <tr><td>Inverse Gaussian</td><td>$(y - \mu)^2 / (\mu^2 y)$</td><td>long-tailed positive severity</td></tr>
+        <tr><td>Tweedie compound Poisson-gamma ($1 &lt; p &lt; 2$)</td><td>$2\left[\dfrac{y^{2-p}}{(1-p)(2-p)} - \dfrac{y\mu^{1-p}}{1-p} + \dfrac{\mu^{2-p}}{2-p}\right]$</td><td>aggregate claims, LGD with zeros</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Two conventions make the table usable at the boundary, and both are licensed by steepness (section 5.2): for Poisson and Tweedie, $y \log(y/\mu) := 0$ when $y = 0$; the gamma and inverse Gaussian rows require $y > 0$ strictly, consistent with the point made in the warning box above. The exposure-weighted version of the deviance, matching the notation of section 5.1, replaces $d(y_i, \mu_i)$ by $v_i \, d(y_i, \mu_i)$ inside the sum that a fitting routine minimises, so that higher-exposure rows contribute proportionally more to the objective, exactly as the likelihood in section 5.1 requires.</p>
+
+  <h3>5.5 Deviance is (twice) a Kullback-Leibler divergence</h3>
+
+  <p>Fix the dispersion $\phi$ and exposure $v$ and compare two densities from the same EDF member: the density at the fitted mean $\mu$, and the degenerate density at the observation $y$ itself (formally, the limit of the family as its mean parameter approaches $y$). The Kullback-Leibler divergence from the fitted density to this degenerate one works out to $(v/\phi) \, d(y,\mu)/2$ exactly: the unit deviance is, up to the constant $v/\phi$, twice a KL divergence between "what the model predicts" and "what actually happened". This is the reason deviance behaves like a distance (it is non-negative, and zero only when $y = \mu$) despite not being a distance in the metric sense, and it is the reason two structurally different loss-function stories, maximum likelihood and information-theoretic discrepancy, arrive at the identical formula. Lecture 14 pushes this connection one step further and asks which loss functions, deviance-shaped or not, are legitimate choices for estimating a conditional mean at all.</p>
+
+  <h3>5.6 Estimating dispersion: the Pearson estimator</h3>
+
+  <p>When $\phi$ is unknown, as it is for every EDF member except Poisson and binomial (where $\phi \equiv 1$ by construction), the standard consistent estimator is the exposure-weighted <strong>Pearson estimator</strong>, a direct generalisation of the Pearson residual introduced in lecture 05:</p>
+
+  $$\hat\phi_P = \frac{1}{n - p} \sum_{i=1}^n v_i \frac{(y_i - \hat\mu_i)^2}{V(\hat\mu_i)},$$
+
+  <p>with $p$ the number of estimated regression coefficients. This is exactly lecture 05's Pearson chi-square goodness-of-fit statistic, divided by degrees of freedom rather than left as a raw sum, and it is what a fitting routine reports when it prints a dispersion parameter for a gamma or Tweedie model. It feeds directly into the scaled deviance $D/\hat\phi_P$ and the AIC-style model-selection statistics lecture 05 introduced, this time with the exposure weighting made explicit rather than assumed away.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Worked example: exposure, offsets, and a boundary case in an LGD model</h2></div>
+
+  <div class="worked">
+    <strong>Step 1: the equivalence, numerically.</strong>
+    <p>A lender has default counts $N_i$ and loan-year exposures $v_i$ for ten segments. Fitting Route A (rate $Y_i = N_i/v_i$, <code>weights = v</code>, log link) and Route B (count $N_i$, <code>offset = log(v)</code>, log link) on the identical data returns coefficients that agree to solver tolerance, $\hat{\boldsymbol{\beta}}_A - \hat{\boldsymbol{\beta}}_B \approx 10^{-9}$ in every implementation checked against R's <code>glm</code> and Python's <code>statsmodels</code>. This is the algebra of section 5.3, not a numerical coincidence, and it is the standard cross-check for a newly implemented exposure-weighted frequency model: fit both ways, expect agreement to solver tolerance, and treat disagreement as a bug in the exposure handling rather than a modelling choice.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 2: what goes wrong if the equivalence is mis-applied.</strong>
+    <p>The same lender's LGD model uses a gamma response on positive recoveries, with case weight set to loan count within a segment (a genuine precision weight, not an exposure in the sense of section 5.1) and an offset of $\log(\text{collateral value})$ added "for consistency with the frequency model". Because the gamma canonical link is the inverse, not the log, and because collateral value does not enter the gamma mean multiplicatively through the case weight in the way exposure enters the Poisson mean, the offset does not reproduce any equivalent weighted-response model; it silently forces a specific, unintended functional form onto the collateral-value effect. Removing the offset and instead entering log(collateral value) as an ordinary covariate, whose coefficient is estimated rather than fixed at one, is the correct fix, and it is exactly the distinction section 5.3's boxed callout warns about.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 3: the boundary case.</strong>
+    <p>Within the same LGD dataset, 12 per cent of defaulted exposures have $y = 0$ (full recovery). Fitting the positive-severity gamma model on the remaining 88 per cent is legitimate (gamma requires $y > 0$, section 5.2), but reporting an overall expected LGD without separately modelling $P(y = 0)$ understates recoveries. The standard remedy, following lecture 05's discussion of Tweedie responses, is to fit the full LGD distribution as Tweedie compound Poisson-gamma with $p \approx 1.5$: this member has a genuine point mass at zero built into its EDF structure (steepness at the lower boundary of the support, section 5.2, is what licenses the $0 \log 0 := 0$ convention used in its unit deviance in the table above), so a single Tweedie fit replaces the two-part zero/positive model without any additional machinery.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 4: dispersion and the scaled deviance.</strong>
+    <p>The fitted Tweedie LGD model has residual unit deviance summed (exposure-weighted) to 340 across $n = 2{,}400$ defaults and $p = 9$ coefficients. The Pearson dispersion estimate from section 5.6 comes out at $\hat\phi_P = 0.31$; dividing the scaled deviance by $\hat\phi_P$ and comparing to a $\chi^2_{n-p}$ reference gives no evidence of residual over-dispersion beyond what the Tweedie power parameter already explains, which is the standard sign-off check before a model of this kind is presented for validation.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Common pitfalls and cognitive traps</h2></div>
+
+  <h3>Treating exposure as a generic precision weight</h3>
+
+  <p>A precision weight (the textbook meaning most analysts learn first) only rescales variance; an exposure weight, when the mean genuinely scales with volume, changes the mean formula too. Passing loan-years into a fitting routine's <code>weights</code> argument without checking that the response and link combination actually implies the volume-scaling relationship of section 5.1 is the single most common source of silently mis-specified exposure-weighted models.</p>
+
+  <h3>Assuming the weights-versus-offset equivalence generalises</h3>
+
+  <p>The proof in section 5.3 is specific to the Poisson distribution with the log link. Applying the same "weights and offset are interchangeable" habit to a gamma severity model, a binomial rate model, or any non-canonical link produces two genuinely different fitted models, and there is no general rule for which one is "more correct"; the correct one is whichever matches the actual data-generating relationship between the response and the volume.</p>
+
+  <h3>Ignoring the support boundary when it is the interesting part of the data</h3>
+
+  <p>An LGD or claims-frequency target that has a meaningful point mass at its boundary (full recovery, a claim-free period) needs a response distribution whose support and steepness properties actually accommodate that point mass (Poisson and Tweedie do; gamma and inverse Gaussian do not). Coding boundary observations as an arbitrarily small positive number to force them into a gamma model is a workaround that distorts the fitted variance function and the resulting unit deviance, not a fix.</p>
+
+  <h3>Reporting an unscaled deviance as if it were a discrepancy on a familiar scale</h3>
+
+  <p>The unit deviance in section 5.4 is comparable across distributions only after accounting for the fact that different EDF members carry different dispersion scales; a Tweedie deviance of 340 and a Gaussian deviance of 340 are not directly comparable magnitudes of "badness of fit" without dividing by the respective $\hat\phi_P$ and referencing the appropriate degrees of freedom, exactly as section 5.6 sets out.</p>
+
+  <div class="callout warn">
+    <span class="tag">The one equivalence, and only that one</span>
+    Keep exactly one fact from this lecture if nothing else: weights and offsets coincide for Poisson-with-log-link and essentially nowhere else. Every other apparent shortcut in exposure handling is a special case masquerading as a general rule, and the unit-deviance table in section 5.4 is the tool for checking, case by case, whether a shortcut you have inherited from someone else's code is actually valid for the response distribution in front of you.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8: Frontiers
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 8</span><h2>Frontiers and what's beyond</h2></div>
+
+  <p>Three directions this lecture does not develop at length. <strong>Double GLMs</strong> (Smyth 1989) model the dispersion $\phi$ itself as a function of covariates, via a second GLM fitted to the deviance residuals; this is the classical statistical ancestor of the multi-parameter gradient boosting extensions (gamboostLSS, NGBoost, cyclic gradient boosting) that the machine-learning track's ensemble-learning lecture covers, and the connection is worth having in mind when that material arrives. <strong>Quasi-likelihood</strong> (Wedderburn 1974) relaxes the requirement that the variance function come from an actual EDF member at all, specifying only a mean-variance relationship $V(\mu)$ and deriving valid (if not maximum-likelihood) estimating equations from it; this is the formal justification for quasi-Poisson fitting under over-dispersion, already introduced informally in lecture 05. <strong>Estimating the Tweedie power parameter $p$</strong> from data, rather than fixing it by domain judgement, is typically done by profile likelihood or by a saddlepoint approximation to the otherwise analytically intractable Tweedie density; this is standard practice in production LGD and aggregate-claims modelling and is available as a fitting option in most actuarial GLM software.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 9: Synthesis, recall, connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 9</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the actuarial reading of the exponential family that lecture 05 assumed but did not spell out. Exposure $v$ and dispersion $\phi$ enter the reproductive form $\text{ED}(\theta, \phi/v)$ differently, and only the Poisson-log-link combination makes the weights-versus-offset choice a matter of taste rather than correctness. Steepness of the cumulant function is what makes the single-observation MLE, and the unit deviance built from it, well-defined at the boundary of the response's support, which is exactly where LGD and claims-frequency data live in practice. The unit-deviance table of section 5.4 is simultaneously a likelihood-derived quantity, a Kullback-Leibler divergence, and the objective function of every gradient boosting library that offers a distributional choice, three facts that turn out to be one fact viewed three ways.</p>
+
+  <p>Lecture 14 takes the next step and asks a harder question: given that many loss functions could in principle be used to fit a mean-estimation model, which ones are actually valid, in the sense of being guaranteed to recover the true conditional mean as the sample grows. The answer, strictly consistent loss functions and the Bregman divergences that generate them, explains why the unit deviances derived here are not merely convenient but necessary, and why the square loss that a default machine-learning tutorial reaches for by habit is frequently the wrong choice on the finite, often heavy-tailed samples that actuarial and credit-risk data actually supply.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Write the reproductive exponential dispersion form $\text{ED}(\theta, \phi/v)$ and state which of $\theta$, $\phi$, $v$ is known by design, which is estimated, and which varies row by row.</li>
+      <li>State the variance identity in the reproductive form. Why does variance decrease as exposure increases?</li>
+      <li>Prove that the Poisson-rate-with-weight and Poisson-count-with-offset parametrisations give the identical MLE. Which two properties of the Poisson-log-link combination make the proof work, and why does it fail for a gamma response?</li>
+      <li>Define steepness of the cumulant function. What goes wrong at the boundary of the support if a distribution is not steep, and why does this matter for a fully-recovered defaulted loan?</li>
+      <li>Write the unit deviance for the Poisson and the gamma distributions. Which one requires $y > 0$ strictly, and why?</li>
+      <li>State the connection between the unit deviance and the Kullback-Leibler divergence. What constant relates the two?</li>
+      <li>Write the exposure-weighted Pearson dispersion estimator and explain when it is needed.</li>
+      <li>You inherit an LGD model that adds <code>offset = log(collateral value)</code> to a gamma GLM "because that's what the frequency model does". Explain what is wrong with this choice and what you would do instead.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 12 (<a href="12-causal_inference.html">causal inference</a>) closed the original nine-lecture methodological core plus the three Part V extensions; this lecture opens a new part that carries pillar 4 forward specifically toward the machine-learning track.</li>
+      <li><strong>Built on:</strong> Lecture 5 (<a href="05-generalised_linear_models.html">generalised linear models</a>) supplied the exponential-family form, the variance function, the canonical link, and the six-distribution table that this lecture assumes throughout.</li>
+      <li><strong>Used by:</strong> Lecture 14 (<a href="14-strictly_consistent_loss_functions.html">strictly consistent loss functions</a>), which asks which loss functions are valid choices for mean estimation and shows the unit deviances derived here are the answer. The machine-learning track's gradient-boosting and forecast-evaluation lectures use the unit-deviance table directly as the menu of loss functions available to a boosted-tree or neural-network model.</li>
+      <li><strong>Next:</strong> Continue to <a href="14-strictly_consistent_loss_functions.html">lecture 14</a>.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Statistics course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 13 of 14</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 62: deep reinforcement learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Reinforcement learning</a></div>
+  <h1>Deep reinforcement learning</h1>
+  <p class="subtitle">Every method in this sub-module so far has assumed a state or action space small enough to store as an explicit table. This closing lecture drops that assumption, replacing the tabular $Q(s,a)$ with a neural network function approximator, and develops the two families of algorithm that follow from that single substitution: value-based methods descended from Q-learning, and policy-based methods that learn a policy directly, closing with the actor-critic and PPO algorithms that power the RLHF pipeline behind every modern large language model.</p>
+  <div class="meta">
+    <span>Lecture 62 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part IX: reinforcement learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">When the state or action space is too large (or continuous) for the previous lecture's tabular methods, a neural network $Q_\theta(s,a)$ takes the table's place, trained by gradient descent to approximate the true action-value function. <strong>Deep Q-networks (DQN)</strong> extend Q-learning this way, stabilised by two specific devices: a <strong>replay memory</strong> that stores past transitions and samples mini-batches from it randomly (breaking the strong correlation between consecutive real-time experiences that would otherwise destabilise gradient descent), and a separate, more slowly updated <strong>target network</strong> that computes the TD target, preventing the network from chasing a target that shifts every single update as it would if the same rapidly-updating network were used for both the current estimate and its own target. <strong>Double DQN</strong> further corrects a specific overestimation bias inherited directly from Q-learning's greedy maximum. A structurally different family, <strong>policy gradient</strong> methods, parameterises the policy $\pi_\theta(a\mid s)$ directly rather than deriving it indirectly from an action-value function, and updates $\theta$ by ascending an estimated gradient of expected return; <strong>REINFORCE</strong> is the simplest such algorithm, and adding a learned <strong>baseline</strong> (commonly a value-function estimate) reduces its notoriously high variance without introducing bias. <strong>Actor-critic</strong> methods combine both families, a policy ("actor") updated via policy gradients using a learned value function ("critic") to reduce variance, with the critic's estimated <strong>advantage function</strong> $A(s,a) = Q(s,a) - V(s)$ (how much better an action is than the state's average) as the standard refinement. <strong>TRPO</strong> and its simpler, now more widely used descendant <strong>PPO</strong> constrain each policy update to stay within a bounded, "trusted" distance of the previous policy, directly addressing policy gradient methods' instability under large, uncontrolled updates, and PPO's clipped objective is the specific reinforcement-learning algorithm behind the RLHF pipeline's final fine-tuning stage.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine the earlier lectures' tabular methods as a driving instructor with a complete, memorised lookup table of "in this exact situation, do this exact thing", workable only because there were a small, fixed number of situations to memorise in the first place. Real driving has effectively infinitely many subtly different situations, so no table could ever be big enough; instead, a driver develops an intuition, a function that maps a continuous, high-dimensional perception of the current situation directly to a sensible action, without ever consulting an explicit table. Deep reinforcement learning is exactly this substitution, replacing an infeasible table with a trained function (a neural network) that generalises sensibly to situations it has never seen in exactly that form before.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture closes the sub-module, and the machine learning course as a whole, by fusing this sub-module's tabular ideas (SARSA, Q-learning, generalised policy iteration) with the deep-learning sub-module's function-approximation machinery. It is also the direct technical payoff of the entire course's generative-AI arc: PPO, developed here, is the specific algorithm behind RLHF, the training stage that turned the large language models sub-module's raw pretrained decoder transformer into an instruction-following assistant.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this lecture's function-approximation methods, not the previous lecture's tabular ones, are what a genuine large-scale RL application actually uses.</p>
+
+  <p>First, <strong>almost every state space of genuine practical interest is too large or too continuous for a table</strong>: a premium-control problem with a continuous premium action and a high-dimensional policyholder state vector has no realistic tabular representation at all, and function approximation is not an optional refinement, it is the only way the previous lecture's ideas can be applied to a problem of this scale.</p>
+
+  <p>Second, <strong>the specific instability of combining function approximation, bootstrapping, and off-policy learning, sometimes called the "deadly triad", is a genuine, well-documented risk that every device in this lecture (replay memory, target networks, the trust-region constraint in TRPO and PPO) exists specifically to manage</strong>; understanding what each device is protecting against is essential to using any of these algorithms responsibly rather than treating them as black-box recipes.</p>
+
+  <p>Third, <strong>PPO's role inside RLHF is the direct, concrete link between this entire sub-module and the large language models sub-module's most consequential training technique</strong>: understanding PPO's trust-region logic here explains, in genuine technical detail rather than by analogy, why RLHF-trained models behave the way they do and what could plausibly go wrong in that training process.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team prototyping a deep-RL-based dynamic pricing agent trained a DQN directly on live, sequential pricing decisions, updating the network's weights after every single transaction using the transaction immediately just observed, reasoning that learning "as live as possible" would adapt fastest to market conditions. Training was highly unstable, with the agent's estimated action-values oscillating wildly and occasionally diverging entirely, because consecutive real-time pricing decisions are strongly correlated (today's price depends heavily on yesterday's, and market conditions move slowly), violating the roughly independent, identically distributed sampling that gradient descent implicitly assumes, and because the same rapidly-updating network was being used to compute both the current estimate and its own bootstrapped target, a moving-target problem that compounds the correlation issue further. Introducing a replay memory, sampling training mini-batches randomly from a buffer of past transitions rather than training exclusively on the single newest one, together with a separate, more slowly updated target network for computing TD targets, resolved the instability directly, exactly the two specific devices DQN was originally built around.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a value-based branch descending from Q-learning (learn $Q_\theta(s,a)$, act greedily with respect to it) and a policy-based branch descending from policy gradients (learn $\pi_\theta(a\mid s)$ directly), meeting in the middle at actor-critic methods, with PPO's trust-region constraint sitting on top of the policy branch to keep each update safely bounded.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Value-based and policy-based deep RL branches meeting at actor-critic, with PPO's trust region on top">
+      <defs>
+        <marker id="drlArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two branches, meeting at actor-critic</text>
+
+      <rect x="30" y="55" width="260" height="90" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="160" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">Value-based: DQN</text>
+      <text x="160" y="102" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">$Q_\theta(s,a)$, replay memory,</text>
+      <text x="160" y="118" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">target network; double DQN</text>
+
+      <rect x="590" y="55" width="260" height="90" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="720" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">Policy-based: REINFORCE</text>
+      <text x="720" y="102" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">$\pi_\theta(a\mid s)$ direct,</text>
+      <text x="720" y="118" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">gradient ascent on return</text>
+
+      <path d="M 190 148 Q 300 200 400 200" stroke="#b45309" stroke-width="2" fill="none" marker-end="url(#drlArrow)"/>
+      <path d="M 690 148 Q 580 200 480 200" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#drlArrow)"/>
+
+      <rect x="340" y="205" width="200" height="70" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="440" y="230" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">Actor-critic</text>
+      <text x="440" y="250" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">actor: policy; critic: $A(s,a)$</text>
+      <text x="440" y="263" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">advantage-weighted updates</text>
+
+      <path d="M 440 277 L 440 290" stroke="#71717a" stroke-width="2" marker-end="url(#drlArrow)"/>
+      <rect x="330" y="292" width="220" height="26" rx="6" fill="#DEEAFB" stroke="#2A3A78" stroke-width="1.5"/>
+      <text x="440" y="309" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#2A3A78">TRPO / PPO: bounded, trusted updates</text>
+    </svg>
+    <figcaption>Value-based methods (left) descend directly from Q-learning, learning an action-value function and stabilising it with replay memory and a target network. Policy-based methods (right) learn a policy directly via gradient ascent. Actor-critic methods combine both, using a learned value function to reduce the policy gradient's variance; TRPO and PPO add a trust-region constraint on top, bounding how far any single update is allowed to move the policy.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A neural network replaces the table; nothing else about the underlying logic changes.</strong> DQN is Q-learning, actor-critic is generalised policy iteration, both with a function approximator standing in for what used to be an explicit table. <strong>Large, uncontrolled policy updates are the single most common failure mode this lecture's machinery exists to prevent.</strong> Replay memory, target networks, and the PPO trust region are three different specific answers to variants of exactly this one problem.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>DQN: replay memory and the target network</h3>
+
+  <p>A <strong>deep Q-network</strong> replaces the tabular $Q(s,a)$ with a neural network $Q_\theta(s,a)$, trained by gradient descent to minimise the squared TD error, $\left(R_{t+1} + \gamma \max_{a'} Q_{\theta^-}(S_{t+1},a') - Q_\theta(S_t,A_t)\right)^2$. Two devices make this stable in practice. <strong>Replay memory</strong> stores past transitions $(s,a,r,s')$ in a buffer and samples training mini-batches from it at random, rather than training exclusively on the single most recent transition, breaking the strong temporal correlation between consecutive real-time experiences that would otherwise violate gradient descent's implicit independence assumption, exactly the correlation problem the pricing vignette encountered. The <strong>target network</strong>, with its own, separate parameters $\theta^-$ updated only periodically (a hard copy every fixed number of steps, or a slow, smoothed update), computes the TD target, preventing the "moving target" instability that arises when the same rapidly-updating parameters are used both to produce the current estimate and, simultaneously, its own bootstrapped target.</p>
+
+  <h3>Double DQN</h3>
+
+  <p>The $\max_{a'} Q_{\theta^-}(S_{t+1},a')$ term in the ordinary DQN target inherits the same overestimation bias flagged for tabular Q-learning in the previous lecture: taking a maximum over noisy estimates is itself a biased-upward estimator of the true maximum. <strong>Double DQN</strong> corrects this by decoupling action selection from action evaluation, using the online network $Q_\theta$ to select which action is best, $a^* = \arg\max_{a'} Q_\theta(S_{t+1},a')$, but the target network $Q_{\theta^-}$ to evaluate that selected action's value, $Q_{\theta^-}(S_{t+1}, a^*)$, a small but consequential change that measurably reduces the overestimation bias, particularly relevant given the triage vignette in the previous lecture, where exactly this kind of overconfidence in thinly-sampled regions caused a genuine operational problem.</p>
+
+  <h3>Policy gradient methods and REINFORCE</h3>
+
+  <p>Rather than deriving a policy indirectly from an action-value function, <strong>policy gradient</strong> methods parameterise the policy directly as $\pi_\theta(a\mid s)$ and update $\theta$ by gradient ascent on expected return. The <strong>policy gradient theorem</strong> gives $\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta}\left[\nabla_\theta \log \pi_\theta(A_t\mid S_t)\, G_t\right]$, and <strong>REINFORCE</strong> is the direct Monte Carlo estimate of this expectation, using the actual observed return $G_t$ from a completed episode as the weight on each action's log-probability gradient. REINFORCE is simple and provably converges to a local optimum, but is notoriously high-variance, since $G_t$ can vary enormously across episodes for reasons entirely unrelated to the quality of the specific action being credited.</p>
+
+  <h3>Baselines and the advantage function</h3>
+
+  <p>Subtracting a <strong>baseline</strong> $b(S_t)$ that does not depend on the action taken, $\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta}\left[\nabla_\theta \log \pi_\theta(A_t\mid S_t)\, (G_t - b(S_t))\right]$, reduces the variance of the gradient estimate without introducing any bias (a standard, provable variance-reduction result), and the most common choice of baseline is a learned estimate of the state-value function, $b(S_t) = V(S_t)$. This choice gives rise to the <strong>advantage function</strong>, $A(s,a) = Q(s,a) - V(s)$, measuring how much better action $a$ is than the average action available in state $s$, a considerably more informative and lower-variance learning signal than the raw return alone, since it directly isolates the specific action's contribution from the state's own baseline quality.</p>
+
+  <h3>Actor-critic</h3>
+
+  <p>An <strong>actor-critic</strong> method combines both families directly: the <strong>actor</strong> is the policy $\pi_\theta$, updated via policy gradients; the <strong>critic</strong> is a learned value function (typically estimating $V(s)$ or the advantage $A(s,a)$ directly), updated via the previous lecture's TD methods, and used to compute the actor's gradient update at every step rather than waiting for a full episode's return as REINFORCE does. This combines TD's lower variance and step-by-step updating (from the critic) with policy gradient's ability to represent and improve a policy directly (via the actor), and is the standard architecture underlying essentially every large-scale, modern deep-RL system.</p>
+
+  <h3>TRPO and PPO</h3>
+
+  <p>A sufficiently large, uncontrolled policy gradient update can move the policy so far, so quickly, that it collapses performance entirely, since the data used to estimate the gradient was collected under the old policy and may no longer be representative once the policy has moved a long way from it. <strong>Trust region policy optimisation (TRPO)</strong> directly constrains each update to keep the new policy within a bounded statistical distance (measured via KL divergence) of the previous policy, guaranteeing monotonic improvement under reasonable conditions, at the cost of a computationally expensive constrained-optimisation step at every update. <strong>Proximal policy optimisation (PPO)</strong> achieves a similar practical effect far more simply, by clipping the probability ratio between the new and old policy in its objective function, directly penalising updates that would move the policy too far in a single step without requiring TRPO's expensive constrained optimisation. PPO's simplicity, stability, and comparatively low computational overhead are exactly why it became the standard choice for the reinforcement-learning stage of the RLHF pipeline developed in the large language models sub-module, fine-tuning a language model's own token-selection policy against a learned reward model while keeping each update safely close to the model's previous behaviour.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Training a deep RL agent directly on sequential, live experience with no replay memory</span>
+    Developed directly in the vignette: consecutive real-time transitions are strongly correlated, and training exclusively on the newest transition violates the roughly independent sampling gradient descent implicitly assumes, producing exactly the oscillating, occasionally diverging training the vignette's team observed before introducing a replay buffer.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using the same rapidly-updating network to compute both the current estimate and its own bootstrapped target</span>
+    This "moving target" problem is a second, independent source of the instability the vignette encountered, addressed specifically by the separate, slowly-updated target network; omitting it, even with a replay buffer already in place, leaves this particular instability unaddressed.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using vanilla REINFORCE without a baseline on a genuinely noisy reward signal</span>
+    REINFORCE's variance without a baseline can be prohibitively high on any environment with substantial reward noise, making learning painfully slow or unstable in practice; a learned value-function baseline (moving towards actor-critic) is close to a default requirement rather than an optional refinement for any application beyond the simplest toy settings.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Allowing uncontrolled, large policy gradient updates</span>
+    A single large, uncontrolled update can move a policy gradient method's policy into a region where its performance collapses, from which recovery can be slow or impossible; TRPO's constrained optimisation and PPO's clipped objective both exist specifically to prevent this single failure mode, and skipping a trust-region mechanism entirely on a large-scale problem is a well-documented recipe for training instability.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Deep reinforcement learning replaces the tabular methods of the previous two lectures with neural network function approximators, reusing the identical underlying logic (Q-learning, generalised policy iteration) at a scale no table could represent. DQN extends Q-learning with a replay memory and target network to manage the instability that direct, correlated, moving-target training would otherwise produce, with double DQN further correcting Q-learning's inherited overestimation bias. Policy gradient methods learn a policy directly, with REINFORCE as the simplest instance and a learned value-function baseline (the advantage function) as the standard variance-reduction technique, meeting value-based methods at actor-critic architectures. TRPO and PPO add a trust-region constraint on top of the policy-gradient framework, directly preventing the large, uncontrolled updates that would otherwise destabilise training, with PPO's simpler, clipped objective now the standard choice, including as the specific algorithm behind the RLHF pipeline that produced every instruction-following large language model discussed earlier in this course.</p>
+
+  <p>This closes both this sub-module and the entire machine learning course: from the first GLM through supervised, unsupervised, and deep learning, calibration, generative modelling, large language models, and finally this sub-module's decision-making paradigm, culminating in the recognition that the course's two newest and most consequential subjects, generative AI and reinforcement learning, are directly and technically connected through exactly the algorithm developed in this closing lecture. The actuarial-applications sub-module, immediately following this one in the wider curriculum, returns to premium control, the actuarial framing this sub-module opened with, and shows how every idea developed across these seven lectures applies to a genuine, regulated pricing decision.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Explain what a deep Q-network changes relative to tabular Q-learning, and describe the two specific devices (replay memory, target network) that stabilise its training.</li>
+      <li>Explain the overestimation bias in ordinary DQN, and how double DQN corrects it.</li>
+      <li>State the REINFORCE update, and explain why subtracting a state-dependent baseline reduces variance without introducing bias.</li>
+      <li>Define the advantage function, and explain its role in an actor-critic architecture.</li>
+      <li>Explain the problem TRPO and PPO both address, and how PPO's clipped objective achieves a similar effect to TRPO's constrained optimisation more simply.</li>
+      <li>In the dynamic-pricing vignette, explain precisely which two specific instabilities the replay memory and target network each addressed.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 6 (<a href="06-monte_carlo_and_td_control.html">Monte Carlo and TD control</a>) developed the tabular SARSA and Q-learning this lecture generalises with function approximation.</li>
+      <li><strong>Built on:</strong> The deep-learning sub-module's neural-network architectures are the function-approximation machinery every algorithm in this lecture relies on.</li>
+      <li><strong>Built on:</strong> The large language models sub-module's <a href="../11_large_language_models/03-prompting_and_reasoning.html">RLHF pipeline</a> uses PPO, developed here, as its reinforcement-learning stage.</li>
+      <li><strong>Outside this course:</strong> The actuarial-applications sub-module's premium-control lecture returns to this sub-module's opening framing and develops a full worked pricing application.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Reinforcement learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 62 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

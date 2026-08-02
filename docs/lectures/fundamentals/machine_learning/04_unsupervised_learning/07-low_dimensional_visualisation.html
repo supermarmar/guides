@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 20: low-dimensional visualisation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Unsupervised learning</a></div>
+  <h1>Low-dimensional visualisation</h1>
+  <p class="subtitle">Every method in this sub-module so far answers "are there groups in this data, and how many". This closing lecture answers a different question: given data with far more than two or three features, how do you draw a picture a human can actually look at, without lying about the structure that is really there? t-SNE and UMAP are the two dominant answers, and both close with the same uncomfortable warning: a categorical covariate can wreck the picture in a way neither method will tell you about.</p>
+  <div class="meta">
+    <span>Lecture 20 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part III: unsupervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">PCA (lecture 2 of this sub-module) draws its low-dimensional picture by preserving <em>global</em> linear structure, the directions of greatest variance; it is fast, exact, and interpretable, but it is blind to non-linear structure and often collapses genuinely separate clusters onto the same region of the plane. <strong>t-distributed stochastic neighbour embedding (t-SNE)</strong> takes the opposite priority: it preserves <em>local</em> structure, who each point's near neighbours are, at the deliberate cost of distorting global distances and cluster sizes. It converts high-dimensional distances into neighbour probabilities $p_{j|i}$ using a Gaussian kernel whose bandwidth is tuned per point via a target <strong>perplexity</strong>, converts low-dimensional distances into neighbour probabilities $q_{j|i}$ using a heavy-tailed Student-t (Cauchy) kernel, and moves the low-dimensional points to minimise the Kullback-Leibler divergence between the two distributions. <strong>UMAP</strong> pursues a related goal via a different mathematical route (fuzzy topological set theory rather than an information-theoretic divergence), runs faster, and better preserves some global structure, without displacing t-SNE as the more widely taught baseline. Both methods share one serious weakness for actuarial data specifically: neither has any native way to handle a categorical covariate, and forcing one in, whether by one-hot coding or an arbitrary numeric recoding, routinely creates visual structure in the picture that reflects the encoding, not the data.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine redrawing a friendship map of a school on a single sheet of paper, where the map has to fit thousands of relationships between students spread across many separate classes, clubs and years. t-SNE's approach is to focus entirely on getting each student's immediate circle of friends right, close together on the page, and not worry at all about whether the ninth-grade cluster ends up twice as far from the tenth-grade cluster as it should be, or whether cluster sizes on the page reflect true group sizes; it deliberately trades a faithful global map for a faithful local one. Reading distances between clusters, or the size of a cluster, off a t-SNE plot is exactly the mistake of concluding two friend groups are unusually far apart just because they landed on opposite corners of the page.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture closes the unsupervised half of the machine-learning course by returning to the tool most practitioners reach for first, a 2D scatter plot, and showing precisely why the two most common ways of producing one (t-SNE and UMAP) answer a narrower question than they appear to: "which points are near which other points", not "how far apart, or how large, are the clusters". The categorical-covariate problem closing this lecture is a genuine, practical warning for exactly the data this course's application track works with daily.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons a 2D embedding earns real analytical weight, not just a slide-deck decoration.</p>
+
+  <p>First, <strong>a well-constructed embedding is often the fastest way to discover that a clustering algorithm's chosen $K$ or $\varepsilon$ is wrong</strong>: plotting the same data through t-SNE or UMAP and colouring points by the cluster label assigned by k-means, K-medoids, GMM, or DBSCAN is a direct visual check of whether those labels correspond to anything a human would call a genuine group, catching cases where an algorithm has split one real cluster into two or merged two real clusters into one.</p>
+
+  <p>Second, <strong>PCA's linear projection genuinely fails on non-linear structure</strong>, collapsing, for instance, two concentric rings of points in the original space onto overlapping regions of a 2D PCA plot; a non-linear embedding is not a stylistic preference in this case, it is the only way of the two to reveal the ring structure at all.</p>
+
+  <p>Third, <strong>an embedding is a communication tool as much as an analytical one</strong>, and the audience-and-storytelling considerations that the following sub-module (visualisation design) develops in full apply directly here: a t-SNE plot presented to a non-technical audience without the caveat that distances between clusters are not meaningful routinely produces false confidence about how separated two customer segments genuinely are.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A pricing team, exploring a policyholder feature set ahead of a segmentation exercise, ran t-SNE on the raw covariates, including a postcode-derived region categorical variable recoded as an arbitrary integer 1 through 40. The resulting plot showed unmistakable, tight, well-separated clusters, and the team's first instinct was that these were genuine, previously undiscovered risk segments worth a new pricing model. Recolouring the identical plot by the region variable revealed that every visible cluster corresponded exactly to a single region code; the integer recoding, entirely arbitrary in its ordering, had been treated by the Gaussian kernel as if regions 12 and 13 were more similar than regions 12 and 30, purely because of the accident of how the codes were assigned, and the striking cluster structure was an artefact of that recoding, not a discovery about risk.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a high-dimensional neighbourhood of points mapped, via matching probability distributions, to a 2D neighbourhood, with the heavy Student-t tail in the low-dimensional space actively pushing dissimilar points apart to leave room for genuine local structure to unfold.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="t-SNE matching a high-dimensional neighbour distribution to a low-dimensional one via KL divergence">
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">t-SNE: matching neighbour probabilities across dimensions</text>
+
+      <rect x="40" y="50" width="330" height="210" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="205" y="72" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">High-dimensional space</text>
+      <circle cx="205" cy="160" r="5" fill="#7c3aed"/>
+      <circle cx="240" cy="140" r="4" fill="#a78bfa"/>
+      <circle cx="175" cy="185" r="4" fill="#a78bfa"/>
+      <circle cx="230" cy="195" r="4" fill="#a78bfa"/>
+      <circle cx="120" cy="110" r="3.5" fill="#d4d4d8"/>
+      <circle cx="320" cy="220" r="3.5" fill="#d4d4d8"/>
+      <path d="M 205 160 L 240 140 M 205 160 L 175 185 M 205 160 L 230 195" stroke="#7c3aed" stroke-width="1" opacity="0.5"/>
+      <text x="205" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">Gaussian kernel, bandwidth set by perplexity: $p_{j|i}$</text>
+
+      <path d="M 385 155 L 460 155" stroke="#71717a" stroke-width="2" marker-end="url(#lvArrow)"/>
+      <defs><marker id="lvArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/></marker></defs>
+      <text x="422" y="140" text-anchor="middle" font-family="Inter" font-size="9" fill="#52525b">minimise KL(P‖Q)</text>
+
+      <rect x="470" y="50" width="330" height="210" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="635" y="72" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#115e59">Low-dimensional space (2D)</text>
+      <circle cx="635" cy="160" r="5" fill="#0d9488"/>
+      <circle cx="680" cy="150" r="4" fill="#2dd4bf"/>
+      <circle cx="600" cy="185" r="4" fill="#2dd4bf"/>
+      <circle cx="670" cy="195" r="4" fill="#2dd4bf"/>
+      <circle cx="530" cy="90" r="3.5" fill="#d4d4d8"/>
+      <circle cx="770" cy="230" r="3.5" fill="#d4d4d8"/>
+      <path d="M 635 160 L 680 150 M 635 160 L 600 185 M 635 160 L 670 195" stroke="#0d9488" stroke-width="1" opacity="0.5"/>
+      <text x="635" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">Student-t kernel, heavy tail: $q_{ij}$</text>
+    </svg>
+    <figcaption>The purple point's near neighbours in the high-dimensional space (connected lines, left) are converted into a probability distribution $p_{j|i}$ using a Gaussian kernel. t-SNE positions the corresponding teal points in 2D so that a Student-t-kernel-based distribution $q_{ij}$ over their distances matches $p_{j|i}$ as closely as possible; the heavy Student-t tail lets moderately distant points repel each other more strongly in 2D than a Gaussian would, which is precisely what prevents distinct clusters from being crushed together on the page.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>t-SNE promises "your neighbours stay your neighbours", not "distances are preserved".</strong> Reading anything from inter-cluster distance or cluster size on a t-SNE plot is reading a promise the method never made. <strong>The picture is only as honest as the encoding of every covariate that went into it.</strong> A categorical variable recoded as an arbitrary integer silently becomes a false ordinal covariate the instant it enters a distance-based method, and the resulting picture will look confident regardless.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>From high-dimensional distances to neighbour probabilities</h3>
+
+  <p>For each pair of observations $i \ne j$ in the original, high-dimensional space, define a conditional probability that $j$ would be picked as $i$'s neighbour under a Gaussian kernel centred on $X_i$,</p>
+  $$p_{j|i} = \frac{\exp(-\lVert X_i - X_j \rVert^2 / 2\sigma_i^2)}{\sum_{k \ne i} \exp(-\lVert X_i - X_k \rVert^2 / 2\sigma_i^2)}, \qquad p_{ij} = \frac{p_{j|i} + p_{i|j}}{2n}.$$
+  <p>The bandwidth $\sigma_i$ is not a single global choice; it is set <em>separately for every point $i$</em> so that the induced distribution $p_{\cdot|i}$ has a target <strong>perplexity</strong>, defined as $2^{H(p_{\cdot|i})}$ where $H$ is the Shannon entropy of the distribution. Perplexity is best read as a smooth, continuous stand-in for "the effective number of neighbours" that point $i$ is considered to have; the modeller chooses one target perplexity (commonly between 5 and 50) applied uniformly, and the algorithm solves for the per-point bandwidth $\sigma_i$ that achieves it, so points in dense regions automatically receive a smaller bandwidth than points in sparse regions.</p>
+
+  <h3>From low-dimensional distances to neighbour probabilities, and the choice of tail</h3>
+
+  <p>In the target low-dimensional space (almost always $q=2$ for a plot), define an analogous distribution over the embedded points $Y_i$, but using a Student-t distribution with one degree of freedom (equivalently, a Cauchy distribution) rather than a Gaussian,</p>
+  $$q_{ij} = \frac{(1 + \lVert Y_i - Y_j \rVert^2)^{-1}}{\sum_{k \ne l} (1 + \lVert Y_k - Y_l \rVert^2)^{-1}}.$$
+  <p>The heavy tail is the deliberate design choice that gives the method its name and solves a real problem: in high dimensions there is simply more "room" for moderately distant points than in two dimensions (the same intuition behind the curse of dimensionality from the PCA lecture), so a low-dimensional embedding using the identical Gaussian kernel would be forced to crush moderately distant points implausibly close together to match the high-dimensional probabilities, a phenomenon known as the <strong>crowding problem</strong>. The Cauchy tail's slower decay lets moderately distant points in 2D repel each other more strongly, which is exactly what keeps genuinely separate clusters visibly apart on the page.</p>
+
+  <h3>The objective and optimisation</h3>
+
+  <p>t-SNE positions the low-dimensional points $Y_i$ to minimise the Kullback-Leibler divergence between the two distributions,</p>
+  $$\mathrm{KL}(P \| Q) = \sum_{i \ne j} p_{ij} \log\frac{p_{ij}}{q_{ij}},$$
+  <p>via gradient descent, initialised randomly (or, in modern implementations, from a PCA projection for stability) and iterated until convergence. Because the KL divergence is asymmetric and penalises $q_{ij}$ being small where $p_{ij}$ is large far more heavily than the reverse, the method preferentially preserves genuine local neighbour relationships at the direct expense of global distance fidelity, exactly the trade-off flagged in the 30-second version.</p>
+
+  <h3>UMAP, briefly</h3>
+
+  <p>Uniform manifold approximation and projection (<strong>UMAP</strong>) pursues a closely related goal, a low-dimensional embedding preserving local neighbourhood structure, via a different mathematical foundation: it constructs a weighted graph representing a fuzzy topological structure on the high-dimensional data (built from each point's local neighbourhood, allowing for varying local density in a similar spirit to t-SNE's per-point perplexity), then optimises a low-dimensional layout whose corresponding fuzzy graph is as similar as possible under cross-entropy, rather than KL divergence over a normalised probability distribution. In practice, UMAP is substantially faster on large datasets, tends to preserve more of the global arrangement between clusters than t-SNE while still prioritising local structure, and has become the more common default in newer tooling; it does not, however, remove the categorical-covariate problem developed next, since that problem is a fact about the distance metric feeding either method, not about which of the two is used.</p>
+
+  <h3>Self-organising maps, briefly</h3>
+
+  <p>A <strong>self-organising map (SOM)</strong> is an older, different approach to the same goal: a grid of nodes, each holding a weight vector in the original feature space, is trained so that nodes near each other on the grid come to represent similar regions of the data (via a competitive-learning update rule that moves the winning node and its grid neighbours towards each presented observation). A SOM produces a fixed, interpretable grid layout rather than a free-form scatter, useful when a stable, reusable 2D reference map is wanted (for instance, plotting new data against a previously trained map), at the cost of being less flexible than t-SNE or UMAP at representing genuinely irregular cluster shapes.</p>
+
+  <h3>The categorical-covariate problem</h3>
+
+  <p>Every method in this lecture, and every distance-based method in this sub-module, depends on a numeric dissimilarity function (lecture 3's framework). A categorical covariate has no native numeric distance: recoding it as an arbitrary integer (region 1, 2, 3, …) silently imposes a false ordinal structure the Gaussian or Cauchy kernel then treats as genuine, one-hot coding it inflates dimensionality and typically dominates the distance calculation for every categorical variable with many levels, and neither option is a free lunch. Bespoke, weighted mixed-distance metrics (Gower's distance is the standard reference) or the entity-embedding approach from the deep-learning sub-module, which learns a genuinely continuous representation of a categorical variable from supervised or unsupervised structure in the data rather than assuming one, are the two principled responses; simply feeding a recoded categorical variable into t-SNE or UMAP and trusting the resulting plot is the single most common way an otherwise rigorous exploratory analysis goes wrong, exactly as the vignette shows.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Reading cluster size or inter-cluster distance off a t-SNE or UMAP plot</span>
+    Both methods prioritise local neighbour fidelity over global distance fidelity by construction; a cluster appearing large, or two clusters appearing far apart, on the embedded plot is not evidence that the corresponding groups are genuinely large or genuinely dissimilar in the original feature space. Treat the plot as evidence about which points are near which other points, and nothing more.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Feeding a categorical covariate into either method without addressing its encoding</span>
+    Developed in full above; the single highest-frequency real-world failure mode of exploratory embeddings on actuarial data, because policy, claims, and underwriting data are saturated with categorical fields (region, product, occupation class, distribution channel).
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Trusting a single run without checking stability across perplexity values and random seeds</span>
+    t-SNE's random initialisation and sensitivity to the perplexity hyperparameter mean a single embedding can show apparent structure that another perplexity value or another random seed does not reproduce; running the embedding at two or three different perplexity settings and confirming the qualitative structure is stable is standard due diligence before drawing any conclusion from the plot.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using a 2D embedding as a substitute for, rather than a companion to, a clustering algorithm's own diagnostics</span>
+    A t-SNE or UMAP plot is an excellent visual sanity check on a clustering result from earlier in this sub-module, but it is not itself a clustering algorithm with a defined, reproducible cluster assignment; two analysts eyeballing the identical plot can reasonably draw the cluster boundaries differently, whereas k-means, K-medoids, GMM, and DBSCAN all produce an explicit, reproducible assignment.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>t-SNE converts high-dimensional distances into per-point neighbour probabilities via a Gaussian kernel tuned to a target perplexity, converts low-dimensional distances into neighbour probabilities via a heavy-tailed Student-t kernel (deliberately, to solve the crowding problem), and positions the low-dimensional points to minimise the KL divergence between the two, at the cost of preserving local structure only, never global distance or cluster size. UMAP pursues the same local-structure priority via a different mathematical route, runs faster, and preserves somewhat more global structure. Self-organising maps offer a fixed, reusable grid alternative. All three share the same unresolved weakness on actuarial data: no native way to handle a categorical covariate, and an arbitrary numeric recoding routinely manufactures visual structure that reflects the encoding, not the data.</p>
+
+  <p>This closes the unsupervised-learning sub-module, seven lectures spanning k-means and PCA (the original two), autoencoders and the dissimilarity-function framework, hierarchical clustering, K-medoids and Gaussian mixtures, DBSCAN, and this lecture's non-linear embeddings. The wider machine-learning course now turns to deep learning in depth, in the next sub-module, where the entity-embedding technique flagged above as one genuine answer to the categorical-covariate problem is developed properly.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Explain the difference in priority between PCA and t-SNE when representing high-dimensional structure in two dimensions.</li>
+      <li>Define perplexity, and explain why t-SNE tunes the Gaussian kernel bandwidth separately for every point rather than using one global bandwidth.</li>
+      <li>Explain the crowding problem, and why a Student-t (Cauchy) tail in the low-dimensional space addresses it.</li>
+      <li>State one respect in which UMAP differs from t-SNE, and one respect in which the two methods share an identical limitation.</li>
+      <li>Explain why reading inter-cluster distance off a t-SNE plot is a misuse of the method.</li>
+      <li>In the pricing-team vignette, explain precisely why recoding the region variable as an arbitrary integer caused the striking cluster structure, and name one alternative encoding that would have avoided it.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 6 (<a href="06-density_based_clustering.html">density-based clustering</a>) closed the clustering arc; this lecture closes the sub-module with non-linear visualisation.</li>
+      <li><strong>Built on:</strong> Lecture 2's <a href="02-pca.html">PCA</a> is the linear baseline this lecture's non-linear methods are contrasted against throughout.</li>
+      <li><strong>Forward:</strong> The <a href="../05_deep_learning/index.html">deep learning sub-module</a> develops entity embedding, flagged above as a genuine answer to the categorical-covariate problem, in full.</li>
+      <li><strong>Outside this course:</strong> The <a href="../../data_analysis/index.html">data analysis course</a>'s forthcoming visualisation-design sub-module develops the audience, storytelling, and honesty considerations this lecture's vignette raises about presenting an embedding to a non-technical audience.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Unsupervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 20 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

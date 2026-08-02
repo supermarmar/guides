@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 37: classification metrics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Model evaluation</a></div>
+  <h1>Classification metrics</h1>
+  <p class="subtitle">The confusion matrix is the parent of every classification metric. From it come accuracy, precision, recall, F1, ROC, AUC, and Gini. Credit-risk practitioners spend more time with Gini than any other number in this course.</p>
+  <div class="meta">
+    <span>Lecture 37 of 62</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Every classification metric derives from one $2 \times 2$ table. The <strong>confusion matrix</strong> cross-tabulates predicted classes against actual classes and produces four counts: true positives, true negatives, false positives, and false negatives. From those four counts come the threshold-dependent metrics that need a decision boundary to compute: <strong>accuracy</strong> (overall hit rate, misleading on imbalanced data), <strong>precision</strong> (of those we flagged, how many were correct), <strong>recall</strong> (of true positives, how many we caught), <strong>specificity</strong> (the recall of the negative class), and <strong>F1</strong> (the harmonic mean of precision and recall, which collapses to a low value when either is small). Above the threshold sit the threshold-independent metrics that summarise the model's ranking ability across every cut-off: the <strong>ROC curve</strong> traces true positive rate against false positive rate as the threshold sweeps from one to zero, <strong>AUC</strong> is the area beneath it (and equals the probability that a random positive is ranked above a random negative), and the <strong>Gini coefficient</strong> $= 2 \cdot \operatorname{AUC} - 1$ is the standard credit-risk summary. Above all of those sits <strong>calibration</strong>, which asks not who is ranked higher but whether a predicted probability of 0.2 actually corresponds to a 20 per cent default rate. Discrimination (Gini, AUC) and calibration are independent: a model can rank perfectly and predict probabilities that are wrong by an order of magnitude. Both matter, and a regulator will ask about both.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A classification model returns a number between zero and one for each customer. To turn that number into a decision (approve or decline, flag or pass) you need a threshold. The confusion matrix is what you build after that threshold is applied: out of every customer in the test set, how many did we flag and were right, how many did we flag and were wrong, how many did we miss, and how many did we correctly let through. Every metric in this lecture is one of those four counts divided by another. The ones that depend on the threshold (accuracy, precision, recall, F1) tell you how a single chosen cut-off performs. The ones that do not (AUC, Gini) tell you how the model would rank customers regardless of the cut-off, and how much room there is to move the threshold around without losing what matters.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    A textbook will list a dozen metrics and tell you to pick the right one for the problem. In credit risk modelling, the choice has been made for you. Gini is the universal scorecard summary because every regulator, every internal validator, and every model committee speaks its dialect. The ECB's TRIM guide, the PRA's SS1/23, and the Bank of England's IRB model approval expectations all reference Gini bands explicitly: below 0.4 the model is weak and needs justification, 0.4 to 0.6 is acceptable, 0.6 to 0.8 is strong, and above 0.8 is excellent (though the band you should expect depends heavily on portfolio segment and risk grade). Knowing the metric does not exempt you from knowing the conventions around it, and the conventions are what land you through validation.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 6 of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>. This is the classification half of model evaluation; <a href="02-regression_diagnostics.html">lecture 36</a> covered regression diagnostics and <a href="04-forecasting_evaluation.html">lecture 38</a> covers forecasting evaluation. The metrics here are downstream of every supervised classifier in sub-module 03, from <a href="../03_supervised_learning/01-k_nearest_neighbours.html">k-nearest neighbours</a> to <a href="../03_supervised_learning/05-ensemble_learning.html">ensemble learning</a>, and they share their statistical foundation with the hypothesis-testing framework in <a href="../../statistics/03-inferential_statistics.html">inferential statistics</a>: a confusion matrix is essentially a contingency table, and the type I and type II error rates of frequentist testing are exactly the false positive and false negative rates of a classifier.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the choice of classification metric is more than a reporting decision. First, <strong>the metric you optimise is the model you get.</strong> A logistic regression fit to maximise log-likelihood does not know whether you care about precision or recall; the threshold you pick afterwards is what determines which of the four confusion-matrix cells the model is willing to populate. Pick a threshold at the default of 0.5 and you implicitly weighted false positives and false negatives equally. In a credit application where a false positive is a lost good customer (a few hundred pounds of foregone interest) and a false negative is a charged-off loan (thousands of pounds of loss), the implicit weighting is wrong by an order of magnitude. The threshold, not the model, encodes the business decision.</p>
+
+  <p>Second, <strong>class imbalance breaks naive metrics.</strong> A retail PD model on a portfolio with a 5 per cent default rate can achieve 95 per cent accuracy by predicting "good" for every customer. The model has learned nothing, and any decision built on it is uninformed, but the headline number looks fine. Precision and recall, both restricted to the positive class, are immune to this trick: a classifier that predicts only the negative class has zero recall and an undefined precision. AUC and Gini are also imbalance-resistant in the sense that they describe the model's ability to rank, regardless of how many positives there are; PR-AUC, restricted to precision and recall on the positive class, is more informative still when positives are scarce.</p>
+
+  <p>Third, <strong>discrimination and calibration are independent.</strong> Discrimination asks: can the model put higher-risk customers above lower-risk customers in a rank ordering? AUC and Gini measure this. Calibration asks: when the model says "20 per cent default probability", does the realised default rate in that decile actually come out at 20 per cent? Brier scores and reliability diagrams measure this. A model can rank perfectly (Gini = 1) but predict probabilities that are systematically two times too high; it can predict perfectly-calibrated probabilities but rank no better than chance (Gini = 0). Regulatory PD models must do both: the IRB capital formula consumes a probability, not a rank, so a mis-calibrated PD feeds straight into a mis-calibrated RWA.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A residential mortgage PD model was rebuilt with a gradient-boosted tree and reported a Gini of 0.78, a substantial uplift over the incumbent logistic regression at 0.62. The validation team accepted the discrimination uplift but rejected the model: the predicted probabilities were systematically too low across every risk grade, by roughly a factor of 1.7. The discrimination was real and the ranking was better, but plugging those probabilities into the A-IRB capital formula would have under-provisioned the portfolio by about a quarter of a billion pounds. A subsequent isotonic regression on top of the GBT recalibrated the probabilities and the model passed. The headline Gini was the easy part of the conversation; the calibration was the part that paid the bills.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. The confusion matrix is a $2 \times 2$ table of counts; every threshold-dependent metric is a ratio of those counts. Slide the threshold from one to zero and the four counts change, the threshold-dependent metrics trace out curves, and the threshold-independent metrics summarise those curves with a single number.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Confusion matrix with the four cells colour-coded and ratios drawn out">
+      <defs>
+        <marker id="cmArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The confusion matrix and the ratios it produces</text>
+
+      <!-- Axis labels -->
+      <text x="270" y="60" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">Predicted</text>
+      <text x="190" y="80" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">negative</text>
+      <text x="350" y="80" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">positive</text>
+
+      <text x="90" y="180" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b" transform="rotate(-90 90 180)">Actual</text>
+      <text x="118" y="135" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">negative</text>
+      <text x="118" y="225" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">positive</text>
+
+      <!-- Cells -->
+      <rect x="140" y="95" width="160" height="80" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="220" y="125" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">TN</text>
+      <text x="220" y="145" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">true negative</text>
+      <text x="220" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">correctly let through</text>
+
+      <rect x="300" y="95" width="160" height="80" fill="#FEF3C7" stroke="#b45309" stroke-width="1.5"/>
+      <text x="380" y="125" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">FP</text>
+      <text x="380" y="145" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">false positive</text>
+      <text x="380" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">flagged in error (type I)</text>
+
+      <rect x="140" y="185" width="160" height="80" fill="#FECACA" stroke="#b91c1c" stroke-width="1.5"/>
+      <text x="220" y="215" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#7f1d1d">FN</text>
+      <text x="220" y="235" text-anchor="middle" font-family="Inter" font-size="9" fill="#b91c1c">false negative</text>
+      <text x="220" y="250" text-anchor="middle" font-family="Inter" font-size="9" fill="#b91c1c">missed (type II)</text>
+
+      <rect x="300" y="185" width="160" height="80" fill="#DCFCE7" stroke="#15803d" stroke-width="1.5"/>
+      <text x="380" y="215" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#14532d">TP</text>
+      <text x="380" y="235" text-anchor="middle" font-family="Inter" font-size="9" fill="#15803d">true positive</text>
+      <text x="380" y="250" text-anchor="middle" font-family="Inter" font-size="9" fill="#15803d">correctly flagged</text>
+
+      <!-- Ratios -->
+      <rect x="500" y="95" width="290" height="42" rx="6" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+      <text x="510" y="115" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">Recall (TPR, sensitivity)</text>
+      <text x="510" y="130" font-family="JetBrains Mono" font-size="10" fill="#0d9488">= TP / (TP + FN)</text>
+
+      <rect x="500" y="142" width="290" height="42" rx="6" fill="#FFFFFF" stroke="#15803d" stroke-width="1"/>
+      <text x="510" y="162" font-family="Inter" font-size="10" font-weight="700" fill="#14532d">Precision (positive predictive value)</text>
+      <text x="510" y="177" font-family="JetBrains Mono" font-size="10" fill="#15803d">= TP / (TP + FP)</text>
+
+      <rect x="500" y="189" width="290" height="42" rx="6" fill="#FFFFFF" stroke="#b45309" stroke-width="1"/>
+      <text x="510" y="209" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">False positive rate (1 - specificity)</text>
+      <text x="510" y="224" font-family="JetBrains Mono" font-size="10" fill="#b45309">= FP / (FP + TN)</text>
+
+      <rect x="500" y="236" width="290" height="42" rx="6" fill="#FFFFFF" stroke="#71717a" stroke-width="1"/>
+      <text x="510" y="256" font-family="Inter" font-size="10" font-weight="700" fill="#18181b">Accuracy</text>
+      <text x="510" y="271" font-family="JetBrains Mono" font-size="10" fill="#71717a">= (TP + TN) / N</text>
+
+      <!-- Footer rule -->
+      <line x1="40" y1="310" x2="780" y2="310" stroke="#7c3aed" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="332" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">Sweep the threshold and you trace a curve</text>
+      <text x="410" y="350" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c3aed">ROC plots TPR vs FPR; AUC is the area beneath; Gini = 2 * AUC - 1</text>
+    </svg>
+    <figcaption>The four cells of the confusion matrix and the four most-used ratios drawn out as numerator and denominator. Recall divides through the positive row, precision divides through the positive column, FPR divides through the negative row, and accuracy divides through the whole table. The purple bar at the bottom is what happens when you stop fixing the threshold and let it sweep.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The diagonal cells (TN, TP) are the model getting it right; the off-diagonal cells (FP, FN) are the model getting it wrong, in two different ways with two different costs. Each ratio on the right is a different question: recall asks about coverage of the positive class, precision asks about the cleanliness of the positive flags, FPR asks about the contamination of the negative class. Slide the threshold down and you raise recall while raising FPR; slide it up and you raise precision while lowering recall. There is no threshold that simultaneously maximises all four ratios, and the ROC curve is the trace of that trade-off.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The confusion matrix</h3>
+
+  <p>A classifier with a binary target produces, for each observation, a predicted probability of the positive class. Apply a threshold $t$ (default 0.5, but never assume the default is right) and the probability becomes a predicted class. Cross-tabulate the predicted class against the actual class and the result is the <strong>confusion matrix</strong>, a $2 \times 2$ table of counts. The four cells are <strong>true positive</strong> (TP, predicted positive and actually positive), <strong>true negative</strong> (TN, predicted negative and actually negative), <strong>false positive</strong> (FP, predicted positive but actually negative; type I error in the hypothesis-testing language), and <strong>false negative</strong> (FN, predicted negative but actually positive; type II error). Their sum is the size of the evaluation set, $N = \operatorname{TP} + \operatorname{TN} + \operatorname{FP} + \operatorname{FN}$. Every other metric in this lecture is a ratio of these four counts or a function of how they vary with the threshold.</p>
+
+  <h3>Threshold-dependent metrics</h3>
+
+  <p><strong>Accuracy</strong> is the proportion of the evaluation set the classifier got right,</p>
+  $$\operatorname{Accuracy} = \frac{\operatorname{TP} + \operatorname{TN}}{\operatorname{TP} + \operatorname{TN} + \operatorname{FP} + \operatorname{FN}} = \frac{\operatorname{TP} + \operatorname{TN}}{N}.$$
+  <p>Intuitive but misleading on imbalanced data. A retail PD model on a portfolio with a 2 per cent default rate can achieve 98 per cent accuracy by predicting "good" for every customer; the model has no discriminating power but the headline number looks excellent. Accuracy is appropriate only when the class prior is roughly balanced and the cost of a false positive is roughly the cost of a false negative. Neither condition holds in credit risk, fraud detection, medical screening, or any of the other settings where classification matters most.</p>
+
+  <p><strong>Precision</strong>, also called positive predictive value, is the proportion of flagged observations that are truly positive,</p>
+  $$\operatorname{Precision} = \frac{\operatorname{TP}}{\operatorname{TP} + \operatorname{FP}}.$$
+  <p>The intuition is "of those we flagged, how many were correct". A spam filter with high precision sends few legitimate emails to the spam folder; a fraud-detection system with high precision sends few honest transactions to manual review. Precision answers the question "if the model says positive, how much should I trust it".</p>
+
+  <p><strong>Recall</strong>, also called sensitivity or the true positive rate (TPR), is the proportion of true positives that the classifier caught,</p>
+  $$\operatorname{Recall} = \operatorname{TPR} = \frac{\operatorname{TP}}{\operatorname{TP} + \operatorname{FN}}.$$
+  <p>The intuition is "of true positives, how many did we catch". A cancer-screening test with high recall misses few cancers; a fraud-detection model with high recall lets few fraudulent transactions through. Recall answers the question "if the truth is positive, how likely is the model to find it".</p>
+
+  <p>Precision and recall trade off against each other. Tighten the threshold (require a higher predicted probability to flag) and precision rises while recall falls; relax it and recall rises while precision falls. The relevant summary is the <strong>F1-score</strong>, the harmonic mean of precision and recall,</p>
+  $$\operatorname{F1} = 2 \cdot \frac{\operatorname{Precision} \cdot \operatorname{Recall}}{\operatorname{Precision} + \operatorname{Recall}}.$$
+  <p>The harmonic mean (rather than the arithmetic mean) is used so that F1 is low when either precision or recall is low: a model with precision 1 and recall 0.01 has arithmetic mean 0.505 but F1 of about 0.02, which correctly reflects that the model is useless despite its perfect precision. F1 ranges from zero to one and is symmetric in precision and recall. A weighted variant, $F_\beta$, lets you bias toward recall ($\beta > 1$) or precision ($\beta < 1$) when the costs of the two error types differ.</p>
+
+  <p><strong>Specificity</strong>, also called the true negative rate (TNR), is the recall of the negative class,</p>
+  $$\operatorname{Specificity} = \operatorname{TNR} = \frac{\operatorname{TN}}{\operatorname{TN} + \operatorname{FP}}.$$
+  <p>The intuition is "of true negatives, how many did we correctly let through". A spam filter with high specificity rarely flags a legitimate email; a credit model with high specificity rarely declines a customer who would have repaid. The complement is the <strong>false positive rate</strong> (FPR), the proportion of negatives flagged in error,</p>
+  $$\operatorname{FPR} = \frac{\operatorname{FP}}{\operatorname{FP} + \operatorname{TN}} = 1 - \operatorname{Specificity}.$$
+  <p>FPR is the horizontal axis of the ROC curve below, which is why specificity is more often reported via its complement than directly.</p>
+
+  <h3>The ROC curve and AUC</h3>
+
+  <p>Each threshold produces one confusion matrix, one TPR, one FPR, and therefore one point in the unit square. Sweep the threshold continuously from one to zero and the point traces out a curve. The <strong>receiver operating characteristic (ROC)</strong> curve plots TPR on the vertical axis against FPR on the horizontal axis as the threshold varies. At a threshold of one the classifier flags nothing, $\operatorname{TPR} = \operatorname{FPR} = 0$, and the curve starts at the origin; at a threshold of zero the classifier flags everything, $\operatorname{TPR} = \operatorname{FPR} = 1$, and the curve ends at the top-right corner. Between those extremes the shape encodes how well the classifier separates positives from negatives.</p>
+
+  <figure>
+    <svg viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ROC curve with the diagonal, the AUC region shaded, and the Gini relationship noted">
+      <text x="360" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The ROC curve, the AUC, and the Gini relationship</text>
+
+      <!-- Axes -->
+      <line x1="120" y1="300" x2="600" y2="300" stroke="#18181b" stroke-width="1.5"/>
+      <line x1="120" y1="60" x2="120" y2="300" stroke="#18181b" stroke-width="1.5"/>
+
+      <text x="360" y="335" text-anchor="middle" font-family="Inter" font-size="11" fill="#18181b">False positive rate (FPR)</text>
+      <text x="80" y="180" text-anchor="middle" font-family="Inter" font-size="11" fill="#18181b" transform="rotate(-90 80 180)">True positive rate (TPR)</text>
+
+      <!-- Axis ticks -->
+      <text x="120" y="316" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#71717a">0</text>
+      <text x="360" y="316" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#71717a">0.5</text>
+      <text x="600" y="316" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#71717a">1</text>
+      <text x="110" y="304" text-anchor="end" font-family="JetBrains Mono" font-size="9" fill="#71717a">0</text>
+      <text x="110" y="184" text-anchor="end" font-family="JetBrains Mono" font-size="9" fill="#71717a">0.5</text>
+      <text x="110" y="64" text-anchor="end" font-family="JetBrains Mono" font-size="9" fill="#71717a">1</text>
+
+      <!-- AUC shaded region under the ROC curve -->
+      <path d="M 120 300 Q 180 120 360 90 Q 480 75 600 60 L 600 300 Z" fill="#ECFEF6" stroke="none" opacity="0.7"/>
+
+      <!-- Diagonal (random classifier) -->
+      <line x1="120" y1="300" x2="600" y2="60" stroke="#71717a" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="475" y="195" font-family="Inter" font-size="10" fill="#71717a" font-style="italic">random classifier (AUC = 0.5)</text>
+
+      <!-- ROC curve -->
+      <path d="M 120 300 Q 180 120 360 90 Q 480 75 600 60" stroke="#0d9488" stroke-width="2.5" fill="none"/>
+      <text x="280" y="115" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">ROC curve</text>
+
+      <!-- Sample threshold point -->
+      <circle cx="240" cy="135" r="4" fill="#b45309"/>
+      <text x="250" y="128" font-family="JetBrains Mono" font-size="9" fill="#92400e">t = 0.5</text>
+
+      <!-- Perfect classifier marker -->
+      <circle cx="120" cy="60" r="4" fill="#15803d"/>
+      <text x="130" y="58" font-family="Inter" font-size="9" font-weight="600" fill="#14532d">perfect classifier</text>
+
+      <!-- AUC label inside shaded region -->
+      <text x="370" y="220" text-anchor="middle" font-family="Inter" font-size="14" font-weight="700" fill="#115e59">AUC</text>
+      <text x="370" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">area under the ROC curve</text>
+
+      <!-- Gini relationship box -->
+      <rect x="430" y="240" width="180" height="50" rx="6" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="520" y="260" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">Gini = 2 * AUC - 1</text>
+      <text x="520" y="278" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">credit-risk standard summary</text>
+    </svg>
+    <figcaption>The ROC curve traces TPR against FPR as the threshold sweeps. A perfect classifier hits the top-left corner; a random classifier follows the diagonal. The shaded area is AUC, the probability that a random positive scores above a random negative. Gini equals twice AUC minus one, so a random classifier has Gini zero and a perfect classifier has Gini one.</figcaption>
+  </figure>
+
+  <p>The <strong>area under the ROC curve (AUC)</strong> integrates the curve and produces a single threshold-independent number between zero and one. Three reference values calibrate the scale. An AUC of 0.5 corresponds to the diagonal: the classifier is no better than random guessing. An AUC of 1 corresponds to perfect separation: every positive is ranked above every negative, the curve passes through the top-left corner, and the area is the entire unit square. An AUC below 0.5 means the classifier is worse than random; flipping its predictions would produce an AUC above 0.5, so a sub-diagonal classifier is a labelling error, not a useful negative-information model.</p>
+
+  <p>AUC has a probabilistic interpretation that is more useful than the geometric one. Draw a positive observation at random and a negative observation at random, and let $\hat{p}_+$ and $\hat{p}_-$ be their predicted probabilities. Then</p>
+  $$\operatorname{AUC} = \mathbb{P}(\hat{p}_+ > \hat{p}_-) + \tfrac{1}{2} \mathbb{P}(\hat{p}_+ = \hat{p}_-).$$
+  <p>In words, AUC is the probability that a random positive is ranked above a random negative. This is exactly what discrimination means: the model's ability to separate the two classes by score, independently of any threshold and independently of the absolute calibration of the scores. A monotonic transformation of the predicted probabilities leaves AUC unchanged, because rankings are preserved.</p>
+
+  <h3>Gini and its credit-risk conventions</h3>
+
+  <p>The <strong>Gini coefficient</strong> is a linear rescaling of AUC,</p>
+  $$\operatorname{Gini} = 2 \cdot \operatorname{AUC} - 1.$$
+  <p>It ranges from $-1$ (perfectly anti-correlated with the target) through $0$ (random) to $1$ (perfectly separating). The rescaling makes the random-classifier baseline zero rather than a half, which is easier to communicate to non-technical audiences ("a Gini of zero means the model is as good as flipping a coin"). The two metrics carry exactly the same information; Gini is preferred in credit risk reporting because it is the convention, not because it is better.</p>
+
+  <p>Credit-risk practice has settled on a set of approximate bands for Gini interpretation: below 0.4 is weak and typically requires either rebuilding or strong justification, 0.4 to 0.6 is acceptable, 0.6 to 0.8 is strong, and above 0.8 is excellent. The bands are convention rather than law and are sensitive to the segment: a wholesale corporate PD model on rated counterparties can plausibly achieve Gini above 0.8 because the public information already separates the names; a thin-file retail unsecured model on revolving credit may struggle to clear 0.5 because the information set is thin and the defaults are noisy. ECB TRIM expectations, PRA SS1/23, and Bank of England IRB approval criteria all reference Gini bands, with adjustments by portfolio type and risk grade.</p>
+
+  <h3>The precision-recall curve and PR-AUC</h3>
+
+  <p>The ROC curve uses TPR and FPR, both of which are normalised by their respective row totals in the confusion matrix. On heavily imbalanced data this can be misleading: a small absolute number of false positives is a small FPR if the negative class is huge, so the ROC curve can look excellent even when the precision is poor. The <strong>precision-recall (PR) curve</strong> plots precision against recall as the threshold varies and is more informative when positives are scarce, because both axes refer to the positive class. <strong>PR-AUC</strong>, the area under the PR curve, is the corresponding summary statistic. For highly imbalanced problems (default rates below a few per cent, fraud detection, rare-disease screening) PR-AUC is the metric to optimise; ROC AUC can be left in as a secondary number for backward comparability.</p>
+
+  <h3>Calibration: Brier score, reliability diagrams, ECE</h3>
+
+  <p>Discrimination metrics (AUC, Gini, PR-AUC) measure ranking and are invariant to monotonic transformations of the predicted probabilities. A model that always predicts probabilities ten times too high but in the correct order has the same AUC as a perfectly calibrated model. For a probability to be useful as a probability, the predicted value must match the empirical frequency: of the customers the model assigns probability 0.2, about 20 per cent should default. This property is <strong>calibration</strong>.</p>
+
+  <p>The <strong>reliability diagram</strong> is the visual diagnostic. Bin predicted probabilities into deciles, compute the mean predicted probability and the empirical default rate in each bin, and plot one against the other. A perfectly calibrated model traces the diagonal; systematic deviation above the diagonal (empirical rate higher than predicted) is under-prediction, deviation below the diagonal is over-prediction. The <strong>Brier score</strong> summarises calibration and discrimination jointly as the mean squared error of the predicted probability,</p>
+  $$\operatorname{Brier} = \frac{1}{N} \sum_{i=1}^{N} (\hat{p}_i - y_i)^2,$$
+  <p>where $y_i \in \{0, 1\}$ is the actual class. Lower is better; the minimum is zero, the maximum (for a binary target) is one. The Brier score decomposes into a calibration term, a refinement term, and an irreducible term; it is a more demanding summary than AUC because a discriminating but mis-calibrated model is penalised. The <strong>expected calibration error (ECE)</strong> is the mean absolute deviation between predicted probability and empirical rate, averaged across bins weighted by bin size; it summarises the reliability diagram with a single number, with lower values better.</p>
+
+  <h3>Threshold selection: cost-weighted and Youden's J</h3>
+
+  <p>None of the threshold-independent metrics tell you what threshold to use in production. Two principled approaches dominate. The <strong>cost-weighted</strong> approach attaches a monetary cost to each cell of the confusion matrix and minimises the expected cost,</p>
+  $$\operatorname{Cost}(t) = c_{\operatorname{FP}} \cdot \operatorname{FP}(t) + c_{\operatorname{FN}} \cdot \operatorname{FN}(t),$$
+  <p>solving for the threshold $t^*$ that minimises the total. In credit underwriting, $c_{\operatorname{FP}}$ is the foregone interest margin on a customer wrongly declined and $c_{\operatorname{FN}}$ is the loss given default on a customer wrongly approved; the ratio is typically twenty to one or worse in favour of caution, which pulls the threshold below 0.5 in almost every retail use case.</p>
+
+  <p>When no explicit cost information is available, <strong>Youden's J statistic</strong> picks the threshold that maximises the vertical distance between the ROC curve and the diagonal,</p>
+  $$J = \operatorname{TPR} - \operatorname{FPR},$$
+  <p>which is equivalent to weighting the two error types equally. Youden's J is a defensible default and the point at which the ROC curve is steepest, but it implicitly assumes the costs are symmetric and the class prior in the test sample matches deployment; both assumptions deserve a sanity check before the threshold is locked in.</p>
+
+  <h3>Multi-class metrics: macro, micro, weighted</h3>
+
+  <p>Precision, recall, F1 and similar metrics are defined for binary classification. For a multi-class problem with $K$ classes, the standard approach is to compute the metric one-vs-rest for each class and then aggregate. Three aggregations are in common use. <strong>Macro</strong> averaging takes the unweighted mean across classes; each class contributes equally regardless of size, which makes macro suitable when rare classes matter as much as common ones. <strong>Micro</strong> averaging pools the confusion matrices across classes before computing the metric; this gives larger classes more weight, which matches the situation where overall accuracy is the objective. <strong>Weighted</strong> averaging takes the mean across classes weighted by class support (number of true instances); it is a halfway house and is the scikit-learn default. The choice between them is a judgement call: macro for balanced importance, micro for overall hit rate, weighted as a compromise. Reporting more than one is usually wise.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every classification-metric incident in production. Each is visible in the validation pack only if you know to look.</p>
+
+  <div class="callout warn">
+    <span class="tag">Accuracy on imbalanced data</span>
+    Reporting accuracy as the headline metric on a portfolio with a 3 per cent default rate is statistically uninformative and operationally negligent. A trivial classifier that predicts "good" everywhere achieves 97 per cent accuracy and zero recall; the model has learned nothing. The fix is to report precision, recall, F1, and at least one threshold-independent metric (AUC or Gini, plus PR-AUC if the imbalance is severe). Reserve accuracy for genuinely balanced problems, of which credit risk is almost never one.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Discrimination without calibration</span>
+    Two PD models can have the same Gini and produce capital numbers that differ by a quarter. Discrimination measures ranking; calibration measures absolute level. The A-IRB capital formula consumes a probability, not a rank, so a model that ranks beautifully but predicts probabilities that are twice the true rate will over-provision capital by a large margin (and vice versa, dangerously, in the other direction). The fix is to report a Brier score or expected calibration error alongside Gini, plot a reliability diagram by risk grade, and recalibrate (Platt scaling, isotonic regression) whenever the diagram shows systematic deviation.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Threshold left at the default</span>
+    Almost every classification library returns predictions at a threshold of 0.5. That value is a mathematical convenience, not a business decision, and it implicitly weights false positives and false negatives equally. In credit, fraud, and medical screening the costs are not equal; in some cases they differ by an order of magnitude. The fix is to set the threshold by cost-weighted minimisation if the costs are known, or by Youden's J if they are not, and to document why. A model approved at the library default has not had a threshold choice made; it has had one accepted by inattention.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">ROC AUC on severe imbalance</span>
+    With a 0.1 per cent positive class (rare-event fraud, catastrophic loss prediction), the ROC curve can look excellent even when precision at the chosen threshold is so low that the false positives drown the true positives in absolute terms. The negative denominator in FPR is huge, so FPR stays small even when FP is operationally unacceptable. The fix is to switch to the precision-recall curve and PR-AUC for severe imbalance, and to report absolute counts of FP and FN at the operating threshold so the operational implications are visible alongside the statistical summary.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Classification metrics all live in the orbit of the confusion matrix. Threshold-dependent metrics (accuracy, precision, recall, F1, specificity, FPR) tell you how a single chosen cut-off performs and are useful once a threshold has been set; threshold-independent metrics (ROC AUC, PR-AUC, Gini) tell you how the model ranks observations across all possible cut-offs and are useful before the threshold is set. The two layers answer different questions. Above both sits calibration, which asks whether a predicted probability is operationally trustworthy as a probability; discrimination and calibration are independent properties and a well-validated model needs both. Threshold selection is the bridge from metrics to decisions: cost-weighted minimisation if the cost structure is known, Youden's J as a defensible default if it is not. Multi-class problems aggregate binary metrics by macro, micro, or weighted averaging, each with its own implicit prior about class importance.</p>
+
+  <p>What this lecture deliberately did not do. It did not introduce regression diagnostics (MSE, RMSE, MAE, MAPE, R-squared, residual analysis), which live in <a href="02-regression_diagnostics.html">lecture 36</a>. It did not introduce forecasting evaluation (autocorrelation, Durbin-Watson, Ljung-Box, backtesting, cumulative lift), which live in <a href="04-forecasting_evaluation.html">lecture 38</a>. It did not derive the underlying classifiers; those are sub-module 03, from <a href="../03_supervised_learning/01-k_nearest_neighbours.html">k-nearest neighbours</a> through <a href="../03_supervised_learning/05-ensemble_learning.html">ensemble learning</a>. The metrics here apply equally to any of those algorithms because they consume only the predicted probability and the actual label, never the model internals.</p>
+
+  <p>Lecture 38, <a href="04-forecasting_evaluation.html">forecasting evaluation</a>, picks up where this lecture ends and asks the time-series analogue of the question raised in section 4. Classification metrics treat each observation as independent; forecasting metrics must account for the fact that residuals from a time-series model are typically autocorrelated, that the test set is not a random sample but a held-out future, and that backtesting is the dominant validation technique. The conceptual link is that both lectures take a model's predictions and reduce them to a small set of numbers a model committee can argue about.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>A binary classifier on a test set of 6,517 observations produces TP = 539, FP = 245, FN = 906, TN = 4,827. Compute accuracy, precision, recall, specificity, and F1 to three decimal places, and state which of the five is most misleading on this data and why.</li>
+      <li>State the formula for the Gini coefficient in terms of AUC, and give the probabilistic interpretation of AUC. Why is Gini preferred over AUC in credit-risk reporting, even though they carry the same information?</li>
+      <li>A new PD model has Gini 0.78 versus an incumbent at 0.62, but its predicted probabilities are systematically 1.7 times the realised default rate across every risk grade. Should the new model be approved, and what additional step would let it pass validation?</li>
+      <li>You are setting the cut-off on a retail underwriting scorecard where the cost of a false negative (charged-off loan) is approximately 25 times the cost of a false positive (lost good customer). Write the expression for the cost-weighted threshold and explain why the resulting threshold will be below 0.5.</li>
+      <li>A fraud-detection model with a 0.1 per cent positive class reports ROC AUC of 0.95 and PR-AUC of 0.18. Reconcile the two numbers and state which is more informative for the operational decision.</li>
+      <li>A logistic-regression PD model has an excellent ROC AUC but the reliability diagram shows the lowest decile under-predicts default rate by a factor of two. What recalibration technique would you apply, and would it change the model's AUC?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 38 (<a href="04-forecasting_evaluation.html">forecasting evaluation</a>) extends the assessment toolkit to time-series predictions, where residual autocorrelation and backtesting replace the iid assumption that the metrics in this lecture quietly relied on.</li>
+      <li><strong>Previous:</strong> Lecture 36 (<a href="02-regression_diagnostics.html">regression diagnostics</a>) covered the regression half of model evaluation (residual analysis, MSE, RMSE, MAE, R-squared, AIC, BIC); together with this lecture it spans the supervised-learning evaluation surface.</li>
+      <li><strong>Prerequisite:</strong> Statistics lecture 3 (<a href="../../statistics/03-inferential_statistics.html">inferential statistics</a>) introduced type I and type II error rates in hypothesis testing; the false positive rate and false negative rate of a classifier are the same quantities in a different vocabulary.</li>
+      <li><strong>Algorithm context:</strong> Every classifier in sub-module 03, from <a href="../03_supervised_learning/01-k_nearest_neighbours.html">k-nearest neighbours</a> to <a href="../03_supervised_learning/05-ensemble_learning.html">ensemble learning</a>, returns predicted probabilities that feed straight into the metrics here; nothing in this lecture depends on which algorithm produced them.</li>
+      <li><strong>Outside this course:</strong> Gini is the universal scorecard summary in credit risk. The A-IRB lifecycle in <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/15-pd_testing.html">application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/06_testing/</a> develops Gini bands, calibration tests, and stability metrics in the regulatory documentation form that ECB, PRA, and Bank of England supervisors expect.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Model evaluation course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 37 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

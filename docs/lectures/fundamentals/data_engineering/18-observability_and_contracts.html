@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 18: observability, lineage, and data contracts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Observability, lineage, and data contracts</h1>
+  <p class="subtitle">A blood test tells you whether one quantity was in range at one moment. A bedside monitor tells you that the heart rate has been climbing for twenty minutes, which no single test would have caught. Validation is the blood test. This lecture is the monitor, plus the notes at the end of the bed saying who is responsible and what was agreed.</p>
+  <div class="meta">
+    <span>Lecture 18 of 20</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part V: the undercurrents</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Data observability</strong> is the practice of knowing the state of your data continuously rather than at the moment a test ran. It rests on five pillars: <strong>freshness</strong>, when did this last update; <strong>volume</strong>, how much arrived compared with normal; <strong>schema</strong>, has the shape changed; <strong>distribution</strong>, do the values still look like themselves; and <strong>lineage</strong>, what does this depend on and what depends on it.</p>
+
+  <p>The first four are monitors over quantities you are already measuring if you followed Lecture 16, which is why persisting measured values rather than verdicts mattered. The fifth is different in kind: lineage is a graph, and its value is in the two questions it answers instantly and no amount of monitoring answers at all. When something breaks, what is affected downstream? When a number is wrong, where upstream did it come from?</p>
+
+  <p>A <strong>data contract</strong> then makes the expectations explicit between the team that produces a dataset and the teams that consume it: the schema, the meaning of each field, the freshness and completeness commitments, the ownership, and the policy for making a breaking change. It converts an implicit assumption that breaks silently into a stated agreement that can be tested in continuous integration.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A patient has a blood test on admission: everything in range, discharge them. A different patient is on a monitor: every individual reading is within range, but the trend over an hour is unmistakable and somebody intervenes before anything is out of range at all. Data platforms almost universally run the blood test and almost universally lack the monitor. The failures that hurt are trends, not thresholds: a table that has been arriving four hours later each week, a source that has been quietly shedding two per cent of rows a month.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Alert fatigue is the failure mode of this lecture</span>
+    A platform that alerts on everything trains its owners to ignore alerts, at which point it is worse than one that alerts on nothing, because the false confidence is expensive. Two rules keep it usable. Every alert names an owner and an action; if you cannot say who acts and what they do, it is a dashboard entry rather than an alert. And every alert that fires without action being needed is a bug in the monitor, to be fixed by adjusting the threshold or removing the check, not by muting it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Nobody tells you the source changed.</strong> A team upstream renames a column, adds a status code, changes the meaning of a flag, or moves from a nightly to a twice-daily extract. None of these arrive as a notification, because from their side it is an improvement to their system. Schema monitoring catches the structural ones on the day they happen; distributional monitoring catches the semantic ones, which are worse because the structure is unchanged and only the meaning moved. A contract is what makes the notification obligatory rather than optional.</p>
+
+  <p><strong>Detection time dominates incident cost.</strong> A pipeline defect found the same day affects one partition and one set of reports that have not yet been circulated. The same defect found at quarter end affects three months of published figures and a supervisory submission. Nothing else in incident management moves the cost as much as the interval between breaking and knowing, which is precisely what monitoring compresses.</p>
+
+  <p><strong>Lineage turns two expensive questions into queries.</strong> "What breaks if I change this column?" and "where does this number come from?" are asked constantly, and answered in most organisations by asking around. With column-level lineage they are graph traversals. For a bank there is a third: BCBS 239 expects a demonstrable path from a reported risk figure back to its source systems, and a lineage graph derived from the code is that path, maintained automatically rather than documented annually.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The five pillars of data observability">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Four things to watch over time, and one graph to consult when they move</text>
+
+      <!-- freshness -->
+      <rect x="30" y="38" width="165" height="130" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="112" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">FRESHNESS</text>
+      <text x="112" y="74" text-anchor="middle" font-family="Inter" font-size="8" fill="#0d9488">when did it last update?</text>
+      <polyline points="46,140 66,138 86,141 106,139 126,142 146,152 166,158 180,160"
+                fill="none" stroke="#0d9488" stroke-width="2"/>
+      <line x1="46" y1="148" x2="180" y2="148" stroke="#DC2855" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="112" y="102" text-anchor="middle" font-family="Inter" font-size="8" fill="#DC2855">arriving later each week:</text>
+      <text x="112" y="114" text-anchor="middle" font-family="Inter" font-size="8" fill="#DC2855">no single day breaches</text>
+      <text x="112" y="126" text-anchor="middle" font-family="Inter" font-size="8" fill="#DC2855">the SLA, the trend does</text>
+
+      <!-- volume -->
+      <rect x="205" y="38" width="165" height="130" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="287" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">VOLUME</text>
+      <text x="287" y="74" text-anchor="middle" font-family="Inter" font-size="8" fill="#b45309">how many rows arrived?</text>
+      <g fill="#b45309">
+        <rect x="222" y="118" width="12" height="42"/><rect x="238" y="116" width="12" height="44"/>
+        <rect x="254" y="120" width="12" height="40"/><rect x="270" y="117" width="12" height="43"/>
+        <rect x="286" y="119" width="12" height="41"/><rect x="302" y="118" width="12" height="42"/>
+        <rect x="318" y="140" width="12" height="20" fill="#DC2855"/>
+        <rect x="334" y="142" width="12" height="18" fill="#DC2855"/>
+      </g>
+      <text x="287" y="102" text-anchor="middle" font-family="Inter" font-size="8" fill="#DC2855">a step change, not noise:</text>
+      <text x="287" y="112" text-anchor="middle" font-family="Inter" font-size="8" fill="#DC2855">a filter changed upstream</text>
+
+      <!-- schema -->
+      <rect x="380" y="38" width="165" height="130" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="462" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">SCHEMA</text>
+      <text x="462" y="74" text-anchor="middle" font-family="Inter" font-size="8" fill="#7c3aed">has the shape changed?</text>
+      <g font-family="JetBrains Mono" font-size="8" fill="#5b21b6">
+        <text x="394" y="98">+ forbearance_reason</text>
+        <text x="394" y="112" fill="#1E9D54">  additive: log it</text>
+        <text x="394" y="130">~ arrears: INT -&gt; VARCHAR</text>
+        <text x="394" y="144" fill="#DC2855">  breaking: stop</text>
+        <text x="394" y="158" fill="#DC2855">- default_date REMOVED</text>
+      </g>
+
+      <!-- distribution -->
+      <rect x="555" y="38" width="175" height="130" rx="10" fill="#FEF3C7" stroke="#a16207" stroke-width="2"/>
+      <text x="642" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">DISTRIBUTION</text>
+      <text x="642" y="74" text-anchor="middle" font-family="Inter" font-size="8" fill="#a16207">do values look the same?</text>
+      <path d="M 572 158 Q 600 92 628 158" fill="none" stroke="#a16207" stroke-width="2"/>
+      <path d="M 610 158 Q 645 104 680 158" fill="none" stroke="#DC2855" stroke-width="2" stroke-dasharray="4 3"/>
+      <text x="642" y="98" text-anchor="middle" font-family="Inter" font-size="8" fill="#DC2855">structure unchanged,</text>
+      <text x="642" y="110" text-anchor="middle" font-family="Inter" font-size="8" fill="#DC2855">meaning shifted: the</text>
+      <text x="642" y="122" text-anchor="middle" font-family="Inter" font-size="8" fill="#DC2855">worst kind of change</text>
+
+      <!-- lineage -->
+      <rect x="30" y="186" width="700" height="180" rx="10" fill="#F4F4F5" stroke="#52525b" stroke-width="2"/>
+      <text x="380" y="208" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#27272a">LINEAGE: THE FIFTH PILLAR IS A GRAPH, NOT A TIME SERIES</text>
+
+      <g font-family="Inter" font-size="8">
+        <rect x="60" y="226" width="90" height="26" rx="5" fill="#ffffff" stroke="#52525b"/>
+        <text x="105" y="243" text-anchor="middle" fill="#27272a">core.payments</text>
+        <rect x="60" y="264" width="90" height="26" rx="5" fill="#ffffff" stroke="#52525b"/>
+        <text x="105" y="281" text-anchor="middle" fill="#27272a">coll.arrears</text>
+
+        <rect x="200" y="245" width="100" height="26" rx="5" fill="#FEE2E2" stroke="#DC2855" stroke-width="2"/>
+        <text x="250" y="262" text-anchor="middle" font-weight="700" fill="#991b1b">int_default_flag</text>
+
+        <rect x="350" y="208" width="110" height="26" rx="5" fill="#FEE2E2" stroke="#DC2855"/>
+        <text x="405" y="225" text-anchor="middle" fill="#991b1b">fact_account_month</text>
+        <rect x="350" y="245" width="110" height="26" rx="5" fill="#FEE2E2" stroke="#DC2855"/>
+        <text x="405" y="262" text-anchor="middle" fill="#991b1b">pd_observation_set</text>
+        <rect x="350" y="282" width="110" height="26" rx="5" fill="#FEE2E2" stroke="#DC2855"/>
+        <text x="405" y="299" text-anchor="middle" fill="#991b1b">ifrs9_staging_input</text>
+
+        <rect x="510" y="208" width="100" height="26" rx="5" fill="#FEE2E2" stroke="#DC2855"/>
+        <text x="560" y="225" text-anchor="middle" fill="#991b1b">capital return</text>
+        <rect x="510" y="245" width="100" height="26" rx="5" fill="#FEE2E2" stroke="#DC2855"/>
+        <text x="560" y="262" text-anchor="middle" fill="#991b1b">PD model build</text>
+        <rect x="510" y="282" width="100" height="26" rx="5" fill="#FEE2E2" stroke="#DC2855"/>
+        <text x="560" y="299" text-anchor="middle" fill="#991b1b">ECL run</text>
+
+        <g stroke="#a1a1aa" stroke-width="1">
+          <line x1="152" y1="239" x2="198" y2="252"/>
+          <line x1="152" y1="277" x2="198" y2="262"/>
+          <line x1="302" y1="255" x2="348" y2="221"/>
+          <line x1="302" y1="258" x2="348" y2="258"/>
+          <line x1="302" y1="262" x2="348" y2="295"/>
+          <line x1="462" y1="221" x2="508" y2="221"/>
+          <line x1="462" y1="258" x2="508" y2="258"/>
+          <line x1="462" y1="295" x2="508" y2="295"/>
+        </g>
+      </g>
+
+      <text x="640" y="330" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#991b1b">blast radius</text>
+      <text x="380" y="330" text-anchor="middle" font-family="Inter" font-size="9" fill="#3f3f46">int_default_flag fails its check. Everything in red is affected, and you know it in one second,</text>
+      <text x="380" y="344" text-anchor="middle" font-family="Inter" font-size="9" fill="#3f3f46">including that a regulatory return and two model builds are downstream. Traversed the other way,</text>
+      <text x="380" y="358" text-anchor="middle" font-family="Inter" font-size="9" fill="#3f3f46">the same graph is the BCBS 239 path from a reported figure back to its source systems.</text>
+    </svg>
+    <figcaption>The five pillars. The first four are time series over quantities you already compute; the freshness and distribution panels show why trends matter more than thresholds. Lineage is qualitatively different: it answers impact and provenance, and it is the pillar that turns an incident from an investigation into a notification list.</figcaption>
+  </figure>
+
+  <h3>What to monitor, and how to set the threshold</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Monitor</th><th>Signal</th><th>Setting the threshold</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Freshness</strong></td><td>Time since last successful materialisation, per partition</td><td>From the contract's commitment, plus a trend alert on the arrival time itself</td></tr>
+      <tr><td><strong>Volume</strong></td><td>Row count, and count of distinct keys</td><td>From observed variation over at least a year, respecting seasonality; state the basis</td></tr>
+      <tr><td><strong>Schema</strong></td><td>Column set, types, nullability, compared with the stored expectation</td><td>Binary, with a classification: additive changes log, breaking changes stop</td></tr>
+      <tr><td><strong>Distribution</strong></td><td>Null rate, mean, quantiles, category mix, population stability index</td><td>From backtesting the metric on history: pick the level that would have fired on real incidents and not otherwise</td></tr>
+      <tr><td><strong>Reconciliation</strong></td><td>Difference from an independent source</td><td>The finance function's materiality, which already exists; do not invent your own</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The method in the right-hand column deserves stating generally, because it is what separates monitors that work from monitors that get muted: derive every threshold from history, and validate it by asking whether it would have fired on the incidents you know about and stayed quiet otherwise. A threshold invented at design time is a guess, and a guess that fires spuriously will be disabled within a month.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Lineage: three levels, and where it comes from</h3>
+
+  <p><strong>Table-level</strong> lineage says <code>fact_account_month</code> depends on <code>stg_loans</code>. <strong>Column-level</strong> lineage says <code>fact_account_month.in_default</code> derives from <code>stg_loans.arrears_months</code> and <code>stg_loans.unlikely_to_pay</code>. <strong>Row-level</strong> lineage would identify which input rows produced a given output row, and is rarely available or affordable outside specific engines.</p>
+
+  <p>Column-level is the level worth investing in, because it is where the questions live: whether a specific reported figure depends on a specific source field, and what breaks if that field changes. Three sources supply it. The transformation tool derives it from the SQL, which is what Lecture 15's generated documentation provides for free within the project. <strong>OpenLineage</strong> is an open standard for emitting lineage events from jobs, so that Airflow, Spark, dbt, and others can populate one graph. And the catalogue stitches those together into an estate-wide view, which is where a bank's lineage requirement is actually satisfied, because a single tool's graph stops at its own boundary.</p>
+
+  <p>The trap to avoid is hand-maintained lineage. A lineage document that a human updates is wrong within a quarter and is worse than nothing, because it is trusted. Derive it from code and from runtime events, and accept coverage gaps where you cannot, marking them explicitly as gaps rather than leaving the graph looking complete.</p>
+
+  <h3>The data contract</h3>
+
+  <p>A contract is a specification of a dataset as an interface, owned by the producer and relied on by named consumers. It is usually a YAML file in the producer's repository, checked in continuous integration, so that a change breaching it fails a build rather than a consumer's overnight job.</p>
+
+  <pre><code>dataset: core_banking.account_snapshots
+version: 2.1.0
+owner:
+  team: core-banking-data
+  contact: "#core-banking-data"          # a channel, not a person who may leave
+  escalation: head-of-banking-platform
+consumers:                                # named, so breaking changes have an audience
+  - team: credit-risk-modelling
+    use: PD and LGD model datasets
+  - team: finance
+    use: IFRS 9 impairment run
+  - team: regulatory-reporting
+    use: COREP credit risk templates
+
+schema:
+  - name: account_id
+    type: varchar
+    nullable: false
+    description: Account identifier, stable across the account's life, not reused after closure.
+  - name: reporting_date
+    type: date
+    nullable: false
+    description: Calendar month end to which this row refers.
+  - name: arrears_months
+    type: integer
+    nullable: false
+    range: [0, 120]
+    description: >
+      Count of complete unpaid contractual monthly instalments as at reporting_date,
+      calculated on a materiality threshold of 1% of the instalment. Cures reset to zero.
+  - name: default_date
+    type: date
+    nullable: true
+    description: >
+      Date the account first met the regulatory default definition (90 days past due or
+      unlikely to pay). Null when the account has never defaulted. Not cleared on cure.
+
+semantics:
+  grain: One row per account_id per reporting_date, for accounts open at any point in the month.
+  default_definition: CRR Article 178, as implemented in int_default_flag v3.
+  currency: Amounts in account currency; see currency column. No conversion applied.
+
+guarantees:
+  freshness: Partition available by 01:00 on the fourth business day after month end.
+  completeness: Row count within 3% of trailing 12-month average, or an explanation provided.
+  reconciliation: Total balance ties to general ledger within GBP 1,000 per legal entity.
+  retention: 10 years of monthly partitions, immutable once published.
+  restatement_window: Trailing 3 months may be restated; older partitions frozen.
+
+change_policy:
+  additive: New nullable columns may be added with 5 working days notice.
+  breaking: >
+    Removing a column, narrowing a type, or changing a documented definition requires a major
+    version bump, 30 days notice to all named consumers, and a parallel-run period of one month.
+  enforcement: Contract tested in CI on every producer change; breach fails the build.</code></pre>
+
+  <p>Read the sections in order of how often they are omitted. The <strong>schema</strong> is what everyone writes. The <strong>semantics</strong> are what almost nobody writes and what actually causes disputes: the grain in one sentence, the definition of the awkward fields, and what has and has not been converted. The <strong>guarantees</strong> turn assumptions into commitments that can be monitored, and each one maps directly to a monitor from the table above. And the <strong>change policy</strong> is the section that prevents the most common incident in this lecture, because it makes notification an obligation with a notice period rather than a courtesy.</p>
+
+  <div class="callout insight">
+    <span class="tag">The definition belongs in the contract, not just the code</span>
+    Notice that <code>arrears_months</code> in the contract above does not merely have a type and a range; it has the materiality threshold and the cure behaviour written out. That is the field where two teams will otherwise disagree, and the disagreement will be discovered during model validation rather than during design. A contract that specifies types without specifying meaning prevents structural breakage and permits semantic breakage, which is the more expensive kind. Where the definition is complex, reference the implementing model by name and version, as the <code>default_definition</code> line does, so there is exactly one place to read the truth.
+  </div>
+
+  <h3>Incident management, briefly</h3>
+
+  <p>Monitors produce incidents, and incidents need a process or they produce only anxiety. Four elements suffice for a risk platform. An <strong>owner</strong> per dataset, recorded in the contract, so there is never a question of who investigates. A <strong>blast radius</strong> from the lineage graph, so the notification list is derived rather than guessed. A <strong>runbook</strong> per pipeline, from Lecture 17. And a short <strong>post-incident note</strong> recording what happened, what the detection interval was, and what change would have caught it sooner. That last item is what turns a monitoring platform into an improving one, and the detection interval is the metric worth tracking over time, because it is the one that determines cost.</p>
+
+  <div class="worked">
+    <strong>Worked example: the source adds a status code, and nobody says anything</strong>
+    <p>What happens with and without the apparatus in this lecture, given a real and unremarkable change: the collections system adds a new value, <code>PENDING_REVIEW</code>, to a status field, and starts assigning it to accounts that were previously coded <code>IN_ARREARS</code> while a forbearance application is assessed. From the collections team's point of view this is a small improvement to their workflow. Nobody informs the risk function.</p>
+    <p><em>Without monitoring or a contract.</em> The extract still loads: the column is still a string, the row count is unchanged, and every validity check passes because the check on that column was written as "not null". The transformation that derives arrears status treats the unrecognised value as not in arrears, because the <code>CASE</code> expression has no branch for it and falls to <code>ELSE</code>. Roughly two thousand accounts silently leave the arrears population. The monthly default rate falls by four basis points, which looks like good news. It is discovered eleven weeks later when a portfolio analyst asks why early arrears volumes dropped, and by then three monthly submissions have used the figure.</p>
+    <p><em>With a schema monitor only.</em> Nothing fires. The schema did not change; only the set of values within a column did. This is the case that makes distributional monitoring necessary rather than optional, and it is worth sitting with, because most teams that adopt observability adopt the schema monitor first and assume they are covered.</p>
+    <p><em>With distributional monitoring.</em> The category mix monitor on the status field fires the morning after the first affected extract: a value never previously seen now accounts for 0.1 per cent of rows, and the share of <code>IN_ARREARS</code> has fallen correspondingly. The population stability index on the arrears distribution also moves. Detection interval: one day. The affected partition has not yet been published, because the check is a blocking node per Lecture 17, so nothing downstream is contaminated.</p>
+    <p><em>With lineage.</em> The owner opens the graph and sees the blast radius: the risk mart, the PD observation dataset, the IFRS 9 staging input, and downstream of those, the capital return and the ECL run. The notification list is derived rather than assembled from memory, and the message to the collections team can state precisely which regulatory outputs their change affects, which is considerably more persuasive than a request to be told about changes in general.</p>
+    <p><em>With a contract.</em> The strongest position. The contract enumerated the accepted values of the status field, and the collections team's own continuous integration failed when they added a value not in the contract, before their change reached production. The conversation happens at design time, with the risk function's requirement visible: either the new status maps to an existing arrears treatment, or the definition of arrears must change deliberately, and the change policy gives thirty days and a parallel run to do it properly. Detection interval: negative. The incident does not occur.</p>
+    <p><em>What this example is really about.</em> Every level of the apparatus reduces the detection interval by roughly an order of magnitude, and the cost of the incident falls with it. The contract is the only intervention that prevents rather than detects, and it is the only one that requires an agreement with another team rather than an engineering change of your own. That is why contracts are the hardest of these to implement and the most valuable: the technical part is a YAML file and a continuous integration check, and the difficult part is the organisational conversation about who owes what to whom. In a bank, the BCBS 239 requirement that risk data be complete, accurate, and timely is a useful lever in that conversation, because it makes the requirement somebody's obligation rather than the risk team's preference.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Observability watches four quantities over time, freshness, volume, schema, and distribution, and consults a fifth thing, the lineage graph, when one of them moves. Thresholds come from history and are validated against known incidents, not invented at design time. Lineage must be derived from code and runtime events rather than maintained by hand, and column-level is the level that answers the questions people actually ask. A data contract states schema, semantics, guarantees, and change policy, and it is the only measure here that prevents incidents instead of detecting them. Distribution monitoring is the pillar that catches the semantic changes a schema monitor cannot see, which is the class of failure that costs the most.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the five pillars and say which one is a graph rather than a time series.</li>
+      <li>Give a change that a schema monitor misses entirely and a distribution monitor catches.</li>
+      <li>How should a monitoring threshold be derived, and how do you validate it before deploying it?</li>
+      <li>Distinguish table-level from column-level lineage, and say which two questions the latter answers.</li>
+      <li>Why is hand-maintained lineage worse than no lineage?</li>
+      <li>List the four sections of a data contract and say which is most often omitted and most often disputed.</li>
+      <li>What makes a contract qualitatively different from the other four pillars?</li>
+      <li>Which metric best predicts the cost of a data incident, and what compresses it?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="16-data_quality.html">Lecture 16</a> produced the measured values these monitors trend, and <a href="17-orchestration.html">Lecture 17</a> is what runs them and blocks on failure.</li>
+      <li><strong>Next:</strong> <a href="19-governance_and_privacy.html">Lecture 19</a> covers the other half of stewardship: who may see the data, how long it is kept, and how that is proven.</li>
+      <li><strong>Cross-link:</strong> the generated lineage graph comes from <a href="15-dbt_analytics_engineering.html">Lecture 15</a>; the restatement window and freshness commitments originate in <a href="10-batch_ingestion.html">Lecture 10</a>; the definitions referenced in a contract are declared in <a href="04-sql_definitions.html">Lecture 04</a>.</li>
+      <li><strong>Banking link:</strong> the population stability index used as a distribution monitor is the same instrument as scorecard monitoring in the <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">credit risk</a> track, and the lineage graph is the practical form of the BCBS 239 aggregation and reporting expectation.</li>
+      <li><strong>Further reading:</strong> the OpenLineage specification; Moses, Gavish, and Vorwerck's <em>Data Quality Fundamentals</em> for the observability framing; the Google SRE book on alerting philosophy, which transfers directly.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 18 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

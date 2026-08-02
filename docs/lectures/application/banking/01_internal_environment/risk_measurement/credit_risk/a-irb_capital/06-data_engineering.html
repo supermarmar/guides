@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A-IRB data engineering: sourcing and quality assessment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Data engineering: sourcing and quality assessment</h1>
+  <p class="subtitle">Lifecycle stage 1. Where the model gets its data, how that data is quality-checked, and how raw transaction tables become the cleaned consolidated dataset (CCD) and model-ready dataset (MRD) every downstream lecture builds on. Worked examples on the Kaggle Home Credit dataset are referenced inline.</p>
+  <div class="meta">
+    <span>A-IRB 6 of n</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Source: <code>docs/wiki/.../a-irb_capital/02_data_engineering/01-data_sourcing.md</code> + <code>02-dqa.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Every IRB model is built on top of a model-ready dataset (MRD), and every MRD is built on top of a cleaned consolidated dataset (CCD). Data engineering is the discipline that gets you from raw source-system tables to the MRD without losing accuracy, completeness or lineage along the way. The principle is BCBS 239: the bank's risk data aggregation must be governed, accurate, complete, timely, adaptable, comprehensive, distributed and reviewed. The Standard's 14 principles are not optional; they are the criteria the supervisor uses to assess whether the data layer underpinning the model is fit for purpose.</p>
+
+  <p>Two data streams feed every retail credit model. The <strong>internal</strong> stream comprises month-end financials (delinquency, balances, limits), transactional records (payments, drawings) and collections data (recovery flows, write-offs). The <strong>external</strong> stream brings credit-bureau scores, application-form attributes and, where the standardised approach is in scope, external ratings. Internal data is preferred because of its alignment with the bank's portfolio and definition of default; external data fills the gaps where internal is unavailable or insufficient. Both streams flow through the same six-dimension data-quality assessment (completeness, accuracy, consistency, timeliness, uniqueness, robustness) before being merged.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The reason data engineering exists as a separate lifecycle stage is that the modelling team and the source-system team work at different time scales. The source systems change daily (new products, new fields, new schema versions). The model lives for years. The data engineering layer is the buffer that absorbs the source-system churn so the model itself only sees a stable, documented, reconciled MRD. If that buffer is missing, every source-system change risks invalidating the model.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Bad data does more damage than bad modelling. A model that is mathematically optimal on a contaminated dataset will outperform on the development sample and degrade catastrophically in production. The classic failure pattern: a payment-allocation field changes definition between two source-system releases, the data-engineering layer fails to detect the change, and the PD model trained on the old definition is silently miscalibrated for two years until the divergence becomes obvious in the back-testing.</p>
+
+  <p>The regulator knows this. BCBS 239 was published in 2013 explicitly because risk-data quality failures were a recurring theme in post-crisis investigations. The PRA's SS3/24 inherits the same expectations and translates them into testable controls. Supervisors at SREP routinely ask to see the data-quality report for the IRB MRD as their first piece of evidence; the model documentation comes second.</p>
+
+  <p>For F107 the data engineering stage is the answer to "describe the data requirements for an A-IRB model". The expected answer is the six dimensions of data quality, the internal-versus-external split, the BCBS 239 alignment, and the lineage from source-system through CCD to MRD. Each piece is testable.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The data layer is best pictured as a pipeline with three checkpoints. Raw source-system data enters at the left, the cleaned consolidated dataset is constructed in the middle, and the model-ready dataset emerges on the right. At each checkpoint a data-quality assessment runs, and any failure stops the data progressing. The diagram below traces the path.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The data engineering pipeline">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">From source systems to the model-ready dataset</text>
+
+      <!-- Source systems on the left -->
+      <g>
+        <rect x="40" y="60" width="170" height="60" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="125" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Internal sources</text>
+        <text x="125" y="96" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">month-end financials,</text>
+        <text x="125" y="108" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">transactions, collections</text>
+
+        <rect x="40" y="140" width="170" height="60" fill="#fef9c3" stroke="#92400e"/>
+        <text x="125" y="160" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">External sources</text>
+        <text x="125" y="176" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">bureau, application form,</text>
+        <text x="125" y="188" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">ratings agencies</text>
+      </g>
+
+      <!-- Arrows to CCD -->
+      <path d="M 210 90 L 320 130" fill="none" stroke="#475569" stroke-width="1.3"/>
+      <polygon points="320,130 313,127 316,134" fill="#475569"/>
+      <path d="M 210 170 L 320 150" fill="none" stroke="#475569" stroke-width="1.3"/>
+      <polygon points="320,150 313,147 316,154" fill="#475569"/>
+
+      <!-- DQA gate 1 -->
+      <g>
+        <rect x="245" y="220" width="120" height="36" fill="#fee2e2" stroke="#991b1b"/>
+        <text x="305" y="238" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">DQA gate 1</text>
+        <text x="305" y="250" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">on raw data</text>
+      </g>
+
+      <!-- CCD -->
+      <g>
+        <rect x="330" y="120" width="160" height="80" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.5"/>
+        <text x="410" y="145" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">CCD</text>
+        <text x="410" y="162" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">cleaned consolidated</text>
+        <text x="410" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">dataset</text>
+        <text x="410" y="190" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">(reconciled to GL)</text>
+      </g>
+
+      <!-- DQA gate 2 -->
+      <g>
+        <rect x="510" y="220" width="120" height="36" fill="#fee2e2" stroke="#991b1b"/>
+        <text x="570" y="238" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">DQA gate 2</text>
+        <text x="570" y="250" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">on CCD</text>
+      </g>
+
+      <!-- Wrangling / variable engineering box -->
+      <g>
+        <rect x="510" y="120" width="160" height="80" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="590" y="142" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Wrangling</text>
+        <text x="590" y="158" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">indicator construction,</text>
+        <text x="590" y="170" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">target variables,</text>
+        <text x="590" y="182" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">eligibility filters</text>
+      </g>
+
+      <!-- MRD -->
+      <g>
+        <rect x="700" y="120" width="160" height="80" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.5"/>
+        <text x="780" y="145" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">MRD</text>
+        <text x="780" y="162" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">model-ready dataset</text>
+        <text x="780" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">(feeds PD / LGD / EAD</text>
+        <text x="780" y="186" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">development)</text>
+      </g>
+
+      <!-- DQA gate 3 -->
+      <g>
+        <rect x="700" y="220" width="120" height="36" fill="#fee2e2" stroke="#991b1b"/>
+        <text x="760" y="238" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">DQA gate 3</text>
+        <text x="760" y="250" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">on MRD</text>
+      </g>
+
+      <!-- Arrows -->
+      <path d="M 490 160 L 510 160" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="510,160 504,157 504,163" fill="#475569"/>
+
+      <path d="M 670 160 L 700 160" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="700,160 694,157 694,163" fill="#475569"/>
+
+      <!-- DQA gate arrows (dotted upward) -->
+      <line x1="305" y1="220" x2="305" y2="200" stroke="#991b1b" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="570" y1="220" x2="570" y2="200" stroke="#991b1b" stroke-width="1" stroke-dasharray="3,3"/>
+      <line x1="760" y1="220" x2="760" y2="200" stroke="#991b1b" stroke-width="1" stroke-dasharray="3,3"/>
+
+      <!-- DQA dimension labels at bottom -->
+      <g font-family="Inter" font-size="10" fill="#475569">
+        <text x="450" y="295" text-anchor="middle" font-weight="700">Six dimensions checked at every gate</text>
+        <text x="60" y="320">Completeness: % non-null per field</text>
+        <text x="60" y="335">Accuracy: matches source / expected distribution</text>
+        <text x="60" y="350">Consistency: definitions stable across time</text>
+        <text x="460" y="320">Timeliness: data available within processing window</text>
+        <text x="460" y="335">Uniqueness: primary key has no duplicates</text>
+        <text x="460" y="350">Robustness: reusable, auditable, reproducible</text>
+      </g>
+    </svg>
+    <figcaption>Source-system data flows through two reconciliation and wrangling steps before reaching the model-ready dataset. Each of the three checkpoints (raw, CCD, MRD) is subject to the same six-dimension data-quality assessment. A failure at any gate stops the pipeline and triggers remediation.</figcaption>
+  </figure>
+
+  <p>The three artefacts to fix in mind are <strong>raw source data</strong> (whatever the operational system happens to produce), the <strong>CCD</strong> (reconciled to the general ledger, schema-validated, with consistent definitions of default, balance and limit), and the <strong>MRD</strong> (the CCD plus engineered features such as DPD buckets, default and cure indicators, 12-month outcome flags, vintage labels and segmentation tags). Each downstream lecture in this track operates on the MRD.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Internal data sources</h3>
+
+  <p>Internal data is preferred for IRB because of its alignment with the bank's portfolio, its accuracy (the bank controls the source system) and its reflection of the bank's operating definition of default. Three categories dominate:</p>
+
+  <ul>
+    <li><strong>Month-end financial data</strong>. The foundation of any retail PD or EAD model. Captures delinquency (DPD, months in arrears, delinquency stage), outstanding balances, and credit limits. The DPD field is the workhorse of the 90-DPD default trigger; the balance and limit fields feed EAD and utilisation features.</li>
+    <li><strong>Transactional data</strong>. Individual payment and drawing records. Useful for behavioural feature engineering (payment regularity, ATM vs POS usage patterns, payment-to-minimum-due ratios) that distinguish transactor from revolver behaviour.</li>
+    <li><strong>Collections data</strong>. Recovery cash flows, contact attempts, settlement and write-off events. Essential for LGD modelling and for the cure / no-cure distinction in the LGD risk-differentiation step.</li>
+  </ul>
+
+  <h3>External data sources</h3>
+
+  <p>External data fills the gaps where internal is unavailable or insufficient, and provides independent validation:</p>
+
+  <ul>
+    <li><strong>Application data</strong>. Information collected at origination: income, employment, residential history, assets, liabilities. The starting point for application scoring (covered later in its own track).</li>
+    <li><strong>Credit bureau data</strong>. External credit scores, full credit history across other lenders, payment behaviour, recent enquiries. The single most powerful retail PD driver in most jurisdictions, and the natural cross-check on internal data quality.</li>
+    <li><strong>Ratings agency data</strong>. Used mainly under the standardised approach for non-retail exposures. Less relevant for A-IRB retail but important context for wholesale work.</li>
+  </ul>
+
+  <h3>BCBS 239 in 14 principles</h3>
+
+  <p>The Basel Committee's "Principles for effective risk data aggregation and risk reporting" sets 14 principles, of which the first eleven apply to banks and the final three apply to supervisors. The bank-facing principles are:</p>
+
+  <ol>
+    <li><strong>Governance</strong>. The bank's governance structure must own risk-data aggregation and reporting capabilities.</li>
+    <li><strong>Data architecture and IT infrastructure</strong>. Must support aggregation and reporting at the required granularity and frequency.</li>
+    <li><strong>Accuracy and integrity</strong>. Output from aggregation must be reliable and reconciled.</li>
+    <li><strong>Completeness</strong>. All material risks, business lines, geographies and asset classes captured.</li>
+    <li><strong>Timeliness</strong>. Aggregation and reporting deliver up-to-date information within agreed processing windows.</li>
+    <li><strong>Adaptability</strong>. Capabilities are flexible enough to meet ad-hoc, stress and supervisory requests.</li>
+    <li><strong>Accuracy (of reporting)</strong>. Reports are reconciled and verified before distribution.</li>
+    <li><strong>Comprehensiveness</strong>. Reporting is consistent with the bank's size and complexity.</li>
+    <li><strong>Clarity and usefulness</strong>. Reports facilitate decision-making.</li>
+    <li><strong>Frequency</strong>. Set by senior stakeholders, reflecting the underlying risk dynamics.</li>
+    <li><strong>Distribution</strong>. Reports go only to those who need them.</li>
+  </ol>
+
+  <p>The three supervisor-facing principles (12 review, 13 remedial actions, 14 home-host co-operation) describe how supervisors enforce the bank-facing principles. The 14 principles together are the regulator's checklist when assessing the data layer.</p>
+
+  <h3>The six dimensions of data quality</h3>
+
+  <p>The DQA process tests six dimensions of data quality at each pipeline checkpoint. They map onto BCBS 239 principles 3, 4 and 5 plus operational concerns.</p>
+
+  <table>
+    <thead>
+      <tr><th>Dimension</th><th>Test</th><th>Worked example</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Completeness</td><td>Proportion of non-null values per field; presence of all required fields</td><td>Identifier columns and primary monetary fields (balance, credit limit, total payment) typically run at 100%; optional behavioural fields (channel-specific drawings, minimum-payment-due) often sit at 80 to 95%. Anything below 100% is investigated against source and either imputed with a documented rationale or recorded in the limitations register.</td></tr>
+      <tr><td>Accuracy</td><td>Conformance to source; observed distributions match expected; type validation</td><td>Schema validation against a typed contract (declared dtypes and value constraints) catches type-coercion failures, out-of-range values and unexpected categorical levels. The common failure mode is null values blocking integer casting on optional count fields; resolved by imputing (typically zero where null encodes "no activity") and revalidating.</td></tr>
+      <tr><td>Consistency</td><td>Field definitions stable across time and tables</td><td>Definition of default unchanged over development window; balance fields equal across general ledger and source system at each month-end snapshot.</td></tr>
+      <tr><td>Timeliness</td><td>Data available within agreed processing windows</td><td>Bureau data load completes by day 5 of each month; month-end financial data refreshed within 48 hours of period close.</td></tr>
+      <tr><td>Uniqueness</td><td>Primary key has no duplicates</td><td>The natural composite key for a monthly snapshot table is (obligor_id, facility_id, snapshot_month). Duplicates fail the gate and are resolved by deduplication (keep first occurrence) with the source of duplication investigated.</td></tr>
+      <tr><td>Robustness</td><td>Reusable, auditable at every step; reproducible from source</td><td>Pipeline scripts versioned; each transformation logged; output parquet files re-creatable from the source-system snapshot with one command.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Worked example: the data-engineering pipeline</h3>
+
+  <p>The repository includes three notebooks that demonstrate a full data-engineering pipeline end to end. The reference implementation runs on a publicly-available retail credit dataset, but the structure and the derivation logic generalise to any monthly snapshot table for a revolving or instalment-loan product: the only inputs the pipeline assumes are an obligor identifier, a facility identifier, a snapshot date, an outstanding balance, a credit limit, a payment amount, a minimum-payment-due (where applicable) and a contract-status flag.</p>
+
+  <p><strong>Notebook one, DQA.</strong> Establishes a query-engine connection (any columnar engine works; the reference uses DuckDB over parquet) and runs the DQA against a typed schema contract. The first pass on raw source data typically fails on type coercion: null values in optional count fields prevent integer casting; unexpected categorical values in the contract-status field break enum validation. The second pass, after cleaning and imputation, should report 100% completeness across declared fields and green schema validation.</p>
+
+  <p><strong>Notebook two, wrangling.</strong> Builds the CCD from raw. Joins source tables on the natural composite key, imputes nulls with documented assumptions (zero where null encodes "no activity", median or mode where null reflects missingness rather than absence), filters out invalid contract states ("Unknown", "Cancelled" before origination), casts numeric and categorical types, and writes the CCD to the interim data folder. The output is a single tidy table with one row per (obligor, facility, snapshot_month).</p>
+
+  <p><strong>Notebook three, MRD assembly.</strong> Converts the CCD into the MRD by engineering the behavioural indicators that the PD, LGD and EAD models consume. The derivation pattern is portable across datasets; the names below are the canonical column names (the reference notebook follows the same convention). Threshold constants in capitals are set in a configuration file so they can be tuned per portfolio without touching the pipeline code.</p>
+
+  <pre><code>loan_term                 row_number per (obligor_id, facility_id) ordered by snapshot_month
+calendar_date             origination_date + loan_term months
+missed_payment_indicator  1 if outstanding > 0 and payment_made < minimum_payment_due
+                          (or both = 0 with positive balance, where minimum is undefined)
+dpd                       rolling count of consecutive missed_payment_indicators × 30
+months_in_arrears         round(dpd / 30)
+arrears_stage             '1. PERFORMING' | '2. 1-30 DPD' | '3. 31-90 DPD' | '4. 90+ DPD'
+instant_default_indicator TRUE if months_in_arrears >= DEFAULT_THRESHOLD (3)
+write_off_indicator       TRUE if months_in_arrears >= WRITE_OFF_THRESHOLD (6)
+probation_indicator       TRUE if any instant default in prior PROBATION_PERIOD (12) months
+cure_indicator            TRUE if NOT instant default AND NOT in probation
+default_indicator         NOT cure
+default_date              calendar_date at the cure-to-default transition
+default_counter           cumulative count of independent default events
+gross_default_balance     outstanding balance at the default-start row
+delinquency_indicator     TRUE if rolling count of >=2 months in arrears >= STICKINESS_PERIOD
+inactive_indicator        TRUE if no balance and no drawings for INACTIVITY_PERIOD (4) months
+transactor_indicator      TRUE if balance==0 and drawings>0 for TRANSACTOR_PERIOD (2) months
+origination_date          first calendar_date for the facility
+12m_default_outcome       the default_indicator 12 months ahead (lead-12 default)
+12m_gross_default_balance the gross_default_balance 12 months ahead
+</code></pre>
+
+  <p>The cure / probation / default chain is the operational implementation of the 12-month probation period set out in CRR Article 178(5) and discussed in the <a href="03-definitions.html">definitions</a> lecture. The <code>12m_*</code> columns are the dependent variables for PD modelling. Once these columns are populated and the eligibility filter has run (closed accounts, zero or negative limits, accounts with incomplete lifecycle information removed), the MRD is written to the processed-data folder and the modelling stages can begin.</p>
+
+  <p>Two implementation patterns are worth internalising because they generalise to any monthly snapshot table. First, the DPD computation uses a <strong>rolling reset window</strong>: every successful payment resets the count to zero, and the count advances monotonically by 30 for each consecutive missed payment. In SQL this is a window function that partitions by (obligor_id, facility_id), orders by loan_term, and sums an inverted missed-payment flag to define reset groups; the position within each reset group times 30 is the DPD. This pattern is portable to any monthly delinquency series. Second, the default counter uses a <strong>LAG/LEAD-over-cure pattern</strong>: a new default event is recorded only when the immediately prior period was a cure. Without this guard, every snapshot inside a single continuous default episode would be counted as a fresh default; with it, one default event maps to one increment of the counter regardless of how long the workout lasts. The same pattern works for any state variable where you need to count <strong>transitions</strong> rather than <strong>memberships</strong>.</p>
+
+  <h3>Supporting documentation</h3>
+
+  <p>The DQA process produces and maintains four supporting documents:</p>
+
+  <ol>
+    <li><strong>Data lineage diagrams</strong>. Trace each variable from source system through staging and transformation to MRD. Each field entry includes business and technical definitions, source table and field, data type and permissible values.</li>
+    <li><strong>Data dictionary</strong>. Definitive specification of every variable used in modelling: name, type, description, permissible values, source, transformations.</li>
+    <li><strong>Summary statistics and profiling</strong>. Missing rates, mean / median / min / max, standard deviation and distribution plots, segmented by product type, time and customer segment. The first place the supervisor looks for a structural break.</li>
+    <li><strong>Reconciliation graphs over time</strong>. Monthly line plots comparing MRD totals (accounts, balances) to source-system totals. Breaks indicate failed loads or schema changes and are flagged for joint investigation with IT and data-control teams.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The discipline that separates a strong data-engineering team from a weak one is not the choice of tooling (everyone now uses Spark, DuckDB, Polars or some variant) but the rigour applied to schemas. A schema is a contract between the source system and the modelling team: it says "these fields will be present, of these types, with these constraints, at this cadence". A schema enforced in code (Pandera, Great Expectations, dbt tests) catches breaks at the boundary, the moment a source-system change ships. A schema documented only in PDF catches breaks weeks later in back-testing, by which point the damage is done.</p>
+
+  <p>The second discipline is <strong>reconciliation to the ledger</strong>. The general ledger is the bank's single source of truth for balances and provisions. Every CCD must reconcile to the GL on the small set of fields they share (typically total balance by portfolio, total provisions, total accounts in default). A reconciliation difference of more than a few basis points is treated as an incident, not a tolerance: it indicates that either the GL or the data pipeline is wrong, and the supervisor will treat any uninvestigated difference as evidence of poor data governance.</p>
+
+  <p>The third discipline is <strong>time-travel</strong>: the ability to reproduce, at any later date, exactly what the MRD looked like on the day a model was trained. This is what supervisory inspections request first, and what most banks struggle to deliver. The robust solution is to snapshot the parquet output of the MRD build at every model-training run, version it, and retain it for the supervisory inspection window (typically 7 to 10 years).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Distinguish the CCD from the MRD. Which one feeds downstream models?</li>
+    <li>Name the six dimensions of data quality and give one DQA test for each.</li>
+    <li>Why is internal data preferred over external data for IRB? Where is external data still essential?</li>
+    <li>List five of the eleven bank-facing BCBS 239 principles.</li>
+    <li>What is the natural composite primary key of a monthly snapshot table for a retail facility, and why does uniqueness on that key matter for downstream modelling?</li>
+    <li>Walk through the cure / probation / default chain at the MRD level: which indicator triggers default, which triggers probation, and how is cure derived?</li>
+    <li>A first DQA run on raw source data fails with a cluster of type-coercion errors on optional count fields. What single class of fix typically resolves them all?</li>
+    <li>What four supporting documents are produced by the DQA process and what does the supervisor use each one for?</li>
+    <li>Explain why schema enforcement in code is preferred to schema enforcement in PDF documentation.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Source:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/02_data_engineering/01-data_sourcing.md</code></li>
+      <li><code>docs/wiki/.../a-irb_capital/02_data_engineering/02-dqa.md</code></li>
+    </ul>
+
+    <p><strong>Worked examples (reference Jupyter notebooks; portable to any retail snapshot dataset):</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/02_data_engineering/06-dqa.ipynb</code> &mdash; schema-driven DQA on raw source tables, pre and post cleaning, via a columnar query engine.</li>
+      <li><code>docs/wiki/.../a-irb_capital/02_data_engineering/07-data_wrangling.ipynb</code> &mdash; CCD construction: joins, imputation, type casting, eligibility filtering.</li>
+      <li><code>docs/wiki/.../a-irb_capital/02_data_engineering/08-model_ready_data.ipynb</code> &mdash; behavioural indicators, target variables (12-month default outcome and gross-default-balance), MRD assembly.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="03-definitions.html">Definitions</a> &mdash; DoD, DPD, probation, cure: the MRD assembly notebook is the operational implementation.</li>
+      <li><a href="04-process_overview.html">Process overview</a> &mdash; the lifecycle stage this lecture instantiates.</li>
+    </ul>
+
+    <p><strong>Forward references:</strong></p>
+    <ul>
+      <li><a href="07-governance_and_limitations.html">Governance and limitations</a> (next) &mdash; the controls, governance and known-limitations register that wrap this stage.</li>
+      <li>08-portfolio_description (planned) &mdash; the descriptive statistics computed on the MRD.</li>
+      <li>09 to 11 feature engineering (planned) &mdash; the next consumer of the MRD per PD, LGD, EAD.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>BCBS 239, "Principles for effective risk data aggregation and risk reporting" (January 2013). The fourteen principles in their authoritative form.</li>
+      <li>PRA SS3/24, paragraphs 11.1 to 11.13. The UK supervisory expectations for IRB data quality.</li>
+      <li>Pandera or Great Expectations documentation, schema validation patterns. Open-source libraries that implement the typed-contract approach used in the reference notebooks.</li>
+      <li>DuckDB or equivalent (Polars, Spark, Snowflake) documentation, parquet integration. Any columnar engine that supports window functions over partitioned data will run the pipeline.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 6 of n.</span>
+  <span><a href="05-use_tests.html">Previous: use tests</a> &middot; <a href="07-governance_and_limitations.html">Next: governance and limitations</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

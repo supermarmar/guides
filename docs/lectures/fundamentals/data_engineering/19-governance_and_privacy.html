@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 19: governance, security, and privacy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Governance, security, and privacy</h1>
+  <p class="subtitle">A library with a restricted section needs three things beyond shelves: a catalogue saying what exists, a rule about who may enter, and a register of who took what and when. A data platform needs exactly the same three, and the register is the one most often missing, because it produces no benefit until somebody asks a question you cannot otherwise answer.</p>
+  <div class="meta">
+    <span>Lecture 19 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part V: the undercurrents</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Data governance answers four questions about every dataset. <strong>Who owns it?</strong> A named team accountable for its definitions and quality. <strong>Who may see it?</strong> Access granted by role and purpose, at the least privilege that lets the work proceed. <strong>How long do we keep it?</strong> A retention period derived from regulatory obligation and privacy law, both of which have opinions. <strong>Can we prove all of the above?</strong> An audit trail of grants and access, because an unprovable control is not a control.</p>
+
+  <p>The mechanism is a <strong>catalogue</strong>: the register of what tables exist, what they mean, who owns them, how they are classified, and who may read them. Lecture 14 introduced it as the component that lets a second engine find your tables; here it becomes the control point where permissions and classification attach. Governance that is not implemented in the catalogue is a policy document, and policy documents do not stop a query.</p>
+
+  <p>Privacy adds a distinct constraint that is not about security at all. Security asks whether the right people can get in. Privacy asks whether we should be holding this, for this purpose, for this long, and both questions have to be answered even when the answer to the security question is yes.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A library. The catalogue tells you what exists and where; without it the restricted section is merely a room nobody has mapped. The rule about who may enter is access control, and "the door is at the back and most people do not know" is not one. The borrowing register is the audit log: it produces no value on any ordinary day, and on the day a book is missing it is the only thing that matters. A platform with a catalogue and no register can tell you who was allowed to read the customer table, but not who did.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Hashing an account number is not anonymisation</span>
+    The most common privacy error in a data platform. Replacing an account number with its hash produces a value that still identifies the account uniquely, still joins to every other table, and can be reversed by anyone who can hash a list of plausible account numbers, which for a fifteen-digit space is trivially cheap. The result is <em>pseudonymised</em> data, which remains personal data under both GDPR and POPIA and carries the same obligations. Genuine anonymisation requires that individuals cannot be re-identified even with additional information, which usually means aggregation or generalisation, and which usually destroys the analytical value you wanted. Say pseudonymised when you mean pseudonymised, and do not let the word anonymised license a weaker control.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>The default access posture in analytical platforms is far too broad.</strong> The historical pattern, an analytics team with read access to everything because scoping it was inconvenient, means that a single compromised laptop exposes the bank's entire customer base, and that an ordinary analyst can accidentally produce a report containing information they had no business seeing. It also fails the simplest supervisory question: who can read customer data, and why? Least privilege is not paranoia here; it is the difference between an incident affecting one portfolio and one affecting every customer.</p>
+
+  <p><strong>Retention has two masters that pull in opposite directions.</strong> Regulation requires a bank to retain records, commonly five to ten years depending on the jurisdiction and the record type. Privacy law requires personal data not to be kept longer than necessary for its purpose, and gives individuals a right to erasure. These genuinely conflict, and the resolution is not to pick one: it is to establish a lawful basis and retention period per data category, to distinguish the records held under legal obligation from those held for convenience, and to delete the second group on schedule. A platform with one retention policy for everything is either breaching privacy law or destroying regulatory records.</p>
+
+  <p><strong>BCBS 239 makes data governance a prudential matter rather than an administrative one.</strong> Its principles cover governance and infrastructure explicitly: a bank should have a data architecture that supports risk aggregation, with clear ownership, agreed definitions, and demonstrable lineage. Combined with model risk expectations, which treat data quality and lineage as part of the model, this means the material in Lectures 16 to 19 is examined by supervisors rather than merely encouraged by them.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Classification comes first, because everything else keys off it</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Tier</th><th>Contains</th><th>Default treatment</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Public</strong></td><td>Published figures, disclosed statements</td><td>No restriction beyond integrity</td></tr>
+      <tr><td><strong>Internal</strong></td><td>Aggregates, portfolio metrics, non-personal reference data</td><td>Readable across the risk and finance functions</td></tr>
+      <tr><td><strong>Confidential</strong></td><td>Account-level financial data without direct identifiers</td><td>Readable by named roles with a stated purpose</td></tr>
+      <tr><td><strong>Restricted (personal)</strong></td><td>Names, addresses, dates of birth, national identifiers, contact details</td><td>Masked by default; unmasked access by exception, logged and reviewed</td></tr>
+      <tr><td><strong>Restricted (special category)</strong></td><td>Health, biometric, and similar categories with heightened legal protection</td><td>Rarely present in risk data; if it is, treat its presence as a finding to be resolved</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The point of classifying is that it converts every later decision from a judgement into a lookup. Should this column be masked in the development environment? What is its tier? May this new joiner read this table? What tier, and what is their role's entitlement? Without classification, each question is relitigated, and the answer depends on who is asked and how busy they are.</p>
+
+  <h3>The four controls, and where each attaches</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Catalogue as the control point for governance">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The catalogue is where policy becomes enforcement</text>
+
+      <!-- catalogue centre -->
+      <rect x="280" y="140" width="200" height="100" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2.5"/>
+      <text x="380" y="166" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#5b21b6">CATALOGUE</text>
+      <text x="380" y="184" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">what exists, what it means,</text>
+      <text x="380" y="197" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">who owns it, how it is classified,</text>
+      <text x="380" y="210" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">who may read it, who did</text>
+      <text x="380" y="230" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#7c3aed">Unity Catalog, Glue, Polaris, Hive</text>
+
+      <!-- four controls -->
+      <rect x="40" y="48" width="200" height="72" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="140" y="68" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">OWNERSHIP</text>
+      <text x="52" y="86" font-family="Inter" font-size="8.5" fill="#0d9488">a named team per dataset,</text>
+      <text x="52" y="99" font-family="Inter" font-size="8.5" fill="#0d9488">accountable for definitions</text>
+      <text x="52" y="112" font-family="Inter" font-size="8.5" fill="#0d9488">and quality (Lecture 18)</text>
+
+      <rect x="520" y="48" width="200" height="72" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="620" y="68" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">ACCESS</text>
+      <text x="532" y="86" font-family="Inter" font-size="8.5" fill="#b45309">grants to groups, not people;</text>
+      <text x="532" y="99" font-family="Inter" font-size="8.5" fill="#b45309">row and column level rules;</text>
+      <text x="532" y="112" font-family="Inter" font-size="8.5" fill="#b45309">masking by classification</text>
+
+      <rect x="40" y="264" width="200" height="72" rx="8" fill="#FEF3C7" stroke="#a16207" stroke-width="2"/>
+      <text x="140" y="284" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">RETENTION</text>
+      <text x="52" y="302" font-family="Inter" font-size="8.5" fill="#a16207">per data category, from legal</text>
+      <text x="52" y="315" font-family="Inter" font-size="8.5" fill="#a16207">obligation and lawful basis;</text>
+      <text x="52" y="328" font-family="Inter" font-size="8.5" fill="#a16207">deletion actually executed</text>
+
+      <rect x="520" y="264" width="200" height="72" rx="8" fill="#FEE2E2" stroke="#DC2855" stroke-width="2"/>
+      <text x="620" y="284" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#991b1b">AUDIT</text>
+      <text x="532" y="302" font-family="Inter" font-size="8.5" fill="#b91c1c">every grant and every access,</text>
+      <text x="532" y="315" font-family="Inter" font-size="8.5" fill="#b91c1c">immutable, reviewed;</text>
+      <text x="532" y="328" font-family="Inter" font-size="8.5" fill="#b91c1c">the control you only need once</text>
+
+      <g stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="4 3">
+        <line x1="242" y1="96" x2="300" y2="146"/>
+        <line x1="518" y1="96" x2="460" y2="146"/>
+        <line x1="242" y1="290" x2="300" y2="236"/>
+        <line x1="518" y1="290" x2="460" y2="236"/>
+      </g>
+
+      <!-- engines -->
+      <text x="380" y="286" text-anchor="middle" font-family="Inter" font-size="9" fill="#3f3f46">every engine asks the catalogue</text>
+      <g font-family="Inter" font-size="8" fill="#27272a">
+        <rect x="250" y="298" width="60" height="22" rx="5" fill="#F4F4F5" stroke="#52525b"/>
+        <text x="280" y="313" text-anchor="middle">Spark</text>
+        <rect x="318" y="298" width="60" height="22" rx="5" fill="#F4F4F5" stroke="#52525b"/>
+        <text x="348" y="313" text-anchor="middle">SQL</text>
+        <rect x="386" y="298" width="60" height="22" rx="5" fill="#F4F4F5" stroke="#52525b"/>
+        <text x="416" y="313" text-anchor="middle">BI tool</text>
+        <rect x="454" y="298" width="60" height="22" rx="5" fill="#F4F4F5" stroke="#52525b"/>
+        <text x="484" y="313" text-anchor="middle">notebook</text>
+      </g>
+      <g stroke="#7c3aed" stroke-width="1.2">
+        <line x1="380" y1="243" x2="380" y2="294"/>
+      </g>
+
+      <text x="380" y="352" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#3f3f46">Governance implemented anywhere other than the catalogue is bypassed by the next new engine.</text>
+      <text x="380" y="368" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">This is the strongest practical argument for a single catalogue over per-tool permissions.</text>
+    </svg>
+    <figcaption>The catalogue as the point where the four controls attach and every engine consults them. Per-tool permissions, granted separately in the warehouse, the BI tool, and the notebook environment, drift apart and leave gaps; a single catalogue makes the control the same regardless of how the data is reached.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Access control that survives staff turnover</h3>
+
+  <pre><code>-- grant to groups, never to individuals: joiners and leavers become an HR process
+GRANT USAGE  ON SCHEMA risk_gold TO GROUP credit_risk_modellers;
+GRANT SELECT ON TABLE  risk_gold.fact_account_month TO GROUP credit_risk_modellers;
+
+-- column-level: the modelling team does not need customer names
+GRANT SELECT (account_id, reporting_date, balance, arrears_months, in_default)
+   ON TABLE risk_gold.account_detail TO GROUP credit_risk_modellers;
+
+-- row-level: an analyst sees only their legal entity
+CREATE ROW ACCESS POLICY entity_filter AS (legal_entity VARCHAR)
+RETURNS BOOLEAN -&gt;
+    IS_ACCOUNT_GROUP_MEMBER('group_risk_all_entities')
+    OR legal_entity = CURRENT_USER_ENTITY();
+
+-- dynamic masking: the same column, different values by role
+CREATE MASKING POLICY mask_surname AS (val VARCHAR) RETURNS VARCHAR -&gt;
+    CASE WHEN IS_ACCOUNT_GROUP_MEMBER('group_pii_authorised') THEN val
+         ELSE 'REDACTED' END;</code></pre>
+
+  <p>Four principles behind that syntax. <em>Grant to groups</em>, so that access is a consequence of a role rather than a series of individual favours, and a leaver loses everything by leaving one group. <em>Least privilege</em>, meaning the default entitlement is the narrowest that lets the work proceed, with broader access granted by exception and reviewed. <em>Column and row level rather than table level</em>, because most real requirements are "this team needs these fields for these entities" and a table-level grant to satisfy it over-grants massively. And <em>masking rather than copying</em>, because the alternative to a masking policy is a separate redacted copy of the table, which then diverges and doubles the surface to govern.</p>
+
+  <h3>Pseudonymisation, tokenisation, and encryption</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Technique</th><th>What it does</th><th>Reversible</th><th>Joins preserved</th><th>Use for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Hashing</strong></td><td>Replaces a value with a digest, optionally salted</td><td>Not directly, but vulnerable to enumeration on small domains</td><td>Yes, if the salt is shared</td><td>Weak pseudonymisation only; never treat as anonymisation</td></tr>
+      <tr><td><strong>Tokenisation</strong></td><td>Replaces a value with a random token, mapping held in a separate vault</td><td>Yes, with vault access</td><td>Yes, consistently</td><td>The standard approach for identifiers in lower environments</td></tr>
+      <tr><td><strong>Encryption at rest</strong></td><td>Ciphertext on disk, transparent to authorised readers</td><td>Yes, with the key</td><td>Yes</td><td>Baseline for all storage; protects against media compromise, not against over-broad grants</td></tr>
+      <tr><td><strong>Masking</strong></td><td>Shows a redacted or partial value based on the reader's role</td><td>Not for the masked reader</td><td>No, if the masked value is constant</td><td>Presentation-layer control for personal fields</td></tr>
+      <tr><td><strong>Aggregation or generalisation</strong></td><td>Removes the individual entirely: bands, totals, k-anonymity style groupings</td><td>No</td><td>No</td><td>The only route to genuine anonymisation, at the cost of analytical detail</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The practical combination for a credit risk platform: encryption at rest everywhere as a baseline; tokenised account and customer identifiers in development and test environments, with the vault accessible only from production; masking policies on personal fields so that the production table serves both audiences; and aggregation for anything shared outside the risk function. Note the sequence in that sentence, because it is the reason tokenisation earns its complexity: it lets a developer work with realistically shaped, join-consistent data without ever holding a real identifier.</p>
+
+  <h3>Secrets, which are a separate discipline</h3>
+
+  <p>Credentials, keys, and connection strings must never appear in code, notebooks, configuration files in the repository, or the orchestrator's task definitions. Use the platform's secret manager, reference secrets by name at runtime, rotate them on a schedule, and scan the repository in continuous integration to catch the accident. This is short because it is not controversial, and it is here because the single most common serious finding in a data platform audit is a credential in a notebook. Lecture 20 wires the scanning into the pipeline.</p>
+
+  <h3>Retention, erasure, and the conflict between them</h3>
+
+  <p>Set retention per data category, not per platform. A monthly regulatory risk snapshot is held under a legal obligation for a defined period and must not be deleted early. A marketing propensity extract has no such obligation and should be deleted when its purpose ends. Contact details held for servicing are retained while the relationship exists plus a defined tail. Writing these down per category is the work, and it requires the privacy function rather than the engineering team to determine the periods.</p>
+
+  <p>The <strong>erasure conflict</strong> is worth understanding precisely, because it is where engineering intuition goes wrong. A right-to-erasure request does not override a legal retention obligation: personal data held because a law requires it to be held may be retained, and the correct response restricts processing rather than deleting the record. What the request does require is deletion from everywhere the data is held for other purposes, which in a data platform means the analytical copies, the extracts on someone's laptop, the caches, and the backups. Three engineering consequences follow. Know where personal data has been copied, which is the lineage of Lecture 18 doing double duty. Prefer holding personal identifiers in one place with tokens elsewhere, because then erasure is a single vault operation rather than a search. And distinguish the immutable regulatory record from the derived analytical copy at the design stage, because a platform that mixes them into one immutable table has made erasure impossible without a rewrite.</p>
+
+  <div class="callout insight">
+    <span class="tag">No production personal data in development</span>
+    The rule is simple and constantly broken, usually with the justification that realistic data is needed for testing. Three legitimate alternatives, in order of preference. Tokenised and masked production data, which preserves shape, volume, and join behaviour without real identifiers. Synthetic data generated to match the statistical properties and edge cases of production, which is better for testing specific conditions and worse for realism. And a small, deliberately curated sample under the same controls as production, for the rare case that needs genuine values. What is never acceptable is a copy of the customer table in a development environment with looser access, which is how a controlled dataset becomes an uncontrolled one.
+  </div>
+
+  <h3>BCBS 239, mapped to the controls in this course</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Expectation</th><th>Implemented by</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Governance and ownership of risk data</td><td>Catalogue ownership metadata; data contracts naming producers and consumers (Lecture 18)</td></tr>
+      <tr><td>Data architecture and infrastructure</td><td>Layered platform with a conformed layer and modelled marts (Lectures 08, 14)</td></tr>
+      <tr><td>Accuracy and integrity</td><td>Constraints, validation suites, and reconciliation to the ledger (Lectures 04, 16)</td></tr>
+      <tr><td>Completeness</td><td>Volumetric checks, key comparisons for deletions, manifest reconciliation (Lectures 10, 16)</td></tr>
+      <tr><td>Timeliness</td><td>Freshness monitors and contractual arrival commitments (Lecture 18)</td></tr>
+      <tr><td>Adaptability, including ad hoc requests under stress</td><td>Queryable modelled history rather than fixed reports; partition and schema evolution (Lectures 08, 14)</td></tr>
+      <tr><td>Reconciliation of reports to source</td><td>Column-level lineage, immutable versions, and time travel (Lectures 14, 18)</td></tr>
+      <tr><td>Distribution and confidentiality of reports</td><td>Catalogue-enforced access control and audit logging (this lecture)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Read the table as a claim about this course rather than about the standard: nothing in Part V was included because a regulator asked for it, and yet the whole of Part V is what the standard requires. That is the useful observation. Good engineering and supervisory expectation converge here, which means the argument for these controls does not have to be a compliance argument.</p>
+
+  <div class="worked">
+    <strong>Worked example: designing access for a credit risk modelling team</strong>
+    <p>The team: six modellers building PD, LGD, and EAD models across three legal entities, plus two contractors on a six-month engagement, plus a validation function that must reproduce everything independently. Design the access, and note where the interesting decisions are.</p>
+    <p><em>1. Classify the tables first.</em> <code>fact_account_month</code> is confidential: account-level financial data, no direct identifiers. <code>dim_customer</code> is restricted, because it carries name, date of birth, and address. The aggregate monitoring marts are internal. The classification is recorded in the catalogue, and it determines everything that follows without further debate.</p>
+    <p><em>2. Groups, not people.</em> Four groups: <code>credit_risk_modellers</code>, <code>credit_risk_validation</code>, <code>credit_risk_contractors</code>, and <code>pii_authorised</code>. Membership is managed by the identity system and driven by the joiner and leaver process, so a contractor's access ends when their record ends rather than when somebody remembers.</p>
+    <p><em>3. Entitlements by role and purpose.</em> Modellers get column-level select on the confidential fact tables for all three entities, because model development legitimately needs the whole population, and they get the masked view of the customer dimension: segment, region, and age band are visible, while name, address, and date of birth are redacted. Nothing about building a PD model requires a customer's name, and stating that plainly is what makes the restriction sustainable rather than resented.</p>
+    <p><em>4. Contractors get less, deliberately.</em> Tokenised identifiers, one entity rather than three, and no path to the token vault. They can build and test the same models on the same shapes; they cannot identify a customer or see the group-wide book. The decision to give an outside party less is easier to make on day one than to retrofit, and the tokenisation from step three of the earlier discussion is what makes it practical rather than obstructive.</p>
+    <p><em>5. The validation function needs a different thing entirely.</em> Independent reproduction requires read access to the same data as the modellers, plus the quality results, the lineage graph, and the version history, and explicitly not write access to anything the modellers own. Their entitlement is broader on reads and narrower on writes, which is a shape that role-based systems handle well and ad hoc grants handle badly.</p>
+    <p><em>6. Unmasked personal data by exception.</em> Occasionally a genuine need arises: investigating a specific account for a model override, or a data quality query traced to one customer. The route is temporary membership of <code>pii_authorised</code>, requested with a stated reason, approved by the data owner, time limited, and logged. The access itself is also logged, so the register shows both the grant and the use. This is the control that lets you say yes to a legitimate request without permanently widening anyone's entitlement.</p>
+    <p><em>7. Review, or the whole thing decays.</em> Quarterly, the owner reviews who is in each group and whether each entitlement is still needed, and any exception grant older than its stated period is revoked automatically. Without a review cycle, access accretes: every temporary grant becomes permanent, and after three years the modelling team can read everything again, which is where the platform started.</p>
+    <p><em>What this buys, stated as questions you can now answer.</em> Who can read customer names? The members of one group, listed, with a reason each. Who did read them last quarter? The audit log, by name and timestamp. Why can the contractor not see entity B? Because the entitlement is scoped by purpose and their engagement covers entity A. How do we know a leaver lost access? Because access derives from group membership and group membership derives from the identity system. Each of these is a question a supervisor or an internal auditor asks, and each is unanswerable in a platform where access was granted table by table to individuals.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Governance is four questions, ownership, access, retention, and provability, implemented in the catalogue so that no new engine can bypass them. Classify first, because classification turns every later decision into a lookup. Grant to groups at least privilege, use column and row level controls and masking rather than redacted copies, and hold personal identifiers in one place with tokens elsewhere so that erasure is a single operation. Retention comes per data category from legal obligation and lawful basis, and the erasure conflict is resolved by distinguishing records held under obligation from analytical copies held for convenience. And review entitlements quarterly, or access silently returns to where it started.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Give the four governance questions and say which one is most often left unimplemented.</li>
+      <li>Why must governance be implemented in the catalogue rather than per tool?</li>
+      <li>Explain why hashing an account number is pseudonymisation rather than anonymisation, and what follows legally.</li>
+      <li>Contrast tokenisation with masking, and say which suits a development environment and why.</li>
+      <li>State the retention conflict between regulatory obligation and the right to erasure, and how it is properly resolved.</li>
+      <li>Give three legitimate alternatives to copying production personal data into development, in order of preference.</li>
+      <li>Why grant to groups rather than individuals, and what does it make automatic?</li>
+      <li>What happens to a well-designed access model with no quarterly review?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="18-observability_and_contracts.html">Lecture 18</a> established ownership and lineage, both of which this lecture depends on: lineage is how you find where personal data has been copied.</li>
+      <li><strong>Next:</strong> <a href="20-dataops.html">Lecture 20</a> closes the course by wiring all of Part V into a deployment pipeline, including secret scanning and environment discipline.</li>
+      <li><strong>Cross-link:</strong> the catalogue enters in <a href="14-lakehouse_table_formats.html">Lecture 14</a>; DCL was deferred here from <a href="04-sql_definitions.html">Lecture 04</a>; the immutability that complicates erasure is <a href="06-sql_manipulation.html">Lecture 06</a>.</li>
+      <li><strong>Banking link:</strong> BCBS 239 sits in the <a href="../../regulation/index.html">regulation</a> track; the model risk expectations that treat data lineage as part of the model are covered in the <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">credit risk</a> track's validation material.</li>
+      <li><strong>Further reading:</strong> BCBS 239 itself is fourteen principles over roughly twenty pages and repays direct reading; the UK Information Commissioner's guidance on anonymisation and pseudonymisation is the clearest statement of the distinction drawn above.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 19 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

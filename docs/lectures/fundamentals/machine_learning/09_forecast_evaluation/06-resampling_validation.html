@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 47: resampling validation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Calibration</a></div>
+  <h1>Resampling validation</h1>
+  <p class="subtitle">Every statistic developed in this sub-module, balance, auto-calibration, the Gini score, Murphy's decomposition, is only as trustworthy as the sample it was estimated on, and actuarial and credit-risk data is frequently scarce, heavy-tailed, and never as large as a machine-learning tutorial's benchmark dataset. This closing lecture supplies the resampling discipline that makes those numbers defensible: stratified cross-validation for heavy-tailed responses, the parametric and non-parametric bootstrap, out-of-bag validation as a natural byproduct of bagging, and a sharp boundary the earlier model-evaluation sub-module's AIC and BIC quietly stop respecting once the model class leaves maximum likelihood behind.</p>
+  <div class="meta">
+    <span>Lecture 47 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part VII: calibration and forecast evaluation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Stratified $K$-fold cross-validation</strong> refines the standard $K$-fold split from the train-test-split sub-module for exactly the case actuarial severity and reinsurance data supplies constantly: heavy-tailed responses, where a handful of extreme claims randomly landing in a single fold can dominate that fold's apparent performance. The fix is to order instances by response size and allocate the largest claims round-robin across folds before allocating the rest, so every fold carries comparable exposure to the tail. The <strong>bootstrap</strong> manufactures additional samples resembling the one you have when a genuinely larger sample is not available: the <strong>parametric bootstrap</strong> simulates new responses from the fitted distributional model with covariates held fixed; the <strong>non-parametric bootstrap</strong> resamples rows with replacement; the <strong>residual bootstrap</strong> resamples standardised residuals and adds them back to the fitted values. <strong>Out-of-bag (OOB) validation</strong> exploits a direct consequence of the non-parametric bootstrap: any given row is excluded from a bootstrap sample with probability converging to $e^{-1} \approx 36.8\%$, so the rows never selected during bagging form a natural, computationally free held-out set, which is exactly why random forests report OOB error without any separate cross-validation step. Finally, <strong>AIC and BIC apply only to maximum-likelihood-fitted models with a well-defined parameter count</strong>; a gradient-boosted tree ensemble, a regularised GLM, or a neural network has no agreed, unambiguous parameter count in the sense AIC and BIC require, which means the information-criteria toolkit from the earlier model-evaluation sub-module quietly stops being valid the moment the model class leaves classical maximum likelihood, and cross-validation or the bootstrap is the general-purpose replacement that works uniformly across every model class.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    If you had unlimited fresh data you would just keep testing your model on new samples forever and never worry about validation methodology. You don't, so every resampling technique in this lecture is a different way of pretending you have more data than you do, honestly. Cross-validation reuses the same rows multiple times, holding out a different slice each time. The bootstrap manufactures entirely new samples that resemble the one you have, by simulation or by resampling with replacement. Out-of-bag validation notices that bagging already manufactures those samples for a different reason and gets a validation set for free as a side effect. None of these tricks creates genuinely new information; all of them squeeze more honest use out of the information you already have, which is exactly what scarce actuarial data needs.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture closes the calibration sub-module and, with it, this sub-module's extension of the model-evaluation material from earlier in the course. It revisits the train-test-split sub-module's cross-validation machinery specifically for the heavy-tailed responses actuarial severity and aggregate-claims data supplies, and it draws a boundary around the AIC and BIC toolkit that the model-evaluation sub-module did not need to draw, because that sub-module's worked examples never left the GLM world.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this closing discipline is not optional bookkeeping.</p>
+
+  <p>First, <strong>actuarial data is frequently scarce in exactly the segments where getting the answer right matters most</strong>: a new product line, a low-default portfolio, a niche specialty book. A single train-test split on a few hundred observations produces a Gini estimate, or a Murphy decomposition, that can swing substantially depending on which handful of rows happened to land in the test set; stratified cross-validation and the bootstrap are the standard, defensible way of reporting an estimate with an honest uncertainty band instead of a single, fragile number.</p>
+
+  <p>Second, <strong>ignoring the heavy tail when constructing folds silently corrupts every statistic this sub-module developed</strong>. A severity or aggregate-claims dataset with a handful of very large losses, allocated at random across cross-validation folds, can produce wildly different fold-level deviance or Gini estimates purely because of which fold happened to catch the largest claim, a pattern that has nothing to do with genuine model instability and everything to do with an avoidable sampling artefact.</p>
+
+  <p>Third, <strong>quoting AIC or BIC to compare a gradient-boosted model against a GLM, or against a neural network, is a common and entirely invalid move</strong>, because the parameter count $k$ that both criteria depend on has no agreed definition once regularisation, early stopping, or an ensemble of trees enters the picture; a model documentation that reports "the GBM's AIC is lower" without addressing this is making a comparison that the theory behind AIC and BIC was never built to support.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A specialty reinsurer validating an aggregate-claims severity model used standard, unstratified 5-fold cross-validation on a dataset of 1,200 claims, three of which were catastrophic losses an order of magnitude larger than the rest. Cross-validated deviance varied by a factor of four across the five folds, entirely explained by which fold happened to contain which of the three catastrophic losses, and the team initially (and incorrectly) read this as evidence of severe model instability. Switching to stratified cross-validation, allocating the three catastrophic losses to different folds deliberately before the remaining claims were assigned, reduced the fold-to-fold deviance range by more than 80 per cent, revealing that the model itself was considerably more stable than the naive cross-validation had suggested.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold two pictures: standard random $K$-fold allocation letting extreme claims fall wherever chance puts them, against stratified allocation deliberately spreading them across folds; and the out-of-bag mechanism, where roughly a third of rows are excluded from any given bootstrap sample purely by the arithmetic of sampling with replacement.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stratified cross-validation for heavy tails, and the out-of-bag mechanism">
+      <defs>
+        <marker id="rvArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Stratifying for the tail, and the out-of-bag arithmetic</text>
+
+      <g transform="translate(40, 55)">
+        <rect x="0" y="0" width="380" height="260" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="190" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Random 5-fold: extreme claims land by chance</text>
+        <g font-family="Inter" font-size="10" fill="#92400e">
+          <rect x="30" y="50" width="60" height="30" fill="#fde68a"/>
+          <rect x="100" y="50" width="60" height="30" fill="#fde68a"/>
+          <rect x="170" y="50" width="60" height="30" fill="#dc2626"/>
+          <rect x="240" y="50" width="60" height="30" fill="#fde68a"/>
+          <rect x="310" y="50" width="60" height="30" fill="#dc2626"/>
+          <text x="60" y="70" text-anchor="middle" fill="#78350f">fold 1</text>
+          <text x="130" y="70" text-anchor="middle" fill="#78350f">fold 2</text>
+          <text x="200" y="70" text-anchor="middle" fill="#fff">fold 3</text>
+          <text x="270" y="70" text-anchor="middle" fill="#78350f">fold 4</text>
+          <text x="340" y="70" text-anchor="middle" fill="#fff">fold 5</text>
+        </g>
+        <text x="190" y="110" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">two large claims (red) both land in folds 3 and 5:</text>
+        <text x="190" y="124" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">fold-level deviance now swings on chance alone</text>
+
+        <text x="190" y="160" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">Stratified 5-fold: large claims spread deliberately</text>
+        <g font-family="Inter" font-size="10" fill="#92400e">
+          <rect x="30" y="185" width="60" height="30" fill="#dc2626"/>
+          <rect x="100" y="185" width="60" height="30" fill="#dc2626"/>
+          <rect x="170" y="185" width="60" height="30" fill="#fde68a"/>
+          <rect x="240" y="185" width="60" height="30" fill="#fde68a"/>
+          <rect x="310" y="185" width="60" height="30" fill="#fde68a"/>
+        </g>
+        <text x="190" y="235" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">each fold now carries comparable tail exposure</text>
+      </g>
+
+      <g transform="translate(460, 55)">
+        <rect x="0" y="0" width="380" height="260" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="190" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Out-of-bag: roughly 1 in e ≈ 36.8% excluded</text>
+        <circle cx="120" cy="150" r="85" fill="#0d9488" fill-opacity="0.15" stroke="#0d9488" stroke-width="2"/>
+        <text x="120" y="140" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">bootstrap sample</text>
+        <text x="120" y="156" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">(~63.2% of rows,</text>
+        <text x="120" y="172" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">some repeated)</text>
+        <circle cx="260" cy="150" r="55" fill="#dc2626" fill-opacity="0.15" stroke="#dc2626" stroke-width="2"/>
+        <text x="260" y="145" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">out-of-bag</text>
+        <text x="260" y="161" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">(~36.8% of rows)</text>
+        <text x="190" y="248" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#115e59">free validation set: no extra refit required</text>
+      </g>
+    </svg>
+    <figcaption>Left: unstratified random folds let extreme observations cluster by chance, distorting fold-level performance estimates in a way that has nothing to do with genuine model instability; stratifying by response size before allocation spreads the tail evenly. Right: because a non-parametric bootstrap sample is drawn with replacement, each row is excluded from any given resample with probability $(1 - 1/n)^n \to e^{-1} \approx 36.8\%$ as $n$ grows; the excluded rows form a validation set that costs nothing extra to obtain, which is exactly why bagging-based models (random forests) report out-of-bag error as standard practice.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Stratify on whatever makes the tail the problem.</strong> If large observations are rare and influential, the fold-construction rule should guarantee they are spread evenly, not left to chance. <strong>Out-of-bag validation is not a separate technique, it is bagging's own bootstrap noticed twice.</strong> The identical resampling step that builds a random forest's individual trees also, as an unavoidable side effect, sets aside a validation set; recognising this saves a redundant cross-validation pass.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Stratified $K$-fold cross-validation for heavy-tailed responses</h3>
+
+  <p>Standard $K$-fold cross-validation, developed in the train-test-split sub-module, partitions the index set $\{1, \ldots, n\}$ at random into $K$ roughly equal folds. For heavy-tailed or right-skewed responses (claim severities, aggregate losses, LGD), a purely random partition can allocate several of the largest observations to the identical fold purely by chance, distorting that fold's apparent performance in a way unrelated to genuine model quality. The remedy: order the instances by response size, and allocate the $K$ largest observations to the $K$ folds in round-robin fashion (one to each fold), then the next $K$ largest likewise, continuing until every instance is assigned. Every fold now carries comparable exposure to the extreme tail, and cross-validated performance differences across folds reflect genuine model behaviour rather than which fold happened to catch the biggest claim.</p>
+
+  <h3>The parametric bootstrap</h3>
+
+  <p>Starting from a fitted distributional model $Y \mid X \sim F(\cdot \mid X; \hat\theta)$, the <strong>parametric bootstrap</strong> holds the covariates $(X_i)_{i=1}^n$ fixed and simulates new responses $Y_i^{(j)} \sim F(\cdot \mid X_i; \hat\theta)$ from the fitted model itself, for $1 \leq i \leq n$. Refitting the model on each simulated sample $(Y_i^{(j)}, X_i)_{i=1}^n$, for $j = 1, \ldots, m$ replications, produces $m$ bootstrap estimates of the model's parameters (or of any downstream quantity computed from them), and the empirical spread of these estimates is the bootstrap's estimate of sampling uncertainty. Because the simulation draws directly from the fitted distributional assumption, the parametric bootstrap is only as trustworthy as that assumption; if the fitted distribution is itself wrong, the bootstrap faithfully reproduces the wrong uncertainty, a genuine limitation revisited in the pitfalls below.</p>
+
+  <h3>The non-parametric and residual bootstraps</h3>
+
+  <p>The <strong>non-parametric bootstrap</strong> avoids any distributional assumption: draw $n$ instances with replacement from the observed sample $(Y_i, X_i)_{i=1}^n$ itself, refit the model on the resulting resample, and repeat. This simultaneously resamples covariates and responses together, preserving whatever dependence structure exists in the original data without assuming a parametric form for it. The <strong>residual bootstrap</strong> is an intermediate option: fit the model once, compute standardised residuals, resample the residuals (rather than the rows) with replacement, and add the resampled residuals back onto the original fitted values to construct a new bootstrap sample with covariates held fixed exactly as in the parametric case, but without committing to a specific distributional family for the residuals themselves.</p>
+
+  <h3>Out-of-bag validation</h3>
+
+  <p>The <strong>non-parametric bootstrap</strong> used inside bagging (random forests, and the ensembling procedures covered in the supervised-learning sub-module) draws $n$ instances with replacement from an $n$-row sample; the probability that a specific row is never drawn across all $n$ draws is $(1 - 1/n)^n$, which converges as $n \to \infty$ to</p>
+
+  $$\lim_{n \to \infty} \left(1 - \frac{1}{n}\right)^n = e^{-1} \approx 36.8\%.$$
+
+  <p>Denote by $I \subset \{1, \ldots, n\}$ the indices actually selected into a given bootstrap sample. The <strong>out-of-bag (OOB) sample</strong> is $(Y_i, X_i, v_i)_{i \notin I}$, and the OOB validation loss is computed on exactly this excluded set:</p>
+
+  $$\widehat{\text{GL}}^{\text{OoB}} = \frac{1}{|\{1,\ldots,n\} \setminus I|}\sum_{i \notin I} v_i \, L(Y_i, \hat\mu(X_i)).$$
+
+  <p>This provides a genuine, held-out generalisation-loss estimate at essentially no extra computational cost for any model already built by bagging, because the bootstrap resamples underlying the ensemble are constructed regardless of whether OOB validation is requested. It is the reason random forest implementations report an OOB error rate as a standard output, without any separate cross-validation loop.</p>
+
+  <h3>Where AIC and BIC stop applying</h3>
+
+  <p>The model-evaluation sub-module's AIC and BIC both require two ingredients: a maximised log-likelihood, and a well-defined count of estimated parameters $k$. Both ingredients are unambiguous for a classical GLM fitted by maximum likelihood. Neither is unambiguous once the model class leaves that setting. A gradient-boosted ensemble of trees, a regularised (ridge or lasso) GLM, or a neural network are all typically over-parametrised relative to the effective flexibility they actually exercise on the data, and there is no single, agreed convention for what "the parameter count" of such a model even means; a lasso model's non-zero coefficient count, a ridge model's effective degrees of freedom (a trace-of-hat-matrix quantity), and a neural network's raw weight count are all different notions, none of which corresponds to what $k$ meant in the derivation of AIC or BIC. The practical consequence: AIC and BIC comparisons are valid within the world of maximum-likelihood-fitted GLMs (comparing two link functions, two covariate sets, on the identical data and response), and cross-validation or the bootstrap, neither of which requires a likelihood or a parameter count at all, only the ability to refit and predict, is the general-purpose validation tool that works uniformly across every model class this course covers, GLM, GBM, or neural network alike.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Situation</th><th>Preferred tool</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Large sample, cheap to fit repeatedly</td><td>Out-of-sample holdout</td><td>Simplest, no repeated refitting needed</td></tr>
+        <tr><td>Small or moderate sample, symmetric response</td><td>$K$-fold cross-validation</td><td>Reuses every row for both fitting and validation</td></tr>
+        <tr><td>Small or moderate sample, heavy-tailed response</td><td>Stratified $K$-fold</td><td>Prevents extreme values distorting individual folds</td></tr>
+        <tr><td>Need an uncertainty band on a fitted quantity</td><td>Parametric or non-parametric bootstrap</td><td>Directly estimates sampling variability by resimulation</td></tr>
+        <tr><td>Model already fitted by bagging</td><td>Out-of-bag validation</td><td>Free, no extra computation, natural byproduct of bagging</td></tr>
+        <tr><td>Comparing GLMs fitted by MLE on identical data</td><td>AIC / BIC</td><td>Cheap, no refitting; valid only in this specific setting</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Comparing AIC across a GBM and a GLM</span>
+    Reporting "the GBM's AIC is lower than the GLM's, so it wins" treats a quantity, the effective parameter count of a tree ensemble, as if it were as well-defined as a GLM's coefficient count. It is not, and the comparison has no theoretical grounding. Use cross-validated loss, computed identically for both model classes on the identical held-out folds, for any comparison that spans model classes.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Ignoring the tail when constructing folds</span>
+    Standard random $K$-fold partitioning on a heavy-tailed response, exactly the vignette in section 2, can make a perfectly stable model look wildly unstable purely because of where the largest observations happened to land. Stratify by response size whenever the response is meaningfully skewed; the cost is negligible and the benefit, as the vignette shows, can be an order-of-magnitude reduction in spurious fold-to-fold variability.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Trusting a parametric bootstrap when the distributional assumption might be wrong</span>
+    A parametric bootstrap's uncertainty estimate is only ever as good as the distributional model it resimulates from; if the true response distribution has heavier tails or different skewness than the fitted family assumes, the bootstrap will faithfully understate the true sampling uncertainty, reproducing the same misspecification it was built on. The non-parametric or residual bootstrap, which make weaker distributional assumptions, are the safer default when the distributional family itself is in doubt.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Applying out-of-bag or cross-validation to panel or time-ordered data without adjustment</span>
+    Both out-of-bag validation and standard cross-validation assume the rows are exchangeable; on panel data (repeated observations of the same policyholder or borrower over time) or on genuinely time-ordered data, naive resampling can leak information from a customer's future observations into a fold that is meant to represent an honest, forward-looking test, exactly the leakage risk the train-test-split sub-module warned against for time series. Grouped or blocked cross-validation, keeping all of a given entity's observations on the same side of any split, is the standard remedy and applies equally to the bootstrap variants developed in this lecture.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Stratified $K$-fold cross-validation protects heavy-tailed actuarial data from the fold-construction artefact a naive random split can introduce. The parametric, non-parametric, and residual bootstraps are three distinct ways of manufacturing additional samples that resemble the one you have, differing in how much distributional structure they assume. Out-of-bag validation is a free consequence of the identical resampling procedure that already underlies bagging. And AIC and BIC, central to the earlier model-evaluation sub-module, are valid only within the world of maximum-likelihood-fitted models with an unambiguous parameter count, a boundary that cross-validation and the bootstrap, requiring neither a likelihood nor a parameter count, do not share.</p>
+
+  <p>This closes the calibration and forecast-evaluation sub-module. Together with the model-evaluation sub-module earlier in the course, you now have the complete validation toolkit this course covers: average performance (information criteria, residual diagnostics, classification metrics), calibration at the portfolio and cohort level (balance, auto-calibration, recalibration), discrimination (the Gini score and Murphy's decomposition), and the resampling discipline that makes every one of those numbers trustworthy at the sample sizes actuarial and credit-risk data actually supplies.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Describe the stratified $K$-fold construction for a heavy-tailed response, and explain what problem with standard random $K$-fold it fixes.</li>
+      <li>Distinguish the parametric, non-parametric, and residual bootstraps. Which assumption does each retain and which does each relax?</li>
+      <li>Derive the limiting out-of-bag probability $e^{-1} \approx 36.8\%$ from the sampling-with-replacement construction, and explain why this makes OOB validation essentially free for a bagged model.</li>
+      <li>Explain precisely why AIC and BIC cannot be used to compare a gradient-boosted model against a GLM, and what should be used instead.</li>
+      <li>A parametric bootstrap on an LGD model gives a tight confidence interval around the fitted mean LGD. Why might this interval understate the true uncertainty, and what would you check?</li>
+      <li>Explain why standard cross-validation or out-of-bag validation can leak information on panel data, and what the standard remedy is.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 46 (<a href="05-score_decomposition_and_lift.html">score decomposition and lift charts</a>) supplied the loss-scale diagnostics this lecture's resampling discipline is applied to obtain honest uncertainty estimates for.</li>
+      <li><strong>Built on:</strong> The train-test-split sub-module's cross-validation machinery, extended here to the heavy-tailed responses actuarial severity modelling supplies, and the statistics track's <a href="../../statistics/03-inferential_statistics.html">inferential statistics</a> lecture, which introduced the bootstrap in its classical form.</li>
+      <li><strong>Outside this course:</strong> Stratified cross-validation for heavy-tailed responses is standard practice in reinsurance and catastrophe-model validation; out-of-bag validation is the default reported statistic for any random-forest-based credit or insurance model; the AIC/BIC boundary drawn here is a common point of confusion in model documentation that compares GLM incumbents against machine-learning challengers.</li>
+      <li><strong>Sub-module complete:</strong> Return to the <a href="index.html">calibration course landing page</a> to review the full six-lecture sequence, or continue to <a href="../08_model_interpretation/index.html">model interpretation</a>, the next sub-module in the course.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Calibration course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 47 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

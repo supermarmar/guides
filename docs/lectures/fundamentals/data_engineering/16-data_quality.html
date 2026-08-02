@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 16: data quality and validation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Data quality and validation</h1>
+  <p class="subtitle">A factory inspects goods inwards. Nobody argues that checking a delivery against the order is wasted effort, or that it would be better to discover the wrong components after the product has shipped. Data platforms routinely make exactly that choice, and then call the consequences a modelling problem.</p>
+  <div class="meta">
+    <span>Lecture 16 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part V: the undercurrents</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Data quality is not a property of data in the abstract; it is fitness for a stated purpose, which means it can only be assessed against expectations somebody has written down. The engineering work is therefore in two halves: making the expectations explicit, and enforcing them at the boundaries where violations can still be stopped cheaply.</p>
+
+  <p>Six dimensions cover almost every expectation worth stating: <strong>completeness</strong>, is everything here; <strong>validity</strong>, does each value conform to its domain; <strong>accuracy</strong>, does it match reality; <strong>consistency</strong>, do related facts agree; <strong>uniqueness</strong>, is anything duplicated; and <strong>timeliness</strong>, did it arrive when it was needed. Accuracy is the awkward one, because checking it needs an independent source, which is exactly what reconciliation provides.</p>
+
+  <p>Three decisions turn expectations into a control. <em>Where</em> to check: at the ingestion boundary, after each transformation, and at the publish gate. <em>What to do</em> on failure: fail the batch, quarantine the offending rows, or warn and continue, chosen per check rather than globally. And <em>whether to keep the result</em>: always, because the series of quality measurements over time is the monitoring signal of Lecture 18 and the evidence a validator will ask for.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Goods inwards at a factory. The delivery note says four hundred bearings of 12 mm; the inspector counts them, measures a sample, and checks the certificate. Rejecting a bad pallet at the gate costs an hour. Discovering the same bad bearings after they are inside a thousand assemblies costs a recall. Nobody in manufacturing finds this controversial. The only reason it is controversial in data is that the bad pallet does not look bad: it produces a number, and the number looks like a number.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Tests are not monitors, and you need both</span>
+    A test is a point-in-time assertion with a binary answer: this column is unique, this key resolves, this value is in range. A monitor watches a quantity over time and alerts on unexpected movement: the row count is down twelve per cent, the default rate has doubled, the file arrived four hours late. Tests catch the things you knew could go wrong. Monitors catch the things you did not. A platform with only tests fails silently in every way its authors did not anticipate, which is most ways. This lecture builds the tests; Lecture 18 builds the monitors.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>The cost curve from Lecture 01 is the entire argument.</strong> A defect caught at ingestion is a failed load. The same defect in a published regulatory return is a restatement, a supervisory conversation, and possibly a capital add-on. Every check in this lecture is an attempt to move detection leftwards, and the economics are so lopsided that the usual objection, that validation slows the pipeline down, answers itself: the pipeline is not the deliverable, the trustworthy number is.</p>
+
+  <p><strong>Model validation treats data controls as part of the model.</strong> A modeller who cannot demonstrate what was checked, when, and with what outcome is presenting an unvalidated model however good the estimation. Persisted quality results are the artefact that closes this, and they are cheap to keep: a table of check name, target, timestamp, result, and measured value costs nothing and answers most of the questions a validator asks about data.</p>
+
+  <p><strong>Silent partial success is the failure mode to design against.</strong> Lecture 10 made this point about ingestion and it generalises. A transformation that drops five per cent of rows through an inner join, a cast that turns unparseable values into nulls, a filter that excludes more than intended: each produces output that is structurally fine and quantitatively wrong. The countermeasure is boring and effective: count rows in and out of every step, assert the relationship you expect, and make an unexpected relationship fatal.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The six dimensions, made checkable</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Dimension</th><th>Question</th><th>How you check it on a loan snapshot</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Completeness</strong></td><td>Is everything present?</td><td>Row count within tolerance of the source and of last month; no null keys; every expected partition exists</td></tr>
+      <tr><td><strong>Validity</strong></td><td>Does each value conform to its domain?</td><td>Types, ranges, accepted values, patterns: arrears months 0 to 120, currency in ISO list, rate between 0 and 1</td></tr>
+      <tr><td><strong>Accuracy</strong></td><td>Does it match reality?</td><td>Reconcile exposure totals to the general ledger; compare a sample to the source system directly</td></tr>
+      <tr><td><strong>Consistency</strong></td><td>Do related facts agree?</td><td>Default flag agrees with default date; balance not above limit for a non-overdraft; maturity after origination</td></tr>
+      <tr><td><strong>Uniqueness</strong></td><td>Is anything duplicated?</td><td>The declared grain is unique: one row per account per reporting date, asserted every build</td></tr>
+      <tr><td><strong>Timeliness</strong></td><td>Did it arrive in time?</td><td>Partition present by the agreed hour; source extract timestamp within the expected window</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Where to check, and what failure means</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three validation gates and three failure responses">
+      <defs>
+        <marker id="ar-dq2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three gates, and what each one is for</text>
+
+      <!-- pipeline -->
+      <rect x="30" y="42" width="120" height="54" rx="8" fill="#F4F4F5" stroke="#52525b" stroke-width="2"/>
+      <text x="90" y="64" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#27272a">source extract</text>
+      <text x="90" y="80" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">arrives in bronze</text>
+
+      <rect x="230" y="42" width="120" height="54" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="290" y="64" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#115e59">conform</text>
+      <text x="290" y="80" text-anchor="middle" font-family="Inter" font-size="8" fill="#0d9488">type, dedupe, silver</text>
+
+      <rect x="430" y="42" width="120" height="54" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="490" y="64" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#92400e">transform</text>
+      <text x="490" y="80" text-anchor="middle" font-family="Inter" font-size="8" fill="#b45309">join, derive, model</text>
+
+      <rect x="630" y="42" width="100" height="54" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="680" y="64" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#5b21b6">publish</text>
+      <text x="680" y="80" text-anchor="middle" font-family="Inter" font-size="8" fill="#7c3aed">gold, consumers</text>
+
+      <g stroke="#71717a" stroke-width="1.5" fill="none">
+        <line x1="153" y1="69" x2="226" y2="69" marker-end="url(#ar-dq2)"/>
+        <line x1="353" y1="69" x2="426" y2="69" marker-end="url(#ar-dq2)"/>
+        <line x1="553" y1="69" x2="626" y2="69" marker-end="url(#ar-dq2)"/>
+      </g>
+
+      <!-- gates -->
+      <g font-family="Inter" font-size="8.5">
+        <rect x="176" y="112" width="128" height="72" rx="6" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="240" y="128" text-anchor="middle" font-weight="700" fill="#115e59">GATE 1: SCHEMA</text>
+        <text x="186" y="144" fill="#0d9488">expected columns present</text>
+        <text x="186" y="157" fill="#0d9488">types coercible</text>
+        <text x="186" y="170" fill="#0d9488">no unexpected columns</text>
+        <text x="240" y="180" text-anchor="middle" font-style="italic" fill="#0d9488">fail the batch</text>
+
+        <rect x="376" y="112" width="128" height="72" rx="6" fill="#ffffff" stroke="#b45309" stroke-width="1.5"/>
+        <text x="440" y="128" text-anchor="middle" font-weight="700" fill="#92400e">GATE 2: ROW RULES</text>
+        <text x="386" y="144" fill="#b45309">ranges, categories</text>
+        <text x="386" y="157" fill="#b45309">cross-field consistency</text>
+        <text x="386" y="170" fill="#b45309">grain uniqueness</text>
+        <text x="440" y="180" text-anchor="middle" font-style="italic" fill="#b45309">quarantine rows</text>
+
+        <rect x="576" y="112" width="154" height="72" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="653" y="128" text-anchor="middle" font-weight="700" fill="#5b21b6">GATE 3: AGGREGATE</text>
+        <text x="586" y="144" fill="#7c3aed">volume within tolerance</text>
+        <text x="586" y="157" fill="#7c3aed">reconciles to ledger</text>
+        <text x="586" y="170" fill="#7c3aed">distribution plausible</text>
+        <text x="653" y="180" text-anchor="middle" font-style="italic" fill="#7c3aed">block the publish</text>
+      </g>
+
+      <!-- responses -->
+      <rect x="30" y="204" width="700" height="140" rx="10" fill="#F4F4F5" stroke="#52525b" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="380" y="226" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#27272a">CHOOSE THE RESPONSE PER CHECK, NOT GLOBALLY</text>
+      <g font-family="Inter" font-size="9.5">
+        <text x="50" y="250" font-weight="700" fill="#991b1b">FAIL</text>
+        <text x="110" y="250" fill="#3f3f46">Stop, publish nothing, page someone. For anything that makes the batch meaningless:</text>
+        <text x="110" y="263" fill="#3f3f46">missing column, unparseable key, grain not unique, reconciliation break.</text>
+
+        <text x="50" y="287" font-weight="700" fill="#92400e">QUARANTINE</text>
+        <text x="140" y="287" fill="#3f3f46">Route bad rows to a side table with the reason, publish the rest, alert on volume.</text>
+        <text x="140" y="300" fill="#3f3f46">For row-level defects in a large batch where 200 bad rows should not block 2 million good ones.</text>
+
+        <text x="50" y="324" font-weight="700" fill="#115e59">WARN</text>
+        <text x="110" y="324" fill="#3f3f46">Record and continue. For checks that are informative but not yet trusted, or where the</text>
+        <text x="110" y="337" fill="#3f3f46">tolerance is still being learned. Review warnings weekly, or they become wallpaper.</text>
+      </g>
+    </svg>
+    <figcaption>Three gates matched to three responses. The critical design point is that the response is a property of the individual check: a missing key column must stop everything, while two hundred implausible arrears counts in two million rows should be quarantined and counted. Applying one response to every check produces either a pipeline that never runs or one that never stops.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Schema enforcement with pandera</h3>
+
+  <p><strong>pandera</strong> declares a schema for a dataframe and validates against it, which puts the type and range discipline of Lecture 04 in the Python layer where extracts and models actually live.</p>
+
+  <pre><code>import pandera.pandas as pa
+
+snapshot_schema = pa.DataFrameSchema(
+    {
+        "account_id":     pa.Column(str, nullable=False),
+        "reporting_date": pa.Column("datetime64[ns]", nullable=False),
+        "customer_id":    pa.Column(str, nullable=False),
+        "currency":       pa.Column(str, pa.Check.isin(["GBP", "EUR", "USD", "ZAR"])),
+        "balance":        pa.Column(float, pa.Check.ge(0), nullable=False),
+        "interest_rate":  pa.Column(float, pa.Check.in_range(0, 1), nullable=False),
+        "arrears_months": pa.Column(int, pa.Check.in_range(0, 120), nullable=False),
+        "unlikely_to_pay": pa.Column(bool, nullable=False),
+        "default_date":   pa.Column("datetime64[ns]", nullable=True),
+    },
+    checks=[
+        # dataframe-level: cross-column consistency, which a column check cannot express
+        pa.Check(lambda df: ((df.arrears_months &gt;= 3) | df.unlikely_to_pay)
+                            == df.default_date.notna(),
+                 error="default flag and default date disagree"),
+        pa.Check(lambda df: ~df.duplicated(subset=["account_id", "reporting_date"]).any(),
+                 error="grain is not unique: account_id + reporting_date"),
+    ],
+    strict=True,      # unexpected columns are an error, which catches schema drift
+    coerce=True,      # cast to the declared type, failing loudly if impossible
+)
+
+# lazy=True collects every failure rather than stopping at the first
+try:
+    validated = snapshot_schema.validate(frame, lazy=True)
+except pa.errors.SchemaErrors as errors:
+    failure_report = errors.failure_cases    # a dataframe: check, column, index, failing value
+    # persist the report, then decide: fail, quarantine, or warn</code></pre>
+
+  <p>Four options carry most of the value. <code>strict=True</code> turns an unexpected column into an error, which is how you detect the schema drift of Lecture 10 on the day it happens rather than the quarter it breaks something. <code>coerce=True</code> makes the schema an active cast rather than a passive assertion, so the downstream code is guaranteed its types. <code>lazy=True</code> gathers every failure into one report, which is the difference between one useful conversation with the source owner and twenty rounds of fix-and-rerun. And dataframe-level checks express the cross-column rules that per-column checks cannot, including the default-flag consistency rule that Lecture 04 encoded as a constraint.</p>
+
+  <p>The class-based interface is worth preferring in a codebase, because a schema then behaves like a type: importable, testable, referenced in function signatures, and documented in one place.</p>
+
+  <pre><code>from typing import Optional
+from pandera.typing import Series
+
+class LoanSnapshot(pa.DataFrameModel):
+    """Monthly loan snapshot at the account-month grain."""
+    account_id:      Series[str]   = pa.Field(nullable=False)
+    reporting_date:  Series[pa.DateTime] = pa.Field(nullable=False)
+    balance:         Series[float] = pa.Field(ge=0)
+    arrears_months:  Series[int]   = pa.Field(in_range={"min_value": 0, "max_value": 120})
+    default_date:    Optional[Series[pa.DateTime]] = pa.Field(nullable=True)
+
+    class Config:
+        strict = True
+        coerce = True
+
+    @pa.dataframe_check(error="grain must be unique")
+    def unique_grain(cls, df) -&gt; bool:
+        return not df.duplicated(subset=["account_id", "reporting_date"]).any()</code></pre>
+
+  <h3>The checks that go beyond a schema</h3>
+
+  <p>Schema validation handles validity and, partly, completeness. Three further categories need explicit work, and they are where the real defects hide.</p>
+
+  <p><em>Volumetric checks.</em> Compare the row count against the same period last month and against a trailing average, with a tolerance chosen from the observed variation rather than invented. A retail book that grows by half a per cent a month should trigger on a three per cent move; a book with genuine seasonality needs the comparison against the same month last year. State the tolerance and its basis, because an unexplained tolerance is either ignored or endlessly debated.</p>
+
+  <p><em>Reconciliation checks.</em> This is the only way to test accuracy, because it is the only check that consults an independent source. Total exposure against the general ledger, account counts against the source system's own report, defaulted balances against the impairment run. A reconciliation that ties to within a stated threshold is the strongest single piece of evidence that a dataset is right, and its absence is why so many data quality frameworks measure only internal plausibility.</p>
+
+  <p><em>Distributional checks.</em> The mean and the tails of key columns, and the stability of the mix. A credit risk audience already has the tool: the <strong>population stability index</strong> used to monitor scorecard inputs is exactly a distributional drift check, and applying it to pipeline outputs rather than only to model inputs catches upstream changes early. A sudden shift in the distribution of a feature is either a real portfolio change or a broken pipeline, and both are worth knowing about within a day.</p>
+
+  <h3>Quarantine, and treating quality results as data</h3>
+
+  <pre><code>-- quarantine: rejected rows keep their context and the reason
+CREATE TABLE IF NOT EXISTS dq_quarantine (
+    quarantined_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    source_table     VARCHAR   NOT NULL,
+    batch_id         VARCHAR   NOT NULL,
+    check_name       VARCHAR   NOT NULL,
+    failure_detail   VARCHAR,
+    row_payload      JSON      NOT NULL      -- the whole rejected row, verbatim
+);
+
+-- results: every check, every run, pass or fail, with the measured value
+CREATE TABLE IF NOT EXISTS dq_results (
+    run_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    batch_id       VARCHAR   NOT NULL,
+    target         VARCHAR   NOT NULL,
+    check_name     VARCHAR   NOT NULL,
+    dimension      VARCHAR   NOT NULL,      -- one of the six
+    severity       VARCHAR   NOT NULL,      -- fail | quarantine | warn
+    passed         BOOLEAN   NOT NULL,
+    measured_value DOUBLE,                  -- the number, not just the verdict
+    threshold      DOUBLE
+);</code></pre>
+
+  <p>Storing the measured value rather than only the verdict is the detail that makes this worth doing. A pass at 1.9 per cent against a two per cent threshold is a warning that a binary result throws away, and a series of such measurements is a monitor. Keeping the rejected row verbatim in the quarantine table means a source owner can be shown the exact record, and a corrected row can be replayed without re-extracting.</p>
+
+  <div class="callout insight">
+    <span class="tag">Nulls, zeros, and the most expensive small mistake</span>
+    A cast that fails silently produces a null. A <code>COALESCE</code> applied thoughtlessly turns that null into a zero. A zero balance is a real value that enters every average, every sum, and every model feature as though it were observed. The discipline: never coalesce a measure to zero at the point of ingestion, keep the null, count the nulls as a quality metric, and decide the treatment consciously in the transformation that needs a value, documenting the choice. Lecture 05's note that <code>AVG</code> ignores nulls is the other half of this: whichever you choose, the population your statistic describes must be stated.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: the validation suite for a monthly loan snapshot</strong>
+    <p>The dataset: two million accounts, monthly, feeding both PD modelling and IFRS 9 staging. Build the suite gate by gate, with the response and the rationale for each. Note how few of these checks are about data types.</p>
+    <p><em>Gate 1, on arrival, response FAIL.</em> Expected columns present and no unexpected ones. Every declared type coercible. No nulls in <code>account_id</code>, <code>reporting_date</code>, or <code>customer_id</code>. Reporting date equals the expected month end and is identical for every row. Any failure here means the extract is not the extract we agreed, so nothing proceeds and the source owner is called.</p>
+    <p><em>Gate 2a, row rules, response QUARANTINE.</em> Arrears months in 0 to 120. Rate in 0 to 1. Currency in the accepted list. Balance non-negative unless the product is an overdraft. Maturity after origination. Origination not after the reporting date. Each failing row goes to quarantine with the check name, and the batch continues. The alert fires on the <em>count</em>: fewer than fifty quarantined rows is logged, more than five hundred pages someone, because a step change in row-level rejects means an upstream change rather than a handful of bad records.</p>
+    <p><em>Gate 2b, grain and referential integrity, response FAIL.</em> The account-month grain is unique. Every <code>customer_id</code> resolves in the customer dimension. These cannot be quarantined: a duplicated grain means every downstream aggregate is wrong, and an unresolvable customer means the dimensional join will silently drop the row later. Fail loudly now.</p>
+    <p><em>Gate 2c, cross-field consistency, response FAIL.</em> The default flag agrees with the default date, per the definition in Lecture 04. This is a fail rather than a quarantine because a disagreement means the definition has been implemented inconsistently somewhere upstream, which is a definitional problem affecting the whole batch rather than a data problem affecting some rows.</p>
+    <p><em>Gate 3a, volumetrics, response FAIL with a manual override.</em> Row count within three per cent of the trailing twelve-month average, with the tolerance derived from the observed monthly variation over three years. Where a genuine portfolio event breaches it, an acquisition, a securitisation, a book transfer, an operator records an approved override with a reason, which is itself logged. That override path is what stops a legitimate business event from becoming an argument about turning the check off permanently.</p>
+    <p><em>Gate 3b, reconciliation, response FAIL.</em> Total exposure by legal entity and currency against the general ledger, to within a stated materiality. This is the check that tests accuracy rather than plausibility, it is the one the finance function already understands, and it is the strongest evidence available that the dataset represents the bank's actual position. A break here is never acceptable to publish through.</p>
+    <p><em>Gate 3c, distribution, response WARN then FAIL on repetition.</em> Population stability index on the arrears distribution, the balance distribution, and the product mix against the prior month, plus the default rate against its twelve-month range. First breach warns, since a real portfolio shift looks identical to a pipeline defect on day one. Two consecutive breaches fail, because a genuine shift will have been explained by then and an unexplained one is a defect.</p>
+    <p><em>What the suite costs and returns.</em> It is perhaps three hundred lines of declarative checks and runs in minutes against two million rows. Against that: schema drift is caught the day the source changes, duplicated loads cannot double count, definitional inconsistency between the PD and IFRS 9 paths cannot occur silently, the exposure ties to the ledger every month with evidence retained, and the quality history is available to a model validator as a table rather than as a recollection. Every item in that list is something that has cost a real risk function a real quarter.</p>
+    <p><em>The one thing the suite cannot do.</em> None of it tests whether the definitions are the right definitions. A perfectly validated dataset built on a misreading of the regulatory default definition passes every check here. Correctness of meaning is established by review, documentation, and the single-definition discipline of Lecture 15, not by validation. Keeping those two ideas separate matters: a green dashboard means the data is what we said it should be, not that what we said was right.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Quality is fitness for a stated purpose, so it starts with written expectations across six dimensions. Enforce them at three gates: schema on arrival, row rules and grain during conforming, aggregate and reconciliation checks before publishing. Choose the response per check, because failing everything and failing nothing are equally useless. Use pandera or its equivalent for schema and cross-column rules in Python, dbt tests for the same in the warehouse, and reconciliation for the only check that tests accuracy. Persist measured values, not verdicts, and quarantine rejected rows verbatim. And keep clear that validation proves conformance to a definition, never the correctness of the definition.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the six quality dimensions and say which one cannot be checked without an independent source.</li>
+      <li>Distinguish a test from a monitor and say what a platform with only tests fails to catch.</li>
+      <li>Give the three gates and the response that suits each, with an example of a check that must fail rather than quarantine.</li>
+      <li>What do <code>strict=True</code>, <code>coerce=True</code>, and <code>lazy=True</code> each buy in a pandera schema?</li>
+      <li>Why store the measured value rather than only the pass or fail verdict?</li>
+      <li>Explain the null-to-zero trap and state the discipline that avoids it.</li>
+      <li>Why should a distributional breach warn on first occurrence but fail on the second?</li>
+      <li>What class of error does a fully green validation suite not detect, and what addresses it instead?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="15-dbt_analytics_engineering.html">Lecture 15</a> covered tests attached to transformation models; this lecture is the wider apparatus around them.</li>
+      <li><strong>Next:</strong> <a href="17-orchestration.html">Lecture 17</a> is what runs these checks on a schedule and decides what happens when one fails at three in the morning.</li>
+      <li><strong>Cross-link:</strong> constraints are <a href="04-sql_definitions.html">Lecture 04</a>; reconciliation controls first appear in <a href="10-batch_ingestion.html">Lecture 10</a>; the monitors that complement these tests are <a href="18-observability_and_contracts.html">Lecture 18</a>.</li>
+      <li><strong>Banking link:</strong> the population stability index used here is the same instrument as in scorecard monitoring in the <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">credit risk</a> track; the accuracy dimension is where data quality meets the finance reconciliation.</li>
+      <li><strong>Further reading:</strong> the pandera documentation; DAMA's data quality dimensions for the canonical taxonomy; the Great Expectations documentation for an alternative expectation-suite approach.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 16 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

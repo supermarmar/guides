@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 18: medoids and mixtures</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Unsupervised learning</a></div>
+  <h1>Medoids and mixtures</h1>
+  <p class="subtitle">K-means, from lecture 1 of this sub-module, has two hidden assumptions worth surfacing: it needs squared Euclidean distance specifically, because that is the only dissimilarity whose cluster centre reduces to a simple average, and it draws a hard boundary around every cluster, as if every observation belonged unambiguously to exactly one group. K-medoids relaxes the first assumption; Gaussian mixture models relax the second. Together they are the standard answers whenever k-means' two silent commitments turn out to be wrong for the problem at hand.</p>
+  <div class="meta">
+    <span>Lecture 18 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part III: unsupervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>K-medoids</strong> solves the identical fixed-$K$ partitioning problem as k-means, minimising total within-cluster dissimilarity, but restricts the cluster centres, the <strong>medoids</strong>, to be genuine observations from the dataset rather than an averaged, possibly nonsensical point: $\arg\min_{(\mathcal{X}_k)_k;\, c_k \in L} \sum_k \sum_{i \in \mathcal{X}_k} L(c_k, X_i)$, with the minimisation running over medoids drawn from the learning sample $L$ itself, not over any point in the ambient space. Because a medoid never needs to be averaged, K-medoids works with any dissimilarity function (lecture 3), not only squared Euclidean distance, at the cost of a harder combinatorial search; the standard algorithm, <strong>partitioning around medoids</strong> (PAM), searches by repeatedly proposing to swap a current medoid for a non-medoid observation and keeping the swap only if it reduces total dissimilarity. <strong>Gaussian mixture models</strong> (GMMs) address the opposite limitation: rather than assuming clusters have hard, mutually exclusive boundaries, a GMM models the population as a weighted mixture of $K$ Gaussian distributions and gives every observation a soft, probabilistic degree of membership in every cluster, fitted by <strong>maximum likelihood</strong> via the <strong>expectation-maximisation</strong> (EM) algorithm, which alternates between computing each observation's cluster membership probabilities (the E-step) and updating each cluster's mean, covariance, and weight given those probabilities (the M-step) until convergence to a local optimum of the likelihood.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    If you cluster policyholders by demographic features and ask k-means for the "centre" of a cluster, it hands you the arithmetic average, which might describe a policyholder who is 47.3 years old, 0.6 male, and drives a car that is 60 per cent a Toyota and 40 per cent a Ford, a description of nobody. K-medoids instead hands you an actual policyholder from the cluster, the one who is, on balance, most centrally representative, which you can point to, look up, and use as a genuine model point. Gaussian mixture models solve a different problem: instead of insisting every policyholder belongs to exactly one segment, they let you say a given policyholder is 70 per cent segment A and 30 per cent segment B, which is often closer to the truth when segments genuinely blend into each other at their edges.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture completes the fixed-$K$, flat-partition family alongside k-means (lecture 1), having introduced the tree-structured alternative in between (lecture 4, hierarchical clustering). K-medoids and GMMs relax k-means' two silent assumptions, the dissimilarity function and the hard-boundary assumption, in that order, and the next lecture's DBSCAN relaxes a third: that the number of clusters must be fixed at all.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons these two extensions earn their place beyond k-means.</p>
+
+  <p>First, <strong>a genuine, pointable representative observation is frequently the actual deliverable, not a mathematical convenience</strong>: the previous lecture's model-point exercise needs a real policy to stand in for a cluster, not the arithmetic average of several policies' features, because downstream valuation and reporting processes need an object that actually exists and can be audited, exactly the gap K-medoids closes.</p>
+
+  <p>Second, <strong>many genuinely useful dissimilarity functions are not squared Euclidean distance</strong>, and k-means simply cannot be applied to them, because its cluster-update step relies specifically on the fact that the mean minimises squared Euclidean distance to a set of points; a Manhattan-distance clustering (more robust to outliers), an edit-distance clustering of claims-narrative text, or any dissimilarity from lecture 3's broader menu needs K-medoids or an equivalent, not k-means.</p>
+
+  <p>Third, <strong>hard cluster boundaries are frequently a modelling fiction that a soft, probabilistic model can avoid</strong>: two risk segments that genuinely blend into each other at the margin (a mid-market small-business book that shares characteristics with both a retail and a corporate book, say) are better described by a mixture model's gradual, overlapping membership probabilities than by k-means' insistence that every policy belongs unambiguously to exactly one segment.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    The actuary from the previous lecture's model-point exercise, having settled on complete-linkage hierarchical clustering to fix the chaining problem, still faced a second issue: each cluster's "centre", computed as the arithmetic mean of the policies in it, was not itself a real policy, meaning the valuation team could not simply look up the model point's cash flows from an existing record and instead had to construct a synthetic policy from averaged features, a process the actuarial function's internal audit had already flagged as a documentation gap in a prior review. Re-running the exercise with K-medoids, keeping the same complete-linkage-derived number of clusters, produced representative policies that were genuine, existing records, each traceable to a real policyholder, closing the audit gap entirely without materially changing the clustering's substantive quality.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold two contrasting pictures: k-medoids' hard boundary around a real observation acting as centre, and a Gaussian mixture's soft, overlapping probability contours with no hard boundary at all.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="K-medoids hard boundaries versus Gaussian mixture soft, overlapping boundaries">
+      <defs>
+        <marker id="mmArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Hard boundary (K-medoids) versus soft, overlapping membership (GMM)</text>
+
+      <g transform="translate(40, 50)">
+        <rect x="0" y="0" width="360" height="240" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="180" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">K-medoids: hard boundary, real medoid</text>
+        <line x1="180" y1="40" x2="180" y2="210" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <g fill="#78716c">
+          <circle cx="100" cy="90" r="3"/><circle cx="80" cy="130" r="3"/><circle cx="120" cy="160" r="3"/>
+          <circle cx="90" cy="180" r="3"/><circle cx="140" cy="110" r="3"/>
+          <circle cx="260" cy="100" r="3"/><circle cx="290" cy="140" r="3"/><circle cx="240" cy="170" r="3"/>
+          <circle cx="270" cy="180" r="3"/><circle cx="310" cy="110" r="3"/>
+        </g>
+        <circle cx="105" cy="140" r="6" fill="#b45309" stroke="#78350f" stroke-width="1.5"/>
+        <text x="105" y="120" text-anchor="middle" font-family="Inter" font-size="8" fill="#78350f">medoid (real obs.)</text>
+        <circle cx="275" cy="140" r="6" fill="#b45309" stroke="#78350f" stroke-width="1.5"/>
+        <text x="180" y="230" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">every point belongs to exactly one side</text>
+      </g>
+
+      <g transform="translate(460, 50)">
+        <rect x="0" y="0" width="360" height="240" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="180" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Gaussian mixture: soft, overlapping membership</text>
+        <ellipse cx="110" cy="140" rx="70" ry="55" fill="#0d9488" fill-opacity="0.15" stroke="#0d9488" stroke-width="1.5"/>
+        <ellipse cx="240" cy="140" rx="70" ry="55" fill="#7c3aed" fill-opacity="0.15" stroke="#7c3aed" stroke-width="1.5"/>
+        <g fill="#78716c">
+          <circle cx="90" cy="110" r="3"/><circle cx="70" cy="150" r="3"/><circle cx="110" cy="170" r="3"/>
+          <circle cx="260" cy="110" r="3"/><circle cx="290" cy="150" r="3"/><circle cx="250" cy="170" r="3"/>
+          <circle cx="175" cy="140" r="3.5" fill="#dc2626"/>
+        </g>
+        <text x="175" y="200" text-anchor="middle" font-family="Inter" font-size="8" fill="#7f1d1d">this point: ~55% green, ~45% purple</text>
+        <text x="180" y="230" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">no hard line; ellipses overlap at the margin</text>
+      </g>
+    </svg>
+    <figcaption>K-medoids (left) draws a hard boundary, exactly like k-means, but anchors each cluster to a genuine observation rather than a computed average. A Gaussian mixture (right) has no hard boundary at all: the overlapping ellipses represent each component's probability contours, and a point in the overlap region (red) receives a genuine, non-trivial probability of belonging to both components rather than being forced into one.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A medoid must already exist; a mean never needs to.</strong> This single restriction is what lets K-medoids work with any dissimilarity function, at the cost of a combinatorial rather than an analytic centre-update step. <strong>A mixture model answers "how much", not "which one".</strong> Where k-means and K-medoids answer "which cluster does this point belong to", a GMM answers "what is the probability this point belongs to each cluster", a genuinely different and often more honest question.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>K-medoids: the double minimisation</h3>
+
+  <p>Recall k-means solves $\arg\min_{(\mathcal{X}_k)_k} \sum_k \sum_{i \in \mathcal{X}_k} \|c_k - X_i\|_2^2$ with the cluster centres $c_k$ computed analytically as the within-cluster mean, a step that only works because the mean is the unique minimiser of total squared Euclidean distance to a set of points. <strong>K-medoids</strong> instead solves a genuine double minimisation, over both the partition and the choice of centres, with centres restricted to the observed sample:</p>
+  $$\arg\min_{(\mathcal{X}_k)_k;\ c_k \in L \text{ for all } k} \sum_{k} \sum_{i \in \mathcal{X}_k} L(c_k, X_i),$$
+  <p>for any dissimilarity function $L$ (lecture 3), not necessarily squared Euclidean distance. Because the minimising $c_k$ can no longer be computed in closed form (there is no formula for "the observation that minimises total dissimilarity to the rest of the cluster" the way there is for a mean), K-medoids necessarily costs more to fit than k-means, a direct, unavoidable consequence of dropping the assumption that made k-means' centre-update step cheap.</p>
+
+  <h3>The PAM algorithm</h3>
+
+  <p><strong>Partitioning around medoids</strong> (PAM) solves the double minimisation by local search. Initialise by choosing $K$ initial medoids at random from $L$, and assign every other observation to its closest medoid, giving an initial total within-cluster dissimilarity $D = \sum_k \sum_{i \in \mathcal{X}_k} L(c_k, X_i)$. Then repeat until no improving move is found: select at random a current medoid and a non-medoid observation, tentatively swap their roles (the non-medoid becomes a candidate medoid, the former medoid rejoins the pool of ordinary observations), reassign every observation to its closest medoid under the new configuration, and recompute the total dissimilarity $D'$; keep the swap if $D' &lt; D$, otherwise reject it and try a different candidate swap. This is a genuine local search, not a guaranteed global optimum, exactly the caveat k-means' own iterative algorithm already carried; running PAM from several different random initial medoid sets and keeping the best result is the standard practical remedy, identical in spirit to k-means' own multiple-restart practice.</p>
+
+  <h3>Gaussian mixture models: the generative story</h3>
+
+  <p>A <strong>Gaussian mixture model</strong> assumes the observations $(X_i)_{i=1}^n$ are drawn i.i.d. from a density that is a weighted combination of $K$ multivariate Gaussian components,</p>
+  $$f(x) = \sum_{k=1}^{K} p_k \cdot \frac{1}{(2\pi)^{q/2}|\Sigma_k|^{1/2}} \exp\left(-\frac{1}{2}(x-c_k)^\top \Sigma_k^{-1}(x-c_k)\right),$$
+  <p>with mean vectors $(c_k)_k$, covariance matrices $(\Sigma_k)_k$, and mixture weights $(p_k)_k$ summing to one, collectively the model parameter $\theta = (c_k, \Sigma_k, p_k)_k$. Unlike k-means and K-medoids, which draw a hard partition boundary directly, a GMM is a genuine probabilistic density model, and clustering falls out of it as a secondary step: assign each observation to the component with the highest posterior probability, computed below, if a flat hard partition is still wanted for reporting purposes.</p>
+
+  <h3>Why maximum likelihood needs help: the EM algorithm</h3>
+
+  <p>Maximising the GMM log-likelihood directly is a harder problem than it looks: the log-likelihood of a mixture is generally unbounded (a component's covariance can shrink toward a single training point, driving that component's density, and hence the overall likelihood, to infinity, a spurious, degenerate solution rather than a genuine one), so a raw maximum-likelihood estimate does not always exist in a well-posed sense, and even where a sensible local maximum exists, it cannot generally be found in closed form the way a single Gaussian's MLE can. The standard practical solution is the <strong>expectation-maximisation</strong> (EM) algorithm, which alternates two steps until convergence to a (local) stationary point of the likelihood.</p>
+
+  <p>The <strong>E-step</strong> computes, for the current parameter estimate $\hat\theta$, each observation's posterior <strong>responsibility</strong>, the probability it was generated by each component given its observed value,</p>
+  $$\gamma_{ik} = \frac{\hat p_k \, \mathcal{N}(X_i; \hat c_k, \hat \Sigma_k)}{\sum_{j=1}^{K} \hat p_j \, \mathcal{N}(X_i; \hat c_j, \hat \Sigma_j)}.$$
+  <p>The <strong>M-step</strong> then updates every parameter as a responsibility-weighted statistic across the sample,</p>
+  $$\hat c_k \leftarrow \frac{\sum_i \gamma_{ik} X_i}{\sum_i \gamma_{ik}}, \qquad \hat \Sigma_k \leftarrow \frac{\sum_i \gamma_{ik}(X_i - \hat c_k)(X_i-\hat c_k)^\top}{\sum_i \gamma_{ik}}, \qquad \hat p_k \leftarrow \frac{1}{n}\sum_i \gamma_{ik}.$$
+  <p>Each pass of E-step then M-step is guaranteed not to decrease the likelihood, so the algorithm converges monotonically to a stationary point, though not necessarily the global maximum, and, as flagged above, not necessarily a well-behaved one at all without further restriction; a common practical safeguard restricts every component's covariance matrix to share the identical, isotropic (spherical) form, trading some flexibility for protection against the degenerate, collapsing-covariance solutions the unrestricted model is prone to. Several random initialisations, exactly as for k-means and PAM, is standard practice here too.</p>
+
+  <h3>Reading off a hard partition, if one is still needed</h3>
+
+  <p>Where a flat, hard partition is required for a downstream process that cannot consume soft probabilities (a reporting system expecting one segment label per policy, say), the standard conversion assigns each observation to the component with the largest responsibility, $\hat k(X_i) = \arg\max_k \gamma_{ik}$. This discards the genuine soft-membership information the GMM computed, and should be treated as a deliberate simplification for a specific downstream constraint, not as evidence that the underlying clustering was ever really hard in the first place.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Using k-means on mixed or categorical data and treating the resulting centroid as meaningful</span>
+    Averaging one-hot-encoded categorical dummies produces a centroid with fractional values on every level, a description of nobody, exactly the failure the vignette's model-point exercise ran into; K-medoids, with a dissimilarity function suited to mixed data, is the direct fix, not a workaround.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating PAM's result as a guaranteed global optimum</span>
+    PAM's swap-based local search, like k-means' own iteration, can converge to different local optima from different random initial medoid sets; running several restarts and keeping the configuration with the lowest total dissimilarity is standard practice, not an optional refinement.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Fitting an unrestricted GMM and being surprised by a degenerate solution</span>
+    An unrestricted covariance GMM can converge to a component whose covariance has collapsed toward a single point (or a small cluster of near-identical points), driving that component's density, and the overall likelihood, toward an unbounded value; restricting covariance structure (equal, isotropic components, as a common default) or monitoring for near-singular covariance estimates during fitting is the standard safeguard.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Discarding soft membership probabilities without a stated reason</span>
+    Converting a GMM's genuine, informative responsibilities into a hard label by taking the arg max throws away exactly the information a GMM was chosen to capture in the first place; do this only when a specific downstream system genuinely cannot consume a probability vector, and consider whether that downstream constraint is itself worth revisiting before defaulting to a hard label.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>K-medoids relaxes k-means' dependence on squared Euclidean distance by restricting cluster centres to genuine observations, solved by PAM's swap-based local search, and pays for that generality with a combinatorial rather than analytic centre-update step. Gaussian mixture models relax the hard-boundary assumption both k-means and K-medoids share, modelling the population as a weighted combination of Gaussian components and computing a genuine, probabilistic degree of membership for every observation in every cluster, fitted by the EM algorithm's alternating E-step (compute responsibilities) and M-step (update parameters given those responsibilities), with degenerate, unbounded solutions a real risk the unrestricted model needs guarding against.</p>
+
+  <p>The next lecture relaxes the remaining assumption every method so far has shared, that the number of clusters $K$ is fixed in advance: density-based clustering, and the DBSCAN algorithm specifically, determines the number of clusters dynamically from the data's own density structure, with no $K$ chosen by the modeller at all.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the K-medoids optimisation problem and explain why it is a genuine double minimisation, unlike k-means.</li>
+      <li>Describe the PAM algorithm's swap step and explain why several random restarts are standard practice.</li>
+      <li>Write the Gaussian mixture density and explain what distinguishes a GMM's answer to "which cluster" from k-means' answer.</li>
+      <li>Describe the E-step and M-step of the EM algorithm, and explain why each pass is guaranteed not to decrease the likelihood.</li>
+      <li>Explain why an unrestricted GMM's likelihood can become unbounded, and name the standard practical safeguard.</li>
+      <li>An actuary needs a genuine, existing policy to serve as a model point for a cluster, not an averaged synthetic one. Which method from this lecture solves this directly, and why does k-means not?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 4 (<a href="04-hierarchical_clustering.html">hierarchical clustering</a>) relaxed the fixed-$K$ assumption via a dendrogram; this lecture relaxes the dissimilarity-function and hard-boundary assumptions instead.</li>
+      <li><strong>Next:</strong> Lecture 6 (<a href="06-density_based_clustering.html">density-based clustering</a>) relaxes the fixed-$K$ assumption directly, via DBSCAN.</li>
+      <li><strong>Paired with:</strong> Lecture 1's <a href="01-k_means_clustering.html">k-means clustering</a> is the method both K-medoids and GMMs generalise; reading them together makes clear exactly which of k-means' assumptions each one relaxes.</li>
+      <li><strong>Built on:</strong> The Bayesian statistics track's treatment of maximum likelihood under latent variables is the general theory the EM algorithm here is a specific instance of.</li>
+      <li><strong>Outside this course:</strong> K-medoids-based model-point selection is standard practice in life insurance valuation exercises requiring a genuine, auditable representative policy per cluster; GMMs are a common soft-segmentation tool wherever risk segments are known to blend at their margins rather than separate cleanly.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Unsupervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 18 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

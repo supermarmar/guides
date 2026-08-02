@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 12: causal inference</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Statistics</a></div>
+  <h1>Causal inference</h1>
+  <p class="subtitle">The closing lecture. Every preceding lecture treated inferential questions about the joint distribution of observed variables: "what is the conditional expectation of $Y$ given $X$?", "what is the probability of $Y &gt; t$?", "what is the dependence structure?". This lecture asks a fundamentally different question: "what would the distribution of $Y$ look like if $X$ were intervened on?". The answer is not in general the same as the conditional expectation, and confusing the two is the root of countless practical mistakes: A/B-testing surrogates that move in the wrong direction, "data-driven" policies that backfire, model-validation exercises that miss the actual treatment effect. The frameworks that distinguish the two questions are the potential outcomes model (Neyman-Rubin) and the graphical model with the do-operator (Pearl). The estimation toolkit (regression adjustment, propensity scores, instrumental variables, regression discontinuity, difference-in-differences, synthetic controls, double machine learning) is the working apparatus that follows. The credit-risk applications are direct: A/B tests of credit offers, evaluating policy changes, model validation under intervention.</p>
+  <div class="meta">
+    <span>Lecture 12 of 14</span>
+    <span>Reading time, 90 minutes</span>
+    <span>Part V: extensions</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Causal inference</strong> is the inferential framework for questions about <em>interventions</em> rather than observations. The conditional expectation $E[Y \mid X = x]$ answers "if I see $X = x$, what should I expect for $Y$?"; the causal effect of $X$ on $Y$, written $E[Y \mid do(X = x)]$ or $E[Y(x)]$, answers "if I intervene to set $X = x$, what should I expect for $Y$?". The two are equal only under special conditions; in general they differ because $X$ in observed data is itself an outcome of some process, and the variables that influence $X$ also influence $Y$ (confounding). Causal inference is the apparatus for identifying when conditional expectations can be read as causal effects, and for adjusting when they cannot.</p>
+
+  <p>The two foundational frameworks are the <strong>potential outcomes model</strong> (Neyman 1923, Rubin 1974), which posits a hypothetical pair of outcomes $(Y(0), Y(1))$ for each unit (the outcome under treatment and under control), and the <strong>graphical model</strong> with the do-operator (Pearl 1995, 2009), which represents the causal structure as a directed acyclic graph and defines the interventional distribution via the do-operator. The two are equivalent in their identification claims; they emphasise different aspects of the problem. The working estimators are organised by what identification assumption they impose: <strong>regression adjustment</strong> and <strong>propensity-score methods</strong> assume measurable confounders; <strong>instrumental variables</strong> assume an external source of variation; <strong>regression discontinuity</strong> assumes a sharp threshold rule; <strong>difference-in-differences</strong> assumes parallel pre-treatment trends; <strong>synthetic controls</strong> assume a weighted combination of untreated units matches the treated unit's counterfactual. Each is a way to import enough additional structure to identify the causal effect from observational data.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The conditional expectation $E[Y \mid X = x]$ is what you would see if you sampled units that happened to have $X = x$ in the population. The causal effect $E[Y \mid do(X = x)]$ is what you would see if you went to every unit in the population and set their $X$ to $x$ by force. The difference is that "happens to have $X = x$" filters on the variables that drove $X$ to $x$ in the first place, which include confounders that also influence $Y$. Causal inference is the apparatus for stripping out the confounding, either by experimental design (randomise $X$) or by observational adjustment (condition on the confounders, exploit an instrument, find a discontinuity). The rest is the algebra of the various adjustment routes.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Where this sits in the stats world
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Where this sits in the stats world</h2></div>
+
+  <div class="callout insight">
+    <span class="tag">Extensions, the interventional question</span>
+    This lecture sits in <strong>Part V</strong> of the <a href="index.html">stats world map</a> and closes the course. The relevant pillars are 3 (inferential) and 4 (modelling): causal inference extends the inferential question from "what is the conditional distribution?" to "what is the interventional distribution?", and extends the modelling question from "what is $f(\mathbf{x}; \theta)$?" to "what is $f(\mathbf{x}; \theta)$ under intervention on a subset of $\mathbf{x}$?". The previous eleven lectures all answered the observational question; this one answers the interventional question. The two are different questions and they have different inferential machinery.
+  </div>
+
+  <p>Three structural links to earlier lectures. To <strong>lecture 03 (inferential statistics)</strong>: the randomised controlled experiment is the gold-standard inferential design and is the only setting in which the observational conditional expectation and the causal effect coincide without further assumption. Estimation in an RCT is two-sample inference of the kind covered in lecture 03; the apparatus of confidence intervals, hypothesis tests, and effect sizes transfers directly. To <strong>lecture 05 (GLMs)</strong>: regression adjustment for causal inference is GLM with a specific identification claim attached. The same model with the same likelihood means different things in an observational versus a randomised setting; the coefficient on the treatment indicator is a causal estimand in the second and an associational quantity in the first (without further assumption). To <strong>lecture 09 (Bayesian statistics)</strong>: Bayesian causal inference combines a structural causal model (a DAG with parametric mechanisms) with priors on the mechanisms, producing a posterior over causal effects. The framework is the natural unifier of observational and experimental data and is widely used in applied epidemiology and increasingly in policy evaluation.</p>
+
+  <p>One scoping note. This lecture covers the standard framework and the major estimation routes. Mediation analysis (decomposing a total effect into direct and indirect paths), heterogeneous treatment effects (estimating effects that vary across the population), causal discovery (inferring the DAG from data), and modern ML-based causal inference (double machine learning, causal forests, deep instrumental variables) are previewed in section 8 but not developed at depth. The Rubin-versus-Pearl debate, which animates much of the academic literature, is treated lightly: in applied work the two frameworks agree on identification and disagree mostly on emphasis.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons causal inference matters for a credit risk modeller. First, <strong>A/B testing and policy evaluation</strong>. A bank that wants to know whether a new credit-limit-increase strategy lifts customer revenue without raising default losses cannot read this off observational data, because customers who took the increase under the current policy are a non-random subset of the population (they applied for it, were approved, accepted it). The naive comparison "revenue of customers who took the increase versus customers who did not" mixes the causal effect of the increase with the selection effect of who tends to take it. An A/B test (randomly allocate the new strategy to a subset of customers, measure the difference) gives the causal effect directly. Causal inference is the framework that makes this rigorous, including the case where pure randomisation is impractical and observational adjustment is needed.</p>
+
+  <p>Second, <strong>model validation and counterfactual analysis</strong>. A PD model trained on observational data predicts default conditional on covariates. It does <em>not</em>, in general, predict what would happen to default rates if the credit-limit policy were changed; predicting that requires a causal model. The mistake of treating predictive correlations as causal is the source of repeated failures in machine-learning-driven credit policy: "give larger limits to customers with high predicted revenue", deployed across a portfolio, often fails because the predicted-revenue feature was correlated with low default in the training distribution but is no longer so once the policy intervention changes the distribution of customers receiving large limits. Causal inference flags this failure mode formally and provides remedies (estimate the effect of the intervention, not the predictive correlation under the current allocation).</p>
+
+  <p>Third, the <strong>regulatory environment</strong> increasingly requires causal-style reasoning. The FCA's principles around "consumer outcomes" and the Consumer Duty in the UK ask firms to demonstrate that their actions cause good outcomes for consumers, not merely that they correlate with them. The EU AI Act's high-risk classification of credit-decision systems requires fairness analysis that, properly done, is causal: does the model treat similarly-situated applicants similarly under counterfactual changes to protected characteristics? Naive predictive-fairness metrics (equal accuracy across groups, demographic parity in predictions) are correlational and can be both achieved without causal fairness and missed when causal fairness is achieved. The framework for principled fairness analysis is causal.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The mental model</h2></div>
+
+  <p>The picture below shows the classical confounding structure and the major identification routes.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 410" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Causal inference: confounding and identification routes">
+      <defs>
+        <marker id="ciArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Confounding and the major identification routes</text>
+
+      <!-- Confounding DAG -->
+      <g transform="translate(40, 60)">
+        <rect x="0" y="0" width="300" height="180" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="150" y="22" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">The confounding problem</text>
+
+        <circle cx="80" cy="120" r="22" fill="#fff" stroke="#b45309" stroke-width="2"/>
+        <text x="80" y="125" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#92400e">X</text>
+        <circle cx="220" cy="120" r="22" fill="#fff" stroke="#b45309" stroke-width="2"/>
+        <text x="220" y="125" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#92400e">Y</text>
+        <circle cx="150" cy="60" r="22" fill="#fff" stroke="#b45309" stroke-width="2"/>
+        <text x="150" y="65" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#92400e">U</text>
+
+        <line x1="100" y1="120" x2="198" y2="120" stroke="#b45309" stroke-width="2" marker-end="url(#ciArrow)"/>
+        <line x1="135" y1="78" x2="92" y2="105" stroke="#b45309" stroke-width="2" marker-end="url(#ciArrow)"/>
+        <line x1="165" y1="78" x2="208" y2="105" stroke="#b45309" stroke-width="2" marker-end="url(#ciArrow)"/>
+
+        <text x="150" y="160" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">U confounds the X→Y relationship</text>
+      </g>
+
+      <!-- The interventional cut -->
+      <g transform="translate(370, 60)">
+        <rect x="0" y="0" width="300" height="180" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="150" y="22" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">After do(X = x)</text>
+
+        <circle cx="80" cy="120" r="22" fill="#fff" stroke="#0d9488" stroke-width="2"/>
+        <text x="80" y="125" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#115e59">X</text>
+        <circle cx="220" cy="120" r="22" fill="#fff" stroke="#0d9488" stroke-width="2"/>
+        <text x="220" y="125" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#115e59">Y</text>
+        <circle cx="150" cy="60" r="22" fill="#fff" stroke="#0d9488" stroke-width="2"/>
+        <text x="150" y="65" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#115e59">U</text>
+
+        <line x1="100" y1="120" x2="198" y2="120" stroke="#0d9488" stroke-width="2" marker-end="url(#ciArrow)"/>
+        <!-- U->X arrow CUT -->
+        <line x1="135" y1="78" x2="92" y2="105" stroke="#dc2626" stroke-width="2" stroke-dasharray="3 3"/>
+        <text x="100" y="92" font-family="Inter" font-size="14" font-weight="700" fill="#dc2626">×</text>
+        <line x1="165" y1="78" x2="208" y2="105" stroke="#0d9488" stroke-width="2" marker-end="url(#ciArrow)"/>
+
+        <text x="150" y="160" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">do(X) cuts the inbound edges into X</text>
+      </g>
+
+      <!-- Routes panel -->
+      <g transform="translate(40, 260)">
+        <rect x="0" y="0" width="800" height="130" rx="12" fill="#EFF6FF" stroke="#1d4ed8" stroke-width="2"/>
+        <text x="400" y="22" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Five major routes to causal identification from observational data</text>
+
+        <g font-family="Inter" font-size="10" fill="#1e3a8a">
+          <text x="20" y="48">1. Randomisation (RCT)</text>
+          <text x="20" y="65" font-style="italic" fill="#1d4ed8">  guarantees X ⊥ U; no further assumption needed</text>
+
+          <text x="20" y="86">2. Regression / propensity adjustment</text>
+          <text x="20" y="103" font-style="italic" fill="#1d4ed8">  assumes all U observed; condition on it</text>
+
+          <text x="420" y="48">3. Instrumental variables</text>
+          <text x="420" y="65" font-style="italic" fill="#1d4ed8">  use exogenous Z that affects X but not Y directly</text>
+
+          <text x="420" y="86">4. Regression discontinuity / Diff-in-diff</text>
+          <text x="420" y="103" font-style="italic" fill="#1d4ed8">  exploit a threshold rule or a pre-post comparison</text>
+        </g>
+
+        <text x="400" y="123" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#1d4ed8">5. Synthetic controls (weighted control unit) and double-ML (use ML for nuisance functions)</text>
+      </g>
+    </svg>
+    <figcaption>The conceptual structure of causal inference. <strong>Left panel</strong>: the confounding DAG. $U$ (an unobserved confounder) affects both treatment $X$ and outcome $Y$; the observed association between $X$ and $Y$ mixes the true $X \to Y$ effect with the spurious $X \leftarrow U \to Y$ backdoor path. <strong>Middle panel</strong>: under intervention $do(X = x)$, the inbound edges into $X$ are cut; $X$ is now set by the experimenter, not by $U$. The backdoor path is broken and the remaining $X \to Y$ effect is the causal effect. <strong>Right panel</strong>: the five major routes to identifying the causal effect from observational data. Each imports a different additional assumption to compensate for the absence of intervention.</figcaption>
+  </figure>
+
+  <p>Two slogans pin the workflow. <strong>Without intervention, you need an identification strategy.</strong> Observational data alone does not identify causal effects; an additional assumption is always required. The candidate assumptions are "all confounders are observed" (regression adjustment, propensity scores), "there is an instrument that affects $X$ but not $Y$ directly" (IV), "there is a sharp threshold in $X$" (RDD), "pre-treatment trends are parallel" (diff-in-diff), "a weighted combination of untreated units approximates the treated counterfactual" (synthetic control). Each is testable to some degree, but none is testable in full; the analyst must defend the choice on subject-matter grounds. <strong>The fundamental problem of causal inference is missing data.</strong> For each unit you observe one of $(Y(0), Y(1))$, never both. The individual-level causal effect $Y_i(1) - Y_i(0)$ is forever unobservable; only averages over units (ATE, ATT, ATU, CATE) are identifiable, and only under assumptions.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The detail</h2></div>
+
+  <h3>5.1 Potential outcomes and causal estimands</h3>
+
+  <p>The Neyman-Rubin potential outcomes framework. For a binary treatment $T \in \{0, 1\}$, each unit $i$ has a pair of potential outcomes $(Y_i(0), Y_i(1))$: the outcome that would be observed if the unit received control or treatment respectively. The <strong>individual-level causal effect</strong> is $\tau_i = Y_i(1) - Y_i(0)$. The <strong>observed outcome</strong> is $Y_i = T_i Y_i(1) + (1 - T_i) Y_i(0)$.</p>
+
+  <p>The <strong>fundamental problem of causal inference</strong> (Holland 1986): for each unit we observe $Y_i(T_i)$ and not $Y_i(1 - T_i)$. The individual-level effect is therefore unobservable; we can only target population-level summaries. The standard estimands:</p>
+
+  <ul>
+    <li><strong>Average treatment effect (ATE)</strong>: $\tau = E[Y(1) - Y(0)]$. The expected effect across the entire population.</li>
+    <li><strong>Average treatment effect on the treated (ATT)</strong>: $\tau_{\text{ATT}} = E[Y(1) - Y(0) \mid T = 1]$. The effect on those who actually received treatment. Often the relevant quantity for a deployed policy: "what did treating these particular customers achieve?".</li>
+    <li><strong>Average treatment effect on the untreated (ATU)</strong>: $\tau_{\text{ATU}} = E[Y(1) - Y(0) \mid T = 0]$. The counterfactual effect that the untreated population would have experienced if treated.</li>
+    <li><strong>Conditional ATE (CATE)</strong>: $\tau(\mathbf{x}) = E[Y(1) - Y(0) \mid \mathbf{X} = \mathbf{x}]$. The effect at a specific covariate value. The basis for personalised treatment policies.</li>
+    <li><strong>Local ATE (LATE)</strong>: the effect on the "compliers" subpopulation in the IV framework (section 5.5). A different beast: not an effect on a well-defined demographic subgroup but on the subpopulation whose treatment status responds to the instrument.</li>
+  </ul>
+
+  <h3>5.2 Identification assumptions</h3>
+
+  <p>Three assumptions underlie almost every causal inference workflow.</p>
+
+  <p><strong>SUTVA (stable unit treatment value assumption)</strong>: the potential outcome $Y_i(t)$ for unit $i$ depends only on unit $i$'s own treatment, not on what treatment other units receive (no interference) and not on the way the treatment is delivered (no hidden variations). Violated by network effects (vaccination spillovers), market-level effects (a price intervention on one customer affects others through market clearing), and "treatment hidden variations" (the treatment label is the same but the delivered intervention differs).</p>
+
+  <p><strong>Unconfoundedness / ignorability</strong>: $(Y(0), Y(1)) \perp T \mid \mathbf{X}$. Given observed covariates $\mathbf{X}$, the treatment assignment is as good as random. This is the assumption that "all confounders are measured". It is the strongest assumption in the framework and the one that observational identification rests on; it is fundamentally untestable from the data alone.</p>
+
+  <p><strong>Positivity / overlap</strong>: $0 &lt; P(T = 1 \mid \mathbf{X} = \mathbf{x}) &lt; 1$ for all $\mathbf{x}$ in the relevant range. Every covariate combination has both treated and untreated units. Violations mean some combinations have no comparison group, and the effect at those combinations is not identifiable without extrapolation.</p>
+
+  <p>Under SUTVA, ignorability, and positivity, the ATE is identified from observational data via</p>
+
+  $$\tau = E[E[Y \mid T = 1, \mathbf{X}] - E[Y \mid T = 0, \mathbf{X}]].$$
+
+  <p>The inner expectation is what regression adjustment estimates per $\mathbf{x}$; the outer expectation marginalises over the population distribution of $\mathbf{X}$.</p>
+
+  <h3>5.3 Randomised experiments</h3>
+
+  <p>The gold standard. A <strong>randomised controlled trial (RCT)</strong> assigns treatment $T$ by a randomisation device independent of all unit characteristics. Under randomisation, $(Y(0), Y(1)) \perp T$ unconditionally; the ignorability assumption is satisfied by design, without conditioning on any covariate. The unbiased ATE estimator is the difference in sample means: $\hat{\tau} = \bar{Y}_1 - \bar{Y}_0$, with variance $\text{Var}(Y_1) / n_1 + \text{Var}(Y_0) / n_0$ and a standard $t$-test for inference.</p>
+
+  <p>Three reasons RCTs remain the gold standard despite their cost. (1) No identification assumption beyond SUTVA. (2) The estimator is the simplest possible (a difference of means); no sophisticated apparatus is required. (3) The experimental design itself is a form of pre-registration that constrains analyst degrees of freedom in interpreting results. The cost is that RCTs are sometimes infeasible (you cannot randomly assign customers to be in default), ethically constrained (you cannot randomly deny credit to half a population to study the effect of denial), or expensive (the necessary sample size for small effects is large).</p>
+
+  <p><strong>Variations on the basic RCT</strong>. Stratified randomisation balances covariates by stratum-level randomisation. Cluster randomisation randomises units of analysis (branches, regions) rather than individuals, with appropriate variance correction. Adaptive trials (multi-armed bandits, response-adaptive designs) allocate more units to the better-performing arms as the trial progresses, trading off statistical power against ethical efficiency. The credit-A/B-testing infrastructure at most large banks is some form of adaptive design.</p>
+
+  <h3>5.4 Regression adjustment and propensity scores</h3>
+
+  <p>When randomisation is infeasible and ignorability is plausible, the working tool is to condition on observed covariates.</p>
+
+  <p><strong>Regression adjustment.</strong> Fit a regression of $Y$ on $\mathbf{X}$ and $T$, with treatment-by-covariate interactions:</p>
+
+  $$E[Y \mid T = t, \mathbf{X} = \mathbf{x}] = \alpha + \beta t + \mathbf{x}^\top \boldsymbol{\gamma} + t \mathbf{x}^\top \boldsymbol{\delta}.$$
+
+  <p>The ATE is $\hat{\tau} = \hat{\beta} + E[\mathbf{X}]^\top \hat{\boldsymbol{\delta}}$ (marginalising the interaction over the sample mean of $\mathbf{X}$). The CATE at $\mathbf{x}$ is $\hat{\beta} + \mathbf{x}^\top \hat{\boldsymbol{\delta}}$. Simple, transparent, and correct under ignorability and correct functional form. The risk is model misspecification: if the conditional expectation is not linear-plus-interaction in $\mathbf{X}$, the regression estimator is biased.</p>
+
+  <p><strong>Propensity score (Rosenbaum and Rubin 1983).</strong> The propensity score is $e(\mathbf{x}) = P(T = 1 \mid \mathbf{X} = \mathbf{x})$, the probability of treatment given covariates. Rosenbaum and Rubin's theorem: under ignorability and positivity, $(Y(0), Y(1)) \perp T \mid e(\mathbf{X})$. Conditioning on the one-dimensional propensity score is equivalent to conditioning on the entire covariate vector, for causal-inference purposes. Three propensity-score-based estimators.</p>
+
+  <p><em>Matching.</em> For each treated unit, find an untreated unit with similar $\hat{e}(\mathbf{x})$ (typically by nearest-neighbour matching with a caliper); the matched untreated unit serves as the counterfactual. The matched-difference average is the ATT estimator. Intuitive, robust to model misspecification in the outcome regression, but depends critically on the propensity-score model.</p>
+
+  <p><em>Inverse probability of treatment weighting (IPTW).</em> Weight each unit by $T_i / \hat{e}(\mathbf{x}_i) + (1 - T_i) / (1 - \hat{e}(\mathbf{x}_i))$ and compute a weighted mean difference. Under correct propensity-score model and positivity, this is an unbiased ATE estimator. Sensitive to extreme propensity scores (units with $\hat{e}$ near 0 or 1 get huge weights and dominate the estimator), with weight stabilisation and trimming as standard remedies.</p>
+
+  <p><em>Doubly-robust estimation.</em> Combine outcome regression and propensity-score weighting in a way that gives a consistent estimator if either model is correctly specified. The augmented inverse probability weighting (AIPW) estimator is</p>
+
+  $$\hat{\tau}_{\text{AIPW}} = \frac{1}{n} \sum_i \left\{\hat{\mu}_1(\mathbf{x}_i) - \hat{\mu}_0(\mathbf{x}_i) + \frac{T_i (Y_i - \hat{\mu}_1(\mathbf{x}_i))}{\hat{e}(\mathbf{x}_i)} - \frac{(1 - T_i)(Y_i - \hat{\mu}_0(\mathbf{x}_i))}{1 - \hat{e}(\mathbf{x}_i)}\right\}.$$
+
+  <p>The first part is the regression imputation; the second and third are bias corrections that vanish if the outcome model is correct but matter if the propensity model is correct. The double robustness is a substantial robustness property and AIPW is the modern default for causal effect estimation under ignorability.</p>
+
+  <h3>5.5 Instrumental variables</h3>
+
+  <p>When ignorability fails because of unobserved confounders, the workhorse alternative is an <strong>instrumental variable (IV)</strong>: a third variable $Z$ that affects the treatment but does not directly affect the outcome except through the treatment. Formally, $Z$ is an instrument for $T$ in identifying the effect of $T$ on $Y$ if:</p>
+
+  <ul>
+    <li><strong>Relevance:</strong> $Z$ is correlated with $T$ (testable).</li>
+    <li><strong>Exclusion restriction:</strong> $Z$ affects $Y$ only through $T$ (not testable; defended on subject-matter grounds).</li>
+    <li><strong>Independence:</strong> $Z$ is independent of the unobserved confounders (not testable; defended on subject-matter grounds).</li>
+  </ul>
+
+  <p>The classical IV estimator for the linear model $Y = \alpha + \beta T + U$ is the two-stage least squares (2SLS): regress $T$ on $Z$ in stage 1 to get fitted values $\hat{T}$; regress $Y$ on $\hat{T}$ in stage 2 to get $\hat{\beta}_{\text{IV}}$. The estimator is consistent for $\beta$ even when $T$ is correlated with $U$. For binary $T$ and binary $Z$, the Wald estimator $\hat{\beta} = (\bar{Y}_{Z=1} - \bar{Y}_{Z=0}) / (\bar{T}_{Z=1} - \bar{T}_{Z=0})$ gives the same result and admits the LATE interpretation (Imbens-Angrist 1994): the effect of $T$ on $Y$ for the "compliers", the subpopulation whose treatment status responds to the instrument.</p>
+
+  <p>The credit application: an exogenous policy change (a regulator-imposed loan-to-value cap, a random rotation of underwriters with different acceptance criteria) can serve as an instrument for credit access. The effect of credit access on default is identifiable from the IV estimator even when the credit-access decision is endogenous to unobserved customer characteristics.</p>
+
+  <p><strong>Weak instruments</strong> are a real problem. If the first-stage F-statistic is below 10 (Staiger-Stock rule of thumb), the IV estimator can be more biased than OLS and have substantially distorted inference. The modern remedy is to use weak-instrument-robust inference (Anderson-Rubin, conditional likelihood ratio) instead of standard 2SLS standard errors.</p>
+
+  <h3>5.6 Regression discontinuity</h3>
+
+  <p>A natural experiment created by a threshold rule. The <strong>regression discontinuity design (RDD)</strong> applies when treatment is assigned by whether a "running variable" $W$ exceeds a cutoff $c$. Units just above and just below the cutoff are nearly identical in expectation (assuming the running variable cannot be precisely manipulated), so the difference in outcomes near the cutoff identifies the local treatment effect.</p>
+
+  <p>The standard estimator fits local linear regressions on each side of the cutoff and reports the difference in intercepts at $W = c$:</p>
+
+  $$\hat{\tau}_{\text{RDD}} = \lim_{w \downarrow c} E[Y \mid W = w] - \lim_{w \uparrow c} E[Y \mid W = w].$$
+
+  <p>The bandwidth choice (how close to the cutoff to fit the regressions) is the main practical issue; modern tools (Calonico-Cattaneo-Titiunik 2014) provide optimal bandwidth selection and bias-corrected inference. The credit application: a credit-score cutoff that determines automatic approval versus manual review provides a natural RDD setting for studying the effect of credit access on customer outcomes. Imbens and Lemieux (2008) review the methodology; the Cattaneo-Idrobo-Titiunik volumes are the modern standard reference.</p>
+
+  <h3>5.7 Difference-in-differences</h3>
+
+  <p>An identification strategy that exploits a treatment introduced at a known date for a known subset of units. Comparing pre-versus-post in the treated group alone mixes the treatment effect with secular trends; comparing treated to untreated post-only mixes the treatment effect with pre-existing group differences. The <strong>difference-in-differences (DiD)</strong> estimator differences out both:</p>
+
+  $$\hat{\tau}_{\text{DiD}} = (\bar{Y}_{\text{treat, post}} - \bar{Y}_{\text{treat, pre}}) - (\bar{Y}_{\text{control, post}} - \bar{Y}_{\text{control, pre}}).$$
+
+  <p>The identification assumption is <strong>parallel trends</strong>: in the absence of treatment, the treated and untreated groups would have followed parallel paths. Testable in the pre-treatment period (do pre-trends look parallel?) and defended forward by assumption. Modern DiD methodology handles staggered treatment adoption (multiple units treated at different times) with the Callaway-Sant'Anna (2021) framework; the older two-way fixed-effects estimator has been shown to be biased under heterogeneous effects and is no longer recommended.</p>
+
+  <h3>5.8 Synthetic controls</h3>
+
+  <p>When the treated unit is a single entity (a country with a tax reform, a state with a new welfare programme, a portfolio with a new credit policy) and the candidate controls are many similar but untreated entities, the <strong>synthetic control method</strong> (Abadie and Gardeazabal 2003; Abadie, Diamond, Hainmueller 2010) constructs a weighted combination of control units that approximates the treated unit's pre-treatment trajectory, and uses the post-treatment difference as the effect estimate.</p>
+
+  <p>The weights are chosen to minimise pre-treatment outcome distance, subject to the weights being non-negative and summing to one. Inference is by placebo tests (apply the same method to each control unit pretending it was treated; the distribution of placebo effects is the null). The framework has become the standard for case-study causal inference and is increasingly used in policy evaluation. Generalisations include the matrix-completion methods (Athey, Bayati, Doudchenko, Imbens, Khosravi 2021) and the synthetic-DiD framework (Arkhangelsky, Athey, Hirshberg, Imbens, Wager 2021).</p>
+
+  <h3>5.9 Graphical models and the do-calculus</h3>
+
+  <p>Pearl's framework. A <strong>directed acyclic graph (DAG)</strong> represents causal relationships: nodes are variables, directed edges are direct causal effects. The structural assumption is that the joint distribution factors according to the DAG: $P(\mathbf{V}) = \prod_i P(V_i \mid \text{parents}(V_i))$. The do-operator $do(X = x)$ represents intervention: the conditional $P(\mathbf{V} \mid do(X = x))$ is obtained by removing the incoming edges into $X$ and setting $X = x$ in the modified factorisation.</p>
+
+  <p>Pearl's <strong>backdoor criterion</strong> identifies sets of variables $\mathbf{Z}$ that, when conditioned on, identify the causal effect of $X$ on $Y$. $\mathbf{Z}$ is a backdoor adjustment set if (a) no node in $\mathbf{Z}$ is a descendant of $X$ in the DAG; (b) $\mathbf{Z}$ blocks every "backdoor path" from $X$ to $Y$ (every path with an arrow into $X$). Conditioning on $\mathbf{Z}$ then identifies $P(Y \mid do(X = x))$ by</p>
+
+  $$P(Y \mid do(X = x)) = \sum_\mathbf{z} P(Y \mid X = x, \mathbf{Z} = \mathbf{z}) P(\mathbf{Z} = \mathbf{z}).$$
+
+  <p>The <strong>front-door criterion</strong> covers a case where no backdoor adjustment set is observed but a mediator is: under appropriate conditions, the effect can still be identified via the mediator. The full <strong>do-calculus</strong> is a set of three inference rules that, applied repeatedly, decides whether any causal effect is identifiable from a given DAG and observed data.</p>
+
+  <p>The graphical framework is most useful for two purposes. First, as a clarifier of confounding structure: drawing the DAG forces the analyst to make assumptions about which variables affect which, and the visual representation reveals adjustment sets and unmeasured-confounder threats. Second, for high-dimensional identification problems where the appropriate adjustment set is not obvious; the do-calculus is an algorithmic answer to "given this DAG, what should I condition on?".</p>
+
+  <h3>5.10 Sensitivity analysis to unmeasured confounding</h3>
+
+  <p>Ignorability is untestable; one of the standard practices in modern causal inference is to ask "how large would the unmeasured confounding have to be to overturn the conclusion?". Three named tools.</p>
+
+  <p><strong>Rosenbaum bounds.</strong> Parameterise the deviation from random treatment assignment by a single sensitivity parameter $\Gamma \geq 1$ (with $\Gamma = 1$ being random assignment). For each $\Gamma$, compute the worst-case bound on the test statistic; find the largest $\Gamma$ that still gives a significant effect. Reported as "the conclusion is robust to a confounder that affects treatment odds by up to a factor of $\Gamma^*$".</p>
+
+  <p><strong>E-values</strong> (VanderWeele and Ding 2017). The minimum strength of association (on a risk-ratio scale) that an unmeasured confounder must have with both the treatment and the outcome, conditional on measured covariates, to fully explain away the observed effect. Easy to compute, increasingly required in observational-study reporting.</p>
+
+  <p><strong>Cinelin-Hazlett bias bounds</strong> (2020). A modern framework that parameterises confounding in terms of the additional partial $R^2$ a hypothetical confounder would explain in the outcome and the treatment; allows graphical contour plots of the "minimum confounding strength to overturn the conclusion" as a function of these two quantities.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Worked example: estimating the effect of a credit-limit increase on default rates</h2></div>
+
+  <p>A bank wants to know whether offering customers a credit-limit increase causes their default rate to rise. Two routes: an A/B test (the gold standard) and an observational analysis on historical data (necessary when A/B testing is not yet available).</p>
+
+  <div class="worked">
+    <strong>Step 1: the A/B test.</strong>
+    <p>Randomly assign a 25 per cent uplift in credit limit to half of an eligible cohort (the treatment), keep the other half at current limits (control). Run for 12 months. Outcome: 12-month default rate. Sample size from a power calculation targeting a 0.5 percentage point detectable effect at 80 per cent power and 5 per cent significance: approximately 30,000 customers per arm. Difference in default rates: treated 2.1 per cent, control 1.6 per cent, difference 0.5 percentage points. $t$-test $p = 0.0008$, 95 per cent CI $[0.21, 0.79]$. Conclusion: the credit-limit increase causes a 0.5 percentage point rise in 12-month default.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 2: observational analysis on legacy data.</strong>
+    <p>Before the A/B test launched, historical data was available for customers who received a credit-limit increase under the previous discretionary policy ($n = 50{,}000$) versus those who did not ($n = 450{,}000$). Naive comparison: default rate among those who received an increase is 1.2 per cent versus 2.0 per cent among those who did not. The naive comparison suggests the increase <em>reduces</em> default rates by 0.8 percentage points, in the opposite direction from the A/B test.</p>
+    <p>What is happening: customers who received an increase under the discretionary policy were selected on having a strong recent payment history, low utilisation, and high credit-bureau scores. These same characteristics independently predict low default. The selection effect is confounding.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 3: propensity-score adjustment.</strong>
+    <p>Fit a logistic regression of "received increase" on observable covariates (credit-bureau score, payment history, utilisation, tenure, age, income). The estimated propensity score $\hat{e}(\mathbf{x})$ ranges from 0.02 to 0.45 in the data. Trim observations with $\hat{e} &lt; 0.05$ or $\hat{e} &gt; 0.4$ to ensure positivity. Apply IPTW: weight each observation by $T / \hat{e}(\mathbf{x}) + (1 - T) / (1 - \hat{e}(\mathbf{x}))$. The reweighted comparison: treated 1.8 per cent, untreated 1.6 per cent, difference 0.2 percentage points (CI roughly $[0.05, 0.35]$). The propensity adjustment has removed most of the spurious negative association but suggests a smaller effect than the A/B test.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 4: doubly-robust AIPW.</strong>
+    <p>Fit an outcome regression of default on covariates within each treatment group. Combine outcome regression and propensity adjustment via the AIPW formula. The point estimate is 0.4 percentage points (CI $[0.15, 0.55]$), closer to the A/B test but still understated.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 5: sensitivity analysis.</strong>
+    <p>The remaining gap (0.4 from AIPW versus 0.5 from RCT) is small but plausibly due to unobserved confounding: an unmeasured variable (the underwriter's gestalt judgement, recent communication with the customer, the customer's stated reason for needing more credit) that affects both the limit-increase decision and the default propensity. Compute the E-value: the unmeasured confounder would need to be associated with both treatment and outcome by a risk ratio of at least 1.6 to fully explain the difference. A confounder of that strength is plausible but not certain. Report both estimates with the sensitivity-analysis result.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 6: lessons and reporting.</strong>
+    <p>The example illustrates four points that recur throughout applied causal inference. (1) Naive observational comparison is often wrong, sometimes in sign, not just magnitude. (2) Propensity-score adjustment substantially corrects the bias but typically does not eliminate it. (3) Doubly-robust estimation is the modern best practice for observational ATE under ignorability. (4) The A/B test is the gold standard and the only one that supports causal claims without strong identification assumptions; whenever feasible, prefer it. The standard workflow for production credit-policy decisions is: pilot with an A/B test on a small cohort; if the test shows the expected direction and magnitude, scale up; if not, revise the policy.</p>
+  </div>
+
+  <p>Three sanity checks. (1) Pre-trends in the diff-in-diff version of the analysis: do treated and untreated cohorts' default rates track each other before the limit-increase decision? Visual diagnostic. (2) Refutation tests: does the propensity-score model produce extreme weights (which would violate positivity)? Are the trimmed observations a small fraction? (3) The estimated treatment effect should be robust to alternative regression specifications and to alternative propensity-score models; substantial sensitivity to either flags model misspecification.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Common pitfalls and cognitive traps</h2></div>
+
+  <h3>Reading a regression coefficient as a causal effect</h3>
+
+  <p>The most common single mistake. A regression of $Y$ on $X$ and controls gives a partial association under the joint distribution; this is a causal effect only under ignorability (all confounders observed and correctly modelled). In observational data the assumption is rarely satisfied without careful design. The reflex "let me just add controls until significance disappears" is not causal inference; it is a sequence of associational claims at different conditioning levels.</p>
+
+  <h3>Conditioning on a collider</h3>
+
+  <p>A collider is a variable that is caused by both $X$ and $Y$. Conditioning on a collider <em>creates</em> spurious association between $X$ and $Y$ where none would exist marginally. The classical example is selection into the sample on an outcome that depends on both treatment and the underlying potential outcome; the consequence is the survivorship and selection biases familiar in operational risk. Drawing the DAG before adding controls is the recommended discipline; collider variables are conditioned on at the analyst's peril.</p>
+
+  <h3>Choosing controls by "what changes the coefficient most"</h3>
+
+  <p>Some controls open backdoor paths and reduce bias; others open new ones (collider conditioning) and increase bias. There is no correct ordering of controls by "how much they change the coefficient"; the correct controls are those identified by the backdoor criterion on the assumed DAG. Stepwise selection, machine-learning feature selection, and "kitchen-sink" regression are all confounders of confounding analysis.</p>
+
+  <h3>Weak instruments interpreted as strong evidence</h3>
+
+  <p>An instrumental variable with a first-stage F-statistic of 5 produces an IV estimator that is more biased than OLS and has standard errors that under-state actual uncertainty by factors of 3 or more. The Staiger-Stock rule of thumb is F &gt; 10 for a single instrument; with multiple instruments the threshold is higher (Stock-Yogo 2005 tables). Weak-instrument-robust inference (Anderson-Rubin) should be the default rather than 2SLS standard errors when first-stage strength is in doubt.</p>
+
+  <h3>Parallel-trends assumed without checking</h3>
+
+  <p>DiD identification rests on the parallel-trends assumption, which can be tested in pre-treatment data and often fails. A DiD analysis with non-parallel pre-trends conflates the treatment effect with the differential pre-trend; the standard remedy is to include unit-by-time trend interactions, but this throws away most of the identifying variation. Modern DiD methodology (Callaway-Sant'Anna, de Chaisemartin-D'Haultfœuille) handles staggered treatment timing and heterogeneous effects properly; the older "two-way fixed effects with treatment dummy" estimator should not be used without explicit checks.</p>
+
+  <h3>Treating the LATE as an ATE</h3>
+
+  <p>The IV estimator identifies the LATE: the effect on the compliers, the subpopulation whose treatment status responds to the instrument. This is generally a different quantity from the ATE (the effect on the whole population) and from the ATT (the effect on the treated). For policy purposes the relevant estimand is often the ATE; the LATE is the right answer to a different question and citing it as the ATE is misleading. The remedy is either to explicitly target the ATE under stronger assumptions (regression adjustment under ignorability) or to interpret the IV result as a LATE with appropriate scope.</p>
+
+  <div class="callout warn">
+    <span class="tag">Causal inference rewards explicit assumptions</span>
+    Every causal claim from observational data rests on an identification assumption that is fundamentally untestable from the data alone. The discipline of causal inference is to name the assumption, justify it on subject-matter grounds, and conduct sensitivity analysis to show how robust the conclusion is to plausible violations. A causal claim that does not name its identification assumption is not causal inference; it is association masquerading as causation. The framework adds rigour by demanding this transparency.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8: Frontiers
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 8</span><h2>Frontiers and what's beyond</h2></div>
+
+  <p>Five frontiers.</p>
+
+  <p><strong>Heterogeneous treatment effects and the CATE.</strong> Average effects mask substantial heterogeneity in many real applications. The CATE $\tau(\mathbf{x})$ is the effect at a specific covariate value, and modern methods (causal forests, X-learner, R-learner, doubly-robust learners) estimate $\tau(\mathbf{x})$ as a function over $\mathbf{x}$ using flexible ML. The output supports personalised treatment policies: "give the credit-limit increase to customers $\mathbf{x}$ where $\hat{\tau}(\mathbf{x}) &lt; 0$". The frameworks of Athey, Wager, and collaborators (the EconML and grf packages) are the standard implementations.</p>
+
+  <p><strong>Double / debiased machine learning.</strong> Chernozhukov et al. (2018) showed how to use ML for the nuisance functions (the outcome regression and the propensity score) while retaining $\sqrt{n}$ inference on the causal parameter, by combining cross-fitting with the AIPW orthogonality structure. The framework decouples the rate of convergence of the nuisance estimators from the rate of inference on the causal parameter, allowing flexible ML (random forests, gradient boosting, neural networks) for the nuisance functions without sacrificing valid confidence intervals. The Python <code>EconML</code> and the R <code>DoubleML</code> packages are the standard tools.</p>
+
+  <p><strong>Causal discovery.</strong> Inferring the DAG from observational data, rather than assuming it as given. The PC algorithm (Spirtes-Glymour 1991), the GES algorithm, and modern continuous-optimisation methods (NOTEARS, Zheng et al. 2018) operate on conditional-independence patterns and on score-based criteria. Causal discovery is theoretically attractive but practically constrained by identifiability limits in the presence of unobserved confounders; for serious causal analysis, expert subject-matter input on the DAG remains essential.</p>
+
+  <p><strong>Causal fairness.</strong> A modern body of work that defines fairness in terms of counterfactual changes to a sensitive attribute, rather than predictive parity measures. Counterfactual fairness (Kusner, Loftus, Russell, Silva 2017): a decision is fair if it would be the same under a counterfactual change to the sensitive attribute, holding non-descendants of the sensitive attribute fixed. Path-specific effects decompose discrimination into legitimate and illegitimate channels. The framework is increasingly relevant for high-risk AI applications under the EU AI Act and similar legislation.</p>
+
+  <p><strong>Mediation analysis.</strong> Decomposing a total effect into a direct effect (not via the mediator) and an indirect effect (via the mediator). VanderWeele's (2015) framework supplies the modern identification theory under sequential ignorability assumptions. Useful for understanding mechanisms: "the credit-limit increase raises default rates by 0.5 percentage points; how much of this is via increased borrowing (the mediator) versus via direct behavioural change?".</p>
+</section>
+
+<!-- ============================================================
+     SECTION 9: Synthesis, recall, connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 9</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the causal-inference toolkit. The potential outcomes framework (Neyman-Rubin) and the graphical-models framework (Pearl) supply two equivalent ways of formalising the interventional question. The randomised experiment is the gold standard and is identified without additional assumption. Observational identification requires an additional assumption: ignorability (regression adjustment, propensity scores), an instrument (IV), a threshold rule (RDD), parallel pre-trends (DiD), or a weighted-control approximation (synthetic controls). Doubly-robust methods (AIPW) are the modern default under ignorability; double machine learning extends to flexible ML for nuisance functions. Sensitivity analysis (Rosenbaum bounds, E-values, Cinelli-Hazlett bias bounds) reports how robust the conclusion is to plausible unobserved confounding.</p>
+
+  <p>This lecture closes the methodological core of the course. The twelve lectures from here back to lecture 01 cover the descriptive (lecture 01), theoretical (02), inferential (03), modelling (04, 05), and stochastic-process (06, 07, 08) pillars, plus the Bayesian transverse framework (09) and three Part V extensions: copulas (10), extreme value theory (11), and causal inference (12). Each lecture builds on the others; reading them in sequence gives a complete map of the methodological discipline as it applies to the credit risk modeller and to the ASSA F107 syllabus. Two further lectures, Part VI, carry the modelling pillar (04, 05) one step further, toward the loss-function and exponential-family machinery the machine-learning track assumes: lecture 13 on the exponential dispersion family and lecture 14 on strictly consistent loss functions. Topics for further study beyond that sit in the machine-learning track (high-dimensional regression, deep learning, reinforcement learning), the financial engineering track (stochastic calculus, derivatives, term-structure models), and the actuarial science track (life contingencies, multi-state models, ruin theory). Statistics is the substrate that connects them all; with the toolkit of these fourteen lectures, the connections become legible.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Distinguish $E[Y \mid X = x]$ from $E[Y \mid do(X = x)]$. Under what condition do they coincide?</li>
+      <li>State SUTVA, ignorability, and positivity. Which of these is testable from observational data?</li>
+      <li>Describe the doubly-robust AIPW estimator. What is the double robustness property and why does it matter in practice?</li>
+      <li>Define an instrumental variable. State the three conditions a variable must satisfy to be a valid instrument, and explain which are testable.</li>
+      <li>Describe the regression discontinuity design. What is the identification assumption, and how can it be checked?</li>
+      <li>State the parallel-trends assumption of difference-in-differences. Why does the standard two-way fixed-effects estimator fail under heterogeneous treatment timing, and what is the modern remedy?</li>
+      <li>Define a collider and explain why conditioning on a collider induces spurious association.</li>
+      <li>You are asked to estimate the causal effect of a new credit-bureau-score model on portfolio default rates, without the ability to run an A/B test. Describe the identification strategy and the diagnostics you would report.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 11 (<a href="11-extreme_value_theory.html">extreme value theory</a>) closed the marginal-tail story; this lecture closes the course by extending the inferential frame from observation to intervention.</li>
+      <li><strong>Built on:</strong> Lecture 3 (<a href="03-inferential_statistics.html">inferential statistics</a>) supplied the testing apparatus that RCT analysis directly applies. Lecture 5 (<a href="05-generalised_linear_models.html">GLMs</a>) supplied the regression machinery for adjustment and the propensity-score model. Lecture 9 (<a href="09-bayesian_statistics.html">Bayesian statistics</a>) supplied the framework for Bayesian causal inference.</li>
+      <li><strong>Used by:</strong> A/B testing in credit-policy experimentation; observational analysis of historical policy changes; model validation under intervention (does the model give the same conclusions under a counterfactual change to the input distribution?); fairness analysis under the EU AI Act and the UK Consumer Duty; policy-evaluation econometrics across most of the empirical economics literature.</li>
+      <li><strong>Outside this course:</strong> the machine-learning track uses causal inference for off-policy evaluation, recommender system evaluation, and reinforcement learning. The economics track uses it as the foundation of empirical microeconomics. The risk-modelling track uses it for stress-test design and counterfactual scenario construction.</li>
+      <li><strong>Methodological core complete:</strong> twelve lectures. The five pillars (descriptive, theoretical, inferential, modelling, stochastic processes), the Bayesian transverse framework, and the three Part V extensions (copulas, EVT, causal inference) cover the statistical toolkit needed for the working credit risk modeller and for the ASSA F107 candidate.</li>
+      <li><strong>Next:</strong> Part VI continues with <a href="13-exponential_dispersion_family.html">lecture 13</a>, which carries the modelling pillar (lectures 04 and 05) forward into the loss-function and exposure machinery the machine-learning track assumes. Otherwise, go back to the <a href="index.html">course landing</a> to navigate.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Statistics course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 12 of 14</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

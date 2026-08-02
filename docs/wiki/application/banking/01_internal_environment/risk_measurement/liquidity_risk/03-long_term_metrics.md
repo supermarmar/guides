@@ -23,3 +23,5 @@ Banks set a single-customer concentration limit (for example, 10% of the aggrega
 # Inter-Entity Lending Report
 
 The **inter-entity lending report** is relevant for group and consolidated banking entities. Intra-group lending is common in banking groups, and in some jurisdictions is subject to cross-border and cross-legal-entity regulatory limits. This report measures the reliance of a specific subsidiary or branch on intra-group funding and tracks proximity to regulatory limits — providing visibility on the self-sufficiency or otherwise of each legal entity within the group.
+
+> **<!-- GAP -->** *Contingency funding plan (CFP): the formal CFP document with triggers, escalation matrix, action menu, and link to recovery and resolution planning under BCBS 144 / PRA SS3-24 / EU BRRD is not yet covered. Required for F107 supervisory framework coverage. See lecture `03-long_term_metrics.html` section 7 for the interim treatment.*

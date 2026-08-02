@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 53: foundation models and pretraining</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Large language models</a></div>
+  <h1>Foundation models and pretraining</h1>
+  <p class="subtitle">The previous lecture described what a large language model can do once trained; this lecture develops how it gets that way. Pretraining is a single, self-supervised objective applied at enormous scale to a broad corpus, producing a foundation model whose weights transfer to a wide range of downstream tasks without task-specific labels. The same recipe, applied to tabular rather than text data, is beginning to reshape how actuaries themselves might one day approach small, structured datasets.</p>
+  <div class="meta">
+    <span>Lecture 53 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part VIII: generative AI and language models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>foundation model</strong> is a single large network, pretrained once on a broad, general-purpose corpus, whose learned representations transfer to a wide range of downstream tasks with little or no task-specific labelled data, a direct scaling-up of the transfer-learning idea already introduced with pre-trained word embeddings in the deep-learning sub-module. <strong>Pretraining</strong> uses a <strong>self-supervised objective</strong>, a task whose labels are derived automatically from the raw, unlabelled data itself rather than from human annotation, at a training-data scale that would be entirely infeasible with human labelling. Two broad objective families dominate: <strong>next-token prediction</strong> (the autoregressive, causal-masked objective already developed in the decoder-transformer lecture, used by the GPT lineage) and <strong>masked prediction</strong> (hiding a random subset of tokens and training the model to reconstruct them from the surrounding, bidirectional context, used by encoder-style models such as BERT). The pretraining corpus itself, its scale, its breadth, and its biases, is not an incidental implementation detail; it is the single largest determinant of what the resulting model can and cannot do well. The same self-supervised, transformer-based recipe, applied to tabular data instead of text, has produced <strong>tabular foundation models</strong> such as TabPFN, pretrained once on a vast synthesis of simulated tabular-prediction tasks and then applied directly to a genuinely new, small tabular dataset with no further gradient-based training at all.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine training a new actuarial graduate not by giving them a specific pricing task straight away, but by first having them read an enormous cross-section of every kind of business document going, contracts, reports, memos, technical notes, with no particular exam question attached to any of it, simply practising the general skill of predicting what word or phrase plausibly comes next given everything read so far. Nobody hand-labelled any of that reading with "correct answers"; the correct answer at each point was just whatever word actually came next in the real document, freely available without any human annotation effort at all. Only once that broad general grounding is in place does the graduate get handed a specific pricing task, at which point they need comparatively little task-specific coaching to do it competently, because so much of the underlying pattern-recognition work was already done during the general reading phase.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Pretraining is the direct generalisation of an idea this course has already met twice: pre-trained word embeddings in the deep-learning sub-module, and the entity-embedding technique that learns a reusable representation of a categorical variable rather than hand-crafting one. A foundation model is what happens when that same "learn a general-purpose representation once, reuse it everywhere" idea is scaled up to an entire network trained on an entire domain's worth of data, rather than one embedding layer trained on one dataset.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the pretraining recipe itself, not just its downstream output, deserves direct attention from a practitioner who will only ever use a model someone else pretrained.</p>
+
+  <p>First, <strong>the pretraining corpus is the single most consequential, and least visible, design choice behind any foundation model's behaviour</strong>: a model pretrained predominantly on general web text will carry systematically different strengths, gaps, and biases than one pretrained with deliberate emphasis on financial or actuarial text, and a practitioner evaluating a model for a regulated use case needs at least a working sense of what went into training it, even without full visibility into the exact corpus.</p>
+
+  <p>Second, <strong>self-supervision is what makes the entire scale-up in the previous lecture economically possible at all</strong>: no human labelling budget on earth could annotate a corpus of the size modern foundation models train on, and understanding that the "labels" are simply the next word in a document (or a masked-out word within one) explains directly why this particular kind of scale was achievable when labelled-supervised scale was not.</p>
+
+  <p>Third, <strong>tabular foundation models are a genuinely new option for exactly the kind of small, structured dataset actuarial work often supplies</strong>, directly relevant to the small-sample, heavy-tailed data problem flagged as a distinguishing feature of actuarial machine learning throughout this course; understanding how they work (and, in the pitfalls below, where they can quietly fail) is squarely within this course's remit even though they are architecturally closer to this lecture's foundation-model machinery than to a conventional GLM or tree ensemble.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A reserving team, faced with a newly written line of business with only two years of claims-development history, a sample size far too thin for a conventional chain-ladder or GLM-based reserving model to fit reliably, experimented with a tabular foundation model pretrained on a broad synthesis of simulated tabular-prediction problems, applying it directly to the thin development triangle with no further training. Initial reserve estimates looked plausible and stable, considerably less noisy than a conventional model fitted on the same sparse data. A validation exercise comparing the foundation model's implicit assumptions against the specific tail behaviour actuaries expect in this particular line of business (informed by decades of broader industry experience, not present anywhere in the two years of this particular portfolio's own data) found the foundation model's tail was systematically thinner than industry experience would suggest, because nothing in its pretraining corpus of simulated generic tabular problems specifically encoded this line's known heavy-tail behaviour. The team used the foundation model's point estimate as one input among several, rather than as a stand-alone reserving figure, and flagged the tail-thinness gap explicitly to the reserving committee.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a single pretraining phase, self-supervised and label-free, feeding into a broad, reusable foundation model, which then branches out to many downstream tasks, each requiring comparatively little task-specific adaptation.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One self-supervised pretraining phase feeding a foundation model that branches to many downstream tasks">
+      <defs>
+        <marker id="fmArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">One pretraining phase, many downstream tasks</text>
+
+      <rect x="30" y="110" width="180" height="110" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="120" y="140" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">Broad corpus</text>
+      <text x="120" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">no human labels;</text>
+      <text x="120" y="175" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">labels derived from</text>
+      <text x="120" y="190" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">the data itself</text>
+
+      <path d="M 212 165 L 265 165" stroke="#71717a" stroke-width="2" marker-end="url(#fmArrow)"/>
+      <text x="238" y="150" text-anchor="middle" font-family="Inter" font-size="9" fill="#52525b">pretrain</text>
+
+      <rect x="270" y="90" width="200" height="150" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="370" y="120" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">Foundation model</text>
+      <text x="370" y="145" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">next-token or</text>
+      <text x="370" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">masked prediction</text>
+      <text x="370" y="185" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">one training run,</text>
+      <text x="370" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">reused many times</text>
+
+      <path d="M 472 130 L 540 90" stroke="#71717a" stroke-width="1.5" marker-end="url(#fmArrow)"/>
+      <path d="M 472 165 L 540 165" stroke="#71717a" stroke-width="1.5" marker-end="url(#fmArrow)"/>
+      <path d="M 472 200 L 540 240" stroke="#71717a" stroke-width="1.5" marker-end="url(#fmArrow)"/>
+
+      <rect x="545" y="60" width="270" height="55" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+      <text x="680" y="92" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">claims-narrative extraction (in-context)</text>
+
+      <rect x="545" y="140" width="270" height="55" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+      <text x="680" y="172" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">tabular reserving (TabPFN-style, no gradient step)</text>
+
+      <rect x="545" y="220" width="270" height="55" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+      <text x="680" y="252" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">chatbot-style prompting (next sub-module lecture)</text>
+    </svg>
+    <figcaption>A single, expensive pretraining run on a broad, label-free corpus produces one reusable foundation model. That single model then branches to many downstream tasks, each drawing on the general representation learned during pretraining rather than requiring a fresh model trained from scratch.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>The labels come from the data, not from a human annotator.</strong> This is the entire economic mechanism that makes internet-scale pretraining possible where labelled-supervised training at the same scale is not. <strong>One pretraining run, many downstream tasks.</strong> The cost of pretraining is paid once; the marginal cost of adapting the resulting model to a new task is, by design, far smaller than training a bespoke model from nothing.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Corpora</h3>
+
+  <p>A pretraining <strong>corpus</strong> is a very large collection of raw, unlabelled text (or, for a tabular foundation model, a large collection of tabular datasets or synthetic tabular tasks), typically assembled from a mixture of sources (web text, books, code, technical documents) at a scale of many billions to trillions of tokens. Corpus composition directly shapes model behaviour: a corpus with heavy representation of code produces stronger coding ability, a corpus with heavy representation of a particular domain's vocabulary and conventions produces stronger performance in that domain, and gaps or skews in the corpus (under-representation of a particular language, dialect, or specialised technical domain such as actuarial notation) become gaps or skews in the resulting model, with no guarantee that any specific gap is visible or documented to a downstream user.</p>
+
+  <h3>Self-supervised objectives</h3>
+
+  <p>A <strong>self-supervised objective</strong> derives its training target automatically from the structure of the raw data, requiring no human annotation. <strong>Next-token prediction</strong>, already developed in full in the decoder-transformer lecture, is the objective behind the GPT lineage: predict each token from everything before it, with the "label" simply being whatever token the real document actually contains at that position. <strong>Masked prediction</strong>, used by encoder-style models, instead hides a random subset of tokens in the input and trains the model to reconstruct them from the surrounding context on both sides, a genuinely bidirectional objective (since the model can see tokens both before and after each masked position) that produces representations well suited to understanding-oriented tasks (classification, extraction) rather than open-ended generation, exactly the trade-off behind the historical split between encoder-style and decoder-style pretrained models.</p>
+
+  <h3>Fine-tuning versus in-context use</h3>
+
+  <p>Once pretrained, a foundation model can be adapted to a specific downstream task in (at least) two ways. <strong>Fine-tuning</strong> continues training the model's weights, usually for a much smaller number of steps and often only on a subset of parameters, using a labelled dataset for the specific target task, genuinely updating the model. <strong>In-context use</strong>, developed in the previous lecture and returned to properly in the next, adapts the model's behaviour purely through what is placed in its input at inference time, with no weight update at all. The choice between the two is a genuine engineering trade-off: fine-tuning requires a labelled dataset and a training pipeline but can produce more reliable, task-specialised behaviour; in-context use requires neither but is bounded by the context window and, as the next lecture develops, by real limits on how much genuine task-adaptation a prompt alone can achieve.</p>
+
+  <h3>Tabular foundation models</h3>
+
+  <p>A <strong>tabular foundation model</strong> such as TabPFN applies the identical pretraining logic to structured, tabular prediction problems rather than text: the model is pretrained once, on an enormous synthetic corpus of simulated tabular-prediction tasks (datasets generated from randomly sampled causal structures and noise processes, designed to span a very broad range of plausible real-world tabular relationships), and the resulting network can then be applied directly to a genuinely new, real tabular dataset via a single forward pass, approximating Bayesian posterior-predictive inference over the space of tasks it was pretrained on, with no gradient-based training on the new dataset required at all. This is a direct, practical answer to exactly the small-sample problem flagged throughout this course as a distinguishing feature of actuarial data: where a conventional GLM or tree ensemble needs enough rows to fit reliably, a tabular foundation model's "training" on the new dataset is a single, fast inference pass, drawing instead on everything the network learned about plausible tabular relationships during its one, expensive pretraining phase.</p>
+
+  <h3>Where tabular foundation models help, and where they are dangerous</h3>
+
+  <p>Tabular foundation models are most useful precisely where conventional methods are weakest: genuinely small datasets, a new line of business, a newly launched product, a market segment too thin for a conventional model to fit reliably, exactly the reserving scenario in the vignette. They are more dangerous in individual-level pricing decisions specifically, because their implicit assumptions about plausible relationships are inherited entirely from the synthetic pretraining distribution, not from the specific line of business's own long-run tail experience, precisely the gap the vignette's validation exercise uncovered; a regulated pricing decision that materially affects an individual policyholder's premium warrants the fuller validation and use-test discipline the governance lecture at the end of this sub-module develops, not a foundation model's point estimate taken at face value.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Treating corpus composition as an invisible, irrelevant implementation detail</span>
+    A model's strengths and gaps are a direct function of what it was pretrained on; evaluating a foundation model for a specialised regulated use without at least a working sense of the corpus's likely domain coverage is evaluating the model's behaviour without evaluating its cause.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming a tabular foundation model's tail behaviour matches the specific line of business</span>
+    Developed directly in the vignette: a tabular foundation model's implicit assumptions come from its synthetic pretraining distribution, not from the specific portfolio's own long-run industry experience; validating tail behaviour against known industry experience, not just against the thin, newly available data itself, is a necessary check the vignette's team correctly insisted on.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Confusing fine-tuning with in-context use, or assuming one is a strict substitute for the other</span>
+    The two adaptation routes have genuinely different requirements (a labelled dataset and training pipeline versus a context-window-bounded prompt) and genuinely different reliability profiles; choosing between them is an engineering decision with real trade-offs, not an interchangeable stylistic choice.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using a foundation model's point estimate as a stand-alone answer in a regulated decision</span>
+    The reserving vignette's team explicitly avoided this by treating the foundation model's estimate as one input among several, with the identified tail-thinness gap flagged to the reserving committee rather than absorbed silently; this discipline, not the specific tool, is what the next sub-module's closing governance lecture generalises into a full framework.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A foundation model is pretrained once, via a self-supervised objective (next-token or masked prediction) that derives its training targets automatically from a broad, unlabelled corpus, and its learned representations transfer to a wide range of downstream tasks via either fine-tuning (further weight updates on labelled data) or in-context use (no weight update, adaptation purely through the prompt). The pretraining corpus's composition is the single largest, and least visible, determinant of the resulting model's behaviour. The same recipe, applied to tabular rather than text data, has produced tabular foundation models such as TabPFN, a genuine answer to the small-sample problem that distinguishes much actuarial data, at the cost of inheriting the synthetic pretraining distribution's assumptions rather than the specific portfolio's own long-run experience.</p>
+
+  <p>The next lecture returns to the in-context-learning explanations previewed in lecture 1, now that pretraining's mechanics are in place, and develops the practical techniques (few-shot prompting, chain-of-thought, and the reinforcement-learning-from-human-feedback pipeline behind instruction-following and reasoning models) that get useful, controllable work out of a pretrained foundation model.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Define a self-supervised objective, and explain why it makes internet-scale pretraining economically feasible where labelled supervision at the same scale would not be.</li>
+      <li>Distinguish next-token prediction from masked prediction, and state which broad model family (encoder or decoder style) each is associated with.</li>
+      <li>Explain the difference between fine-tuning and in-context use as two routes to adapting a pretrained model to a downstream task.</li>
+      <li>Describe how a tabular foundation model such as TabPFN is pretrained, and why it requires no further gradient-based training on a genuinely new dataset.</li>
+      <li>Explain why corpus composition is described as the single largest determinant of a foundation model's behaviour.</li>
+      <li>In the reserving vignette, explain precisely why the tabular foundation model's tail estimate diverged from known industry experience, and what the team did in response.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 1 (<a href="01-from_decoders_to_llms.html">from decoders to LLMs</a>) previewed the in-context-learning explanations this lecture's pretraining mechanics support.</li>
+      <li><strong>Next:</strong> Lecture 3 (<a href="03-prompting_and_reasoning.html">prompting and reasoning</a>) develops the practical techniques for using a pretrained model.</li>
+      <li><strong>Built on:</strong> The deep-learning sub-module's <a href="../05_deep_learning/05-word_embeddings.html">word embeddings</a> lecture introduced the transfer-learning idea, pre-trained representations reused across tasks, that this lecture scales up.</li>
+      <li><strong>Outside this course:</strong> The risk-modelling course's small-sample and heavy-tail estimation techniques (credibility theory, extreme value theory) are the actuarial discipline's own long-standing tools for exactly the thin-data problem tabular foundation models are beginning to address from a different direction.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Large language models course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 53 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

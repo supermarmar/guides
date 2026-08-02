@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 27: recurrent networks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Deep learning</a></div>
+  <h1>Recurrent networks</h1>
+  <p class="subtitle">A convolutional layer sees a fixed-width window of a sequence at a time; a recurrent network instead carries a summary of everything seen so far, updated one step at a time, and reads the entire preceding history through that summary rather than through a sliding window. This was the standard architecture for sequential data for two decades. It is the reason attention had something specific to fix, and understanding its failure mode, badly summarising long histories, is the fastest route to understanding why the next lecture's transformer looks the way it does.</p>
+  <div class="meta">
+    <span>Lecture 27 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part IV: deep learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>recurrent neural network</strong> (RNN) processes a sequence $X_1, \ldots, X_T$ one element at a time, maintaining a <strong>hidden state</strong> $h_t$ that is updated at every step by a function of the previous hidden state and the current input, $h_t = \phi(W_h h_{t-1} + W_x X_t + b)$, with the identical weights $W_h, W_x, b$ reused at every time step, a parameter-sharing idea directly analogous to a CNN's shared filter but applied across time rather than across space. The hidden state is the network's compressed memory of everything it has seen so far, and a prediction at time $t$ is read off $h_t$ through an ordinary readout layer. The simple RNN above suffers acutely from the <strong>vanishing-gradient problem</strong> already introduced for deep feed-forward networks in lecture 1, here compounded across every time step of a long sequence, so that gradients from a loss many steps in the future barely reach the hidden-state updates from the distant past, and the network effectively forgets long-range dependencies. <strong>Long short-term memory</strong> (LSTM) and <strong>gated recurrent unit</strong> (GRU) networks introduce learnable gates that let the hidden state carry information over many steps largely unattenuated, substantially, though not completely, alleviating the problem. RNNs were the dominant sequence architecture through the 2010s and have since been largely displaced by the transformer (next lecture) on most large-scale tasks, for the specific reason developed in this lecture's closing section: a transformer processes all sequence positions in parallel, while an RNN's step-by-step recurrence is inherently sequential and cannot be parallelised across time during training.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Reading a long claims narrative one word at a time, you do not remember every word verbatim by the time you reach the end; you carry forward a compressed summary ("motor accident, driver at fault, minor injuries, ongoing treatment") and update that summary as each new word arrives. An RNN does exactly this: at every step it looks at the current input and its own running summary from the previous step, and produces an updated summary. The problem is that if the summary has to be squeezed through the identical fixed-size vector at every step, for a very long sequence, early details get overwritten by later ones the same way your own mental summary of a long document loses the exact wording of its opening paragraph. LSTM and GRU add a mechanism that lets the summary protect specific pieces of information from being overwritten, at the cost of extra machinery.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the sequential counterpart to the previous lecture's grid-structured CNN, and it sets up the single most important comparison in this sub-module: the next lecture's transformer is best understood as a direct response to this lecture's two limitations, the vanishing-gradient-driven memory problem and the sequential (non-parallelisable) computation, both addressed by replacing recurrence with attention.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons RNNs still earn a lecture despite being largely superseded.</p>
+
+  <p>First, <strong>understanding what attention replaced is the fastest way to understand why attention works</strong>. A transformer's design decisions, direct access to every previous position rather than a single compressed summary, full parallelism across the sequence during training, are answers to specific, nameable RNN weaknesses; skipping this lecture and going straight to transformers means taking those design decisions on faith rather than understanding the problem they solve.</p>
+
+  <p>Second, <strong>RNNs remain a reasonable, lower-cost choice for genuinely short sequences or resource-constrained deployment</strong>, and knowing when a full transformer is overkill, a short telematics trip segment, a brief structured event sequence, is a legitimate architectural judgement call this lecture equips a modeller to make rather than defaulting to the largest available architecture by reflex.</p>
+
+  <p>Third, <strong>the vanishing-gradient problem this lecture develops for recurrence is the identical mathematical phenomenon lecture 1 introduced for depth</strong>, and seeing it recur in a second, structurally different setting (compounding across time rather than across layers) reinforces that it is a general property of composing many differentiable operations, not an idiosyncrasy of any one architecture.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A telematics analytics team built a simple RNN to predict a driver's risk score from an entire multi-month sequence of daily driving summaries, expecting the network to learn to weight a recent deterioration in driving behaviour more heavily than an old, resolved issue. The trained model instead weighted the earliest few weeks of the sequence disproportionately, effectively anchoring on a driver's behaviour when they first joined the telematics programme and under-reacting to genuine recent changes, a direct symptom of the vanishing-gradient problem attenuating the training signal from the loss (computed at the end of the sequence) as it propagated back to the earliest hidden-state updates. Switching to an LSTM, and separately truncating the input to the most recent eight weeks rather than the full multi-month history, both independently improved responsiveness to recent behaviour change; the team adopted both.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: the identical cell, with the identical weights, unrolled across time steps, each one taking the previous hidden state and the current input and producing the next hidden state.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="An RNN unrolled across time steps, sharing identical weights at every step">
+      <defs>
+        <marker id="rnnArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same cell, unrolled across time, sharing identical weights at every step</text>
+
+      <g font-family="Inter" font-size="10">
+        <rect x="50" y="120" width="80" height="60" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="90" y="145" text-anchor="middle" fill="#5b21b6" font-weight="700">cell</text>
+        <text x="90" y="162" text-anchor="middle" fill="#5b21b6">t = 1</text>
+        <text x="90" y="105" text-anchor="middle" fill="#5b21b6">X₁</text>
+
+        <rect x="220" y="120" width="80" height="60" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="260" y="145" text-anchor="middle" fill="#5b21b6" font-weight="700">cell</text>
+        <text x="260" y="162" text-anchor="middle" fill="#5b21b6">t = 2</text>
+        <text x="260" y="105" text-anchor="middle" fill="#5b21b6">X₂</text>
+
+        <rect x="390" y="120" width="80" height="60" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="430" y="145" text-anchor="middle" fill="#5b21b6" font-weight="700">cell</text>
+        <text x="430" y="162" text-anchor="middle" fill="#5b21b6">t = 3</text>
+        <text x="430" y="105" text-anchor="middle" fill="#5b21b6">X₃</text>
+
+        <text x="530" y="155" text-anchor="middle" fill="#71717a" font-size="16">...</text>
+
+        <rect x="600" y="120" width="80" height="60" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="640" y="145" text-anchor="middle" fill="#5b21b6" font-weight="700">cell</text>
+        <text x="640" y="162" text-anchor="middle" fill="#5b21b6">t = T</text>
+        <text x="640" y="105" text-anchor="middle" fill="#5b21b6">X_T</text>
+      </g>
+
+      <line x1="130" y1="150" x2="215" y2="150" stroke="#7c3aed" stroke-width="2" marker-end="url(#rnnArrow)"/>
+      <line x1="300" y1="150" x2="385" y2="150" stroke="#7c3aed" stroke-width="2" marker-end="url(#rnnArrow)"/>
+      <line x1="470" y1="150" x2="500" y2="150" stroke="#7c3aed" stroke-width="2" marker-end="url(#rnnArrow)"/>
+      <line x1="560" y1="150" x2="595" y2="150" stroke="#7c3aed" stroke-width="2" marker-end="url(#rnnArrow)"/>
+      <line x1="680" y1="150" x2="730" y2="150" stroke="#7c3aed" stroke-width="2" marker-end="url(#rnnArrow)"/>
+
+      <text x="170" y="140" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">h₁</text>
+      <text x="340" y="140" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">h₂</text>
+
+      <text x="440" y="230" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">identical weights W_h, W_x, b reused at every step</text>
+      <text x="440" y="250" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#dc2626">gradient from the final-step loss must flow back through every arrow to reach step 1</text>
+    </svg>
+    <figcaption>An RNN "unrolled" across its $T$ time steps looks like a very deep feed-forward network, one layer per time step, but with the identical weights reused at every layer. Backpropagation through this unrolled structure, called backpropagation through time, faces exactly lecture 1's vanishing-gradient problem, now compounded across $T$ steps rather than across a fixed number of layers; for a long sequence, the gradient reaching step 1 from a loss computed at step $T$ can be vanishingly small.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Recurrence is parameter sharing across time, the way convolution is parameter sharing across space.</strong> The identical cell function is applied at every time step, exactly as the identical filter is applied at every spatial position. <strong>Backpropagation through time is just backpropagation on a very deep, weight-tied network.</strong> No new training mathematics is needed, only the observation that "depth" here means "sequence length", and the vanishing-gradient problem scales with it directly.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The simple RNN</h3>
+
+  <p>A <strong>simple (vanilla) RNN</strong> maintains a hidden state $h_t \in \mathbb{R}^d$, updated at each time step by</p>
+  $$h_t = \phi\big(W_h h_{t-1} + W_x X_t + b\big), \qquad h_0 = \mathbf{0},$$
+  <p>with $\phi$ typically $\tanh$, and weight matrices $W_h \in \mathbb{R}^{d\times d}$, $W_x \in \mathbb{R}^{d \times q}$, and bias $b \in \mathbb{R}^d$, all shared identically across every time step $t = 1, \ldots, T$. A prediction at time $t$ (or, for a sequence-level prediction, only at the final time $T$) is read from the hidden state through an ordinary readout layer, $\hat{Y}_t = g^{-1}\langle w^{(\text{out})}, h_t\rangle$, exactly the GLM-style readout from lecture 1's feature-extractor framing, with the recurrent cell playing the role of the feature extractor.</p>
+
+  <h3>Backpropagation through time and the vanishing-gradient problem</h3>
+
+  <p>Training an RNN requires the gradient of the loss (typically computed at the final time step, or summed across every time step) with respect to the shared weights $W_h, W_x, b$. Unrolling the recurrence across its $T$ steps produces a computational graph identical in shape to a $T$-layer feed-forward network, and backpropagating through it, called <strong>backpropagation through time</strong> (BPTT), applies the identical chain-rule machinery lecture 1 developed, with one crucial difference: the identical weight matrix $W_h$ appears at every one of the $T$ steps, so the gradient contribution involves a product of $T$ copies of (a term closely related to) $W_h$'s Jacobian. If the dominant eigenvalue of that Jacobian is less than one, the product shrinks geometrically with $T$, vanishing for long sequences; if it exceeds one, the product grows geometrically, exploding. This is lecture 1's vanishing- and exploding-gradient pitfall, reappearing here compounded across time rather than across depth, and for a genuinely long sequence ($T$ in the hundreds or thousands), the vanishing case is close to unavoidable for the simple RNN cell above.</p>
+
+  <h3>Long short-term memory (LSTM)</h3>
+
+  <p>The <strong>LSTM</strong> (Hochreiter and Schmidhuber, 1997) addresses the vanishing-gradient problem by adding a separate <strong>cell state</strong> $c_t$ alongside the hidden state $h_t$, updated through gates that control how much of the previous cell state to keep, how much new information to add, and how much of the (possibly updated) cell state to expose as the hidden state. Three gates, each a sigmoid-activated function of the current input and previous hidden state (so each gate's output lies in $(0,1)$, interpretable as "how much to let through"):</p>
+  $$f_t = \sigma(W_f X_t + U_f h_{t-1} + b_f) \quad \text{(forget gate)},$$
+  $$i_t = \sigma(W_i X_t + U_i h_{t-1} + b_i) \quad \text{(input gate)},$$
+  $$o_t = \sigma(W_o X_t + U_o h_{t-1} + b_o) \quad \text{(output gate)}.$$
+  <p>A candidate update $\tilde c_t = \tanh(W_c X_t + U_c h_{t-1} + b_c)$ is combined with the previous cell state, gated by the forget and input gates,</p>
+  $$c_t = f_t \odot c_{t-1} + i_t \odot \tilde c_t, \qquad h_t = o_t \odot \tanh(c_t),$$
+  <p>with $\odot$ denoting element-wise multiplication. The crucial structural feature is the <strong>additive</strong> update to $c_t$: when the forget gate $f_t$ is close to one, information in $c_{t-1}$ passes through to $c_t$ nearly unchanged, with a gradient path that does not need to repeatedly multiply through a squashing non-linearity at every step the way the simple RNN's hidden-state update does. This is what lets an LSTM carry information over many more time steps than a simple RNN before the gradient vanishes, though not indefinitely; very long sequences (thousands of steps) still challenge even a well-trained LSTM, which is part of the motivation for the transformer's fully different approach in the next lecture.</p>
+
+  <h3>Gated recurrent unit (GRU)</h3>
+
+  <p>The <strong>GRU</strong> (Cho et al., 2014) simplifies the LSTM by merging the cell state and hidden state into a single vector and reducing three gates to two, a <strong>reset gate</strong> $r_t$ and an <strong>update gate</strong> $z_t$:</p>
+  $$r_t = \sigma(W_r X_t + U_r h_{t-1} + b_r), \qquad z_t = \sigma(W_z X_t + U_z h_{t-1} + b_z),$$
+  $$\tilde h_t = \tanh\big(W_h X_t + U_h (r_t \odot h_{t-1}) + b_h\big), \qquad h_t = (1-z_t)\odot h_{t-1} + z_t \odot \tilde h_t.$$
+  <p>The update gate $z_t$ plays a role directly analogous to the LSTM's combined forget-and-input gating, interpolating between the old hidden state and a new candidate. GRUs have roughly a quarter fewer parameters than an LSTM of comparable hidden size, train somewhat faster, and perform comparably on most tasks; the choice between the two is more often a matter of established convention within a given application area than a decisive empirical difference.</p>
+
+  <h3>Deep and bidirectional RNNs</h3>
+
+  <p>Exactly as feed-forward layers stack, recurrent layers stack: a <strong>deep RNN</strong> feeds the hidden-state sequence output by one recurrent layer as the input sequence to a second recurrent layer, and so on, letting later layers build higher-level temporal abstractions on top of earlier layers' outputs, directly analogous to a deep CNN's hierarchy of increasingly abstract spatial features. A <strong>bidirectional RNN</strong> runs two separate recurrent passes over the sequence, one forward in time and one backward, and concatenates the two hidden states at each position; this is appropriate whenever the entire sequence is available at prediction time (a completed claims narrative, a full driving trip) rather than being generated incrementally, since the backward pass requires seeing the end of the sequence before processing can begin.</p>
+
+  <h3>Why transformers displaced RNNs</h3>
+
+  <p>Two distinct problems motivate the shift to the next lecture's architecture, and it is worth separating them clearly. The first is the vanishing-gradient-driven <strong>memory problem</strong> developed above: even LSTM and GRU gating does not fully solve long-range dependency learning for very long sequences. The second, arguably more consequential for why transformers won so decisively at scale, is a <strong>computational</strong> problem: an RNN's hidden-state update at step $t$ depends on the hidden state at step $t-1$, an inherently sequential dependency that prevents parallelising the computation across time steps within a single training example, however many GPU cores are available. A transformer's attention mechanism, developed next, computes a representation for every sequence position using operations that can be evaluated for all positions simultaneously, trading a different computational cost (attention scales quadratically in sequence length, versus an RNN's linear scaling) for full parallelism, a trade that has favoured the transformer decisively as GPU compute has grown far faster than typical sequence lengths.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Using a simple RNN on genuinely long sequences</span>
+    A plain (non-gated) RNN cell on a sequence of more than a few dozen steps is close to certain to suffer the vanishing-gradient problem badly enough to lose most long-range signal; LSTM or GRU should be the default choice for any sequence of meaningful length, with the plain RNN reserved for short sequences or pedagogical illustration.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Feeding a full multi-year history through recurrence and expecting recency to dominate</span>
+    As the telematics vignette shows, a recurrent network's default behaviour, even with gating, does not automatically weight recent events more heavily than distant ones; if recency is what the application needs, either truncate the input to a relevant recent window, or use an architecture (attention, developed next) that can learn recency-weighting directly rather than relying on gating to discover it unassisted.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Applying a bidirectional RNN where only a prefix is available at inference time</span>
+    Bidirectional RNNs require the complete sequence before the backward pass can run; using one for a task where predictions are needed incrementally, as a sequence unfolds (an in-progress telematics trip, a live claims-narrative transcription), is a structural mismatch, not a minor inefficiency, because the backward pass literally cannot be computed until the sequence ends.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing an RNN by default for sequence data without considering a transformer</span>
+    For most sequence tasks at a scale where training compute is not the binding constraint, a transformer will typically outperform an RNN of comparable size on tasks with meaningful long-range dependencies, for the reasons developed in this lecture's closing section. Reach for an RNN deliberately (short sequences, tight compute budgets, streaming inference constraints) rather than by historical habit.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A recurrent network shares weights across time steps rather than across spatial positions, maintaining a hidden state that compresses everything seen so far. Backpropagation through time trains it, and the identical vanishing-gradient problem lecture 1 introduced for depth reappears here compounded across sequence length, badly limiting a simple RNN's ability to learn long-range dependencies. LSTM and GRU cells introduce learnable gates and an additive cell-state update that substantially, though not completely, alleviate the problem. Two distinct issues, imperfect long-range memory and inherently sequential (non-parallelisable) computation, motivate the shift to the transformer, developed next, which replaces recurrence with attention and processes every sequence position simultaneously.</p>
+
+  <p>The next lecture is the single most important architecture in this sub-module for modern practice: the transformer, its scaled dot-product attention mechanism, and the tabular adaptation that lets the identical mechanism process ordinary rows of covariates rather than only sequences of tokens.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Write the simple RNN's hidden-state update equation and explain what is shared across time steps.</li>
+      <li>Explain backpropagation through time and why the vanishing-gradient problem is, if anything, worse for a long sequence than for a comparably deep feed-forward network.</li>
+      <li>Describe the LSTM's forget, input, and output gates and explain why the cell state's additive update helps gradients survive over more time steps than the simple RNN's update does.</li>
+      <li>Compare GRU to LSTM: what is simplified, and what performance difference should you expect in practice?</li>
+      <li>State the two distinct reasons transformers have displaced RNNs on most large-scale sequence tasks, and explain why they are genuinely separate problems.</li>
+      <li>A telematics model built on an LSTM under-reacts to a driver's recent behaviour change. Name two independent fixes and explain the mechanism behind each.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 6 (<a href="06-convolutional_networks.html">convolutional networks</a>) developed the grid-structured counterpart to this lecture's sequence-structured architecture.</li>
+      <li><strong>Next:</strong> Lecture 8 (<a href="08-transformers.html">transformers</a>) replaces recurrence with attention, directly addressing both limitations this lecture closed with.</li>
+      <li><strong>Built on:</strong> The vanishing-gradient problem is introduced in general form in <a href="01-neural_networks.html">lecture 1</a>; this lecture is its second, structurally distinct appearance.</li>
+      <li><strong>Outside this course:</strong> RNNs remain a reasonable choice for short-sequence, latency-sensitive, or compute-constrained deployments; the large-language-model material later in this course explains why RNNs were abandoned almost entirely at the scale of modern language models specifically.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Deep learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 27 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 6: prompting for code</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Prompting for code: the request, the constraint, the definition of done</h1>
+  <p class="subtitle">A good coding prompt has three parts, and the one people omit is the third. Without a stated definition of done, the agent stops when the work looks finished, and "looks finished" is the only signal it has. You then become the verification loop, which is the bottleneck the whole practice exists to move.</p>
+  <div class="meta">
+    <span>Lecture 6 of 22</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part II: steering the agent</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Three parts make a coding prompt work. The <strong>request</strong> says what should change, scoped to specific files and a specific scenario. The <strong>constraints</strong> say what must not change, which is the half nobody writes and which is what stops a two-line fix becoming a hundred-line diff. The <strong>definition of done</strong> says what the agent should check before claiming success, and it is the part that decides whether you get a session you can walk away from or one you have to watch.</p>
+
+  <p>Anthropic's guidance puts the third part first among all recommendations, and the reasoning is exact: Claude stops when the work looks done, and without a check it can run, "looks done" is the only available signal. Give it something that produces a pass or fail, a test suite, a build exit code, a linter, a script that diffs output against a fixture, and the loop closes on itself. The agent works, runs the check, reads the result, and iterates without you. That single change converts you from the verifier into the reviewer, which is a different and much smaller job.</p>
+
+  <p>The rest is specificity, and the pattern is consistent across every documented example. "Add tests for <code>foo.py</code>" becomes "write a test for <code>foo.py</code> covering the edge case where the user is logged out, avoid mocks". "Fix the login bug" becomes "users report login fails after session timeout, check the token refresh in <code>src/auth/</code>, write a failing test that reproduces it, then fix it". The transformation in both cases is the same: name the file, name the scenario, name what finished looks like.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Before sending a prompt, answer one question: what will the agent do to convince itself it is finished? If the answer is "re-read its own work", you have written a prompt that ends with your review. If the answer is "run the test I named", you have written one that ends with a signal. The difference is a single clause, and it is worth more than every other refinement combined.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    There is an old idea underneath this. A specification precise enough to verify mechanically is, in the limit, a program; this is the observation behind formal methods, property-based testing, and Dijkstra's insistence that a program and its proof are written together. What has changed is who does the translation. You now write the specification and something else writes the implementation, which makes the quality of specifications the binding constraint on output in a way it has never quite been before. The engineers who get most from these tools are, almost without exception, the ones who were already good at saying precisely what they wanted.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that the cost of a vague prompt is not paid at prompt time. It is paid in the review, where you read a diff you cannot evaluate because you never said what right would look like, and then in the correction round, and often in a second correction round after that. The forty seconds spent naming the file and the acceptance test is the cheapest forty seconds in the whole workflow, and it is skipped because vagueness feels faster in the moment.</p>
+
+  <p>The second reason is that this is the lever that decides whether autonomy is safe. Lecture 1 argued that the autonomy slider should be set by how mechanical the verification is; this lecture is about manufacturing that mechanicalness. A task with a named check can run at high autonomy because the check does the supervising. The same task without one cannot, regardless of how capable the model is. Prompt quality and safe autonomy are the same variable seen from two sides.</p>
+
+  <p>The third reason is that vagueness has a legitimate use, and conflating the two wastes it. A deliberately open prompt, "what would you improve in this file?", surfaces things you would not have thought to ask about, and the documentation says so explicitly. That is exploration, and it is valuable. The failure is not vagueness; it is vagueness applied to execution, where you needed a specification and wrote an invitation instead.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The three parts</h3>
+
+  <p>The <strong>request</strong> is the change you want, and its quality is measured in how few readings it admits. "Improve the error handling" admits dozens. "Every public function in this module should raise <code>ValueError</code> on malformed input rather than returning <code>None</code>" admits one. The mechanical fix is to name three things: which file or module, which scenario or input, and which observable behaviour should differ afterwards.</p>
+
+  <p>The <strong>constraints</strong> are the boundary, and they exist because of the scope-sprawl weakness from Lecture 1. Left unbounded, an agent asked to fix one function will reformat the file, add type hints to its neighbours, and improve three unrelated docstrings, each defensible and collectively turning a reviewable diff into an unreviewable one. Constraints are how you keep the diff the size of the change. They are also where you encode the things a newcomer would get wrong: no new dependencies, do not touch the migration files, keep the public signature.</p>
+
+  <p>The <strong>definition of done</strong> is the check, and it has a hierarchy of strength. Weakest is stating criteria in the prompt and asking the agent to run them. Stronger is a session-level goal condition that gets re-checked after every turn. Stronger still is a hook that runs your check as a script and blocks the turn from ending until it passes, which is enforcement rather than request. Strongest for judgement-shaped work is a second opinion: a verification subagent in a fresh context that never saw the reasoning which produced the change and therefore evaluates it on its own terms.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Strength of verification mechanisms">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">How hard the check gates the stop</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <rect x="90" y="42" width="580" height="34" rx="8" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="110" y="63" font-weight="600" fill="#3D2EB5">In the prompt</text>
+        <text x="270" y="63" fill="#3D2EB5">"run the tests and iterate" — works today, on any task</text>
+
+        <rect x="90" y="86" width="580" height="34" rx="8" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="110" y="107" font-weight="600" fill="#2A3A78">Across the session</text>
+        <text x="270" y="107" fill="#2A3A78">a goal condition re-checked after every turn</text>
+
+        <rect x="90" y="130" width="580" height="34" rx="8" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="110" y="151" font-weight="600" fill="#1E9D54">As a hard gate</text>
+        <text x="270" y="151" fill="#1E9D54">a Stop hook that blocks the turn ending until it passes</text>
+
+        <rect x="90" y="174" width="580" height="34" rx="8" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="110" y="195" font-weight="600" fill="#C76B2A">By second opinion</text>
+        <text x="270" y="195" fill="#C76B2A">a fresh-context subagent that did not write the code</text>
+
+        <text x="380" y="232" text-anchor="middle" font-size="11" font-style="italic" fill="#71717a">Each step down trades setup effort for attention you no longer have to spend.</text>
+      </g>
+    </svg>
+    <figcaption>The top row costs nothing and works immediately, which is why it is the one to build a habit around. The lower rows are what make an unattended run finish correctly rather than merely finish.</figcaption>
+  </figure>
+
+  <h3>Four specificity moves</h3>
+
+  <p>The documented before-and-after pairs reduce to four repeatable transformations, and they are worth learning as moves rather than as examples.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Move</th><th>Before</th><th>After</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Scope the task</td><td>"add tests for foo.py"</td><td>Name the file, the scenario, and the testing preference</td></tr>
+      <tr><td>Point at the source</td><td>"why is this API so weird?"</td><td>"look through its git history and summarise how it came to be"</td></tr>
+      <tr><td>Reference the pattern</td><td>"add a calendar widget"</td><td>Name an existing widget as the model to follow</td></tr>
+      <tr><td>Describe the symptom</td><td>"fix the login bug"</td><td>Symptom, likely location, and what fixed looks like</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Pointing at the source is the most underused of the four. An agent asked why a piece of code is strange will speculate plausibly from the code alone; the same agent told to read the git history will find the commit that explains it. The move generalises: whenever a question has a documentary answer somewhere in the repository, naming the document converts an inference into a lookup, and lookups do not hallucinate.</p>
+
+  <div class="defcard">
+    <strong>Definition of done.</strong> A check the agent can run and read the result of, stated in the prompt. Distinguished from an acceptance criterion you hold privately, which cannot close the loop because the agent cannot evaluate it.
+  </div>
+
+  <div class="defcard">
+    <strong>Evidence over assertion.</strong> Asking for the test output, the command run, or the screenshot, rather than for the claim that it worked. Reviewing evidence is faster than re-running the verification yourself, and it works for sessions you were not watching.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Getting context in without pasting it</h3>
+
+  <p>Lecture 2 argued against pasting files. The practical alternatives are all cheaper. Referencing a file by path has the agent read it, and read only what it needs. Images can be pasted directly, which matters more than it sounds: a screenshot of a broken layout or a design to match communicates in one step what a paragraph of description communicates badly. URLs work for documentation, and frequently used domains can be allowlisted so they stop prompting. Data can be piped straight in from the shell. And the option people forget is to let the agent fetch its own context: telling it to go and find what it needs, rather than assembling a briefing yourself, is usually both faster and more accurate, because it retrieves what turned out to matter rather than what you predicted would.</p>
+
+  <h3>Asking for the failing test first</h3>
+
+  <p>One phrasing deserves singling out because it changes the character of a bug fix: <em>write a failing test that reproduces the issue, then fix it</em>. It appears in the documented symptom-description example and it is doing more work than it appears to.</p>
+
+  <p>Without it, the agent forms a hypothesis about the cause and writes a fix for that hypothesis. If the hypothesis is wrong, the fix is wrong, and you will not find out until later, because nothing in the loop tested the hypothesis independently. With it, the reproduction has to succeed before any fix is written, which means the hypothesis is confirmed before it is acted on. It also leaves behind a regression test, which is the thing you wanted anyway. The same instruction defends against the stopping-too-early failure from Lecture 1: an agent told only to make the tests pass may weaken an assertion, whereas one told to first write a test that fails for the right reason has committed to the failure being real.</p>
+
+  <h3>The instruction that prevents sprawl</h3>
+
+  <p>Scope discipline has to be asked for explicitly, because the model's default is to be helpful and helpfulness looks like improving what it passes. The instruction that works is concrete about what not to do:</p>
+
+  <pre><code class="language-md">Only make the change I described. Do not reformat surrounding code, do not add
+type hints or docstrings to functions you did not change, and do not add error
+handling for cases that cannot occur. If you notice something else worth fixing,
+list it at the end instead of fixing it.</code></pre>
+
+  <p>The last clause matters as much as the rest. Suppressing the observation entirely wastes it; the agent often <em>is</em> noticing something real. Redirecting it into a list at the end keeps the diff clean and keeps the finding, and it converts a review problem into a backlog item.</p>
+
+  <h3>Correcting, and knowing when to stop correcting</h3>
+
+  <p>Correct early. The documented pattern is a tight loop: interrupt as soon as the direction is wrong, because context is preserved and redirecting costs a sentence. Letting a wrong approach run to completion out of politeness costs the whole run.</p>
+
+  <p>Then the harder rule, which is a counting rule and therefore easy to follow: <strong>after two failed corrections on the same issue, stop correcting and start over.</strong> By the third attempt the context is full of failed approaches, and each one makes the next attempt worse rather than better, because the window now contains a record of things that did not work presented as things that were tried. Clearing and rewriting the initial prompt with what you learned beats a third correction almost every time. It feels like conceding. It is the cheapest move available, and the fact that it feels like conceding is exactly why people do not make it.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    "Make the tests pass" and "fix the build" are the two most dangerous instructions in common use, because both name a <em>signal</em> rather than a <em>state</em>, and signals can be satisfied without the state being reached. A weakened assertion makes tests pass. A suppressed warning fixes a build. Neither is what you meant, and neither announces itself in the diff. The remedy is to name the invariant alongside the signal: "the build fails with this error, fix the root cause and do not suppress it", or "make the suite pass without weakening any existing assertion".
+  </div>
+
+  <h3>Worked example: two prompts for the same defect</h3>
+
+  <div class="worked">
+    <strong>Worked example: a PD model producing scores above one</strong>
+    <p>The reported problem: a probability-of-default scoring function occasionally returns values greater than 1.0, which downstream code silently accepts and which shows up as impossible capital numbers three steps later.</p>
+    <p><strong>The prompt most people write.</strong> "The PD scores are coming out above 1 sometimes, can you fix it?" The agent reads the scoring module, finds the most likely culprit, applies a clamp at the output, and reports that it has fixed the issue. It has. The scores are now all in range, the symptom is gone, and the underlying defect, a logistic transform applied twice on one code path, is still there and now permanently masked. Nothing about the diff announces this. It is four lines and it looks correct.</p>
+    <p><strong>The prompt with all three parts.</strong> "Scores from <code>score_pd()</code> in <code>src/pd/scoring.py</code> sometimes exceed 1.0. Write a failing test that reproduces it before changing anything, then find the root cause. Constraints: do not clamp or otherwise bound the output, the function's signature must not change, and no new dependencies. Done means the new test passes, <code>pytest -m "not slow"</code> is green, and you can tell me which code path produced the out-of-range value."</p>
+    <p><strong>What each clause bought.</strong> The reproduction requirement forced the defect to be located rather than hypothesised. Naming the file and function removed a search. The no-clamping constraint specifically forbade the plausible wrong fix, which was the entire risk in this task. The signature constraint kept the diff reviewable. And the last clause, asking which code path was responsible, is the evidence requirement: it cannot be satisfied by a fix that masks the symptom, because a clamp has no code path to name.</p>
+    <p><strong>The general move.</strong> When you can predict the plausible wrong fix, forbid it by name. That single sentence is worth more than any amount of general instruction about quality, because it targets the specific failure this task invites rather than the failures tasks invite in general. Ask yourself, before sending: what is the cheap fix that would make the symptom go away without solving anything? Then rule it out.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A coding prompt is a request, a set of constraints, and a definition of done, and the third is the one that decides whether you can walk away. Verification strength runs from a clause in the prompt through a session goal and a blocking hook to a fresh-context reviewer, and each step trades setup for attention. The four specificity moves, scope the task, point at the source, reference the pattern, describe the symptom, cover most of what separates a prompt that works from one that produces a diff you cannot evaluate. Ask for the failing test before the fix. Forbid the plausible wrong fix by name. Correct early, and after two failures clear and rewrite rather than correcting a third time.</p>
+
+  <p>The wider point is that the prompt is where the autonomy slider actually gets set, whatever you believe about it beforehand. A prompt with a machine-checkable definition of done can safely run unattended; the same task without one cannot, and no amount of trust in the model changes that. The next lecture takes the case where the specification is too large to fit in a prompt at all, and the discipline that handles it: separating research from planning from execution, so that the wrong understanding gets caught while it is still one sentence.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the three parts of a coding prompt. Which is most often omitted, and what does its absence cost?</li>
+      <li>Why is "the work looks done" a dangerous stopping condition, and what replaces it?</li>
+      <li>List the four verification strengths from weakest to strongest. What does each additional step buy?</li>
+      <li>Give the four specificity moves, with a before-and-after for one of them.</li>
+      <li>Why does asking for a failing test before the fix do more than produce a regression test?</li>
+      <li>What is wrong with "make the tests pass"? Rewrite it safely.</li>
+      <li>You have corrected the agent twice on the same issue without success. What should you do, and why is the instinct to correct a third time wrong?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="05-claude_md.html">Lecture 5 (CLAUDE.md)</a> covered the standing instruction; this lecture covers the individual request.</li>
+      <li><strong>Next:</strong> Lecture 7 (plan mode and specs) handles the case where the specification is too large for a prompt.</li>
+      <li><strong>Cross-link:</strong> <a href="01-agentic_coding.html">Lecture 1 (what agentic coding is)</a> established the verifiability argument this lecture operationalises.</li>
+      <li><strong>Cross-link:</strong> Lecture 11 (test-driven development) develops the failing-test-first move into a full workflow.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/05-testing.html">Software engineering, Lecture 5 (testing)</a> is the prerequisite for having checks worth naming.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "Best practices for Claude Code", code.claude.com/docs/en/best-practices (the source for the verification hierarchy, the specificity table, and the two-correction rule).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 6 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

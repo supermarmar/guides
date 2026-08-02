@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 11: ensemble learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Supervised learning</a></div>
+  <h1>Ensemble learning</h1>
+  <p class="subtitle">A single tree overfits, a hundred trees agreeing rarely do. Ensemble methods combine many high-variance learners into one low-variance whole, and gradient-boosted trees are the de facto standard for tabular data including most credit risk models in production today.</p>
+  <div class="meta">
+    <span>Lecture 11 of 62</span>
+    <span>Reading time, 65 minutes</span>
+    <span>Part II: supervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">An <strong>ensemble</strong> is a model whose prediction is a combination of the predictions of several base learners, fitted in a way that makes their errors as uncorrelated as possible. Three families do almost all the work. <strong>Bagging</strong> fits many copies of a high-variance learner on bootstrap resamples of the data and averages them; random forests add per-split feature randomisation on top to decorrelate the trees further. <strong>Boosting</strong> fits learners sequentially, with each new learner targeted at the residual error of the running ensemble; AdaBoost up-weights the misclassified observations, gradient boosting fits the next tree to the negative gradient of a chosen loss, and the modern implementations (XGBoost, LightGBM, CatBoost) wrap that idea in regularisation, histogram splitting, and engineering tricks that make them the production winners on tabular data. <strong>Stacking</strong> trains an arbitrary mix of base learners, uses k-fold cross-validation to generate out-of-fold predictions on the training set, and fits a meta-learner on those predictions plus optionally the original features. The single principle behind all three: independent errors average to zero, correlated errors compound.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Suppose you ask a hundred junior analysts to score the same loan applicant. Each one is biased, each one is noisy, but each one is biased and noisy in their own way. Average the scores and the idiosyncratic noise cancels out, leaving a sharper estimate than any single analyst could produce. That is bagging in one sentence. Now suppose instead that you ask the first analyst for a score, look at where the analyst was wrong, and ask the second analyst to focus on exactly those cases; then the third focuses on what the first two between them still miss. That is boosting. Bagging makes uncorrelated learners and averages them, boosting makes correlated learners that correct each other in sequence; both end up far ahead of any single learner.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Every internal A-IRB challenger model and almost every IFRS 9 forward-looking PD model built at a major bank in the last five years has been a gradient-boosted tree ensemble. The regulatory-accepted scorecard remains a logistic regression on WoE-encoded bins because of interpretability, but the benchmark that scorecard is judged against, the model used for prioritising collections, the model used for early-warning indicators, the model used in fraud screening, are all variants of XGBoost or LightGBM. When practitioners say "tabular machine learning" they mean "trees in an ensemble". The question on most modelling desks is no longer "which algorithm" but "which gradient-boosting implementation and how do we tune it".
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 3 of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>. The base learner of choice for all three ensemble families is the decision tree from <a href="02-decision_trees.html">lecture 9</a>; ensembles only make sense once that lecture's high-variance, low-bias single-tree model is in hand. Hyperparameter tuning becomes critical here because ensembles have many more knobs than single learners, so this lecture pairs with <a href="../06_hyperparameter_tuning/01-tuning_principles.html">lecture 31 on tuning principles</a>. Interpretation is also more complex because the ensemble obscures any single tree's logic, which is why model-agnostic methods like SHAP exist; see <a href="../08_model_interpretation/03-model_agnostic_methods.html">lecture 36</a>.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons ensembles dominate tabular prediction. First, <strong>variance reduction from averaging is essentially free.</strong> Take $M$ independent copies of a learner with prediction variance $\sigma^2$ and average their predictions. The variance of the average is $\sigma^2 / M$. The bias is unchanged, because averaging unbiased predictions gives an unbiased prediction. A single deep decision tree memorises the training set and has prediction variance close to the noise variance of the data; averaging a hundred such trees on bootstrap resamples gives a near-unbiased estimator with a fraction of the variance. The catch is that bootstrap resamples are not independent (they share most of the original data), so the variance reduction is less than the textbook $1/M$ factor; the empirical reduction depends on how correlated the resulting trees are, which is what random forests' feature randomisation is for.</p>
+
+  <p>Second, <strong>boosting reduces bias in a way bagging cannot.</strong> A weak learner with high bias (a stump can split on one feature; everything else is constant) cannot fit a complex function no matter how many copies you average. Boosting addresses this by fitting each new learner to the residual error of the running ensemble, so the ensemble's bias drops as more learners are added. The model class is grown incrementally toward whatever functional shape the data demands. Gradient boosting generalises this by interpreting the residual as the negative gradient of a chosen loss, which lets the same machinery target squared error for regression, log loss for classification, quantile loss for tail estimation, Huber loss for robustness, or any other differentiable objective.</p>
+
+  <p>Third, <strong>ensembles dominate empirical leaderboards on structured data.</strong> Every public competition on tabular data in the last decade has been won by a gradient-boosting variant or a stack of them, often blended with neural nets at the end. The empirical edge is small but consistent: a well-tuned XGBoost or LightGBM beats a well-tuned single model by one to three points of AUC, beats a random forest by half a point to a point, and beats a deep neural net on most tabular problems outside of very large datasets. In credit risk, that one-point AUC gain translates directly into reductions in expected loss at fixed approval rate, which is why every bank's challenger model line-up looks the same.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail unsecured PD model was rebuilt as an XGBoost challenger to the incumbent logistic regression scorecard. The challenger's out-of-time AUC was three points higher and its calibration was tighter. The challenger never went into production: the model risk committee asked for individual-account explanations of the predicted PD, the team produced SHAP values, and the regulator asked why the SHAP value for "months since last enquiry" was different for two applicants with identical values on that feature. The team could not answer in one sentence. The logistic scorecard went back into production and the XGBoost was repurposed as an early-warning indicator for collections, where the interpretability bar is lower. The lesson is not that XGBoost is worse, it is that the choice of algorithm is also a choice about how the model will be governed.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Bagging, boosting, and stacking are three different geometries of combining learners. Bagging is wide and parallel: every learner sees a different slice of the data and the final prediction is a vote or average. Boosting is long and sequential: each learner sees what the previous ones got wrong and is built to fix it. Stacking is two-storey: a tier of diverse learners produces predictions that become features for a meta-learner. The first two differ in their failure mode of choice (bagging fights variance, boosting fights bias); the third differs in being agnostic about base learner family.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three ensemble geometries side by side: bagging, boosting, and stacking">
+      <defs>
+        <marker id="enArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three geometries of combining learners</text>
+
+      <!-- ============== BAGGING column ============== -->
+      <g>
+        <text x="140" y="52" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#0d9488">BAGGING</text>
+        <text x="140" y="68" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">parallel, variance reduction</text>
+
+        <!-- Dataset -->
+        <rect x="80" y="80" width="120" height="22" rx="4" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+        <text x="140" y="95" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">training set</text>
+
+        <!-- Bootstrap samples -->
+        <rect x="60" y="120" width="50" height="20" rx="3" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+        <text x="85" y="134" text-anchor="middle" font-family="Inter" font-size="8" fill="#115e59">boot 1</text>
+        <rect x="115" y="120" width="50" height="20" rx="3" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+        <text x="140" y="134" text-anchor="middle" font-family="Inter" font-size="8" fill="#115e59">boot 2</text>
+        <rect x="170" y="120" width="50" height="20" rx="3" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+        <text x="195" y="134" text-anchor="middle" font-family="Inter" font-size="8" fill="#115e59">boot M</text>
+
+        <line x1="130" y1="102" x2="90" y2="120" stroke="#71717a" stroke-width="1"/>
+        <line x1="140" y1="102" x2="140" y2="120" stroke="#71717a" stroke-width="1"/>
+        <line x1="150" y1="102" x2="190" y2="120" stroke="#71717a" stroke-width="1"/>
+
+        <!-- Trees -->
+        <g>
+          <circle cx="85" cy="170" r="12" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+          <text x="85" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">T1</text>
+        </g>
+        <g>
+          <circle cx="140" cy="170" r="12" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+          <text x="140" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">T2</text>
+        </g>
+        <g>
+          <circle cx="195" cy="170" r="12" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+          <text x="195" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">TM</text>
+        </g>
+
+        <line x1="85" y1="140" x2="85" y2="158" stroke="#71717a" stroke-width="1"/>
+        <line x1="140" y1="140" x2="140" y2="158" stroke="#71717a" stroke-width="1"/>
+        <line x1="195" y1="140" x2="195" y2="158" stroke="#71717a" stroke-width="1"/>
+
+        <!-- Aggregator -->
+        <rect x="80" y="220" width="120" height="28" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="140" y="232" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">vote / average</text>
+        <text x="140" y="244" text-anchor="middle" font-family="Inter" font-size="8" fill="#0d9488">independent equal weights</text>
+
+        <line x1="85" y1="182" x2="120" y2="220" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+        <line x1="140" y1="182" x2="140" y2="220" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+        <line x1="195" y1="182" x2="160" y2="220" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+
+        <text x="140" y="278" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488" font-style="italic">random forest = bagging</text>
+        <text x="140" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488" font-style="italic">+ per-split feature subset</text>
+      </g>
+
+      <!-- ============== BOOSTING column ============== -->
+      <g>
+        <text x="440" y="52" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#b45309">BOOSTING</text>
+        <text x="440" y="68" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">sequential, bias reduction</text>
+
+        <!-- Dataset -->
+        <rect x="380" y="80" width="120" height="22" rx="4" fill="#FFF7ED" stroke="#b45309" stroke-width="1"/>
+        <text x="440" y="95" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">training set with weights</text>
+
+        <!-- Sequence -->
+        <g>
+          <rect x="350" y="120" width="42" height="22" rx="3" fill="#FFFFFF" stroke="#b45309" stroke-width="1"/>
+          <text x="371" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">stump 1</text>
+        </g>
+        <g>
+          <rect x="402" y="120" width="42" height="22" rx="3" fill="#FFFFFF" stroke="#b45309" stroke-width="1"/>
+          <text x="423" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">stump 2</text>
+        </g>
+        <g>
+          <rect x="454" y="120" width="42" height="22" rx="3" fill="#FFFFFF" stroke="#b45309" stroke-width="1"/>
+          <text x="475" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">stump 3</text>
+        </g>
+        <text x="510" y="135" font-family="Inter" font-size="9" fill="#b45309">...</text>
+
+        <line x1="392" y1="131" x2="402" y2="131" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+        <line x1="444" y1="131" x2="454" y2="131" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+
+        <!-- Residuals -->
+        <text x="371" y="158" text-anchor="middle" font-family="Inter" font-size="8" fill="#b45309">errors r1</text>
+        <text x="423" y="158" text-anchor="middle" font-family="Inter" font-size="8" fill="#b45309">errors r2</text>
+        <text x="475" y="158" text-anchor="middle" font-family="Inter" font-size="8" fill="#b45309">errors r3</text>
+
+        <line x1="371" y1="142" x2="371" y2="152" stroke="#71717a" stroke-width="0.8" stroke-dasharray="2 2"/>
+        <line x1="371" y1="160" x2="402" y2="142" stroke="#b45309" stroke-width="0.8" stroke-dasharray="2 2"/>
+        <line x1="423" y1="160" x2="454" y2="142" stroke="#b45309" stroke-width="0.8" stroke-dasharray="2 2"/>
+
+        <text x="440" y="190" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309" font-style="italic">each learner fitted to the negative</text>
+        <text x="440" y="202" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309" font-style="italic">gradient of the loss at the running fit</text>
+
+        <!-- Weighted sum -->
+        <rect x="380" y="220" width="120" height="28" rx="6" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="440" y="232" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">weighted sum</text>
+        <text x="440" y="244" text-anchor="middle" font-family="Inter" font-size="8" fill="#b45309">alpha or learning rate</text>
+
+        <line x1="371" y1="160" x2="400" y2="220" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+        <line x1="423" y1="160" x2="440" y2="220" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+        <line x1="475" y1="160" x2="480" y2="220" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+
+        <text x="440" y="278" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309" font-style="italic">AdaBoost = exponential loss</text>
+        <text x="440" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309" font-style="italic">GBM / XGB / LGBM / CatBoost</text>
+      </g>
+
+      <!-- ============== STACKING column ============== -->
+      <g>
+        <text x="740" y="52" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">STACKING</text>
+        <text x="740" y="68" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">two-storey, learner combination</text>
+
+        <!-- Dataset -->
+        <rect x="680" y="80" width="120" height="22" rx="4" fill="#F5F3FF" stroke="#5b21b6" stroke-width="1"/>
+        <text x="740" y="95" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">training set (k-fold split)</text>
+
+        <!-- Level 0 base learners -->
+        <g>
+          <rect x="665" y="120" width="40" height="22" rx="3" fill="#FFFFFF" stroke="#5b21b6" stroke-width="1"/>
+          <text x="685" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">logreg</text>
+        </g>
+        <g>
+          <rect x="715" y="120" width="40" height="22" rx="3" fill="#FFFFFF" stroke="#5b21b6" stroke-width="1"/>
+          <text x="735" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">SVM</text>
+        </g>
+        <g>
+          <rect x="765" y="120" width="40" height="22" rx="3" fill="#FFFFFF" stroke="#5b21b6" stroke-width="1"/>
+          <text x="785" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">RF</text>
+        </g>
+
+        <line x1="720" y1="102" x2="695" y2="120" stroke="#71717a" stroke-width="1"/>
+        <line x1="740" y1="102" x2="735" y2="120" stroke="#71717a" stroke-width="1"/>
+        <line x1="760" y1="102" x2="780" y2="120" stroke="#71717a" stroke-width="1"/>
+
+        <!-- Out-of-fold predictions -->
+        <rect x="660" y="160" width="160" height="22" rx="3" fill="#FFFFFF" stroke="#5b21b6" stroke-width="1" stroke-dasharray="3 2"/>
+        <text x="740" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">out-of-fold predictions p1, p2, p3</text>
+
+        <line x1="685" y1="142" x2="700" y2="160" stroke="#71717a" stroke-width="1"/>
+        <line x1="735" y1="142" x2="735" y2="160" stroke="#71717a" stroke-width="1"/>
+        <line x1="785" y1="142" x2="770" y2="160" stroke="#71717a" stroke-width="1"/>
+
+        <text x="740" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6" font-style="italic">predictions become features</text>
+        <text x="740" y="212" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6" font-style="italic">for the meta-learner</text>
+
+        <!-- Meta learner -->
+        <rect x="680" y="220" width="120" height="28" rx="6" fill="#F5F3FF" stroke="#5b21b6" stroke-width="1.5"/>
+        <text x="740" y="232" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">meta-learner</text>
+        <text x="740" y="244" text-anchor="middle" font-family="Inter" font-size="8" fill="#5b21b6">learns how to combine</text>
+
+        <line x1="740" y1="182" x2="740" y2="220" stroke="#71717a" stroke-width="1" marker-end="url(#enArrow)"/>
+
+        <text x="740" y="278" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6" font-style="italic">base learners need not be</text>
+        <text x="740" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6" font-style="italic">the same algorithm or family</text>
+      </g>
+
+      <!-- Footer rule -->
+      <line x1="40" y1="320" x2="840" y2="320" stroke="#37352F" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="440" y="340" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b">The unifying principle</text>
+      <text x="440" y="358" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">independent errors average to zero; the three families differ in how they engineer independence</text>
+    </svg>
+    <figcaption>Bagging engineers independence by giving each learner a different slice of the data; boosting engineers complementarity by making each learner fit what the previous ones missed; stacking engineers diversity by mixing algorithm families and letting a meta-learner figure out the weights. The base learner is most often a decision tree, but only stacking explicitly relaxes that.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. Bagging's arrows are all in parallel and the aggregator weights are fixed; boosting's arrows are in series and the weights are learned. Stacking's structure is similar to bagging at the bottom (parallel base learners) but adds a learned combination at the top, which makes it the most flexible of the three and the most data-hungry. The dashed line in the boosting panel is the residual feedback: each new stump is trained on what the running ensemble cannot yet explain. The dashed box in stacking is the out-of-fold prediction matrix, the central trick that stops the meta-learner from memorising the base learners' training-set predictions.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Why averaging reduces variance</h3>
+
+  <p>Take $M$ predictors $f_1, \ldots, f_M$ with the same expected value $\mu$, the same variance $\sigma^2$, and pairwise correlation $\rho$ between any two of them. The variance of the average is</p>
+  $$\operatorname{Var}\!\left(\frac{1}{M} \sum_{m=1}^{M} f_m\right) = \rho \sigma^2 + \frac{1 - \rho}{M} \sigma^2.$$
+  <p>Two regimes follow. If the predictors are independent ($\rho = 0$), the variance falls as $\sigma^2 / M$ and goes to zero as $M$ grows. If the predictors are perfectly correlated ($\rho = 1$), the variance stays at $\sigma^2$ no matter how many predictors are averaged. The practical regime is somewhere in between: bootstrap-resampled trees on the same data are positively correlated, so the variance reduction tapers off as the residual correlation $\rho \sigma^2$ dominates. The job of random forests' per-split feature subset is exactly to push $\rho$ down so the $M$-term keeps doing useful work for longer.</p>
+
+  <h3>Bagging: bootstrap aggregating</h3>
+
+  <p><strong>Bagging</strong> is the procedure: draw $M$ bootstrap samples of size $n$ from the training set (sampling with replacement), fit a model on each, and aggregate by majority vote for classification or arithmetic mean for regression. The base model is intentionally a high-variance, low-bias learner; a deep unpruned decision tree is the canonical choice because trees can memorise their training set, which is exactly the property variance reduction needs to be worth doing. Linear regression and logistic regression do not benefit from bagging because their predictions barely change under resampling, so there is little variance to reduce.</p>
+
+  <p>The bootstrap sample omits, on average, about a third of the original rows because each row's chance of being picked at least once in $n$ draws with replacement is $1 - (1 - 1/n)^n \to 1 - e^{-1} \approx 0.632$. The omitted rows form the <strong>out-of-bag</strong> sample for that tree; their predictions can be averaged across the trees that did not see them to produce an unbiased estimate of the ensemble's generalisation error, with no need for a separate validation split. The out-of-bag error is one of bagging's quiet luxuries: in scikit-learn, setting <code>oob_score=True</code> on <code>RandomForestClassifier</code> gives a near-free cross-validation estimate.</p>
+
+  <p>Scikit-learn's <code>BaggingClassifier</code> is the general-purpose wrapper. It bags any estimator passed in (decision tree, logistic regression, SVM), exposes <code>n_estimators</code> for the number of base models, <code>max_samples</code> for the bootstrap size as a fraction of the training set, and <code>max_features</code> for column subsampling. The latter approaches the random-forest idea but applies the subsampling once per tree rather than once per split.</p>
+
+  <h3>Random forests: bagging plus per-split feature randomisation</h3>
+
+  <p>A <strong>random forest</strong> is bagging applied to decision trees with one extra source of randomness: at every split inside every tree, only a random subset of features is considered as a candidate for the split. The standard default is to consider $\sqrt{p}$ features at each split in classification and $p/3$ in regression, where $p$ is the total feature count. The effect is to decorrelate the trees: without per-split feature subsampling, any single very strong feature would dominate the top split of nearly every tree in the forest, and the trees would end up similar. By forcing different splits to be considered at the top of different trees, the forest gives weaker features a chance to lead, producing trees that are individually weaker but collectively less correlated, and therefore better when averaged.</p>
+
+  <p>Random forests are the most practitioner-friendly ensemble method. They have few hyperparameters that matter much (the count <code>n_estimators</code> mostly cannot be set too high, the per-split feature count <code>max_features</code> can be tuned but defaults are good, and the tree-level controls like <code>min_samples_leaf</code> trade variance for bias in the obvious direction). They handle mixed numeric and categorical features (after encoding), are robust to outliers, do not require scaling, and produce a free out-of-bag estimate of generalisation error along with feature importances. The price is mediocre extrapolation outside the training data range and a slight tendency to underfit smooth functional shapes that gradient boosting picks up more efficiently.</p>
+
+  <pre><code>from sklearn.ensemble import RandomForestClassifier
+
+rf = RandomForestClassifier(
+    n_estimators=500,        # more is rarely worse, often better
+    max_features="sqrt",     # default for classification
+    min_samples_leaf=20,     # raises bias slightly, reduces variance
+    n_jobs=-1,               # parallelise across cores
+    oob_score=True,          # free generalisation estimate
+    random_state=42,
+)
+rf.fit(X_train, y_train)
+print(f"OOB score: {rf.oob_score_:.4f}")</code></pre>
+
+  <h3>AdaBoost: adaptive boosting via reweighting</h3>
+
+  <p><strong>AdaBoost</strong> was the first practical boosting algorithm and remains the cleanest way to understand the boosting idea. Initialise sample weights $w_i = 1/n$ uniformly. At each of $M$ rounds, fit a weak learner $f_m$ (typically a decision stump, a tree of depth one) to the weighted training set, compute its weighted error rate $\varepsilon_m$, set its model weight</p>
+  $$\alpha_m = \frac{1}{2} \ln\!\left(\frac{1 - \varepsilon_m}{\varepsilon_m}\right),$$
+  <p>and update the sample weights so misclassified observations receive more weight on the next round:</p>
+  $$w_i \leftarrow w_i \cdot \exp(\alpha_m \cdot \mathbb{1}[y_i \ne f_m(x_i)]),$$
+  <p>followed by renormalisation. The final prediction is the sign of $\sum_m \alpha_m f_m(x)$. Better learners (small $\varepsilon_m$) get large $\alpha_m$ and dominate the vote; worse learners get small or even negative $\alpha_m$.</p>
+
+  <p>AdaBoost can be derived from forward stagewise additive modelling under exponential loss, $L(y, f) = \exp(-y f(x))$. This makes it a special case of gradient boosting where the loss and the algorithm are tightly coupled; the more general gradient-boosting framework decouples them and admits any differentiable loss. In practice AdaBoost is rarely used today on tabular data because gradient boosting with squared or log loss is more flexible and more robust to label noise (the exponential loss penalises misclassifications very hard, which exaggerates the influence of mislabelled rows).</p>
+
+  <h3>Gradient boosting: fit each tree to the negative gradient</h3>
+
+  <p><strong>Gradient boosting</strong> generalises AdaBoost. Define a differentiable loss $L(y, f)$. Start with a constant initial prediction $f_0(x) = \arg\min_c \sum_i L(y_i, c)$. At step $m$, compute the negative gradient (the "pseudo-residual") at the current fit,</p>
+  $$r_i^{(m)} = -\left.\frac{\partial L(y_i, f(x_i))}{\partial f(x_i)}\right|_{f = f_{m-1}},$$
+  <p>fit a regression tree $h_m$ to those pseudo-residuals, choose a small step size $\eta$ (the <strong>learning rate</strong>, usually between 0.01 and 0.1), and update:</p>
+  $$f_m(x) = f_{m-1}(x) + \eta \cdot h_m(x).$$
+  <p>The recipe specialises to familiar algorithms by choice of loss: squared error gives gradient-boosted regression with residual fitting, log loss gives gradient-boosted classification (with the gradient being the predicted probability minus the label), and the exponential loss recovers AdaBoost. The learning rate $\eta$ is the dial that trades fitting speed for regularisation: small $\eta$ means each tree contributes a little, so more trees are needed but the fit is smoother and less prone to overshoot.</p>
+
+  <p>Three observations matter for tuning. First, $\eta$ and <code>n_estimators</code> trade off directly: halving the learning rate roughly doubles the optimal number of trees. The empirical recipe is to fix $\eta$ at a small value (0.05 is a good starting point), run a large number of trees, and use early stopping on a validation fold to pick the true tree count. Second, <code>max_depth</code> controls the tree size, which controls the interaction order the model can capture: depth-three trees can capture three-way interactions, depth-six trees can capture six-way, and the right choice depends on how interactive the truth is. Most credit-risk problems are well served by depth four to eight. Third, <code>subsample</code> (row subsampling, sometimes called stochastic gradient boosting) acts as a regulariser by adding variance to the per-tree fit and decorrelating successive trees.</p>
+
+  <h3>XGBoost: regularised gradient boosting with second-order optimisation</h3>
+
+  <p><strong>XGBoost</strong> (extreme gradient boosting) is gradient boosting with two technical upgrades and a long list of engineering improvements. The first technical upgrade is a regularised objective: at each tree, the algorithm minimises not just the loss but also a complexity penalty</p>
+  $$\Omega(h_m) = \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2,$$
+  <p>where $T$ is the number of leaves in the tree and $w_j$ is the predicted value at leaf $j$. The $\gamma$ term penalises trees that add many leaves (a per-leaf complexity cost), and $\lambda$ is L2 regularisation on the leaf values (an L1 penalty <code>reg_alpha</code> is also available). The second technical upgrade is second-order optimisation: where standard gradient boosting fits each tree to the first-order gradient, XGBoost uses both the gradient and the Hessian (second derivative) of the loss to compute the split gains and the leaf values. The result is faster convergence per tree and a more accurate split criterion.</p>
+
+  <p>The engineering improvements are equally important in practice: native handling of missing values via a "default direction" learned per split, an approximate split-finding algorithm that bins continuous features into histograms to avoid the $O(n)$ cost of sorting each feature at each split, sparse-aware tree construction that skips zero entries in one-hot-encoded data, and a parallelised tree-construction loop that scales across cores and across machines. Together these make XGBoost dramatically faster than the scikit-learn <code>GradientBoostingClassifier</code> while typically more accurate as well, and it is the most widely deployed boosting implementation in production.</p>
+
+  <pre><code>import xgboost as xgb
+
+model = xgb.XGBClassifier(
+    n_estimators=2000,       # large with early stopping
+    learning_rate=0.05,
+    max_depth=6,
+    subsample=0.8,           # row subsampling per tree
+    colsample_bytree=0.8,    # column subsampling per tree
+    reg_alpha=0.0,           # L1 on leaf weights
+    reg_lambda=1.0,          # L2 on leaf weights
+    eval_metric="auc",
+    early_stopping_rounds=50,
+    n_jobs=-1,
+    random_state=42,
+)
+model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)</code></pre>
+
+  <h3>LightGBM: histogram splitting and leaf-wise growth</h3>
+
+  <p><strong>LightGBM</strong> took XGBoost's histogram-binning idea and pushed it further, making it the default split strategy rather than an optional approximation, with per-feature histograms cached and reused across splits. The other distinguishing choice is <strong>leaf-wise tree growth</strong> rather than level-wise: at each step the algorithm splits the leaf that promises the largest reduction in loss, regardless of which level of the tree that leaf is on. Level-wise growth (XGBoost's default) grows the tree balanced layer by layer; leaf-wise growth grows asymmetric trees that fit difficult regions of the input space more deeply. The asymmetric trees typically achieve lower loss per tree but can overfit small datasets, which is why LightGBM exposes <code>num_leaves</code> as its main complexity control rather than <code>max_depth</code> (the two are loosely related: a balanced depth-$d$ tree has at most $2^d$ leaves, but a leaf-wise tree with $2^d$ leaves can be much deeper on one branch than another).</p>
+
+  <p>LightGBM is typically the fastest gradient-boosting implementation on large datasets and the most memory-efficient. Two additional tricks contribute: <strong>gradient-based one-side sampling</strong> downsamples observations with small gradients (already well-fit) while keeping all observations with large gradients (where the next tree has work to do), and <strong>exclusive feature bundling</strong> packs mutually exclusive sparse features (such as one-hot dummies from the same categorical) into a single histogram. The combination is what makes LightGBM the choice when training time matters, for instance when hyperparameter tuning a model on tens of millions of rows is part of the workflow.</p>
+
+  <h3>CatBoost: ordered boosting and native categorical handling</h3>
+
+  <p><strong>CatBoost</strong> is the third major implementation and the one with the most distinctive design. Its primary innovation is <strong>ordered boosting</strong>, which addresses a subtle leakage problem in standard gradient boosting: each tree is fit on residuals computed from the running ensemble's predictions on the same observations the tree is then trained on, so the tree implicitly sees information about the labels of those observations via the residuals. CatBoost fixes this by maintaining a separate model for each observation that excludes that observation from its training history, and computing each observation's residual from the model that has not seen it. The result is a small but real improvement in generalisation on smaller datasets, where the leakage from standard boosting matters most.</p>
+
+  <p>The second innovation is native categorical handling. CatBoost computes target statistics for each categorical level using only the rows that precede the current row in a random permutation of the training data, which gives an out-of-fold target encoding without the user having to set one up. This makes CatBoost the easiest of the three implementations to use when categoricals dominate the feature set, because the categorical columns can be passed in as-is with their level identifiers and the algorithm handles the encoding internally. The third architectural choice is <strong>symmetric (oblivious) trees</strong>: at each level of a tree, the same feature and threshold are used to split every node on that level. This restricts the tree class but makes prediction extremely fast (a depth-$d$ symmetric tree is essentially a $d$-dimensional lookup) and provides implicit regularisation.</p>
+
+  <p>The three implementations are close enough in predictive performance on most datasets that the choice often comes down to operational preferences. XGBoost is the most mature and best-tested in production. LightGBM is the fastest, particularly on wide sparse data. CatBoost is the most convenient when categorical features are the bulk of the feature set, and is least sensitive to default hyperparameters out of the box.</p>
+
+  <h3>Stacking: meta-learning the combination</h3>
+
+  <p><strong>Stacking</strong> (also known as stacked generalisation or blending) is the most flexible of the three families. The procedure has two tiers. At <strong>level 0</strong>, fit a set of diverse base learners on the training set. The diversity matters more than the strength: a stack of three strong learners that all make the same kind of mistake is no better than the best of them, while a stack of a logistic regression, a random forest, and a k-nearest-neighbour model often beats all three because they err in different ways. To avoid the meta-learner overfitting on the base learners' training-set predictions, the level-0 predictions used for training the meta-learner are produced by k-fold cross-validation: for each fold, each base learner is trained on the other folds and predicts on the held-out fold; concatenating these out-of-fold predictions gives a full prediction column on the training set with no in-fold contamination.</p>
+
+  <p>At <strong>level 1</strong>, a meta-learner is fit on the matrix of out-of-fold predictions (one column per base learner, $n$ rows), optionally augmented with the original features (scikit-learn's <code>passthrough=True</code>). The meta-learner is usually something simple: a logistic regression, a ridge regression, or another random forest. Once the meta-learner is fit, the entire stack predicts on new data by passing it through each base learner trained on the full training set and feeding their predictions into the meta-learner.</p>
+
+  <pre><code>from sklearn.ensemble import StackingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold
+
+base_learners = [
+    ("logreg", LogisticRegression(max_iter=1000)),
+    ("forest", RandomForestClassifier(n_estimators=300, random_state=42)),
+]
+stack = StackingClassifier(
+    estimators=base_learners,
+    final_estimator=LogisticRegression(),
+    cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42),
+    stack_method="predict_proba",
+    passthrough=False,
+)
+stack.fit(X_train, y_train)</code></pre>
+
+  <p>Stacking gains tend to be small on top of a well-tuned single boosting model, on the order of one to two per cent reduction in log loss or 0.005 AUC. The trade-off is that the stack inherits the inference cost of every base learner, which can make deployment expensive. The honest application is when no single learner family clearly wins on the problem, the dataset is large enough to support training many models, and the small accuracy gain is worth the operational cost; otherwise a single XGBoost or LightGBM with good tuning is the simpler answer.</p>
+
+  <h3>When to pick which</h3>
+
+  <p>A practical decision rule, in roughly the order to try things. <strong>Random forest as the safe default.</strong> If a single model is needed on a tabular dataset, with little time for tuning and modest expectations, a random forest with the scikit-learn defaults will get within a few per cent of the best achievable accuracy and will be easy to explain. It is the right starting point for a first cut and often the right end point too. <strong>XGBoost or LightGBM as the production winners.</strong> For problems where the last few per cent of accuracy matters (credit risk PD, fraud, conversion, churn), gradient-boosted trees are almost always the answer. Pick XGBoost if maturity and ecosystem (SHAP integration, distributed training, broad language support) matter most; pick LightGBM if training speed on large data matters most. <strong>CatBoost when categoricals dominate.</strong> If most of the predictive signal lives in high-cardinality categoricals (geography, merchant, occupation), CatBoost's ordered target encoding is the path of least resistance and the defaults are excellent. <strong>Stacking when no single family wins.</strong> If careful comparison shows three or four different model families all achieving similar performance with different error patterns, a stack of them with a simple meta-learner extracts the residual gains.</p>
+
+  <h3>Hyperparameters that matter</h3>
+
+  <p>Five parameters do almost all the work across boosting implementations. <code>n_estimators</code> is the number of trees; with early stopping it does not need to be tuned and can be set large. <code>learning_rate</code> is the step size; smaller is better but slower, with 0.05 a reasonable default. <code>max_depth</code> (or <code>num_leaves</code> in LightGBM) controls per-tree capacity and therefore the interaction order the model can capture; four to eight is a good range for most tabular problems. <code>subsample</code> sets the row sampling rate per tree; values around 0.7 to 0.9 provide useful regularisation without losing too much signal. <code>colsample_bytree</code> sets the column sampling rate per tree; similar range, same purpose. Beyond these, <code>reg_alpha</code> (L1 penalty on leaf values) and <code>reg_lambda</code> (L2 penalty on leaf values) provide direct regularisation and become important on noisy data where the default values let the model overfit. The full tuning workflow is the subject of <a href="../06_hyperparameter_tuning/01-tuning_principles.html">lecture 31</a>; the principle to hold is that boosting has more knobs than bagging, almost all of them interact, and Bayesian optimisation or successive halving is usually more efficient than grid search for finding good combinations.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Five failure modes account for most ensemble-related modelling incidents. Each is unobvious at first and obvious in retrospect.</p>
+
+  <div class="callout warn">
+    <span class="tag">Boosting too many rounds without early stopping</span>
+    Gradient boosting overfits monotonically once enough trees have been added; training loss keeps falling but validation loss starts rising. Setting <code>n_estimators</code> to a fixed value picked from prior experience is fragile because the right value depends on the learning rate, the data size, and the noise level. The fix is structural: always pass an evaluation set and an <code>early_stopping_rounds</code> argument, train with a generous tree budget, and let the algorithm pick the right number of trees from the validation curve. In scikit-learn's <code>GradientBoostingClassifier</code>, the equivalent is <code>n_iter_no_change</code>; in <code>XGBClassifier</code> and <code>LGBMClassifier</code>, it is <code>early_stopping_rounds</code>.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Target leakage through target encoding under boosting</span>
+    Combining target encoding with gradient boosting is a common path to inflated training accuracy. The encoding column carries the label directly into the feature matrix unless it is computed out-of-fold. CatBoost's ordered target encoding handles this internally; XGBoost and LightGBM do not, so the practitioner has to compute the encoding via cross-validation manually. The symptom is training AUC very close to one with a large gap to validation AUC, in a model that should not be that good. The fix is either to switch to CatBoost or to wrap target encoding in a cross-validated pipeline that excludes the held-out fold's rows from the encoding statistic.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Feature importance read as causation</span>
+    Random forests and gradient-boosted trees both report feature importance scores, computed from the total reduction in impurity (or in gain) attributable to splits on each feature. These scores measure how much the model used the feature, not how much the feature drives the underlying outcome. Two issues follow: high-cardinality features inflate impurity-based importance because they offer more candidate splits, and correlated features split the importance score between them so neither looks important even when their combined effect is large. The fix is to use permutation importance on a held-out set (which measures how much accuracy drops when a feature is shuffled) and to read feature importance descriptively rather than causally. Causal questions need causal methods; see <a href="06-causal_models.html">lecture 12 on causal models</a>.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Stacking that overfits the meta-learner</span>
+    The point of out-of-fold prediction in stacking is to prevent the meta-learner from seeing predictions that have already been fit to the rows the meta-learner is being trained on. Skipping that step, or generating the level-0 predictions using <code>predict</code> on the training set after fitting the base learners on the same training set, leaks the training labels into the meta-features and the meta-learner overfits dramatically. The fix is to use scikit-learn's <code>StackingClassifier</code> as designed, which generates predictions via cross-validation by default, or to implement the same logic by hand with explicit <code>KFold</code> loops. Manual implementations are where this bug appears.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Random forests treated as scale-invariant for all uses</span>
+    Tree-based ensembles are scale-invariant for prediction: rescaling a feature does not change which split a tree picks. They are not scale-invariant for distance-based diagnostics built on top of them: proximity-based outlier detection using a random forest's leaf-membership matrix, k-nearest-neighbour analyses on the forest's embedded representation, or stacking a random forest with a downstream linear meta-learner all depend on feature scales. The model itself is fine, but the post-hoc use of the model is not. The pragmatic rule is to scale features at the pipeline level if anything downstream of the tree ensemble cares about scale, even though the tree itself does not.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Ensemble learning is the supervised lecture that has changed practice the most. Bagging takes a high-variance base learner and averages many copies on bootstrap resamples, with random forests adding per-split feature randomisation to push the residual correlation between trees down further. Boosting takes a high-bias base learner and adds copies sequentially, each fitted to the negative gradient of the loss at the running ensemble, with XGBoost adding regularisation and second-order optimisation, LightGBM adding histogram binning and leaf-wise growth, and CatBoost adding ordered boosting and native categorical handling. Stacking takes any base learners and learns the combination weights with a meta-learner trained on out-of-fold predictions. The common principle is that uncorrelated errors average to zero, and the three families differ in how they engineer that lack of correlation.</p>
+
+  <p>The single empirical fact to internalise is that gradient-boosted trees, well-tuned, are the strongest tabular supervised method by a small but consistent margin. Every production credit model built outside of regulatory scorecards in the last five years has been a boosting variant or a stack containing one. The interpretability gap that historically kept logistic regression in regulated environments is closing as model-agnostic methods like SHAP become standard practice for explaining individual predictions, and supervisors are increasingly comfortable with non-linear models so long as the explanations are reliable.</p>
+
+  <p>What this lecture deliberately did not do. It did not derive the bias-variance trade-off from first principles; that was lecture 1 in this sub-module and the language here assumed it. It did not cover model interpretation in any depth; SHAP and permutation importance live in <a href="../08_model_interpretation/03-model_agnostic_methods.html">lecture 36 on model-agnostic methods</a>, which is the right next read after this one for anyone planning to deploy a boosting model. It did not tune any hyperparameters; that is <a href="../06_hyperparameter_tuning/01-tuning_principles.html">lecture 31 on tuning principles</a>, which is essential follow-up for ensembles because the count of meaningful hyperparameters is much higher than for single learners.</p>
+
+  <p>Lecture 12, <a href="06-causal_models.html">causal models</a>, makes the conceptual jump from "what does the model predict" to "what would happen if we intervened". Ensemble methods are the most predictive supervised tools available, and they are also among the least suited to causal questions because their non-linearity and their feature interactions obscure the structural relationships between variables. The next lecture sets up the language for asking causal questions properly and explains why high predictive accuracy is not enough when the question is about intervention.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Take $M$ predictors with variance $\sigma^2$ and pairwise correlation $\rho$. Write the variance of their average and explain in one sentence why random forests' per-split feature randomisation reduces $\rho$ rather than $\sigma^2$.</li>
+      <li>A bootstrap sample of size $n$ drawn with replacement from $n$ rows omits roughly what fraction of the original rows in the limit of large $n$? Derive the answer.</li>
+      <li>In gradient boosting, what does "negative gradient" mean for squared-error regression, and how does that recover the residual-fitting picture commonly taught for the algorithm?</li>
+      <li>State the AdaBoost weight update rule in one line and explain what happens to the sample weights of correctly classified observations from round $m$ to round $m+1$.</li>
+      <li>What is the trade-off between <code>learning_rate</code> and <code>n_estimators</code> in gradient boosting, and what is the standard operational fix that lets you set both without having to tune their combination?</li>
+      <li>Why does the meta-learner in a stacking ensemble need out-of-fold predictions on the training set rather than ordinary <code>predict</code> output, and what is the symptom of getting this wrong?</li>
+      <li>Name the distinctive design choice of CatBoost and the practical situation in which it matters most.</li>
+      <li>You read that a random forest's "feature importance" for "customer_id" is the third-highest in your model. What are two distinct reasons this could be a meaningless number, and what diagnostic would you run to check?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 12 (<a href="06-causal_models.html">causal models</a>) leaves predictive accuracy behind and asks what would happen under intervention. Ensembles are predictive workhorses but causal inference requires structural assumptions that prediction methods do not encode.</li>
+      <li><strong>Previous:</strong> Lecture 10 (<a href="04-naive_bayes.html">naive Bayes</a>) was the last of the single-learner supervised methods; ensembles take those single learners as building blocks and combine them.</li>
+      <li><strong>Prerequisite:</strong> Lecture 9 (<a href="02-decision_trees.html">decision trees</a>) is the base learner for all three ensemble families and the source of the high-variance property that bagging exists to exploit. The decision-tree fundamentals (impurity, splits, depth control) carry directly into every ensemble built on trees.</li>
+      <li><strong>Tuning:</strong> Lecture 31 (<a href="../06_hyperparameter_tuning/01-tuning_principles.html">tuning principles</a>) is essential follow-up because boosting has more hyperparameters than single learners and most of them interact; Bayesian optimisation or successive halving is the practical answer to that combinatorial space.</li>
+      <li><strong>Interpretation:</strong> Lecture 36 (<a href="../08_model_interpretation/03-model_agnostic_methods.html">model-agnostic methods</a>) introduces SHAP, partial dependence, and permutation importance, the standard tools for explaining ensemble predictions. Deployment of any boosting model in a regulated setting depends on the interpretation toolkit from that lecture.</li>
+      <li><strong>Outside this course:</strong> The A-IRB capital model lifecycle at <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/index.html">application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/</a> uses gradient-boosted trees as the challenger model standard and as the input to model risk and validation discussions. The IFRS 9 impairments lifecycle at the sibling folder uses the same algorithms for forward-looking PD and SICR, where the regulatory bar for non-linear models is lower and gradient boosting is increasingly the production choice.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Supervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 11 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 6: time series</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Statistics</a></div>
+  <h1>Time series</h1>
+  <p class="subtitle">The first lecture under pillar 5: drop the IID assumption and let the observations evolve through time. The new object is the dependence structure $\gamma(h)$ between an observation now and an observation $h$ steps ago. Stationarity is the gateway concept; ARMA and ARIMA are the gateway models; GARCH adds dynamics to the variance; cointegration handles long-run equilibrium between non-stationary series. By the end you should be able to fit, diagnose, and compare forecasts from a time-series model with the same fluency as a GLM, and read a macroeconomic forecast or a market-risk model with the same critical eye.</p>
+  <div class="meta">
+    <span>Lecture 6 of 9</span>
+    <span>Reading time, 85 minutes</span>
+    <span>Part III: stochastic processes</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>time series</strong> is a sequence of observations indexed by time: $\{X_t\}_{t=1, 2, \ldots}$, with the index carrying meaning. The independence assumption of lectures 1-5 is dropped; the joint distribution of consecutive observations is the new object of interest. The fundamental statistical question changes from "what is the mean?" to "what is the dependence structure?", because once you have the dependence structure, you have everything: the mean function, the conditional forecast, the prediction-interval width, the long-run behaviour.</p>
+
+  <p>Four families of model cover almost everything a working analyst will meet. The <strong>ARMA family</strong> (AR, MA, ARMA, ARIMA, SARIMA) models linear dependence in the conditional mean and is the workhorse of econometric forecasting. <strong>Exponential smoothing</strong> (simple, Holt, Holt-Winters) is the workhorse of business forecasting; in state-space ETS form it overlaps with ARIMA without being identical. <strong>Vector autoregressions (VAR)</strong> extend to multiple series and, with the cointegration tests, handle long-run equilibrium relationships among non-stationary variables. <strong>GARCH</strong> and its variants model the dynamics of the conditional variance, the central object in market risk and a recurring feature of financial time series everywhere.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Time series is regression where the predictors are lagged versions of the response. Yesterday's value predicts today's; last year's value predicts this year's. The model is just a recipe for which lags matter and how. Stationarity is the technical condition that makes the recipe work the same way over time: same mean, same variance, same dependence structure across the sample. When stationarity fails, you difference until it doesn't, fit your model on the differenced series, and integrate back to forecast on the original scale. Everything else is bookkeeping.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Where this sits in the stats world
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Where this sits in the stats world</h2></div>
+
+  <div class="callout insight">
+    <span class="tag">Pillar 5, time-indexed</span>
+    This lecture sits at <strong>pillar 5</strong> of the <a href="index.html">stats world map</a>: stochastic processes. The previous five lectures all assumed observations are IID conditional on covariates. Here we drop that and let observations depend on each other through a time index. The dependence structure is what we model, the IID-assuming inferential apparatus does not directly apply, and the standard errors of conditional-mean regressions need correcting for autocorrelation (HAC, Newey-West). Lecture 07 will do the same with censoring as the dependence; lecture 08 with discrete state transitions; lecture 09 will revisit time series from a Bayesian angle (state-space models).
+  </div>
+
+  <p>The link backwards to GLMs is closer than it looks. An AR(1) model $X_t = \phi X_{t-1} + \epsilon_t$ is, formally, an OLS regression of $X_t$ on $X_{t-1}$. The complication is that the residuals are no longer IID across observations, so the OLS standard errors are wrong. Hence the apparatus of HAC standard errors, the Durbin-Watson and Ljung-Box residual tests, and the specific stationarity conditions that keep the regression well-behaved. A VAR is the same idea generalised to multiple series. A GARCH model is a GLM-style model on the conditional variance: the linear predictor takes lagged squared residuals as inputs. Time-series is GLM-with-dependence, and most of the modelling apparatus carries over.</p>
+
+  <p>One scoping note. This lecture treats classical time-series methods. Bayesian state-space models, dynamic linear models with MCMC, and modern neural-network approaches (LSTMs, Prophet, N-BEATS, transformer forecasters) are mentioned in section 8 but not developed. The classical methods remain the dominant tools in regulated finance: ARIMA models for macroeconomic forecasting, GARCH for market-risk variance, VECM for cointegrated portfolios. They are also the easiest to audit, which matters in regulated settings.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons time series deserves the same depth as GLMs. First, every macro-conditional model in banking is a time-series model. The IFRS 9 ECL framework requires forward-looking information (FLI) under multiple economic scenarios; the scenario generator is invariably a vector-autoregression or a VECM of GDP, unemployment, house prices, and interest rates. Pillar 2B stress testing under the EBA / BoE / DFAST regimes uses the same machinery, calibrated to specific stress paths. PD-in-time, LGD-in-time, EAD-in-time, every component of through-the-cycle credit modelling has a time-series engine behind it. Misreading the engine produces capital that swings unaccountably or fails to swing when it should.</p>
+
+  <p>Second, market risk is essentially a time-series subject. Value-at-risk is a quantile of a conditional return distribution; the conditional distribution evolves over time according to a GARCH-family model in the production stack; the parameters are re-estimated daily on a rolling window. Expected shortfall, FRTB risk weights, the multipliers on internal-model VaR after exceedances, all sit on top of a GARCH or a stochastic-volatility model. A market risk manager who does not understand GARCH is the equivalent of a credit risk manager who does not understand logistic regression.</p>
+
+  <p>Third, the failure modes of time-series modelling are different from those of cross-sectional modelling and far less forgiving. <strong>Spurious regression</strong> (Granger and Newbold 1974) shows that regressing one random walk on another produces high $R^2$ and significant t-statistics with probability approaching 1, despite no real relationship. This is not a small effect: it pervades macroeconomics and was the original motivation for cointegration theory. Cross-validation does not work directly on time series; the temporal ordering must be preserved (rolling-origin or expanding-window CV). Standard errors that ignore autocorrelation understate uncertainty, sometimes by a factor of three. Each of these traps requires explicit handling that the cross-sectional toolkit does not flag.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The mental model</h2></div>
+
+  <p>A time series is decomposable into four conceptual components: trend, seasonality, cycle, and irregular. The diagram below shows the canonical additive decomposition.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Time series decomposition into trend, seasonality, cycle, and irregular">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Additive decomposition: X_t = trend + season + cycle + irregular</text>
+
+      <!-- Trend panel -->
+      <g transform="translate(40, 50)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#0d9488">Trend</text>
+        <line x1="0" y1="50" x2="340" y2="50" stroke="#71717a" stroke-width="0.7"/>
+        <path d="M 0 60 L 340 20" stroke="#0d9488" stroke-width="2.2" fill="none"/>
+        <text x="170" y="78" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">slow secular movement</text>
+      </g>
+
+      <!-- Seasonal panel -->
+      <g transform="translate(440, 50)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#7c3aed">Seasonality</text>
+        <line x1="0" y1="50" x2="340" y2="50" stroke="#71717a" stroke-width="0.7"/>
+        <path d="M 0 50 Q 30 25, 60 50 T 120 50 T 180 50 T 240 50 T 300 50 T 340 50" stroke="#7c3aed" stroke-width="2.2" fill="none"/>
+        <text x="170" y="78" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">fixed-period oscillation</text>
+      </g>
+
+      <!-- Cycle panel -->
+      <g transform="translate(40, 160)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#b45309">Cycle</text>
+        <line x1="0" y1="50" x2="340" y2="50" stroke="#71717a" stroke-width="0.7"/>
+        <path d="M 0 60 Q 80 20, 160 60 T 320 60 L 340 65" stroke="#b45309" stroke-width="2.2" fill="none"/>
+        <text x="170" y="78" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">irregular-period oscillation (business cycle)</text>
+      </g>
+
+      <!-- Irregular -->
+      <g transform="translate(440, 160)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#be185d">Irregular</text>
+        <line x1="0" y1="50" x2="340" y2="50" stroke="#71717a" stroke-width="0.7"/>
+        <path d="M 0 53 L 20 47 L 40 56 L 60 45 L 80 55 L 100 47 L 120 58 L 140 48 L 160 53 L 180 55 L 200 46 L 220 56 L 240 49 L 260 54 L 280 47 L 300 53 L 320 50 L 340 52" stroke="#be185d" stroke-width="1.8" fill="none"/>
+        <text x="170" y="78" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">stationary residual; what models target</text>
+      </g>
+
+      <!-- Bottom note -->
+      <text x="410" y="295" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#52525b">Strip trend and seasonality first; fit a stationary model to the residual; reconstruct on the original scale to forecast.</text>
+    </svg>
+    <figcaption>The four components of a time series. <strong>Trend</strong> is the long-run direction. <strong>Seasonality</strong> is a fixed-period repeating pattern (monthly, quarterly, yearly). <strong>Cycle</strong> is an irregular-period oscillation, usually the business cycle. <strong>Irregular</strong> is the stationary residual after the first three are removed; it is what ARMA models fit. STL decomposition (Cleveland 1990) is the canonical algorithm that separates these components without imposing strong functional forms. The classical Box-Jenkins workflow is: difference / detrend / deseasonalise → identify ARMA orders on the residual → forecast → invert the transformations.</figcaption>
+  </figure>
+
+  <p>Two slogans pin the workflow. <strong>Stationarity first.</strong> Almost every classical method assumes the series is at least weakly stationary; if it isn't, the apparatus produces nonsense (spurious regression, biased forecasts, non-convergent estimators). Make the series stationary by differencing, transforming (log, Box-Cox), or removing a deterministic trend, then model. <strong>ACF and PACF together identify the model.</strong> The autocorrelation function $\rho(h)$ and partial autocorrelation function $\phi(h)$ have characteristic patterns for AR, MA, and ARMA models; reading them is the Box-Jenkins identification step.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The detail</h2></div>
+
+  <h3>5.1 Stochastic processes and stationarity</h3>
+
+  <p>A <strong>discrete-time stochastic process</strong> $\{X_t\}_{t \in \mathbb{Z}}$ is an indexed family of random variables on a common probability space. The joint distribution of any finite subset $(X_{t_1}, \ldots, X_{t_k})$ characterises the process; the marginals alone do not.</p>
+
+  <p>The process is <strong>strictly stationary</strong> if the joint distribution of $(X_{t_1}, \ldots, X_{t_k})$ is invariant to time shifts: it equals the distribution of $(X_{t_1 + h}, \ldots, X_{t_k + h})$ for any $h$. The process is <strong>weakly stationary</strong> (or covariance-stationary) if its mean is constant, its variance is constant, and its autocovariance $\gamma(h) = \text{Cov}(X_t, X_{t+h})$ depends only on $h$. Strict stationarity plus finite variance implies weak stationarity, but not the reverse.</p>
+
+  <p>The <strong>autocorrelation function</strong> (ACF) is $\rho(h) = \gamma(h)/\gamma(0)$, bounded in $[-1, 1]$, symmetric in $h$. The <strong>partial autocorrelation function</strong> (PACF) $\phi(h)$ is the correlation between $X_t$ and $X_{t+h}$ after removing the linear effect of intermediate lags; it is the coefficient on the $h$-th lag in a regression of $X_t$ on $X_{t-1}, \ldots, X_{t-h}$.</p>
+
+  <p>Stationarity matters because every classical estimator and inferential result assumes it. Sample autocorrelations are consistent estimators of population autocorrelations under stationarity and ergodicity. The asymptotic distribution of the sample mean is $\sqrt{n}(\bar{X} - \mu) \to \mathcal{N}(0, \sum_h \gamma(h))$, which uses the autocovariance series. Without stationarity none of this is valid: spurious regression, divergent estimators, useless inference. The Box-Jenkins methodology, the unit-root tests below, and the differencing operator are all designed to enforce stationarity on a candidate series.</p>
+
+  <h3>5.2 Unit roots and differencing</h3>
+
+  <p>The most common non-stationarity in financial and economic data is a <strong>unit root</strong>: a series with a stochastic trend that propagates shocks indefinitely. The textbook example is the random walk $X_t = X_{t-1} + \epsilon_t$, with $\text{Var}(X_t) = t \sigma^2$ growing without bound. A series with a unit root is integrated of order one, written $I(1)$; differencing once makes it stationary, $\Delta X_t = X_t - X_{t-1}$ is $I(0)$. A series integrated of order $d$ requires $d$ differences.</p>
+
+  <p>Three standard unit-root tests, with $H_0$ = "the series has a unit root":</p>
+
+  <ul>
+    <li><strong>Augmented Dickey-Fuller (ADF)</strong> (Said and Dickey 1984). Regress $\Delta X_t$ on $X_{t-1}$ plus $p$ lags of $\Delta X$; test whether the coefficient on $X_{t-1}$ is zero. The test statistic has a non-standard (Dickey-Fuller) distribution; software supplies the critical values. The most widely used unit-root test, with versions including a deterministic constant and trend.</li>
+    <li><strong>Phillips-Perron (PP)</strong>. Same null as ADF but uses HAC-style non-parametric correction for autocorrelation rather than including lags. Asymptotically equivalent to ADF in many settings; sometimes preferred when the autocorrelation structure is complex.</li>
+    <li><strong>KPSS</strong> (Kwiatkowski, Phillips, Schmidt, Shin 1992). Reverses the null: $H_0$ = "the series is stationary". Useful as a cross-check; if ADF rejects (no unit root) and KPSS does not reject (stationary), you have strong evidence of stationarity. Disagreements between ADF and KPSS are common in finite samples and need careful interpretation.</li>
+  </ul>
+
+  <p>The complication: ADF and KPSS have low power against alternatives close to a unit root, and finite-sample distortions can be severe. The pragmatic recipe is to look at the autocorrelation function (a unit-root series has $\rho(h)$ decaying slowly, almost linearly), test, difference if non-stationary, repeat. For most financial price series, log returns are stationary even when log prices are not; this is the workhorse pre-processing.</p>
+
+  <h3>5.3 The ARMA family</h3>
+
+  <p>Once a series is stationary, the ARMA family supplies linear-Gaussian models for it.</p>
+
+  <p><strong>Autoregressive AR(p):</strong></p>
+  $$X_t = c + \phi_1 X_{t-1} + \phi_2 X_{t-2} + \cdots + \phi_p X_{t-p} + \epsilon_t,$$
+  <p>with $\epsilon_t$ white noise (zero-mean, IID with variance $\sigma^2$). The model is stationary iff the roots of $1 - \phi_1 z - \cdots - \phi_p z^p = 0$ lie outside the unit circle. AR(1) is the canonical example: $X_t = \phi X_{t-1} + \epsilon_t$ is stationary iff $|\phi| &lt; 1$, with $\text{Var}(X_t) = \sigma^2/(1 - \phi^2)$ and $\rho(h) = \phi^{|h|}$.</p>
+
+  <p><strong>Moving average MA(q):</strong></p>
+  $$X_t = \mu + \epsilon_t + \theta_1 \epsilon_{t-1} + \cdots + \theta_q \epsilon_{t-q}.$$
+  <p>Always stationary (a finite linear combination of IID innovations); the additional <em>invertibility</em> condition requires the roots of $1 + \theta_1 z + \cdots + \theta_q z^q = 0$ to lie outside the unit circle, so the MA representation can be re-expressed as an infinite AR. The ACF of MA(q) cuts off at lag $q$, the PACF decays geometrically.</p>
+
+  <p><strong>ARMA(p, q):</strong> combines the two. The ACF and PACF both decay geometrically. The Wold decomposition theorem (Wold 1938) shows that any stationary process has a (potentially infinite-order) MA representation, which is why ARMA models with moderate $p$ and $q$ approximate almost everything.</p>
+
+  <p><strong>ARIMA(p, d, q):</strong> applies an ARMA(p, q) to the $d$-th difference of the series. The notation $X_t \sim \text{ARIMA}(p, d, q)$ means $\Delta^d X_t \sim \text{ARMA}(p, q)$. ARIMA(0, 1, 0) is a random walk; ARIMA(1, 1, 0) is a random walk with first-order autoregressive drift in the differences.</p>
+
+  <p><strong>Box-Jenkins identification.</strong> The classical workflow:</p>
+
+  <ol>
+    <li>Plot the series; visually identify trend, seasonality, level shifts.</li>
+    <li>Test for unit roots (ADF, KPSS); difference until stationary; record $d$.</li>
+    <li>Plot ACF and PACF of the (differenced) series. AR(p): PACF cuts off at $p$, ACF decays. MA(q): ACF cuts off at $q$, PACF decays. ARMA: both decay.</li>
+    <li>Fit a candidate ARMA(p, q); check the residuals for whiteness (Ljung-Box test).</li>
+    <li>Compare candidates by AIC or BIC; pick the parsimonious one with white residuals.</li>
+    <li>Forecast and validate on a hold-out period.</li>
+  </ol>
+
+  <h3>5.4 Seasonal ARIMA and exogenous regressors</h3>
+
+  <p><strong>SARIMA(p, d, q)(P, D, Q)$_s$</strong> extends ARIMA with a seasonal lag operator at lag $s$. For monthly data with annual seasonality, $s = 12$; for daily data with weekly seasonality, $s = 7$. The seasonal AR, MA, and differencing components handle the periodic structure that ordinary ARIMA cannot capture.</p>
+
+  <p><strong>SARIMAX</strong> adds exogenous regressors: $X_t = \mathbf{z}_t^\top \boldsymbol{\beta} + \text{SARIMA}$ residual. The exogenous variables are modelled with OLS-style coefficients while the residual carries the time-series dependence. This is the natural model for "GDP growth as a function of inflation, plus residual dynamics" or "default rate as a function of unemployment, plus residual dynamics".</p>
+
+  <h3>5.5 Exponential smoothing and the state-space ETS family</h3>
+
+  <p>Exponential smoothing is the second classical workhorse, more popular in business forecasting than in econometrics. The simplest version is <strong>simple exponential smoothing (SES)</strong>:</p>
+
+  $$\hat{X}_{t+1} = \alpha X_t + (1 - \alpha) \hat{X}_t,$$
+
+  <p>a weighted average of the most recent observation and the previous forecast, with smoothing parameter $\alpha \in [0, 1]$. SES is appropriate for series with no trend and no seasonality. <strong>Holt's linear method</strong> adds a level and a trend component, each with its own smoothing parameter. <strong>Holt-Winters</strong> adds a seasonal component (additive or multiplicative), giving three smoothing parameters total.</p>
+
+  <p>Hyndman and Athanasopoulos's state-space ETS framework (Error-Trend-Seasonal) unifies the smoothing methods as state-space models with three components, each in one of three forms (N = none, A = additive, M = multiplicative). The resulting taxonomy (ETS(A, N, N), ETS(A, A, A), ETS(M, A, M), etc.) covers thirty named models, with maximum-likelihood estimation, prediction intervals, and AIC-based model selection. The <code>forecast</code> package in R and <code>statsmodels</code> in Python implement the family.</p>
+
+  <p>Relationship to ARIMA. The two families overlap but are not identical. Every linear additive ETS model has an equivalent ARIMA representation; the multiplicative ETS models do not. ARIMA dominates when the modeller wants explicit lag interpretation and exogenous variables (SARIMAX); ETS dominates when the modeller wants automatic robustness and minimal tuning. In practice, both should be tried and AIC-compared.</p>
+
+  <h3>5.6 Vector autoregression and Granger causality</h3>
+
+  <p><strong>VAR(p):</strong> a vector $\mathbf{X}_t \in \mathbb{R}^k$ of $k$ time series, each regressed on $p$ lags of itself and the other series:</p>
+
+  $$\mathbf{X}_t = \mathbf{c} + \boldsymbol{\Phi}_1 \mathbf{X}_{t-1} + \cdots + \boldsymbol{\Phi}_p \mathbf{X}_{t-p} + \boldsymbol{\epsilon}_t.$$
+
+  <p>$\boldsymbol{\Phi}_i$ are $k \times k$ coefficient matrices; $\boldsymbol{\epsilon}_t$ is white noise with covariance $\boldsymbol{\Sigma}$. A VAR is stable (stationary) iff the eigenvalues of the companion matrix lie inside the unit circle.</p>
+
+  <p>VARs are the standard tool for macroeconomic scenario generation: build a VAR on GDP, inflation, unemployment, equity returns, and a credit spread; estimate; simulate forward under a baseline path; perturb to a stress path. The output is a coherent multivariate scenario that respects the historical correlations between the variables. The IFRS 9 FLI engine in most banks is a VAR or a Bayesian VAR.</p>
+
+  <p><strong>Granger causality</strong> tests whether lags of $X_2$ help predict $X_1$ over and above lags of $X_1$ itself, by an F-test on the relevant block of coefficients in a VAR. It is not "causality" in the causal-inference sense (the test is symmetric to reverse causation through unobserved confounders); it is a predictive-content test. Reading too much into a Granger causality finding is a standard error.</p>
+
+  <p><strong>Impulse response functions</strong> trace the dynamic response of $\mathbf{X}_t$ to a one-unit shock in one component. They require an orthogonalisation of the contemporaneous shocks (Cholesky, generalised IRF, structural identification) because the raw VAR residuals are typically correlated. IRF analysis is the standard output of macro-policy VARs.</p>
+
+  <h3>5.7 Cointegration</h3>
+
+  <p>Two $I(1)$ series can have a stationary linear combination, in which case they are <strong>cointegrated</strong>. The economic interpretation: there is a long-run equilibrium relationship $X_{1,t} - \beta X_{2,t} = $ stationary, even though each series wanders without bound on its own. Examples: short and long interest rates (term-structure equilibrium), share prices in cross-listed firms, prices of substitutable goods.</p>
+
+  <p>Cointegration matters because <strong>regressing two cointegrated series on each other works (super-consistent OLS estimator of $\beta$), whereas regressing two arbitrary $I(1)$ series on each other gives spurious regression</strong>. The whole technology of cointegration is the apparatus for distinguishing these two cases.</p>
+
+  <p>Two standard tests / estimators:</p>
+
+  <ul>
+    <li><strong>Engle-Granger two-step.</strong> Regress $X_1$ on $X_2$ by OLS; test the residuals for a unit root by ADF on the residual series (with appropriate critical values, since the ADF distribution is non-standard for residual series). If the residuals are stationary, the series are cointegrated.</li>
+    <li><strong>Johansen procedure.</strong> A maximum-likelihood approach in a VAR-style framework that handles multiple cointegrating vectors. Yields a vector error-correction model (VECM): differences are modelled, with a "speed of adjustment" term pulling the system back toward the cointegrating relationship. The Johansen test reports the rank of the cointegrating matrix.</li>
+  </ul>
+
+  <p>VECMs are the gold standard for credit-portfolio macroeconomic scenario generation when long-run equilibrium between macro variables is a relevant feature (most of the time). Without them, simulated scenarios drift apart from each other and from historical reality.</p>
+
+  <h3>5.8 Volatility models: ARCH and GARCH</h3>
+
+  <p>Classical ARMA models fit the conditional mean. They assume the conditional variance is constant. Financial returns visibly violate this: large moves cluster (volatility clustering), and the unconditional distribution has fatter tails than a normal. ARCH and GARCH model the conditional variance directly.</p>
+
+  <p><strong>ARCH(q)</strong> (Engle 1982): $\sigma_t^2 = \alpha_0 + \alpha_1 \epsilon_{t-1}^2 + \cdots + \alpha_q \epsilon_{t-q}^2$, where $\epsilon_t = \sigma_t z_t$ with $z_t \sim \mathcal{N}(0, 1)$ IID. The conditional variance at time $t$ is a linear function of past squared shocks.</p>
+
+  <p><strong>GARCH(p, q)</strong> (Bollerslev 1986): adds lagged conditional variances,</p>
+
+  $$\sigma_t^2 = \alpha_0 + \sum_{i=1}^q \alpha_i \epsilon_{t-i}^2 + \sum_{j=1}^p \beta_j \sigma_{t-j}^2.$$
+
+  <p>GARCH(1, 1) is the workhorse: $\sigma_t^2 = \alpha_0 + \alpha_1 \epsilon_{t-1}^2 + \beta_1 \sigma_{t-1}^2$. Empirically $\alpha_1 + \beta_1$ is typically close to but less than one ("high persistence"). The unconditional variance exists when $\alpha_1 + \beta_1 &lt; 1$ and equals $\alpha_0 / (1 - \alpha_1 - \beta_1)$.</p>
+
+  <p>Two important extensions:</p>
+
+  <ul>
+    <li><strong>EGARCH</strong> (Nelson 1991): models $\log \sigma_t^2$ instead of $\sigma_t^2$, ensuring positivity without sign constraints on coefficients, and allows an asymmetric response of variance to positive vs negative shocks (the <strong>leverage effect</strong>: stock returns become more volatile after a fall than after a rise of the same magnitude).</li>
+    <li><strong>GJR-GARCH</strong> (Glosten, Jagannathan, Runkle 1993): a simpler asymmetric extension that adds a dummy-weighted past-squared-shock term for negative returns. Often preferred to EGARCH for its interpretability.</li>
+  </ul>
+
+  <p>GARCH is the backbone of internal-model market-risk VaR. The daily process: (1) fit a GARCH(1, 1) (or asymmetric variant) to the most recent ~1000 observations; (2) one-step-ahead conditional variance forecast $\hat{\sigma}_{t+1}^2$; (3) VaR at 99 per cent = $\hat{\mu}_{t+1} + z_{0.01} \cdot \hat{\sigma}_{t+1}$ (with $z_{0.01} = -2.33$ under normality, or the empirical quantile if returns are non-normal); (4) back-test against realised returns. Under FRTB, the same machinery is extended to expected shortfall at 97.5 per cent over an overlapping 10-day holding period.</p>
+
+  <h3>5.9 Forecast evaluation</h3>
+
+  <p>Five standard accuracy measures for a point forecast $\hat{X}_t$ against realised $X_t$ over a hold-out:</p>
+
+  <ul>
+    <li><strong>Mean absolute error (MAE):</strong> $\text{MAE} = (1/n) \sum |X_t - \hat{X}_t|$. Same units as the response; robust to outliers.</li>
+    <li><strong>Root mean squared error (RMSE):</strong> $\text{RMSE} = \sqrt{(1/n) \sum (X_t - \hat{X}_t)^2}$. Same units as the response; penalises large errors more than MAE; differentiable.</li>
+    <li><strong>Mean absolute percentage error (MAPE):</strong> $\text{MAPE} = (1/n) \sum |X_t - \hat{X}_t|/|X_t|$. Unit-free; useful for cross-series comparison; undefined or unstable near zero.</li>
+    <li><strong>Symmetric MAPE (sMAPE):</strong> $\text{sMAPE} = (1/n) \sum 2|X_t - \hat{X}_t|/(|X_t| + |\hat{X}_t|)$. Bounded in $[0, 2]$; less unstable than MAPE near zero.</li>
+    <li><strong>Mean absolute scaled error (MASE):</strong> $\text{MASE} = \text{MAE}/\text{MAE}_{\text{naive}}$, where the naive benchmark is a random-walk or seasonal-naive forecast. Less than one means "better than naive". Unit-free, well-defined for zero-valued series, recommended by Hyndman and Koehler (2006) as the default.</li>
+  </ul>
+
+  <p>For comparing two forecasts, the <strong>Diebold-Mariano test</strong> (1995) provides a formal statistical comparison. The test statistic is the standardised mean of the per-period loss differential $d_t = \ell(e_{1,t}) - \ell(e_{2,t})$ (for any loss function $\ell$ and the two forecast errors), with HAC-corrected variance for the autocorrelated loss differentials. Under the null of equal forecast accuracy, the statistic is asymptotically standard normal.</p>
+
+  <p><strong>Cross-validation for time series</strong> is rolling-origin or expanding-window, never random k-fold. Random k-fold leaks future information into training and produces falsely optimistic accuracy. The correct procedure: train on $[1, T]$, evaluate on $[T+1, T+h]$; advance $T$; repeat. The average per-period accuracy across hold-outs is the time-series CV estimate. <code>scikit-learn</code>'s <code>TimeSeriesSplit</code> and the <code>tsCV</code> function in R's <code>forecast</code> package implement this.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Worked example: forecasting unemployment for IFRS 9 FLI</h2></div>
+
+  <p>IFRS 9 ECL requires forward-looking information across three macroeconomic scenarios (base, upside, downside). Unemployment is the canonical driver for retail-portfolio default rates. Here is the workflow for a univariate ARIMA forecast of monthly UK unemployment, with the path then perturbed for scenarios.</p>
+
+  <div class="worked">
+    <strong>Step 1: explore.</strong>
+    <p>Plot the level series. It shows a slow trend (rising in recessions, falling in expansions), no obvious seasonal pattern at the monthly level after seasonal adjustment, and persistent dependence: the unemployment rate next month is closer to this month's than the long-run average. Plot the ACF: slow geometric decay, typical of a unit-root or near-unit-root process. Plot the PACF: a large spike at lag 1, smaller at lag 2, near-zero thereafter.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 2: stationarity.</strong>
+    <p>Run the ADF test on the level series: fails to reject the unit-root null at conventional levels (test stat $-1.8$, 5 per cent critical value $-2.9$). Run KPSS: rejects stationarity. Both agree the level series is non-stationary. Take first differences. ADF on $\Delta X_t$: rejects (test stat $-7.5$, well below any threshold). KPSS on $\Delta X_t$: fails to reject stationarity. The differences are stationary; $d = 1$.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 3: identify.</strong>
+    <p>ACF of $\Delta X_t$: significant at lag 1, near-zero thereafter. PACF of $\Delta X_t$: significant at lag 1, near-zero thereafter. This pattern is ambiguous between AR(1) on the differences (an ARIMA(1, 1, 0)) and MA(1) on the differences (an ARIMA(0, 1, 1)). Fit both. AIC prefers ARIMA(0, 1, 1) by a small margin. The Ljung-Box test on the residuals of the chosen model fails to reject white noise at lags 12 and 24. The model is acceptable.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 4: forecast.</strong>
+    <p>Generate a 36-month-ahead forecast with 80 and 95 per cent prediction intervals. The point forecast asymptotes to the long-run mean of the differences (essentially zero for unemployment), so the level forecast plateaus at the last observation plus a small drift. The prediction intervals widen with horizon at rate $\sqrt{h}$.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 5: scenarios.</strong>
+    <p>For the IFRS 9 application, the central forecast is the "base" scenario. The "downside" scenario perturbs the level path upward by a shock calibrated to a 1-in-25-year recession (say +3 percentage points over 12 months). The "upside" scenario perturbs downward by a smaller amount. The credit risk model then computes ECL under each scenario and weights by scenario probability. The forecast object is the input to a downstream loss-given-default and exposure-at-default model; the ARIMA is the engine.</p>
+  </div>
+
+  <p>A multivariate VAR with GDP, unemployment, and HPI would produce internally consistent scenarios across the three variables. For a small portfolio with a single dominant driver, the univariate approach is defensible and far simpler to validate; for a large bank, a Bayesian VAR or VECM is the production standard.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Common pitfalls and cognitive traps</h2></div>
+
+  <h3>Spurious regression</h3>
+
+  <p>Regressing two independent $I(1)$ series on each other produces a high $R^2$ and significant t-statistics with probability approaching one. Granger and Newbold's (1974) simulation showed that two simulated random walks have a t-statistic above 2 in 75 per cent of cases, despite being independent by construction. The cure is to difference both series before regressing, or to use cointegration tests if a long-run equilibrium is suspected.</p>
+
+  <h3>Ignoring autocorrelation in residuals</h3>
+
+  <p>Standard OLS standard errors assume IID residuals. Autocorrelated residuals from a time-series regression produce <em>understated</em> standard errors (sometimes by a factor of two or three) and falsely significant t-statistics. The cures: include enough lags of the response to whiten the residuals, or use HAC (Newey-West) standard errors. The Durbin-Watson and Ljung-Box tests flag the failure mode.</p>
+
+  <h3>Random k-fold CV on time series</h3>
+
+  <p>Treating time-series data as if it were IID and using random k-fold cross-validation leaks future information into training and produces optimistic out-of-sample estimates. Use rolling-origin or expanding-window CV instead. The same warning applies to train-test splits done by random row selection rather than by date.</p>
+
+  <h3>Overfitting in ARMA order selection</h3>
+
+  <p>Box-Jenkins identification by eyeball plus AIC-minimisation tends to overfit on short series. The differences in AIC between competing models are small relative to the variability of the estimator, so the AIC-selected model is unstable across bootstrapped samples. The fix: use BIC if parsimony is the priority (in regulated forecasting, usually yes), and validate the chosen model on a hold-out period before deploying.</p>
+
+  <h3>Assuming the future will look like the past</h3>
+
+  <p>Every time-series model is, fundamentally, an extrapolation. Structural breaks (the 2008 crisis, the 2020 pandemic) invalidate the historical fit. The cures are: build models with regime-switching structure (Markov-switching ARIMA, lecture 08), use rolling windows so the model adapts, and stress-test the forecast under explicit alternative-history scenarios.</p>
+
+  <h3>Forgetting the prediction interval</h3>
+
+  <p>A point forecast 18 months out from a credit-portfolio default model is virtually noise; the 95 per cent prediction interval is what matters. Many production scorecards report only the central forecast, which encourages downstream consumers to over-trust it. Always report intervals and report them at multiple horizons.</p>
+
+  <div class="callout warn">
+    <span class="tag">Why time-series modelling is harder than cross-sectional</span>
+    Five of the six pitfalls above have no cross-sectional analogue. The temporal-ordering structure that time series imposes also introduces failure modes that an analyst trained only on cross-sectional data will not anticipate. A common pattern: a junior modeller produces an excellent-looking time-series model with 99 per cent in-sample $R^2$ and discovers in production that the out-of-sample errors are catastrophic. The cause is almost always one or more of the issues above. Time-series modelling rewards conservatism, parsimony, and obsessive out-of-sample validation.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8: Frontiers
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 8</span><h2>Frontiers and what's beyond</h2></div>
+
+  <p>Four frontiers sit past the classical material.</p>
+
+  <p><strong>State-space models and the Kalman filter.</strong> Any linear time-series model (ARIMA, exponential smoothing, factor models) can be cast in the state-space form $\mathbf{x}_t = \boldsymbol{\Phi} \mathbf{x}_{t-1} + \boldsymbol{\omega}_t$ (state equation), $\mathbf{y}_t = \mathbf{H} \mathbf{x}_t + \boldsymbol{\nu}_t$ (observation equation). The Kalman filter (Kalman 1960) computes the optimal one-step-ahead forecast and filtered state estimate recursively; the Kalman smoother retrospectively estimates the state at every time. Bayesian state-space models add prior distributions on the parameters and use MCMC (lecture 09). The framework is the umbrella under which most modern time-series modelling sits.</p>
+
+  <p><strong>Stochastic volatility models.</strong> GARCH models the conditional variance as a deterministic function of past shocks. Stochastic volatility models treat the log-variance as an unobserved Markov process: $\log \sigma_t^2 = \mu + \phi(\log \sigma_{t-1}^2 - \mu) + \eta_t$. They produce more flexible volatility dynamics than GARCH and are the standard model in option-pricing (Heston model). Estimation requires MCMC or particle filtering; not yet routine in production market-risk systems but widespread in academic finance.</p>
+
+  <p><strong>High-frequency and intraday data.</strong> When observations arrive every second rather than every day, the time-series machinery needs different tools: realised volatility (sum of intra-day squared returns) is a non-parametric estimator of integrated variance, and is consistent under mild assumptions. Hawkes processes (self-exciting point processes) model trade-arrival dynamics. Order-book models combine state-space dynamics with discrete event arrivals. The financial-engineering track of this guide covers these in depth.</p>
+
+  <p><strong>Neural and ML forecasting.</strong> LSTMs and GRUs (recurrent neural networks) were the dominant ML forecasters in the 2010s; transformers (encoder-decoder architectures with attention) are dominant in the 2020s. Hybrid models like N-BEATS (Oreshkin et al. 2020) and N-HiTS (Challu et al. 2023) combine neural-network expressiveness with the inductive biases of classical decomposition methods. Facebook's Prophet (Taylor and Letham 2018) is a Bayesian additive model that won popularity for ease of use rather than statistical sophistication. M5 and M6 forecasting competitions have shown that classical methods (ETS, ARIMA, theta) remain competitive against neural methods on most business forecasting problems; the difference is small and the simpler model usually wins on robustness and audit cost.</p>
+
+  <p><strong>Causal inference in time series.</strong> Granger causality is associational, not causal in the sense of Pearl's intervention-based framework. The CausalImpact framework (Brodersen et al. 2015) uses a Bayesian structural time-series model plus a control group to estimate the causal effect of an intervention (a price change, a policy launch) on a time series. Synthetic control methods (Abadie et al.) generalise this to multiple control units. Both are increasingly used in policy evaluation and business analytics.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 9: Synthesis, recall, connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 9</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the classical time-series toolkit. Stationarity is the technical gateway; the ARMA family supplies linear-Gaussian models for stationary series, and the integration / differencing apparatus extends them to series that are stationary after differencing. Exponential smoothing supplies an alternative family with state-space formulation. VAR and VECM extend to multiple series and handle long-run equilibrium. GARCH and its asymmetric variants model the conditional variance. Forecast evaluation uses MASE and the Diebold-Mariano test, with rolling-origin CV for hyperparameter tuning. The pitfalls are different from those of cross-sectional modelling and far less forgiving.</p>
+
+  <p>The next lecture introduces a different kind of dependence: censoring. Time-to-event data (time-to-default, time-to-claim, time-to-recovery) arrives with the complication that some observations are not yet observed at the end of the study; they are <em>censored</em>. Classical regression cannot handle this without throwing away the censored observations and biasing the result. The Kaplan-Meier estimator, the log-rank test, the Cox proportional hazards model, and the parametric AFT models are the tools that handle censoring properly. Lecture 07 takes them up.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Distinguish strict from weak stationarity. Which is the operational definition used by classical estimators, and why?</li>
+      <li>Describe the Box-Jenkins identification step. Which combination of ACF and PACF patterns indicates AR(1), MA(1), and ARMA(1, 1)?</li>
+      <li>Why is differencing the standard remedy for a unit root? What does over-differencing produce?</li>
+      <li>State the GARCH(1, 1) equation. What is the condition on $\alpha_1 + \beta_1$ for a finite unconditional variance, and why?</li>
+      <li>Define cointegration. Why is OLS on two cointegrated $I(1)$ series valid, but OLS on two arbitrary $I(1)$ series spurious?</li>
+      <li>Describe rolling-origin cross-validation. What goes wrong if you use random k-fold CV on a time series?</li>
+      <li>Why is MASE often preferred to MAPE? Give one scenario where MAPE fails.</li>
+      <li>You are asked to build a macro-conditional default-rate model with three economic drivers and a 36-month horizon. Describe the model family you would use and the validation procedure.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 5 (<a href="05-generalised_linear_models.html">GLMs</a>) gave us regression for IID conditional-on-covariates data; this lecture relaxed the IID assumption along the time index.</li>
+      <li><strong>Next:</strong> Lecture 7 (survival analysis) relaxes the IID assumption in a different direction by introducing censoring; lecture 8 (Markov chains) relaxes it by introducing discrete state dynamics.</li>
+      <li><strong>Used by:</strong> the IFRS 9 ECL FLI engine; through-the-cycle credit modelling; market-risk VaR and ES; macroeconomic scenario generation for ICAAP and stress testing.</li>
+      <li><strong>Outside this course:</strong> the financial engineering track on derivatives pricing uses continuous-time analogues (Brownian motion, jump-diffusions); the actuarial track uses mortality time-series models for life-expectancy projection.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Statistics course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 6 of 9</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

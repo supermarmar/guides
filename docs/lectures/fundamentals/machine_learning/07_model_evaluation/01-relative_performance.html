@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 35: relative model performance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Model evaluation</a></div>
+  <h1>Relative model performance</h1>
+  <p class="subtitle">Two models, one dataset, which wins? Information criteria score the likelihood-fit-versus-complexity trade-off in one number and let you read the relative evidence between candidates. They do not tell you whether either model is any good on its own.</p>
+  <div class="meta">
+    <span>Lecture 35 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">When two or more models have been fit to the same data, the question "which one should I prefer" splits into two independent questions that need different tools. The <strong>relative</strong> question (is model A better than model B on this data?) is answered by an <strong>information criterion</strong>: a single number that scores each model's likelihood against a penalty for the number of parameters it spent to achieve that likelihood. The <strong>absolute</strong> question (is either model any good in the first place?) is answered by residual diagnostics, out-of-sample error, and the dozen other measures in <a href="02-regression_diagnostics.html">lecture 36</a>. Information criteria are silent on the absolute question. If all the candidates fit poorly, the criterion still picks one as least-poorly-fitting and reports no warning. The two workhorses are <strong>AIC</strong>, derived as a biased estimate of expected Kullback-Leibler divergence between the fitted model and the truth, and <strong>BIC</strong>, derived as an approximation to the Bayes factor under a uniform prior. They share an ingredient (the maximised log-likelihood $\ln(\hat{L})$, or equivalently the deviance $D = -2\ln(\hat{L})$) and differ only in the complexity penalty: $2k$ for AIC, $k\ln(n)$ for BIC. The one-line decision rule is "AIC for prediction, BIC for inference", and never let either substitute for an absolute check.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Adding a parameter to a model can only make the likelihood go up, never down, because the optimiser is free to set the extra parameter to zero if it does not help. So picking the model with the highest likelihood always picks the most complex model, which is the model most likely to overfit. Information criteria fix this by charging a price for each parameter. AIC charges two units of log-likelihood per parameter; BIC charges $\ln(n)$ units, which grows with the sample size and so penalises complexity more harshly on larger datasets. Whichever criterion you use, the smaller number wins, and the comparison is only valid between models fit to identical data on identical rows.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The phrase "AIC for prediction, BIC for inference" hides a deeper asymmetry. AIC is <strong>efficient</strong>: as the sample grows, it picks the model that minimises expected prediction error, even when no candidate is the true model (which is the usual case in practice). BIC is <strong>consistent</strong>: as the sample grows, it picks the true model with probability tending to one, but only if the true model is in the candidate set. In real applications the true data-generating process is essentially never in the candidate set, so BIC's consistency is a guarantee about a counterfactual world and AIC's efficiency is the property that pays off. The reason BIC is still used heavily is that it is much more aggressive at trimming nuisance parameters in moderately sized samples, which is exactly what an actuary documenting a parsimonious credit-risk GLM wants on the page in front of a regulator.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 6 of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>. The criteria here compare candidate parametric models on the same training data. They do not replace the train-validation-test split (a held-out test set still answers a different question, namely how the chosen model generalises). They are the right tool when the candidate models are nested or non-nested likelihood-based fits, the dataset is the same for every candidate, and you want a single defensible scalar to put in the model documentation. The companion lecture <a href="02-regression_diagnostics.html">lecture 36</a> takes whichever model wins on AIC or BIC and asks whether its residuals behave well enough to deploy.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three things go wrong without an information criterion in the toolkit.</p>
+
+  <p>First, <strong>likelihood alone is a one-way ratchet</strong>. Every additional predictor weakly improves the maximised likelihood on the training data, because the maximiser can always set its coefficient to zero and recover the previous fit; in finite samples it almost always finds a non-zero coefficient that fits some noise.</p>
+
+  <p>A model selection rule based on raw likelihood (or equivalently on training $R^2$, training deviance, or training accuracy) systematically prefers the most complex candidate, which is also the one most likely to fail on new data. An information criterion is the cheapest correction available: a single penalty term, evaluated on the same training data, that converts the one-way ratchet into a balanced trade-off.</p>
+
+  <p>Second, <strong>nested-model hypothesis testing is the wrong tool for non-nested comparisons</strong>. A likelihood-ratio test compares two models where one is a strict restriction of the other (some parameters are forced to zero). It does not extend to comparisons between a log-linear model and a probit, between a GLM with one link function and another, or between a parametric and a semi-parametric specification.</p>
+
+  <p>Information criteria handle all of these, because they only need a maximised likelihood from each candidate; they do not need the candidates to share a structural relationship.</p>
+
+  <p>This is why information criteria, not F-tests, are the standard reporting object in regulatory model documentation that compares several candidate specifications. An F-test answers "is the larger model significantly better than its nested restriction"; an information criterion answers "which of these very different candidates loses the least information about the data". The second question is what model selection is actually asking, and the first question is a special case.</p>
+
+  <p>Third, <strong>information criteria force the relative-versus-absolute distinction onto the page</strong>. A model documentation that reports only AIC and BIC across candidates is incomplete: it has answered "which of these is least bad" without answering "is the chosen one good enough to use".</p>
+
+  <p>A reviewer who is alert to the distinction will demand both. Practitioners who internalise the split avoid the most common selection failure mode, which is presenting an AIC-winning model with no residual diagnostics and no out-of-sample evaluation.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team rebuilding an A-IRB PD model proudly reported that their new GLM had a lower BIC than the incumbent by about 40 units, claiming overwhelming evidence in favour of the new specification. Validation rejected the model: residuals showed clear heteroscedasticity in the highest exposure decile, the calibration plot bowed away from the diagonal for grades F and G, and the out-of-time Gini dropped six points. The BIC comparison was valid (lower is better, the gap was substantial) but it had answered the relative question only. The new model was a smaller-bad-fit among bad fits. The fix was to start the candidate set over with a richer feature set, not to declare a winner from the existing one.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. An information criterion is a likelihood score with a complexity tax bolted on. The likelihood score is the same for every criterion: twice the negative log-likelihood, also called the <strong>deviance</strong>, written $D = -2\ln(\hat{L})$. Smaller is better, because a larger likelihood means a more probable dataset under the fitted model.</p>
+
+  <p>The complexity tax is what differs. AIC taxes each parameter at a flat rate of two units. BIC taxes each parameter at a rate that scales with the log of the sample size.</p>
+
+  <p>So when the sample is small (roughly $n < 8$, where $\ln(n) < 2$), BIC is the more lenient criterion; for any realistic sample size BIC is the stricter one, and the gap widens with $n$. The diagram below makes the comparison concrete.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AIC and BIC penalty per parameter as a function of sample size">
+      <defs>
+        <marker id="icArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Penalty per parameter as the sample grows: AIC is flat at 2, BIC is ln(n) and overtakes at n approx 8</text>
+
+      <!-- plot area -->
+      <rect x="80" y="60" width="660" height="240" fill="#FFFFFF" stroke="#e4e4e7" stroke-width="1"/>
+
+      <!-- horizontal grid lines -->
+      <line x1="80" y1="276" x2="740" y2="276" stroke="#f4f4f5" stroke-width="1"/>
+      <line x1="80" y1="240" x2="740" y2="240" stroke="#f4f4f5" stroke-width="1"/>
+      <line x1="80" y1="204" x2="740" y2="204" stroke="#f4f4f5" stroke-width="1"/>
+      <line x1="80" y1="168" x2="740" y2="168" stroke="#f4f4f5" stroke-width="1"/>
+      <line x1="80" y1="132" x2="740" y2="132" stroke="#f4f4f5" stroke-width="1"/>
+      <line x1="80" y1="96" x2="740" y2="96" stroke="#f4f4f5" stroke-width="1"/>
+
+      <!-- y axis labels (penalty per parameter, 0 to 12) -->
+      <text x="74" y="280" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">0</text>
+      <text x="74" y="244" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">2</text>
+      <text x="74" y="208" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">4</text>
+      <text x="74" y="172" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">6</text>
+      <text x="74" y="136" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">8</text>
+      <text x="74" y="100" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">10</text>
+
+      <!-- x axis labels (n on a log scale, 1 to 100000) -->
+      <text x="80" y="294" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">1</text>
+      <text x="212" y="294" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">10</text>
+      <text x="344" y="294" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">100</text>
+      <text x="476" y="294" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">1,000</text>
+      <text x="608" y="294" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">10,000</text>
+      <text x="740" y="294" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">100,000</text>
+
+      <!-- axis titles -->
+      <text x="410" y="316" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b">sample size n (log scale)</text>
+      <text x="22" y="180" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b" transform="rotate(-90 22 180)">penalty per parameter</text>
+
+      <!-- AIC line (constant at 2, mapped to y=240) -->
+      <line x1="80" y1="240" x2="740" y2="240" stroke="#0d9488" stroke-width="2.5"/>
+
+      <!-- BIC curve: y = ln(n), n in [1, 1e5]; x maps log10(n) to [80, 740]; y maps value 0..12 to [276, 60] -->
+      <!-- Sampled points: n=1 -> ln=0; n=10 -> 2.30; n=100 -> 4.61; n=1000 -> 6.91; n=10000 -> 9.21; n=100000 -> 11.51 -->
+      <polyline points="80,276 212,234.6 344,193.0 476,151.6 608,110.2 740,69.0"
+                fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+
+      <!-- crossover marker: ln(n) = 2 -> n = e^2 approx 7.39, log10 = 0.869, x = 80 + 0.869/5 * 660 approx 194.7 -->
+      <circle cx="195" cy="240" r="4" fill="#b45309"/>
+      <text x="195" y="226" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">n approx 8</text>
+      <text x="195" y="216" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">BIC overtakes AIC</text>
+
+      <!-- annotation for a typical credit-risk sample -->
+      <line x1="568" y1="60" x2="568" y2="300" stroke="#71717a" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="568" y="74" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#71717a">n = 26,064</text>
+      <text x="568" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">(worked example)</text>
+
+      <!-- legend -->
+      <rect x="100" y="76" width="220" height="44" rx="6" fill="#FFFFFF" stroke="#e4e4e7" stroke-width="1"/>
+      <line x1="112" y1="92" x2="140" y2="92" stroke="#0d9488" stroke-width="2.5"/>
+      <text x="148" y="96" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">AIC penalty per parameter = 2</text>
+      <line x1="112" y1="110" x2="140" y2="110" stroke="#7c3aed" stroke-width="2.5"/>
+      <text x="148" y="114" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">BIC penalty per parameter = ln(n)</text>
+
+      <!-- footer rule -->
+      <line x1="40" y1="338" x2="780" y2="338" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="356" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">Implication: for any realistic credit dataset, BIC charges roughly five times more per parameter than AIC</text>
+    </svg>
+    <figcaption>The complexity tax is what separates the two criteria. AIC's flat charge of two units per parameter is independent of how much data you have. BIC's charge scales with $\ln(n)$ and so grows without bound. For a typical actuarial dataset of tens of thousands of observations, $\ln(n)$ is around ten, so a parameter has to improve the log-likelihood by roughly five units (rather than just one) for BIC to keep it.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The two penalties cross at $n = e^2 \approx 7.39$; below that BIC is the more permissive criterion, which is why some textbooks present AIC as the stricter of the two and confuse a generation of readers. For any sample size an actuary will ever work with, BIC is the stricter criterion.</p>
+
+  <p>The gap between them is multiplicative in the number of parameters. A model with twenty parameters at $n = 26{,}064$ pays $20 \times 2 = 40$ units to AIC and $20 \times \ln(26064) \approx 203$ units to BIC, a difference of 163 units of deviance, which is enormous on the scale these numbers usually live at. The same comparison at $n = 100$ costs 40 units to AIC and 92 units to BIC, a difference of 52: still meaningful but two-thirds smaller in absolute terms.</p>
+
+  <p>And finally, neither penalty depends on the data beyond the sample size; the deviance is the only part of the criterion that carries information about how well the model actually fits. This is why a candidate model with double the deviance of its competitor will lose under both criteria regardless of how many parameters it spends, and why the comparison degenerates when the candidates differ only in functional form rather than parameter count.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The shared ingredient: maximised likelihood and deviance</h3>
+
+  <p>Every likelihood-based information criterion starts from the same object. The <strong>likelihood</strong> $L(\theta; y)$ is the joint probability (or density) of the observed data $y$ viewed as a function of the parameters $\theta$. The <strong>maximised likelihood</strong> $\hat{L} = L(\hat{\theta}; y)$ is the value of that function at the maximum-likelihood estimate $\hat{\theta}$. For numerical reasons we always work with the log; the <strong>maximised log-likelihood</strong> is</p>
+  $$\ln(\hat{L}) = \ln L(\hat{\theta}; y).$$
+  <p>The <strong>deviance</strong> is a convenient rescaling,</p>
+  $$D = -2 \ln(\hat{L}).$$
+  <p>Larger $\hat{L}$ (more probable data under the model) corresponds to smaller $D$. In a normal linear regression the deviance reduces to the residual sum of squares divided by the noise variance, plus an additive constant. In a logistic regression it equals minus twice the cross-entropy on the training set.</p>
+
+  <p>The deviance is the quantity statsmodels reports as <code>Log-Likelihood</code> (times minus two), and is the common ingredient across every information criterion below. Most software prints both the log-likelihood and the deviance; the deviance is the more convenient form for arithmetic because adding a parameter that contributes a $z$-statistic of $z$ to the linear predictor changes the deviance by approximately $-z^2$ (the likelihood-ratio test statistic), which is what made the worked-example arithmetic above tractable.</p>
+
+  <p>Two practical caveats apply to every criterion. The likelihood must be on the same data for every candidate. The residual sums-of-squares for two regressions with different transformations of the target are not comparable, because the change of variable shifts the density by a Jacobian factor; a model on $y$ and a model on $\ln(y)$ have likelihoods on different scales even when fit to the same rows.</p>
+
+  <p>And the likelihood must be evaluated at the same observations. No candidate may drop rows the others use; a single missing value handled by listwise deletion in one model and imputation in another breaks the comparison.</p>
+
+  <p>The rule of thumb: fix the dataset (the rows, the target, the likelihood family) before any candidate is fit, and only let the linear predictor or the link function vary between candidates. The candidates can differ in which features they include, which interaction terms they admit, and which functional transformations they apply, but they must not differ in what rows they see or what the target is on those rows.</p>
+
+  <h3>Akaike Information Criterion (AIC)</h3>
+
+  <p>The AIC of a model is</p>
+  $$\operatorname{AIC} = 2k - 2\ln(\hat{L}),$$
+  <p>where $k$ is the number of estimated parameters (including the intercept and the noise variance for a Gaussian likelihood). Smaller AIC is better.</p>
+
+  <p>The derivation, due to Akaike (1973), is that AIC is a biased estimator of the expected <strong>Kullback-Leibler divergence</strong> between the true data-generating distribution $p$ and the fitted model $\hat{q}$,</p>
+  $$\operatorname{KL}(p \,\|\, \hat{q}) = \mathbb{E}_p\!\left[ \ln \frac{p(Y)}{\hat{q}(Y)} \right].$$
+  <p>The intuition: a model that is close to the truth (small KL divergence) loses little information about new data; a model that is far from the truth loses a lot.</p>
+
+  <p>AIC estimates the expected KL divergence up to additive constants, and the model with the smallest AIC is the one with the smallest estimated information loss. Minimising AIC is therefore minimising expected prediction error in a precise asymptotic sense, which is why AIC is the right criterion for predictive model selection.</p>
+
+  <p>The KL divergence is asymmetric: $\operatorname{KL}(p \,\|\, \hat{q})$ is not the same as $\operatorname{KL}(\hat{q} \,\|\, p)$. AIC uses the first form, which weights regions where the truth has high mass; the fitted model is rewarded for assigning probability to where the data actually live and lightly penalised for assigning probability to regions the truth ignores. The asymmetry is the technical reason AIC behaves well as a predictive criterion: predictive performance is also weighted by where the truth puts its mass.</p>
+
+  <p>The penalty $2k$ is exactly the bias correction needed to make the in-sample log-likelihood an unbiased estimate of expected out-of-sample log-likelihood, under regularity conditions and large $n$. For small samples the bias correction is too small and the criterion is too generous to complex models.</p>
+
+  <p>The <strong>corrected AIC (AICc)</strong> adjusts for this,</p>
+  $$\operatorname{AICc} = \operatorname{AIC} + \frac{2k(k+1)}{n - k - 1}.$$
+  <p>For $n/k > 40$ the correction is negligible; for smaller samples (which most credit-risk models do not have, but most survival-analysis models do) it is material. Burnham and Anderson recommend using AICc by default and letting it reduce to AIC asymptotically; in practice most software (statsmodels, R's <code>AIC()</code>) reports the uncorrected version and the analyst applies AICc when justified.</p>
+
+  <h3>Bayesian Information Criterion (BIC)</h3>
+
+  <p>The BIC of a model is</p>
+  $$\operatorname{BIC} = k \ln(n) - 2\ln(\hat{L}),$$
+  <p>where $n$ is the number of observations and $k$ is again the number of parameters. Smaller is better.</p>
+
+  <p>The derivation, due to Schwarz (1978), is that BIC is an asymptotic approximation to minus twice the log of the model's marginal likelihood (the probability of the data integrated over the parameters under a prior), under regularity and a flat prior. Equivalently, the difference $\operatorname{BIC}_A - \operatorname{BIC}_B$ approximates $-2 \ln(B_{AB})$, where $B_{AB}$ is the Bayes factor in favour of model $A$ against model $B$.</p>
+
+  <p>A common rule of thumb (Kass and Raftery, 1995) for interpreting BIC differences as relative evidence:</p>
+  $$\Delta \operatorname{BIC} = \operatorname{BIC}_{\text{worse}} - \operatorname{BIC}_{\text{better}}.$$
+  <p>A difference of 0 to 2 is "not worth more than a bare mention", 2 to 6 is "positive evidence", 6 to 10 is "strong evidence", and above 10 is "very strong evidence" for the model with the lower BIC. These thresholds are calibrated to the Bayes-factor interpretation; the AIC differences do not have the same calibration, although they are sometimes (loosely) read on the same scale.</p>
+
+  <p>BIC penalises complexity more heavily than AIC for any $n > e^2 \approx 7.39$, and the gap grows logarithmically with the sample. The substantive consequence: BIC tends to prefer smaller, more parsimonious models, especially as the data grows.</p>
+
+  <p>It is <strong>consistent</strong> for model selection in the sense that if the true model is in the candidate set, BIC selects it with probability tending to one as $n \to \infty$. It is not efficient: it does not minimise expected prediction error, and on finite samples it can drop parameters that a predictive model would have kept. The decision rule "AIC for prediction, BIC for inference" follows directly from this asymptotic split.</p>
+
+  <h3>Counting parameters in practice</h3>
+
+  <p>Both criteria depend on $k$, and software does not always count it the way an analyst would. Three cases trip people up, and each adds a small but real bias if it is wrong in the same direction across all candidates.</p>
+
+  <p>The general principle is to read $k$ from the same source for every candidate and to verify by hand on at least one model.</p>
+
+  <p>Reproducible parameter counts are a small discipline that catches a large class of selection errors before they reach the documentation.</p>
+
+  <p>For a Gaussian linear regression, the noise variance $\sigma^2$ is itself a parameter; statsmodels includes it in <code>df_model</code> some places and excludes it in others, so the AIC and BIC values can shift by $2$ and $\ln(n)$ respectively depending on which convention is in use. The fix is to record exactly what $k$ each candidate uses and to verify the values are consistent across candidates.</p>
+
+  <p>For a generalised linear model with a known dispersion (logistic regression, Poisson regression at scale-fixed-to-one), the dispersion does not enter $k$ at all. For a quasi-likelihood model where the dispersion is estimated, it does.</p>
+
+  <p>The boundary is the family argument in the GLM call: <code>Binomial()</code> fixes the dispersion, <code>Gaussian()</code> estimates it, and the count adjusts. Mixing the two families in a candidate comparison without adjusting $k$ to match is a subtle and surprisingly common error.</p>
+
+  <p>For a model with a one-hot-encoded categorical, $k$ counts the dummies, not the original levels. A categorical with seven levels (such as <code>loan_grade</code>, used in the worked example) contributes six dummies plus an intercept-absorbed reference level.</p>
+
+  <p>The intercept is one parameter regardless of how many categoricals share it. Two categoricals with seven and four levels respectively, sharing an intercept, contribute $6 + 3 + 1 = 10$ parameters, not $7 + 4 + 1 = 12$. The dummy-trap rule from feature transformation comes back here directly: dropping the reference level is what makes the parameter count match the rank of the design matrix.</p>
+
+  <p>These counts are not optional: a wrong $k$ produces a wrong information criterion, and a wrong criterion produces a defensible-looking but wrong model selection. The discipline of writing $k$ alongside each candidate's AIC and BIC in the documentation table is the cheapest way to catch the error before it propagates.</p>
+
+  <h3>When AIC and BIC disagree</h3>
+
+  <p>For large $n$ the two criteria often agree, because the deviance is large enough that both penalties are small in relative terms. For small $n$, or for candidate models that differ by only one or two parameters with marginal contributions, they can disagree sharply. The disagreement is informative, not a problem to be averaged away.</p>
+
+  <p>When AIC prefers a larger model and BIC prefers a smaller one, the larger model is fitting some real but weak signal that AIC values for prediction and BIC dismisses as not worth the parameter.</p>
+
+  <p>The right response depends on what the model is for. If the next step is a forecast on new data, take AIC's choice. If the next step is to write down an inferential claim about which variables matter, take BIC's choice. If you cannot decide, report both and let the document reader see the dependence.</p>
+
+  <p>A useful framing is the asymptotic split. AIC is <strong>efficient</strong> but not consistent: as $n$ grows, it picks the model with the smallest expected out-of-sample log-likelihood, but it does not, in general, pick the true model even when the true model is in the candidate set.</p>
+
+  <p>BIC is <strong>consistent</strong> but not efficient: as $n$ grows, it picks the true model (when the true model is in the candidate set) but on finite samples it often drops parameters that would have improved prediction.</p>
+
+  <p>The choice between them is a choice between two different statistical objectives, not a choice between two estimates of the same thing. Reporting "AIC and BIC disagree" without naming the objective each is optimising for is reporting that two thermometers disagree without saying that one is calibrated in Celsius and the other in Fahrenheit.</p>
+
+  <h3>Other information criteria</h3>
+
+  <p>Three further criteria appear in practice. The <strong>Deviance Information Criterion (DIC)</strong> generalises AIC to Bayesian models where the number of "parameters" is not well-defined because of hierarchical structure. It replaces $k$ with an effective number of parameters $p_D$ computed from the posterior, and uses the posterior-mean deviance in place of the maximised deviance. DIC is convenient because it falls out of any MCMC run, but it is known to be unstable for non-nested model comparisons and is gradually being replaced.</p>
+
+  <p>The <strong>Widely Applicable Information Criterion (WAIC)</strong>, due to Watanabe, is the modern Bayesian replacement for DIC. It estimates expected out-of-sample log-likelihood directly from the posterior predictive distribution, with no assumption that the model is regular or that the parameters are identified. WAIC is the default in Stan, PyMC, and similar Bayesian workflows, and is preferred over DIC where computation allows.</p>
+
+  <p>Finally, <strong>leave-one-out cross-validation (LOO-CV)</strong> is the brute-force benchmark all of the above approximate. Each observation is held out in turn, the model is refit on the remaining $n - 1$ points, and the log-likelihood of the held-out point is summed across observations. For exponential-family GLMs, LOO-CV and AIC agree to first order; for Bayesian models, Pareto-smoothed importance sampling (PSIS-LOO) gives a computationally cheap approximation to exact LOO-CV that is the current best practice for Bayesian model comparison.</p>
+
+  <p>The five criteria can be lined up by their selection target. AIC and AICc target expected predictive log-likelihood under the frequentist sampling distribution of the data. BIC targets the marginal likelihood under a flat prior. DIC and WAIC target the posterior expected log pointwise predictive density. LOO-CV targets the same quantity as WAIC but evaluates it without the regularity assumptions.</p>
+
+  <p>For an unpenalised GLM fit by maximum likelihood, AIC is the natural default. For a hierarchical Bayesian model with weak priors, WAIC or PSIS-LOO. For a regulatory document that wants a Bayes-factor-style statement about which variables matter, BIC. The right criterion is the one whose selection target matches the model's intended use, and the wrong criterion will systematically pick models that are optimal for the wrong target.</p>
+
+  <h3>Worked example: comparing two nested GLMs on a credit-risk dataset</h3>
+
+  <p>The notebook fits an OLS regression of <code>loan_amnt</code> on eight features (two scaled numerics, <code>person_age_scaled</code> and <code>person_income_scaled</code>, plus six loan-grade dummies for grades B through G) on $n = 26{,}064$ training observations.</p>
+
+  <p>The maximised log-likelihood is $\ln(\hat{L}) = -263{,}726.5$, the number of parameters is $k = 10$ (eight slopes, an intercept, and the noise variance), and statsmodels reports</p>
+  $$\operatorname{AIC}_{\text{full}} = 5.275 \times 10^5, \qquad \operatorname{BIC}_{\text{full}} = 5.275 \times 10^5.$$
+  <p>The agreement to four significant figures is a coincidence of the print precision and the size of the deviance; the underlying values differ by $k(\ln(n) - 2) = 10 \times (\ln(26064) - 2) \approx 81$ units.</p>
+
+  <p>Now consider a restricted model that drops <code>person_age_scaled</code>, whose coefficient in the full fit was statistically indistinguishable from zero ($t = -0.32$, $p = 0.75$). The maximised likelihood of the restricted model is, to a close approximation, $\ln(\hat{L})_{\text{restricted}} = \ln(\hat{L})_{\text{full}} - \tfrac{1}{2} z^2 \approx -263{,}726.5 - 0.05$, so the deviance increases by about $0.1$. The number of parameters drops by one. Then</p>
+  $$\Delta \operatorname{AIC} = \operatorname{AIC}_{\text{restricted}} - \operatorname{AIC}_{\text{full}} = (-2)(0) + 2(-1) + 0.1 \approx -1.9,$$
+  <p>so AIC prefers the restricted model by about two units (small, but in favour of dropping age). For BIC the parameter penalty is larger,</p>
+  $$\Delta \operatorname{BIC} = (-1) \ln(26064) + 0.1 \approx -10.0,$$
+  <p>so BIC prefers the restricted model by about ten units, which on the Kass-Raftery scale is "very strong evidence" for dropping the parameter.</p>
+
+  <p>The two criteria agree on the direction here and disagree on the strength: AIC is a near-tie, BIC is decisive. This is the textbook BIC-prefers-the-simpler-model case at work, and it is the right call: <code>person_age_scaled</code> is doing nothing in the model and BIC is more sensitive to that signal than AIC.</p>
+
+  <p>The relative-evidence reading: BIC says the data give very strong support to the model without <code>person_age_scaled</code>, conditional on the candidate set. It says nothing about whether either model captures the conditional distribution of <code>loan_amnt</code> well in absolute terms.</p>
+
+  <p>The OLS summary's $R^2$ of $0.098$ is a separate (and damning) signal that this whole specification is missing most of the variation, which is the absolute question handed off to the next lecture. The two readings have to live side by side: BIC has done its job by ranking the candidates correctly, and $R^2$ has done its job by flagging that the ranking is over a poor candidate set.</p>
+
+  <p>Extending the candidate set is the natural next step. Suppose we add <code>loan_int_rate_scaled</code> and <code>loan_percent_income_scaled</code>, two features that for credit-economic reasons should move the target. The deviance of the enlarged model drops by, say, $1{,}200$ units (a substantial improvement, reflecting real signal) and the parameter count rises by two. The AIC change is</p>
+  $$\Delta \operatorname{AIC} = 2 \times 2 - 1{,}200 = -1{,}196,$$
+  <p>and the BIC change is</p>
+  $$\Delta \operatorname{BIC} = 2 \times \ln(26064) - 1{,}200 \approx 20.3 - 1{,}200 = -1{,}179.6.$$
+  <p>Both criteria prefer the richer model by enormous margins; both penalties are dwarfed by the deviance reduction. This is the regime in which AIC and BIC agree: the new parameters are doing real, large-scale work, and the difference in penalty (about 16 units) is negligible against a 1,200-unit deviance change.</p>
+
+  <p>The interesting comparisons are the ones near the threshold, where the deviance reduction is on the order of the penalty itself. That is where AIC and BIC can split, where the inference-versus-prediction choice has to be made explicitly, and where the relative-evidence interpretation does most of its work.</p>
+
+  <p>The three candidates from the worked example can be lined up in a single table, which is the format every regulatory model document should use:</p>
+  $$\begin{array}{l|ccc}
+  \text{candidate} & k & \Delta \operatorname{Dev} & \Delta \operatorname{BIC} \\
+  \hline
+  \text{full (eight features)} & 10 & 0 & 0 \\
+  \text{drop person\_age\_scaled} & 9 & +0.1 & -10.0 \\
+  \text{add two credit features} & 12 & -1{,}200 & -1{,}179.6
+  \end{array}$$
+  <p>Read across the row: the deviance change tells you how much fit you bought, and the BIC change tells you whether you paid for it. The winner is the row with the smallest (most negative) $\Delta \operatorname{BIC}$ relative to the reference.</p>
+
+  <p>Here the enlarged model wins by a wide margin, and the dropping of <code>person_age_scaled</code> would be the right next move within the enlarged model. A complete model selection workflow iterates: enlarge the candidate set, refit, retabulate, identify the relative winner, and then run absolute diagnostics on the relative winner before stopping.</p>
+
+  <h3>Reporting and documentation</h3>
+
+  <p>The minimum disclosure for an information-criterion-based selection is the candidate list, the deviance and $k$ for each candidate, the AIC and BIC for each, the criterion used to select the winner, and the absolute diagnostics on the winner.</p>
+
+  <p>Without the deviance and $k$, a reader cannot reconstruct the penalty structure and cannot tell whether two close AIC values are saying "these models are equivalent" or "the data are barely informative". Without the absolute diagnostics, the reader has no way to judge whether the winner is fit for purpose.</p>
+
+  <p>Most software (statsmodels' <code>summary()</code>, R's <code>summary(glm)</code>, scikit-learn's auxiliary statsmodels-wrapped reports) prints the deviance and the criteria automatically, so the disclosure burden is reading and tabulating, not computing. The discipline is to assemble the candidate table before the selection is made, not after, so the candidate set is fixed and the comparison is not retrospective.</p>
+
+  <h3>Why the deviance in AIC and BIC is not an arbitrary choice of loss</h3>
+
+  <p>Every AIC and BIC comparison in this lecture has quietly relied on one fact this lecture has not stated explicitly: the deviance, $-2\ln(\hat{L})$, is only a sound basis for comparing candidate models because it is a <strong>strictly consistent loss function for mean estimation</strong>, guaranteed to be minimised, in expectation, by the true conditional mean and by no other candidate. Not every loss function has this property; mean absolute error and the pinball loss used for quantile regression are consistent for the median and for other quantiles respectively, not for the mean, and substituting either of them into an AIC-style comparison for a mean-targeting model answers a different, silently substituted question. A second, sharper point follows directly: among the strictly consistent losses available for a given response, the one whose implied variance function matches the response's actual mean-variance relationship (the Poisson deviance for count data, the gamma deviance for constant-coefficient-of-variation severity data, and so on) gives the best finite-sample efficiency, not merely asymptotic consistency, a result due to Gourieroux, Monfort and Trognon (1984). This is the formal justification for choosing the deviance family (Table 2.2-style unit deviances, one per exponential-family member) to match the response's distribution shape, rather than defaulting to Gaussian deviance (equivalently, residual sum of squares) regardless of what the response actually looks like. The statistics track's lecture on <a href="../../statistics/14-strictly_consistent_loss_functions.html">strictly consistent loss functions</a> develops both results in full; the practical payoff here is that an AIC or BIC comparison built on the wrong deviance family is not merely suboptimal, it can rank candidate models incorrectly on the finite samples credit-risk and insurance data typically supplies.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for most misuse of information criteria. Each turns a valid relative-evidence tool into a misleading absolute claim.</p>
+
+  <div class="callout warn">
+    <span class="tag">Comparing models fit on different data</span>
+    AIC and BIC are only comparable between models fit to identical observations under identical likelihoods. Drop a row in one model and the comparison is invalid; transform the target in one model (log-income vs raw income) and the change of variables shifts the likelihood by an additive Jacobian that breaks the comparison even though the deviances look comparable. The fix is structural: fix the rows and the target before any candidate is fit, and compute the criteria inside a pipeline that enforces both. Most regulatory model documentation that quotes "the BIC dropped from X to Y" without showing that the data is identical is quietly broken.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating a low information criterion as proof of fit</span>
+    The information criterion is silent on absolute quality. A candidate set of ten badly-misspecified models has a winning AIC and a winning BIC; both are still badly misspecified. The fix is to follow every information-criterion comparison with the absolute diagnostics in <a href="02-regression_diagnostics.html">lecture 36</a>: residual histogram, Q-Q plot, residuals-versus-fitted scatter, and an out-of-time or out-of-sample evaluation. A model with the lowest AIC in the candidate set and visible structure in its residuals is not a winner; it is the least-bad fit in a bad set.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Reading AIC differences on the BIC scale</span>
+    The Kass-Raftery thresholds (a difference of 2 to 6 is "positive evidence", 6 to 10 is "strong", above 10 is "very strong") are calibrated to BIC's Bayes-factor interpretation. They do not apply to AIC differences. An AIC difference of 4 is small in predictive terms; a BIC difference of 4 is positive evidence on the Kass-Raftery scale. The fix is to keep the scales separate: report AIC and BIC side by side, interpret each on its own terms, and do not collapse them into a single "the information criterion improved by X" statement.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using the criterion to select the regulariser</span>
+    Some software exposes "select the lasso lambda by AIC" or "select the ridge penalty by BIC". This works only when the effective number of parameters in the penalised fit is well-defined, which it usually is not (lasso's $k$ is the count of non-zero coefficients, ridge's $k$ is a trace-of-hat-matrix quantity, and neither matches the unpenalised parameter count). The fix is to use cross-validation for hyperparameter tuning and reserve AIC and BIC for unpenalised likelihood-based candidates. Mixing the two routinely produces under-regularised models that look fine on the criterion and fail on a held-out fold.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating BIC as a Bayes factor without checking the prior</span>
+    The Bayes-factor approximation that underlies BIC assumes a flat prior on the parameters. With an informative prior (a regulator-imposed bound on PD, a previous-cycle posterior used as a prior for the next cycle, a hand-crafted hierarchical prior), the BIC penalty no longer matches the true Bayes factor and the Kass-Raftery thresholds are no longer calibrated. The fix in a serious Bayesian workflow is to compute the marginal likelihood directly (via bridge sampling, nested sampling, or PSIS-LOO on the posterior predictive) rather than using BIC as a proxy. Reporting "the Bayes factor is approximately $e^{\Delta \operatorname{BIC}/2}$" is fine when the priors are flat and the regularity assumptions hold; it is wrong otherwise, and the difference can be one or two orders of magnitude.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Relative performance is the question of which candidate among a fixed set fits the data best, with complexity charged at a defensible rate.</p>
+
+  <p>Information criteria score the trade-off in one number: deviance plus a penalty. The deviance is the same ingredient across every criterion; the penalty is what makes one criterion AIC, another BIC, another AICc, another WAIC.</p>
+
+  <p>AIC charges two units per parameter and minimises expected prediction error in an asymptotic sense, which is what you want for forecasting. BIC charges $\ln(n)$ units per parameter and is consistent in selecting the true model when the true model is in the candidate set, which is what you want for inference and what fits comfortably on a regulatory document.</p>
+
+  <p>The two share the deviance as a common ingredient, the same eligibility rule (the candidates must be fit to identical data under comparable likelihoods), and the same silence on absolute quality.</p>
+
+  <p>Other criteria (AICc, DIC, WAIC, LOO-CV) refine the same ideas for small samples, Bayesian models, and posterior-based evaluation, but the AIC-versus-BIC choice covers ninety per cent of the candidate-comparison decisions an actuary will make.</p>
+
+  <p>What this lecture deliberately did not do. It did not introduce residual diagnostics (histogram, Q-Q plot, residuals-versus-fitted, Durbin-Watson, Pearson residuals); those answer the absolute question and live in <a href="02-regression_diagnostics.html">lecture 36</a>.</p>
+
+  <p>It did not discuss accuracy, precision, recall, F1, ROC, AUC, Gini, lift, or KS; those are classification-specific scalars on held-out data, also in the next lecture. And it did not address the Bayes factor as a primary object (only its BIC approximation); the full Bayesian model-comparison apparatus belongs in a separate stream that statsmodels and scikit-learn do not natively support.</p>
+
+  <p>Lecture 36, regression diagnostics and absolute performance, picks up where this lecture ends. The model that minimises BIC on the candidate set has been chosen; the next question is whether its residuals look like white noise, whether its predictions on a held-out set are within tolerance, and whether any structural assumption (linearity, homoscedasticity, independence) is materially violated.</p>
+
+  <p>That is the absolute side of the model-evaluation split, and it is the input to the deployment go/no-go decision. A model that wins the relative comparison and fails the absolute check is not ready to deploy; a model that passes both is.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the formula for AIC and the formula for BIC in terms of $k$, $n$, and the maximised log-likelihood $\ln(\hat{L})$. Identify the single difference between them and the sample size at which they coincide.</li>
+      <li>A candidate model has $k = 12$ parameters and a deviance of $D = 4{,}210$ on $n = 10{,}000$ observations. Compute its AIC and its BIC. Which criterion gives the larger numerical value, and by how much?</li>
+      <li>Explain in one sentence why a likelihood-ratio test cannot be used to compare a logit GLM with a probit GLM on the same data, and why AIC and BIC can.</li>
+      <li>An analyst reports that adding a new predictor reduced the BIC by 0.8 units and claims the new model is preferred. On the Kass-Raftery scale, what is the strength of the evidence and what should you conclude?</li>
+      <li>You fit two GLMs on the same dataset. Model A drops three observations because of missing values in one of its predictors; Model B imputes those three values with the column median. Both report an AIC. Are the two AIC values comparable, and why or why not?</li>
+      <li>A candidate set of five GLMs is fit on a credit-risk dataset and the winning model has BIC about 200 units lower than the runner-up. The chosen model's calibration plot bows away from the diagonal at the high-PD end and its out-of-time Gini drops by four points. State the relative and the absolute verdict separately and explain why both are needed.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 36 (<a href="02-regression_diagnostics.html">regression diagnostics</a>) takes the model selected by AIC or BIC and asks the absolute question with residual histograms, Q-Q plots, residuals-versus-fitted scatters, and out-of-sample error metrics (MSE, RMSE, MAE, MAPE, $R^2$, adjusted $R^2$).</li>
+      <li><strong>Previous:</strong> The model-evaluation lectures sit at stage 6 of the pipeline introduced in <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>. By the time you reach this lecture, the candidate models have already been trained on a fixed feature matrix and you are choosing among them.</li>
+      <li><strong>Prerequisite:</strong> The likelihood framework that AIC and BIC are built on is developed in <a href="../../statistics/03-inferential_statistics.html">statistics lecture 3</a> (inferential statistics, MLE, asymptotic theory) and <a href="../../statistics/05-generalised_linear_models.html">statistics lecture 5</a> (generalised linear models, deviance, score and Wald tests). The reason the deviance itself is a defensible basis for comparison, rather than an arbitrary convention, is developed in <a href="../../statistics/14-strictly_consistent_loss_functions.html">statistics lecture 14</a> (strictly consistent loss functions).</li>
+      <li><strong>Outside this course:</strong> In credit-risk modelling, information criteria appear on the title page of nearly every A-IRB candidate-model comparison document. The relative-versus-absolute split shows up structurally in the IRB validation framework: relative selection sits in development documentation, absolute performance sits in independent validation and ongoing monitoring.</li>
+      <li><strong>Calibration and discrimination:</strong> This lecture and lecture 36 answer "how good is this model on average". A sharper set of questions, whether the model's predicted level is correct at every point of the score (not just on average) and whether it genuinely discriminates risks apart, is developed in sub-module 09, <a href="../09_forecast_evaluation/index.html">calibration and forecast evaluation</a>.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Model evaluation course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 35 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

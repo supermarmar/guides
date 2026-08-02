@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 2: covariate engineering for actuaries</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="index.html">AI for actuaries</a></div>
+  <h1>Covariate engineering for actuaries</h1>
+  <p class="subtitle">Every architecture in the rest of this course, however sophisticated, is only as good as the covariates fed into it. This lecture develops the specific covariate-engineering choices an actuary makes before any model is fitted: how to code a categorical variable, how to shrink a sparse target-encoded estimate towards a stable collateral mean, and how to penalise a graduation or a set of coefficients into the smooth, monotone shape actuarial judgement expects.</p>
+  <div class="meta">
+    <span>Lecture 2 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Source: <em>AI Tools for Actuaries</em> (SSRN 5162304), ch. 2</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A categorical covariate needs a numeric representation before any model, GLM or network, can use it. <strong>Ordinal coding</strong> assigns integers to categories with a genuine natural order (a risk band, low to high); it is wrong for a category with no natural order. <strong>One-hot coding</strong> and <strong>dummy coding</strong> represent an unordered category as a set of binary indicator columns, one per level (dummy coding drops one level to avoid the exact collinearity a full-rank model requires, one-hot coding keeps all levels, appropriate for models that do not need full rank, tree ensembles among them). <strong>Entity embedding</strong>, developed in full in the deep-learning sub-module, learns a genuinely continuous, low-dimensional representation of a categorical variable directly from data, the modern, more flexible alternative to fixed coding schemes, particularly valuable for a high-cardinality variable (postcode, occupation code) that one-hot coding would otherwise blow up into an unmanageable number of columns. <strong>Target encoding</strong> replaces a categorical level with the mean of the target variable observed for that level, a fast, powerful technique that carries a serious <strong>leakage risk</strong> unless shrunk towards a stable collateral mean using exactly the Bühlmann credibility weighting this track's own risk-modelling course derives, $Z \cdot \bar{y}_{\text{level}} + (1-Z) \cdot \bar{y}_{\text{overall}}$. <strong>Hierarchical categorical structures</strong> (a postcode nested within a region nested within a country) benefit from encoding that respects the nesting rather than treating every level as flat and unrelated. <strong>Fused and group penalties</strong>, and the classical actuarial technique of <strong>mortality graduation</strong>, are two names for the identical underlying idea: penalising a set of coefficients to be smooth or grouped rather than allowing each one to vary freely and noisily.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine pricing a genuinely new, tiny postcode with only three policies' worth of claims history. Trusting those three policies' raw average claim cost directly would be pricing on almost pure noise; trusting the wider region's average entirely would ignore whatever genuine local information those three policies do carry. Target encoding with credibility shrinkage is the precise, quantified answer to exactly this dilemma, blending the sparse local average with the stable regional one in proportion to how much genuine information the local sample actually carries, exactly the calculation an actuary has been making by hand, under the name credibility theory, for the better part of a century.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What is beyond the source</span>
+    The source covers entity embedding, target encoding, and the standard structured penalties as machine-learning techniques in their own right. This lecture makes explicit, and derives directly, the identity between target-encoding shrinkage and the Bühlmann credibility formula from this track's own risk-modelling course, and draws the parallel between fused-LASSO-style smoothness penalties and classical actuarial graduation, a synthesis the source leaves as an implicit family resemblance rather than a worked equivalence.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons covariate engineering earns a dedicated lecture ahead of any architecture in this course.</p>
+
+  <p>First, <strong>target encoding without credibility shrinkage is one of the single most common, and most dangerous, sources of leakage in actuarial machine learning</strong>: encoding a categorical level by the target mean computed including the very observations being predicted, or without shrinking a sparse level towards a stable collateral estimate, routinely produces a model that looks excellent in a naive validation split and fails badly on genuinely new data, exactly the leakage risk this lecture's shrinkage formula is built to prevent.</p>
+
+  <p>Second, <strong>the choice of coding scheme is a genuine, consequential decision, not a mechanical pre-processing step to delegate to a library default</strong>: choosing ordinal coding for a genuinely unordered category silently imposes a false, arbitrary ranking exactly as the unsupervised-learning sub-module's categorical-covariate-problem lecture warned against for t-SNE and UMAP, and the identical warning applies here, before a single model has even been fitted.</p>
+
+  <p>Third, <strong>structured penalties (fused, group) are a direct, modern generalisation of a technique actuaries have used for over a century, mortality graduation</strong>, and recognising this connection means an actuary does not need to relearn smoothness discipline from scratch when it reappears wearing a machine-learning name, only to recognise the same underlying idea in unfamiliar notation.</p>
+
+  <div class="callout insight">
+    <span class="tag">A worked comparison</span>
+    A pricing team encoding a "vehicle model" covariate with several hundred distinct levels, many represented by only a handful of policies, initially used raw target encoding (the observed mean claim cost per vehicle model, computed on the full training set). Cross-validated performance looked excellent. Deployed live, the model's predictions for the rarest vehicle models were markedly worse than for common ones, because the raw encoding for a rare model was, in effect, memorising the handful of training observations for that exact level rather than learning any genuine relationship, precisely the leakage the naive validation split had failed to catch since the same rare levels appeared, by chance, in both the training and validation folds. Re-encoding with credibility shrinkage towards the overall vehicle-category mean, weighted down for low-count levels, closed the gap between cross-validated and live performance directly.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Picture a single dial, the credibility weight $Z$, sliding between two extremes for encoding any given categorical level: at $Z=0$, the encoded value is entirely the stable, low-variance collateral mean; at $Z=1$, it is entirely the level's own, potentially sparse and noisy, sample mean; every genuine target-encoding scheme sits somewhere between the two, with $Z$ set by how much genuine information the level's own sample size actually carries.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 780 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The credibility weight Z sliding between the collateral mean and the level's own sample mean as sample size grows">
+      <text x="390" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The credibility dial: $Z$ as a function of level sample size</text>
+
+      <line x1="70" y1="220" x2="700" y2="220" stroke="#52525b" stroke-width="1.5"/>
+      <line x1="70" y1="220" x2="70" y2="60" stroke="#52525b" stroke-width="1.5"/>
+      <text x="385" y="255" text-anchor="middle" font-family="Inter" font-size="11" fill="#52525b">observations for this level, increasing right</text>
+      <text x="40" y="140" text-anchor="middle" font-family="Inter" font-size="11" fill="#52525b" transform="rotate(-90 40 140)">credibility weight $Z$</text>
+
+      <path d="M 70 210 Q 200 180 300 130 Q 420 80 700 68" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+      <text x="500" y="60" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">$Z \to 1$: trust the level's own mean</text>
+      <text x="200" y="240" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">$Z \to 0$: trust the collateral mean</text>
+
+      <line x1="70" y1="68" x2="700" y2="68" stroke="#0d9488" stroke-width="1" stroke-dasharray="4 2"/>
+      <text x="700" y="55" text-anchor="end" font-family="Inter" font-size="9" fill="#115e59">$Z = 1$ ceiling</text>
+
+      <circle cx="150" cy="200" r="5" fill="#dc2626"/>
+      <text x="150" y="185" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">rare vehicle model, low $Z$</text>
+
+      <circle cx="600" cy="75" r="5" fill="#0d9488"/>
+      <text x="600" y="95" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">common vehicle model, high $Z$</text>
+    </svg>
+    <figcaption>The credibility weight $Z$ rises smoothly as a categorical level's own sample size grows, sliding the encoded target-mean estimate from the stable, low-variance collateral mean at low sample sizes towards the level's own, increasingly trustworthy sample mean at high sample sizes. A raw target encoding with no shrinkage implicitly forces $Z=1$ for every level regardless of sample size, exactly the failure the vehicle-model vignette encountered.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A categorical encoding is a probability statement about how much to trust a small sample, whether or not it is labelled that way.</strong> Raw target encoding forces $Z=1$ on every level by construction, an implicit, usually unjustified claim of full trust in sparse data. <strong>Smoothness penalties and mortality graduation are the identical idea wearing different names.</strong> Recognising the identity is what lets an actuary bring a century of graduation intuition directly to bear on a modern fused-LASSO penalty.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Ordinal, one-hot, and dummy coding</h3>
+
+  <p><strong>Ordinal coding</strong> assigns successive integers to a category's levels, appropriate only when the levels carry a genuine, meaningful order (a risk band from low to high); applying it to an unordered category (a product code, a region name) silently imposes a false numeric distance between arbitrary levels, exactly the categorical-covariate problem the unsupervised-learning sub-module warned against. <strong>One-hot coding</strong> represents an unordered category with one binary indicator column per level, avoiding the false-ordering problem at the cost of a column count that grows with the number of levels; it is the standard choice for tree-based ensembles and other models with no full-rank requirement. <strong>Dummy coding</strong> is identical to one-hot coding except one level is dropped (the "reference level"), avoiding the exact linear dependence a full-rank GLM design matrix requires; the dropped level's effect is then absorbed into the model's intercept, and every other level's coefficient is interpreted relative to it.</p>
+
+  <h3>Entity embedding</h3>
+
+  <p><strong>Entity embedding</strong>, developed fully in the deep-learning sub-module, replaces a fixed coding scheme with a genuinely continuous, low-dimensional vector learned directly from the training data (typically alongside the rest of the network, via ordinary backpropagation), letting the model discover which categorical levels behave similarly rather than requiring the analyst to specify this in advance. It is particularly valuable for high-cardinality categorical variables, a detailed occupation code or a fine-grained postcode, where one-hot coding would otherwise produce an unmanageably wide, sparse design matrix; the exposure-scaled regularisation variant developed in the deep-learning sub-module directly addresses the scarce-data problem raised in lecture 1, shrinking the embedding of a thinly-observed level towards a stable default more aggressively than a well-observed one.</p>
+
+  <h3>Target encoding and credibility shrinkage</h3>
+
+  <p><strong>Target encoding</strong> replaces a categorical level $l$ with the observed mean of the target variable for that level, $\bar{y}_l$. Used raw, without shrinkage, this is a direct leakage risk: a level with very few observations produces a target-mean estimate dominated by sampling noise, and, worse, the encoding uses the exact target values the model is later asked to predict, a subtle form of the model effectively memorising rather than generalising, precisely the failure in this lecture's vehicle-model vignette. The standard fix is <strong>credibility-shrunk target encoding</strong>,</p>
+  $$\hat{\mu}_l = Z_l \cdot \bar{y}_l + (1 - Z_l) \cdot \bar{y},$$
+  <p>where $\bar{y}$ is the overall (collateral) target mean and $Z_l \in [0,1]$ is a credibility weight increasing in the level's own sample size $n_l$, commonly of the Bühlmann form $Z_l = n_l / (n_l + k)$ for a tuned constant $k$, the identical formula developed in full, from first principles, in this track's own credibility-theory lecture. This is not a coincidental resemblance: target-encoding shrinkage and Bühlmann credibility are solving the identical statistical problem, how much to trust a sparse, level-specific estimate relative to a stable, pooled one, and the mathematics is, correspondingly, identical.</p>
+
+  <h3>Hierarchical categorical structures</h3>
+
+  <p>Many actuarial categorical variables carry a genuine, known hierarchy, a postcode nested within a region nested within a country, an occupation nested within an industry. A flat encoding treats every level as equally unrelated to every other, discarding this known structure entirely. A <strong>hierarchical encoding</strong> instead shrinks a sparse lower-level estimate towards its immediate parent level's estimate (postcode towards region, region towards country) rather than directly towards the single, most distant overall mean, a direct, multi-level generalisation of the credibility formula above, and one that makes better use of genuinely available structure whenever the hierarchy is known and meaningful.</p>
+
+  <h3>Fused and group penalties as mortality graduation</h3>
+
+  <p>Classical <strong>mortality graduation</strong> smooths a noisy, age-by-age empirical mortality rate estimate by penalising excessive roughness (a large second difference between adjacent ages), trading a small amount of in-sample fit for a much more stable, plausible-looking curve. A <strong>fused LASSO</strong> penalty applies the identical logic to an arbitrary sequence of model coefficients, penalising the absolute difference between adjacent coefficients (adjacent ages, adjacent income bands, adjacent years) to encourage a smooth, graduated profile rather than one that jumps erratically between neighbouring categories purely due to sampling noise. A <strong>group LASSO</strong> penalty instead penalises whole groups of related coefficients (all levels of one categorical variable, say) jointly, encouraging an entire covariate to be included or excluded from the model as a unit rather than allowing some of its levels to survive regularisation while others do not, avoiding an arbitrary, hard-to-explain asymmetry between levels of the identical underlying variable.</p>
+
+  <h3>Positivity, monotonicity, and the actuarial reading of a penalty</h3>
+
+  <p>Beyond smoothness, several actuarial contexts require a stronger structural constraint: mortality rates must be positive, and a rating factor's effect (age, say, on motor claim frequency) is often expected, on genuine actuarial judgement, to be monotone over at least part of its range. A ReLU-based hinge function (developed in the deep-learning sub-module) or an explicit monotonicity penalty can enforce this directly inside a network architecture, developed in full in lecture 3's treatment of ICEnet, rather than leaving monotonicity to be checked only after the fact as a validation afterthought.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Target-encoding leakage is the single most common actuarial machine-learning bug</h3>
+  <p>More production actuarial machine-learning models fail in live deployment because of unshrunk or leaked target encoding than for any other single covariate-engineering reason. The specific failure mode, a validation split that happens to place the identical rare category in both training and test folds, is easy to miss precisely because the validation metric looks good; the only reliable defence is applying credibility shrinkage as a matter of standing discipline, not as a fix applied only after a live-deployment failure is already observed.</p>
+
+  <h3>The choice of $k$ in the credibility formula is itself a judgement call, not a technical detail</h3>
+  <p>The constant $k$ in $Z_l = n_l/(n_l+k)$ controls how aggressively sparse levels are shrunk, exactly the same judgement an actuary already makes when setting a credibility standard in a conventional Bühlmann calculation. Treating $k$ as a machine-learning hyperparameter to be tuned purely by cross-validated accuracy, with no reference to the actuary's own judgement about how much genuine signal a given category plausibly carries, discards exactly the domain expertise that makes an actuarial model defensible to a validator in the first place.</p>
+
+  <h3>Hierarchy-aware shrinkage is underused relative to how often a genuine hierarchy exists</h3>
+  <p>Postcode-level, occupation-level, and product-level categorical variables very often carry a genuine, known hierarchy that a flat target encoding simply discards. Using the available hierarchy, shrinking a sparse child level towards its immediate parent rather than jumping straight to the single overall mean, is a comparatively cheap improvement in estimate quality that is nonetheless frequently skipped in practice, usually because the flat version is marginally simpler to implement, not because the hierarchical version is genuinely harder to justify.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Distinguish ordinal, one-hot, and dummy coding, and state when ordinal coding is inappropriate.</li>
+      <li>State the credibility-shrunk target-encoding formula, and identify each term's role.</li>
+      <li>Explain the leakage risk in raw, unshrunk target encoding, and how credibility shrinkage addresses it.</li>
+      <li>Explain the identity between target-encoding shrinkage and Bühlmann credibility weighting.</li>
+      <li>Distinguish a fused LASSO penalty from a group LASSO penalty, and explain how each maps onto classical mortality graduation.</li>
+      <li>In the vehicle-model vignette, explain precisely why the naive validation split failed to detect the leakage, and what specifically fixed it.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next in this course</h4>
+    <ul>
+      <li><a href="03-actuarial_network_architectures.html">Lecture 3: actuarial network architectures</a>, which uses this lecture's covariate-engineering choices as direct inputs to CANN, LocalGLMnet, and ICEnet.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li>Wüthrich, Richman, Avanzi, Lindholm, Maggi, Mayer, Schelldorfer and Scognamiglio, <em>AI Tools for Actuaries</em>, chapter 2 (version 20 January 2026, <a href="https://ssrn.com/abstract=5162304">https://ssrn.com/abstract=5162304</a>, CC BY-NC).</li>
+    </ul>
+    <h4>Cross-references</h4>
+    <ul>
+      <li>The <a href="../04_risk_modelling/07-credibility_theory.html">credibility theory</a> and <a href="../04_risk_modelling/08-empirical_bayes_credibility.html">empirical Bayes credibility</a> lectures derive the Bühlmann formula this lecture applies directly to target encoding.</li>
+      <li>The <a href="../../machine_learning/05_deep_learning/04-tensors_and_embeddings.html">tensors and embeddings</a> lecture develops entity embedding and exposure-scaled regularisation in full.</li>
+      <li>The <a href="../../machine_learning/01_feature_engineering/04-feature_selection.html">feature selection</a> lecture develops fused and group LASSO penalties in their generic machine-learning form.</li>
+    </ul>
+    <h4>Further reading</h4>
+    <ul>
+      <li>Bühlmann and Gisler, <em>A Course in Credibility Theory and its Applications</em>. The full derivation of the credibility formula this lecture applies to target encoding.</li>
+      <li>Micci-Barreca (2001), "A preprocessing scheme for high-cardinality categorical attributes". The original target-encoding-with-shrinkage reference in the machine-learning literature.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All AI for actuaries lectures</a></span>
+  <span>Lecture 2 of 7: covariate engineering for actuaries</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 46: score decomposition and lift charts</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Calibration</a></div>
+  <h1>Score decomposition and lift charts</h1>
+  <p class="subtitle">Every lecture so far in this sub-module has treated calibration and discrimination as separate concerns, checked with separate tools. Murphy's score decomposition puts a single number on each and adds them up: a model's total expected loss splits exactly into an irreducible uncertainty term, a discrimination term (how much loss a perfectly calibrated version of this model's ranking would save), and a miscalibration term that vanishes exactly when the auto-calibration property from lecture 43 holds. Lift charts and double lift charts are the practitioner's chart-based version of the identical idea, and the double lift chart in particular is the standard way two competing pricing models get compared head to head before one replaces the other.</p>
+  <div class="meta">
+    <span>Lecture 46 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part VII: calibration and forecast evaluation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">For any strictly consistent loss function $L$, <strong>Murphy's score decomposition</strong> splits a model's expected loss into three additive, non-negative pieces:</p>
+
+  $$E[L(Y, \mu(X))] = \text{UNC}_L - \text{DSC}_L + \text{MSC}_L,$$
+
+  <p>where $\text{UNC}_L = E[L(Y, \mu_0)]$ is the <strong>uncertainty</strong>, the loss achieved by the global mean $\mu_0 = E[Y]$ and hence a property of the data alone, not of any model; $\text{DSC}_L = E[L(Y, \mu_0)] - E[L(Y, \mu^{\text{rc}}(X))]$ is the <strong>discrimination (resolution)</strong>, the loss reduction a perfectly auto-calibrated version of the model's own ranking (the recalibration step $\mu^{\text{rc}}$ from lecture 43, estimated by isotonic regression as in lecture 44) achieves over the naive global mean; and $\text{MSC}_L = E[L(Y, \mu(X))] - E[L(Y, \mu^{\text{rc}}(X))]$ is the <strong>miscalibration</strong>, the extra loss the actual, uncorrected model carries on top of its own recalibrated version, and which vanishes exactly when the model is already auto-calibrated. Every term is estimated empirically, exactly as every other quantity in this sub-module, on a held-out test sample. <strong>Lift charts</strong> plot the identical actual-versus-predicted information from lecture 43 with bin labels on the horizontal axis instead of predicted values, the standard actuarial presentation format; <strong>double lift charts</strong> bin two competing models by the ratio of their predictions and plot both models' predictions against the actuals across those bins, the standard way of settling which of two candidates should replace the other.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Take a model's total prediction error and ask three questions in order. How much of it is simply because outcomes are inherently variable, even if you knew absolutely nothing about the covariates (uncertainty, a fact about the world, not the model)? How much loss would a perfectly level-corrected version of this exact model's ranking save you over just guessing the average (discrimination, the genuine skill in the ranking)? And how much extra loss is the model carrying purely because its levels are wrong, a gap that would disappear entirely with a free isotonic recalibration step (miscalibration)? Murphy's decomposition answers all three with one formula, on the identical scale, and adding the three answers back together exactly reproduces the model's total loss.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture closes the calibration sub-module's scoring toolkit by formalising what lectures 42 to 45 argued informally. It draws directly on the recalibration step from lecture 44 (used to estimate the $\mu^{\text{rc}}$ term) and gives a loss-scale companion to the rank-scale Gini score from lecture 45; the two measure related but not identical things, a distinction developed in the pitfalls below.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this decomposition earns its place beyond the qualitative story already told.</p>
+
+  <p>First, <strong>it turns "the model needs work" into an actionable, quantified diagnosis</strong>. A large miscalibration term relative to discrimination says the fastest, cheapest improvement available is an isotonic recalibration step, no new features or architecture required. A large uncertainty term relative to what discrimination is achievable says the ceiling on model improvement is close to being reached and further modelling effort has diminishing returns; a small discrimination term relative to what a richer feature set plausibly offers says the real opportunity is in feature engineering or a different model class.</p>
+
+  <p>Second, <strong>every term uses the identical loss function the model was actually fitted to minimise</strong>, unlike comparing a deviance-fitted model's discrimination via Gini (a rank-based statistic on a different scale entirely) to its calibration via an aggregate deviance number. Murphy's decomposition keeps everything on one consistent scale, which is what makes the three terms genuinely additive and comparable to each other.</p>
+
+  <p>Third, <strong>lift charts and double lift charts are the format a rate filing, a model-replacement business case, or a board presentation actually uses</strong>, because bin labels on a horizontal axis with two overlaid series (predicted and actual) read more naturally to a non-technical stakeholder than a scatter plot against predicted value on a continuous axis, even though the underlying information is identical to the actual-versus-predicted plot from lecture 43.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A pricing team was asked to justify why a proposed GBM tariff should replace the incumbent GLM. Murphy's decomposition, computed on the same held-out sample for both, showed the GBM's discrimination term was 15 per cent higher than the GLM's (genuinely better ranking) but its miscalibration term was nearly as large as the entire discrimination gain, almost cancelling the advantage in total loss terms. Applying isotonic recalibration to the GBM (lecture 44) removed the miscalibration term entirely, at which point the GBM's total loss advantage over the GLM was clear and the business case for replacement was approved with the recalibration step built into the deployment pipeline as a mandatory stage, not an optional extra.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold two pictures: a single stacked bar showing total loss split into its three Murphy components, and a lift chart showing the identical calibration information from lecture 43 relabelled by bin index rather than predicted value.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Murphy's score decomposition as a stacked bar, and a lift chart">
+      <defs>
+        <marker id="liftArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Murphy's decomposition, and the lift chart it feeds</text>
+
+      <g transform="translate(60, 55)">
+        <text x="140" y="14" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#18181b">Total loss = UNC − DSC + MSC</text>
+        <rect x="60" y="40" width="160" height="220" fill="#F4F4F5" stroke="#71717a" stroke-width="1"/>
+        <rect x="60" y="40" width="160" height="220" fill="#94a3b8" fill-opacity="0.35"/>
+        <text x="140" y="55" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#334155">UNC (data only)</text>
+
+        <rect x="60" y="120" width="160" height="140" fill="#0d9488" fill-opacity="0.55"/>
+        <text x="140" y="195" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">− DSC (ranking skill)</text>
+
+        <rect x="60" y="90" width="160" height="30" fill="#dc2626" fill-opacity="0.55"/>
+        <text x="140" y="110" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#7f1d1d">+ MSC (miscalibration)</text>
+
+        <text x="140" y="278" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">final height = total expected loss</text>
+        <text x="140" y="292" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#dc2626">MSC shrinks to ~0 after isotonic recalibration</text>
+      </g>
+
+      <g transform="translate(440, 55)">
+        <rect x="0" y="0" width="360" height="270" rx="12" fill="#EFF6FF" stroke="#1d4ed8" stroke-width="2"/>
+        <text x="180" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Lift chart</text>
+        <line x1="30" y1="230" x2="330" y2="230" stroke="#1d4ed8" stroke-width="1"/>
+        <line x1="30" y1="230" x2="30" y2="45" stroke="#1d4ed8" stroke-width="1"/>
+        <polyline points="45,215 90,195 135,170 180,150 225,120 270,90 315,60" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
+        <polyline points="45,220 90,190 135,175 180,145 225,125 270,85 315,55" fill="none" stroke="#1e3a8a" stroke-width="2.5" stroke-dasharray="5 3"/>
+        <text x="180" y="252" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">bin label (1 = lowest predicted, 20 = highest)</text>
+        <text x="70" y="70" font-family="Inter" font-size="9" fill="#b45309">predictors</text>
+        <text x="70" y="82" font-family="Inter" font-size="9" fill="#1e3a8a">actuals</text>
+      </g>
+    </svg>
+    <figcaption>Left: the total expected loss stacks the (data-only) uncertainty on the bottom, subtracts the discrimination achieved by a perfectly calibrated version of the model's own ranking, and adds back whatever extra loss the actual, uncorrected model carries because it is not calibrated. Right: a lift chart plots the same predicted-versus-actual information as lecture 43's actual-versus-predicted plot, but with the horizontal axis relabelled by bin index rather than the predicted value itself, a presentation choice that reads more naturally to a business audience while carrying identical information.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Uncertainty is the ceiling nobody can move.</strong> It depends on the data alone, and no model, however good, reduces it below what the population's genuine variability allows. <strong>Miscalibration is the free money on the table.</strong> Because it is exactly closed by an isotonic recalibration step, a non-zero miscalibration term is, almost by definition, an improvement available before any further modelling work is even considered.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The decomposition, term by term</h3>
+
+  <p>Fix a strictly consistent loss function $L$, lower-bounded by zero, so all terms below are well-defined and non-negative. Murphy's score decomposition (Murphy, 1973) states</p>
+
+  $$E[L(Y, \mu(X))] = \underbrace{E[L(Y, \mu_0)]}_{\text{UNC}_L} \;-\; \underbrace{\Big(E[L(Y, \mu_0)] - E[L(Y, \mu^{\text{rc}}(X))]\Big)}_{\text{DSC}_L} \;+\; \underbrace{\Big(E[L(Y, \mu(X))] - E[L(Y, \mu^{\text{rc}}(X))]\Big)}_{\text{MSC}_L}.$$
+
+  <p><strong>Uncertainty</strong> ($\text{UNC}_L$) is the loss of the global mean $\mu_0 = E[Y]$, a quantity that does not depend on the fitted model $\mu$ at all; it is entirely a property of the response distribution, the irreducible variability no model, however good, can price away. <strong>Discrimination</strong> ($\text{DSC}_L$, sometimes called resolution) is the reduction in loss achieved by using the auto-calibrated version of the model's own ranking, $\mu^{\text{rc}}(X) = E[Y \mid \mu(X)]$, in place of the uninformative global mean; it is non-negative by the strict consistency of $L$, and it is genuinely about the model's ranking ability, because $\mu^{\text{rc}}$ is, by construction (lecture 43), auto-calibrated regardless of whether the original $\mu$ was. <strong>Miscalibration</strong> ($\text{MSC}_L$) is the extra loss the actual model $\mu$ carries relative to its own auto-calibrated version $\mu^{\text{rc}}$; it is non-negative for the identical reason, and it is exactly zero when $\mu$ is already auto-calibrated, since in that case $\mu = \mu^{\text{rc}}$ everywhere.</p>
+
+  <h3>Estimating the decomposition on a test sample</h3>
+
+  <p>Every term is estimated empirically on a held-out test sample $T = (Y_t, X_t, v_t)_{t=1}^m$, exposure-weighted exactly as every other quantity in this sub-module:</p>
+
+  $$\widehat{\text{UNC}}_L = \frac{1}{\sum_t v_t}\sum_{t=1}^m v_t \, L(Y_t, \bar\mu_0), \qquad \widehat{\text{DSC}}_L = \widehat{\text{UNC}}_L - \frac{1}{\sum_t v_t}\sum_{t=1}^m v_t \, L(Y_t, \hat\mu^{\text{rc}}(X_t)),$$
+
+  $$\widehat{\text{MSC}}_L = \frac{1}{\sum_t v_t}\sum_{t=1}^m v_t \, L(Y_t, \mu(X_t)) - \frac{1}{\sum_t v_t}\sum_{t=1}^m v_t \, L(Y_t, \hat\mu^{\text{rc}}(X_t)),$$
+
+  <p>with $\bar\mu_0$ the exposure-weighted sample mean of $Y$ and $\hat\mu^{\text{rc}}$ the isotonic-regression estimate of the recalibration step from lecture 44, fitted on the identical test sample. Every quantity here has already been introduced in this sub-module; this lecture's contribution is showing how they combine into a single, additive accounting identity.</p>
+
+  <h3>Reading the decomposition</h3>
+
+  <p>A model-improvement priority follows directly from the relative size of the three terms. If $\widehat{\text{MSC}}_L$ is large relative to $\widehat{\text{DSC}}_L$, the cheapest available improvement is recalibration, exactly as lecture 44 developed, with no change to the underlying model. If $\widehat{\text{MSC}}_L$ is already close to zero (the model is essentially auto-calibrated) and $\widehat{\text{DSC}}_L$ is small relative to $\widehat{\text{UNC}}_L$, the model is extracting little of the discriminatory signal the data could in principle support, and the priority is better features or a richer model class, not recalibration. Comparing two models' decompositions on the identical response and the identical test sample, term by term, is a more informative comparison than a single aggregate loss number, because it separates "which model ranks better" from "which model needs recalibrating" as two independent questions with two independent, actionable answers.</p>
+
+  <h3>Lift charts</h3>
+
+  <p>A <strong>lift chart</strong> presents the identical information as the actual-versus-predicted plot from lecture 43, with one presentational change: bin the test-set predictions into equal-sized groups (a 5 per cent step, giving 20 bins, is standard actuarial practice), and plot both the bin-average prediction and the bin-average actual on the vertical axis, against the bin's label (1 to 20, lowest predicted to highest) on the horizontal axis, rather than plotting actual against predicted directly. Reading a lift chart: the gap between the predictor line and the actuals line at any bin is the local miscalibration at that point of the score distribution, exactly what the actual-versus-predicted plot shows; whether the actuals line is monotonically increasing across bins is a direct visual check of whether the model's ranking is behaving sensibly; and the difference between the lowest and highest bins, the "lift" the chart's name refers to, is a rough visual proxy for discrimination, though the Gini score from lecture 45 is the properly defined statistic for that purpose.</p>
+
+  <h3>Double lift charts</h3>
+
+  <p>A <strong>double lift chart</strong> compares two candidate models directly. Given predictions $\mu_1(X_t)$ and $\mu_2(X_t)$ from two fitted models on the identical test sample, compute the ratio $\rho_t = \mu_2(X_t)/\mu_1(X_t)$ for every instance, and bin the test set by this ratio (again typically in 5 per cent steps). Within each bin, plot the bin-average of $\mu_1$, the bin-average of $\mu_2$, and the bin-average of the actuals, all three on the same vertical axis against the bin label. This construction isolates exactly the region of the covariate space where the two models disagree most (the extreme bins, where the ratio is furthest from one) and shows, directly, which model's predictions track the actuals more closely in precisely that region. This is the standard chart used to settle a model-replacement decision: two models that agree everywhere except a narrow band of the portfolio can be compared, in that band specifically, on the strength of a single chart, rather than on an aggregate statistic that averages the disagreement away.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Computing any term of the decomposition in-sample</span>
+    Every term of Murphy's decomposition inherits the identical in-sample optimism risk the actual-versus-predicted plot and the Gini score already warned against; an in-sample $\widehat{\text{MSC}}_L$ will understate true miscalibration for a flexible model class that has partially memorised its own training predictions. All three terms must be estimated on a held-out sample.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Comparing uncertainty terms across models fitted to different responses</span>
+    Because $\text{UNC}_L$ depends only on the data, not the model, comparing it between two models fitted to differently defined responses (a claims-frequency model against a claims-severity model, say) is comparing two different data-generating processes, not two models. Uncertainty comparisons are only meaningful between models fitted to the identical response on the identical (or at least comparable) data.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Conflating the discrimination term with the Gini score</span>
+    Both $\text{DSC}_L$ and Gini measure a model's ranking ability, but they are not the same statistic and do not move in lockstep: $\text{DSC}_L$ is measured on the loss scale, in the same units as the model's total error, and is sensitive to the variance of the response in a way the purely rank-based, scale-free Gini score is not. A model with a high $\text{DSC}_L$ relative to a low-variance response can have a modest Gini, and the two should be reported alongside each other, not treated as interchangeable readings of the identical underlying property.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Under-populated double lift chart bins</span>
+    Binning by the ratio $\mu_2/\mu_1$ concentrates observations unevenly, particularly at the extremes where the two models disagree most and where, often, exposure is thinnest; the same fine-binning noise pitfall from lecture 43 applies with extra force here, because the most interesting bins (the ones showing the biggest disagreement) are frequently the ones with the fewest observations to support a reliable bin average. Merging sparse extreme bins, or reporting a minimum-exposure threshold alongside the chart, is the standard safeguard.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Murphy's score decomposition, $E[L(Y,\mu(X))] = \text{UNC}_L - \text{DSC}_L + \text{MSC}_L$, is the single formula that formalises this entire sub-module's argument: uncertainty is a property of the data, discrimination is the genuine skill in the model's ranking, and miscalibration is the extra loss a free isotonic recalibration step would remove. Lift charts present the actual-versus-predicted comparison in the bin-label format actuarial practice prefers, and double lift charts extend the identical construction to a direct, head-to-head comparison of two competing models, isolating exactly the region of disagreement that a replacement decision hinges on.</p>
+
+  <p>The final lecture of this sub-module turns from the modelling and diagnostic toolkit to the validation discipline that makes every number reported so far trustworthy on the sample sizes actuarial and credit data actually supply: stratified cross-validation, the parametric and non-parametric bootstrap, out-of-bag validation, and the specific reason AIC and BIC, so central to the earlier model-evaluation sub-module, stop applying once the model class leaves maximum likelihood behind.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State Murphy's score decomposition and define each of the three terms in words.</li>
+      <li>Explain why $\text{UNC}_L$ depends only on the data and not on the fitted model, and why this means it cannot be used to compare two models fitted to different response definitions.</li>
+      <li>Why is $\text{MSC}_L$ exactly zero when a model is auto-calibrated? What is the cheapest way to drive it to (near) zero for a model that is not?</li>
+      <li>Describe the construction of a lift chart and explain how it relates to the actual-versus-predicted plot from lecture 43.</li>
+      <li>Describe the construction of a double lift chart and explain why binning by the ratio of two models' predictions isolates the region where a model-replacement decision matters most.</li>
+      <li>Explain why $\text{DSC}_L$ and the Gini score, though both measures of discrimination, are not interchangeable and should be reported together rather than as substitutes for one another.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 45 (<a href="04-discrimination_and_gini.html">discrimination and the Gini score</a>) supplied the rank-based measure of discrimination this lecture's $\text{DSC}_L$ term gives a loss-scale companion to.</li>
+      <li><strong>Next:</strong> Lecture 6 (<a href="06-resampling_validation.html">resampling validation</a>) closes the sub-module with the cross-validation and bootstrap toolkit that makes every statistic reported across this sub-module trustworthy at actuarial sample sizes.</li>
+      <li><strong>Built on:</strong> The isotonic-regression estimate of $\mu^{\text{rc}}$ from <a href="03-nonparametric_recalibration.html">lecture 44</a> and the strictly-consistent-loss framework from the statistics track's <a href="../../statistics/14-strictly_consistent_loss_functions.html">lecture 14</a>.</li>
+      <li><strong>Outside this course:</strong> Double lift charts are the standard exhibit in an actuarial rate filing or a model-replacement business case wherever two pricing models are being compared head to head.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Calibration course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 46 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

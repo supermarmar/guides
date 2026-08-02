@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 4: choosing the model and the effort</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Choosing the model and the effort</h1>
+  <p class="subtitle">Two dials govern what you are actually buying on any given turn: which weights run, and how hard they are allowed to think. Most people set the first once and never touch the second, which is the wrong way round. Effort is the dial that moves cost and quality most, and it is free to change.</p>
+  <div class="meta">
+    <span>Lecture 4 of 22</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The model families sit on a capability and price ladder, and the useful thing to know is the ratio rather than the absolute numbers. At the time of writing, Haiku 4.5 costs a fifth of Sonnet 5 per output token and a tenth of Opus 5; Opus 5 costs half of Fable 5. Those ratios are stable in shape even as the names change. What follows from them is the routing question: which parts of your work justify the expensive weights, and which parts are being over-served.</p>
+
+  <p>The second dial is <strong>reasoning effort</strong>, a setting on the current models with five levels from <code>low</code> to <code>max</code>. It controls how much the model thinks before and between actions, and it changes both cost and quality more than most model swaps do. The published guidance is direct: <code>xhigh</code> is the best setting for most coding and agentic use cases and is what Claude Code uses by default, <code>high</code> is the sensible minimum for anything intelligence-sensitive, and <code>low</code> is for short mechanical work and subagents. The counter-intuitive part, and the part worth internalising, is that higher effort often <em>reduces</em> total cost on agentic work, because a better plan means fewer turns.</p>
+
+  <p>The routing heuristic that most teams converge on is: think hard once, act cheaply many times. Plan on the strongest model at high effort, where the decisions are made and a mistake propagates; implement on a cheaper one, where the decisions have already been made and the work is transcription; run subagents at low effort, because their job is to read a lot and report a little. It is a good default. It is not a law, and the second half of this lecture argues against it in the cases where it fails.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Ask two questions of any turn. Does this decision propagate, or is it local? And can a machine check the result? Propagating decisions with no mechanical check deserve the best model at high effort, because you are paying for judgement you cannot verify cheaply. Local work with a test suite behind it can run on the cheap model at low effort, because the suite is doing the checking. Everything else is interpolation between those two poles.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Effort is the practical face of a deep result: for a fixed set of weights, spending more compute at inference time buys measurably more capability. That is why a smaller model thinking longer can beat a larger one answering immediately, and it is why the frontier is now contested on two axes rather than one. The economic consequence is that "which model" stopped being a single decision. You are choosing a point on a two-dimensional surface of weights and inference compute, and the cheapest point that clears your quality bar is rarely at either extreme.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that the default is almost never optimal in both directions at once. Run everything on the strongest model at maximum effort and you pay several times over for work that a cheaper configuration would have done identically, and you wait longer for it. Run everything on the cheapest and you get plausible output on the tasks that needed judgement, which is the expensive failure rather than the cheap one. The cost of getting this wrong is asymmetric and it points in different directions on different tasks, which is exactly why a single global setting cannot be right.</p>
+
+  <p>The second reason is that model and effort choices are the part of the practice that ages fastest. Names and prices change every few months, the capability ordering occasionally reshuffles, and a routing rule written against last year's lineup quietly becomes wrong rather than loudly breaking. Any routing table you write is a maintenance liability, so it should be written in terms that survive: what kind of task goes where, not which named model handles it. This lecture's worked example is a real routing table on this machine that drifted exactly this way.</p>
+
+  <p>The third reason is that these two dials are the only levers that change the economics without changing the work. Everything else in this course improves the output by improving the process: better instructions, better verification, better context. Model and effort are different. They buy or save money directly, at fixed process, which makes them the first thing to tune once the process is sound and the last thing to blame while it is not.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The ladder, and what the rungs cost</h3>
+
+  <p>The table below reflects the published API rates at the time of writing, in dollars per million tokens. Treat the ratios as the durable part; the names and the absolute figures will move.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Model</th><th>Context</th><th>Input</th><th>Output</th><th>Positioned for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Fable 5</td><td>1M</td><td>$10</td><td>$50</td><td>The most demanding reasoning and longest-horizon autonomous work</td></tr>
+      <tr><td>Opus 5</td><td>1M</td><td>$5</td><td>$25</td><td>Complex agentic coding and multi-file feature work</td></tr>
+      <tr><td>Sonnet 5</td><td>1M</td><td>$3</td><td>$15</td><td>The speed-and-intelligence balance for high-volume work</td></tr>
+      <tr><td>Haiku 4.5</td><td>200K</td><td>$1</td><td>$5</td><td>Simple, latency-sensitive, high-throughput tasks</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Two features of this table matter more than the numbers. The output column is the one to watch: output tokens cost five times input tokens across the range, and thinking is billed as output, so effort settings show up in the expensive column. And the spread between adjacent rungs is roughly a factor of two, not a factor of ten, which means model choice is a coarser instrument than people assume. Moving one rung down saves half; getting the effort setting right on a long agentic run can save considerably more than that.</p>
+
+  <h3>Effort: the second dial</h3>
+
+  <p><strong>Reasoning effort</strong> controls how much the model thinks and how thoroughly it acts, on a five-level scale. The default is <code>high</code>. Lower settings produce fewer and more consolidated tool calls, less preamble, and terser confirmations; higher settings produce more exploration, more verification, and more deliberate planning.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Level</th><th>Reach for it when</th><th>Watch for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>low</code></td><td>Short scoped edits, mechanical transformations, subagents whose job is to read and summarise</td><td>Under-thinking on anything with a hidden dependency</td></tr>
+      <tr><td><code>medium</code></td><td>Cost-sensitive routine work where quality holds</td><td>Nothing much; often the quiet sweet spot</td></tr>
+      <tr><td><code>high</code></td><td>The default. Anything intelligence-sensitive</td><td>Rarely wrong, occasionally more than needed</td></tr>
+      <tr><td><code>xhigh</code></td><td>Coding and agentic work. What Claude Code uses by default</td><td>Needs generous output budget; do not starve it</td></tr>
+      <tr><td><code>max</code></td><td>Correctness matters more than cost, and the problem is genuinely hard</td><td>Diminishing returns and overthinking on simple tasks</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The non-obvious property, and the one that overturns the naive cost model, is that effort and total spend are not monotonically related on agentic work. A low-effort run that misunderstands the task will explore the wrong part of the repository, write the wrong patch, fail the tests, and iterate; a high-effort run that plans properly may finish in a third of the turns. Higher effort per turn, fewer turns, less total spend. This only holds where the extra thinking actually improves the plan, which is why sweeping the levels on your own workload beats reasoning about it from first principles.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Routing by decision scope and verifiability">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Routing by two questions: does the decision propagate, and can a machine check it?</text>
+
+      <g font-family="Inter" font-size="11">
+        <line x1="140" y1="235" x2="660" y2="235" stroke="#71717a" stroke-width="1.5"/>
+        <line x1="140" y1="235" x2="140" y2="45"  stroke="#71717a" stroke-width="1.5"/>
+        <text x="400" y="264" text-anchor="middle" fill="#52525b">Verification is mechanical  &#8594;</text>
+        <text x="128" y="140" text-anchor="middle" fill="#52525b" transform="rotate(-90 128 140)">Decision propagates  &#8594;</text>
+
+        <rect x="160" y="60" width="230" height="80" rx="10" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="275" y="88"  text-anchor="middle" font-weight="600" fill="#C76B2A">Strongest model, high effort</text>
+        <text x="275" y="107" text-anchor="middle" font-size="10.5" fill="#C76B2A">architecture, approach, a modelling</text>
+        <text x="275" y="122" text-anchor="middle" font-size="10.5" fill="#C76B2A">assumption nobody can unit-test</text>
+
+        <rect x="410" y="60" width="230" height="80" rx="10" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="525" y="88"  text-anchor="middle" font-weight="600" fill="#1E9D54">Strong model, high effort</text>
+        <text x="525" y="107" text-anchor="middle" font-size="10.5" fill="#1E9D54">large refactor behind a fast,</text>
+        <text x="525" y="122" text-anchor="middle" font-size="10.5" fill="#1E9D54">trustworthy test suite</text>
+
+        <rect x="160" y="152" width="230" height="70" rx="10" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="275" y="180" text-anchor="middle" font-weight="600" fill="#2A3A78">Mid model, medium effort</text>
+        <text x="275" y="199" text-anchor="middle" font-size="10.5" fill="#2A3A78">prose, docs, judgement you will read</text>
+
+        <rect x="410" y="152" width="230" height="70" rx="10" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="525" y="180" text-anchor="middle" font-weight="600" fill="#3D2EB5">Cheap model, low effort</text>
+        <text x="525" y="199" text-anchor="middle" font-size="10.5" fill="#3D2EB5">renames, search, subagent reports</text>
+      </g>
+    </svg>
+    <figcaption>Only the top-left quadrant genuinely needs the most expensive configuration, because it is the only one where you are buying judgement that nothing else will check. The bottom-right is where most teams overspend without noticing.</figcaption>
+  </figure>
+
+  <div class="defcard">
+    <strong>Reasoning effort.</strong> A request-level setting controlling how much the model thinks and how thoroughly it acts, from <code>low</code> to <code>max</code>. Distinct from a token cap: a cap is enforced against the model, whereas effort shapes what it chooses to do.
+  </div>
+
+  <div class="defcard">
+    <strong>Inference-time compute.</strong> Work done at answering time rather than training time. Effort is the user-facing control over it, and the reason a cheaper model thinking longer can outperform a stronger one answering immediately.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Where the cheap model genuinely wins</h3>
+
+  <p>Three task shapes belong on the cheapest model that can do them, and moving them there is the highest-return routing decision available.</p>
+
+  <p>The first is <strong>search and exploration</strong>. A subagent sent to find where authentication is handled reads twenty files and returns two hundred words. Its job is recall and summary, not judgement, and the read-to-conclusion ratio is enormous. Running that on the strongest model at high effort is paying frontier rates to grep.</p>
+
+  <p>The second is <strong>mechanical transformation</strong>: a rename across forty files, a migration whose pattern you have already specified and verified on three examples, a reformat. The judgement happened when you wrote the specification. What remains is application, and application is where cheap models are strongest.</p>
+
+  <p>The third is <strong>anything a fast test suite guards</strong>. If a wrong answer fails a test in under a second, the loop can iterate its way to correct, and the model's job changes from "be right first time" to "converge". Convergence is cheap. That is the practical content of the verifiability argument from Lecture 1, expressed as a billing decision.</p>
+
+  <h3>Where the expensive model earns its keep</h3>
+
+  <p>The mirror image is work where being wrong is expensive and being wrong is invisible. Architectural decisions, because everything downstream inherits them. Anything touching a regulatory or contractual interpretation, because the failure surfaces months later in someone else's review. Debugging a problem that has already resisted one attempt, because the cheap explanations have been eliminated and what remains needs actual inference. Long autonomous runs, because errors compound across turns and a small early mistake becomes a large late one.</p>
+
+  <p>Notice that none of those categories is defined by difficulty in the ordinary sense. They are defined by <em>how expensive it is to discover you were wrong</em>. That is the criterion to route on, and it is the one people substitute for "how hard does this feel", which is a poor proxy.</p>
+
+  <h3>The plan-strong, implement-cheap heuristic, and its limits</h3>
+
+  <p>The routing rule most teams settle on separates the phases: plan on the strongest model, implement on a cheaper one. It has a real justification. Planning is where propagating decisions get made, the output is short, and you read it, so the expensive tokens are few and the value per token is high. Implementation against an agreed plan is long, mechanical, and checkable.</p>
+
+  <p>The strongest case against it is worth stating plainly, because the rule is applied more dogmatically than it deserves. First, handoff is not free: a plan detailed enough for a weaker model to execute without judgement is nearly as much work as the implementation, and a plan that leaves gaps hands the gaps to the model you chose <em>because</em> it is worse at judgement. Second, a model switch discards the accumulated context of the planning session, so the implementing model re-reads and re-derives, and the tokens saved on rates are partly spent again on re-establishing context. Third, and most simply, the gap between adjacent rungs is a factor of two, not ten; the saving on a single feature is often smaller than the cost of one extra correction round.</p>
+
+  <p>The honest version of the rule is narrower. Split phases when the plan is genuinely complete and mechanical to execute, when the implementation is long enough for the rate difference to matter, and when a test suite will catch the weaker model's mistakes. Stay on one model when the work is exploratory, when the plan will evolve during implementation, or when the session is short. Neither is a default; the shape of the task decides.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Starving a high-effort run of output budget produces the worst of both worlds: you pay for extensive thinking and then the answer truncates. The thinking is billed as output and shares the same budget as the response, so a limit tuned for a low-effort run will cut a high-effort one off mid-thought. Raise the budget when you raise the effort, and treat a truncated answer after an expensive run as a configuration bug rather than a model failure.
+  </div>
+
+  <h3>Worked example: a routing table that drifted</h3>
+
+  <div class="worked">
+    <strong>Worked example: the model routing table in this machine's global CLAUDE.md</strong>
+    <p>The global instruction file on this machine carries a routing table with four rows: plan and architect on Opus 4.7, implement on Sonnet 4.6, run every subagent on Haiku 4.5, and use Sonnet for any subagent that writes files. It closes with two rules: "Plan on Opus, implement on Sonnet" and "Never start implementation on Opus. If already on Opus and ready to implement, prompt me to switch first."</p>
+    <p><strong>What is right about it.</strong> The reasoning is sound and the categories are the right ones. It routes on task type rather than on mood, it puts subagents on the cheapest model, and it makes an explicit exception for subagents that write files, which is the correct exception: a bad read costs tokens, a bad write costs work. Someone thought about this properly.</p>
+    <p><strong>What has gone wrong.</strong> The named models are a generation behind what the session actually runs. The table pins Opus 4.7 and Sonnet 4.6; the current lineup is Opus 5 and Sonnet 5, and the file has no way to know that. Worse, it is loaded on every turn of every session in every directory, so a stale table is not inert: it is an instruction to switch to a model that is no longer the right rung.</p>
+    <p><strong>The rule that has aged worst.</strong> "Never start implementation on Opus" was written when the tiers were further apart in cost per unit of useful work. Against the current lineup it is often false economy. Implementation on the stronger model at moderate effort frequently finishes in fewer turns than implementation on the weaker one at high effort, and the switch itself costs a context reset. The rule also fires hardest at exactly the wrong moment, interrupting a session that has just built up a complete understanding of the problem in order to hand that understanding to a model that does not have it.</p>
+    <p><strong>The fix, and the general principle.</strong> Rewrite the rows in durable terms: "plan on the strongest available model at high effort", "run read-only subagents on the cheapest model at low effort", "subagents that write files use the mid tier". Add the dial that is missing entirely, effort, which the table does not mention despite it being the larger lever. And demote the never-implement-on-the-strong-model rule from a prohibition to a prompt, because it is a cost heuristic, not a safety rule, and prohibitions are for the latter. The general principle is worth stating: any instruction file naming a specific model version has a shelf life, so write the routing rule in terms of tiers and let the tier resolve at read time.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Two dials, and the second one matters more than most people give it credit for. The model ladder spans roughly a factor of two between adjacent rungs, with output tokens costing five times input and thinking billed as output. Effort spans five levels, defaults to <code>high</code>, and on coding and agentic work is best around <code>xhigh</code>, where the extra thinking per turn is frequently repaid by needing fewer turns. Route by asking whether a decision propagates and whether a machine can check it: propagating and unverifiable earns the expensive configuration, local and test-guarded does not. And the plan-strong, implement-cheap split is a good heuristic with real limits, chiefly the cost of handing over a context the receiving model does not have.</p>
+
+  <p>That closes Part I. The foundations are now in place: the loop and its verification gap, the context window as the binding constraint, the harness as the machinery you actually control, and the model and effort as the economics laid over the top. Everything so far has been about the shape of the system. Part II turns to steering it, and it begins where all durable steering begins, with what you have written down. The next lecture takes CLAUDE.md seriously as a piece of engineering: what belongs in it, what quietly ruins it, and why the file that fixes your problem this week is the file that gets ignored next month.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Roughly what is the cost ratio between adjacent rungs of the model ladder, and between input and output tokens? Why does the second ratio make effort settings expensive?</li>
+      <li>Name the five effort levels. Which is the default, and which is recommended for coding and agentic work?</li>
+      <li>Explain why raising effort can reduce total spend on an agentic task. When does that argument fail?</li>
+      <li>State the two questions to route on. Give a task for each of the four quadrants they define.</li>
+      <li>Give three task shapes that belong on the cheapest model, and say what they have in common.</li>
+      <li>Argue the strongest case against "plan on the strong model, implement on the cheap one". Under what three conditions does the split actually pay?</li>
+      <li>A colleague raises effort to the maximum and reports that answers now truncate mid-sentence. Diagnose it.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="03-the_harness.html">Lecture 3 (anatomy of a harness)</a> covered the machinery that these weights run inside.</li>
+      <li><strong>Next:</strong> Lecture 5 (CLAUDE.md) opens Part II with the artefact that carries routing rules like the one dissected here, and shows why it decays.</li>
+      <li><strong>Cross-link:</strong> Lecture 10 (subagents) develops the read-to-conclusion argument that puts exploration on the cheapest tier.</li>
+      <li><strong>Cross-link:</strong> Lecture 21 (evaluation and cost) returns to this with measurement rather than heuristics.</li>
+      <li><strong>Cross-link:</strong> <a href="../machine_learning/11_large_language_models/02-foundation_models_and_pretraining.html">Machine learning, LLM module, Lecture 2 (foundation models and pretraining)</a> explains what the capability difference between tiers actually consists of.</li>
+      <li><strong>Outside this course:</strong> Anthropic, model overview and pricing pages, platform.claude.com/docs (the authority on the current lineup, which changes); Anthropic, "Best practices for Claude Code", code.claude.com/docs/en/best-practices; Anthropic's model migration guidance on effort levels and their cost-quality trade-offs.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 4 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

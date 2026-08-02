@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 41: model-agnostic interpretation methods</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Model interpretation</a></div>
+  <h1>Model-agnostic interpretation methods</h1>
+  <p class="subtitle">The model is a black box. Treat it as a function, probe its behaviour at the boundary, and recover a human-readable story. Four methods in increasing order of theoretical grounding: permutation importance, partial dependence, SHAP, LIME. The course ends here.</p>
+  <div class="meta">
+    <span>Lecture 41 of 62</span>
+    <span>Reading time, 75 minutes</span>
+    <span>Part VI: interpretation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>model-agnostic interpretation method</strong> is a procedure that probes a fitted predictor $f$ by manipulating its inputs and observing its outputs, without ever opening the box to inspect coefficients, splits, or weights. Four methods do almost all the practical work. <strong>Permutation importance</strong> ranks features globally by how much a model's performance degrades when a single column is shuffled. <strong>Partial dependence plots</strong> show the marginal effect of one or two features on the prediction by averaging over the remaining columns. <strong>SHAP</strong> attributes each prediction to its features using Shapley values from cooperative game theory, the unique allocation that satisfies efficiency, symmetry, dummy, and additivity at the same time. <strong>LIME</strong> explains a single prediction by fitting a sparse linear surrogate on perturbations around the point of interest. The four methods differ in scope (global versus local), in computational cost, in theoretical foundation, and in how they cope with correlated features; together they cover the regulatory and operational ground that interpretable-by-construction models cannot reach. The four are not interchangeable; choosing among them is the question this lecture answers.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A model takes a row of features and produces a prediction. You cannot see inside it, but you can ask it questions. Permutation importance asks "which column matters most for getting the score right". Partial dependence asks "how does the score change as I sweep this feature through its range, holding the rest fixed". SHAP asks "for this exact customer, how much did each feature push the score up or down from the population average". LIME asks "if I draw a small region around this customer and fit a line, which features dominate locally". Each is a different question; the answers add up to a story you can tell a regulator.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Textbooks present these four methods in parallel as a menu. In credit risk practice they sit in a strict hierarchy of acceptability. Permutation importance is universally accepted as a sanity check. Partial dependence is accepted with the caveat that the modeller has confirmed the independence assumption is not catastrophically violated. SHAP has become the de facto standard for adverse-action reasoning in credit decisions because its additivity property maps cleanly onto a per-customer "reason code" output; the FCA, PRA, and US fair-lending regimes are converging on SHAP as the explanation method auditors expect to see. LIME survives in research papers but is rarely accepted in production model documentation because of its instability across re-runs. The hierarchy is not academic preference; it is what model risk committees will sign off.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 6 of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>, and the final lecture of the course. The previous lecture (<a href="02-model_specific_methods.html">model-specific methods</a>) covered what comes for free from a fitted linear model, decision tree, or ensemble; this lecture covers what is left when those tools do not apply, which is anything involving a gradient-boosted tree of more than trivial depth, a random forest with hundreds of estimators, or a neural network from <a href="../05_deep_learning/01-neural_networks.html">sub-module 05</a>. The framing lecture (<a href="01-explaining_models.html">white box, black box</a>) set the regulatory context that decides which of these methods are admissible at all.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons model-agnostic interpretation is the question that decides whether a black-box model ships at all. First, <strong>regulators have stopped accepting opaque models for any decision that materially affects a customer.</strong> The EU AI Act, the UK's PRA SS1/23, the US Equal Credit Opportunity Act adverse-action requirement, and the EBA's guidelines on internal models all converge on the same expectation: a model used in credit, pricing, capital, or onboarding must be able to produce an explanation for any individual decision and a coherent global account of which features drive the model. Gradient-boosted trees and neural networks are not interpretable by construction; without a post-hoc method they fail this test on contact.</p>
+
+  <p>Second, <strong>the post-hoc method is itself a model component that must be validated.</strong> A SHAP explainer that produces unstable attributions, a permutation-importance ranking that is dominated by noise, or a LIME surrogate that disagrees with itself between two runs is not a defensible explanation. Model risk committees increasingly run a second model-validation cycle on the interpretation layer, asking the same questions they ask of the predictor: how was the explainer chosen, what assumptions does it rely on, how stable is it under resampling and refit, what happens at the edge of the training distribution. The interpretation method's reliability is now part of the model's regulatory surface area.</p>
+
+  <p>Third, <strong>the choice of method commits the bank to an explanation that downstream users will treat as ground truth.</strong> A relationship manager handed a SHAP waterfall plot for a declined application will quote it back to the customer; a model owner challenged by a regulator on why the score dropped from one quarter to the next will point at a partial dependence plot. The artefact outlives the meeting that produced it. Choosing a method that is locally faithful but globally misleading (or vice versa) embeds that mismatch into every conversation that uses the artefact. The choice is editorial, not just technical.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail PD model rebuilt as a gradient-boosted tree improved out-of-time AUC by two points over the incumbent logistic regression. The validation pack included permutation importance and a global SHAP summary. Six months into production, the customer-services team began receiving complaints from declined applicants whose adverse-action letters listed "loan-to-income ratio" as the top reason, when their loan-to-income was below the population median. The cause was a stale explainer: the SHAP TreeExplainer object had been built on the development sample's class balance and never refreshed when the production population drifted to a higher approval rate. The local SHAP values were technically correct for a different baseline. Two lessons. The explainer is a model artefact and needs the same monitoring as the model. Adverse-action reasoning that goes to a customer is a regulated output even when it is derived from an unregulated method.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. The four methods sit on two axes. The first is scope: a <strong>global</strong> method describes the model's behaviour across the population, a <strong>local</strong> method describes its behaviour at a single point. The second is what the method consumes: a <strong>perturbation</strong>-based method only needs the function $f$ as a callable, a <strong>structural</strong> method exploits something specific about the model class (TreeSHAP exploits the tree structure for an exact polynomial-time computation). Permutation importance and partial dependence are global and purely perturbation-based. LIME is local and purely perturbation-based. SHAP straddles both: locally it gives a per-row attribution, globally it aggregates by averaging absolute values; structurally it has fast variants for trees and linear models, and falls back to KernelSHAP perturbations otherwise.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four model-agnostic methods plotted on scope and theoretical grounding axes">
+      <defs>
+        <marker id="maArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The four methods on two axes: scope (global vs local) and theoretical grounding</text>
+
+      <!-- Axes -->
+      <line x1="80" y1="320" x2="780" y2="320" stroke="#71717a" stroke-width="1.2" marker-end="url(#maArrow)"/>
+      <line x1="80" y1="320" x2="80" y2="60" stroke="#71717a" stroke-width="1.2" marker-end="url(#maArrow)"/>
+      <text x="430" y="350" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#52525b">Theoretical grounding (heuristic to axiomatic)</text>
+      <text x="40" y="190" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#52525b" transform="rotate(-90 40 190)">Scope (local to global)</text>
+
+      <!-- Quadrant labels -->
+      <text x="200" y="80" text-anchor="middle" font-family="Inter" font-size="10" fill="#a1a1aa">global, heuristic</text>
+      <text x="640" y="80" text-anchor="middle" font-family="Inter" font-size="10" fill="#a1a1aa">global, axiomatic</text>
+      <text x="200" y="305" text-anchor="middle" font-family="Inter" font-size="10" fill="#a1a1aa">local, heuristic</text>
+      <text x="640" y="305" text-anchor="middle" font-family="Inter" font-size="10" fill="#a1a1aa">local, axiomatic</text>
+
+      <!-- Method bubbles -->
+      <!-- Permutation importance: global, mid-grounding -->
+      <g>
+        <circle cx="220" cy="120" r="36" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="220" y="118" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">PERMUTATION</text>
+        <text x="220" y="132" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">IMPORTANCE</text>
+      </g>
+
+      <!-- Partial dependence: global, low-mid grounding -->
+      <g>
+        <circle cx="340" cy="170" r="34" fill="#FEF3C7" stroke="#b45309" stroke-width="1.5"/>
+        <text x="340" y="168" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">PARTIAL</text>
+        <text x="340" y="180" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">DEPENDENCE</text>
+      </g>
+
+      <!-- SHAP: spans local-global, high grounding -->
+      <g>
+        <ellipse cx="620" cy="200" rx="80" ry="56" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="620" y="180" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">SHAP</text>
+        <text x="620" y="198" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">local: per-row attribution</text>
+        <text x="620" y="212" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">global: mean(|SHAP|)</text>
+        <text x="620" y="226" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">Shapley axioms</text>
+      </g>
+
+      <!-- LIME: local, low grounding -->
+      <g>
+        <circle cx="260" cy="260" r="36" fill="#FEE2E2" stroke="#dc2626" stroke-width="1.5"/>
+        <text x="260" y="258" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#991b1b">LIME</text>
+        <text x="260" y="272" text-anchor="middle" font-family="Inter" font-size="9" fill="#dc2626">local linear surrogate</text>
+      </g>
+
+      <!-- Notes -->
+      <line x1="100" y1="360" x2="760" y2="360" stroke="#52525b" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="430" y="378" text-anchor="middle" font-family="Inter" font-size="10" fill="#52525b">All four treat $f$ as a callable. SHAP and LIME explain a row; permutation and PDP describe the population.</text>
+    </svg>
+    <figcaption>Permutation importance and partial dependence describe the model globally and rely on perturbing a single column at a time. SHAP and LIME explain an individual prediction, with SHAP also offering a defensible global aggregation. SHAP's theoretical position is unique among the four: it is the only method whose attributions are the unique solution to a stated set of fairness axioms.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The vertical axis (scope) is the operational axis: a permutation importance bar chart goes in the model documentation, a SHAP waterfall plot goes in the adverse-action letter, and they answer different questions for different audiences. The horizontal axis (grounding) is the regulatory axis: methods further to the right are easier to defend under audit because the choice of attribution is forced by the axioms rather than chosen by the modeller. SHAP is the only method that occupies both axes simultaneously, which is most of why it has displaced earlier tools in regulated practice.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Permutation importance</h3>
+
+  <p><strong>Permutation importance</strong> measures how much a model's performance degrades when the values of a single feature are randomly reshuffled across the test set. If the feature carried real signal, the shuffle destroys the relationship between that column and the target, and the performance metric drops. If the feature was noise, the shuffle changes nothing.</p>
+
+  <p>The procedure is unambiguous. Fit a model $f$ on the training set. Compute a baseline performance metric $s_0$ on the test set, where the metric can be accuracy, AUC, $R^2$, log-loss, or anything else that is meaningful for the task. For each feature $j$, repeatedly permute the column $X_j$ across the test rows, leaving all other columns intact, score the model on the shuffled matrix, and record the drop $s_0 - s_j^{(b)}$. The importance of feature $j$ is the mean drop over $B$ repeats,</p>
+  $$I_j = \frac{1}{B} \sum_{b=1}^{B} \left(s_0 - s_j^{(b)}\right).$$
+  <p>The variance across repeats is an honest measure of the uncertainty in the ranking; in practice $B$ between five and thirty repeats is enough to separate signal from noise.</p>
+
+  <p>Two properties make permutation importance the natural baseline. First, it is genuinely model-agnostic: the procedure only uses $f$ as a callable, so the same code works for logistic regression, random forests, gradient-boosted trees, and neural networks. Second, it is computed on held-out data, which makes it unbiased with respect to overfitting. Tree-based "feature importance" measures derived from training-set impurity reduction (the default <code>feature_importances_</code> attribute of scikit-learn random forests, sometimes called Gini importance) are biased toward high-cardinality features and inflated by training-set overfitting; permutation importance computed on the test set has neither defect. The scikit-learn implementation is <code>permutation_importance</code> from <code>sklearn.inspection</code>, which returns the mean drop, the standard deviation, and the per-repeat array for any fitted estimator and any chosen scoring metric.</p>
+
+  <p>The method has two limitations the practitioner has to manage. The first is <strong>correlated features.</strong> If $X_j$ and $X_k$ are strongly correlated and both predictive, permuting $X_j$ alone leaves $X_k$ available to carry the signal, so the model's performance barely drops and $X_j$ looks unimportant. Permute $X_k$ in a separate repeat and the same happens in reverse. The two features share an importance budget that the procedure cannot allocate. The standard remedy is grouped permutation: identify clusters of correlated features (hierarchical clustering on the absolute correlation matrix, threshold around 0.7) and permute the cluster as a block. The reported importance is then a cluster-level statistic, which is honest but coarser.</p>
+
+  <p>The second limitation is that <strong>permutation breaks correlations that the model actually depends on,</strong> creating implausible feature combinations the model has never seen. A model with $\text{age}$ and $\text{years\_employed}$ as features will encounter rows after permutation in which age is 19 and years employed is 35, and the prediction on these synthetic rows is not meaningful. The reported drop conflates the loss of the feature's signal with the loss of the joint distribution, so the importance is overstated. There is no perfect fix; the conditional permutation approach (permute $X_j$ within strata of correlated features) reduces the artefact at the cost of a heavier procedure and a less interpretable output. In regulated practice the standard is to report standard permutation importance with an explicit note flagging correlated clusters.</p>
+
+  <h3>Partial dependence plots</h3>
+
+  <p><strong>Partial dependence</strong> describes the marginal effect of one feature on the prediction, after averaging out the contribution of every other feature. The partial dependence function for feature $j$ is</p>
+  $$\operatorname{PDP}(x_j) = \mathbb{E}_{X_{-j}}\!\left[f(x_j, X_{-j})\right] = \int f(x_j, x_{-j}) \, p(x_{-j}) \, dx_{-j},$$
+  <p>where $X_{-j}$ denotes all features except $j$. In practice the integral is replaced by the empirical average over the test set,</p>
+  $$\widehat{\operatorname{PDP}}(x_j) = \frac{1}{n} \sum_{i=1}^{n} f(x_j, x^{(i)}_{-j}).$$
+  <p>The computation is mechanical. Pick a grid of candidate values for $x_j$ (the column's quantiles, or a uniform grid over its range). For each candidate value, replace column $j$ of the test matrix with that single value, score the model on the modified matrix, and average the predictions. Plotting the resulting averages against the grid gives the partial dependence curve. The shape of the curve is the model's average response to the feature; a positive slope says the prediction rises with the feature on average, a flat curve says the feature has no marginal effect, a non-monotonic curve says the relationship reverses somewhere in the range.</p>
+
+  <p>The PDP is global, in the sense that the curve summarises the model's behaviour across the whole population, and marginal, in the sense that it averages out interactions with the other features. The assumption that breaks if pushed too hard is <strong>independence between $X_j$ and $X_{-j}$.</strong> When the candidate value of $x_j$ is substituted into every row, the procedure constructs rows in which $x_j$ takes any value and $X_{-j}$ takes whatever values were observed empirically; if $X_j$ is correlated with any of the other columns, the resulting synthetic rows are implausible. The PDP is then averaging predictions on points the model has never seen, and the curve can be flat (because the model is interpolating into a region where extrapolation is constant) or wildly non-smooth (because the model is extrapolating idiosyncratically). The rule is to check correlations among features before reading the PDP, and to discount any segment of the curve where the candidate value of $x_j$ falls outside the range that is jointly plausible with the average of $X_{-j}$.</p>
+
+  <p><strong>Individual conditional expectation (ICE) plots</strong> address the second weakness of PDP, which is that the average can hide heterogeneity. An ICE plot draws one curve per observation: for row $i$, replace $x_j^{(i)}$ with each candidate value while holding $x_{-j}^{(i)}$ fixed at the observed values, and trace the resulting prediction. The PDP is the row-wise average of the ICE curves. When the ICE curves are parallel translates of one another, the PDP captures the relationship faithfully; when they cross or fan out, the feature interacts with something else and the PDP is hiding the interaction. Centred ICE plots subtract each curve's value at a reference point so the curves share a common origin, which makes the heterogeneity easier to see. In credit risk practice an ICE plot is the standard diagnostic before publishing a PDP in model documentation; a PDP without an accompanying ICE is incomplete.</p>
+
+  <p><strong>Two-dimensional PDPs</strong> extend the procedure to pairs of features, sweeping a grid over $(x_j, x_k)$ and averaging over the remaining columns. The output is a contour plot or heat map that surfaces pairwise interactions: if the joint surface is the sum of the two marginal PDPs, the features do not interact in the model; if the surface bends, they do. The 2D case is the practical visual limit; three-dimensional PDPs exist but are hard to read and rarely produced.</p>
+
+  <h3>Marginal (M) plots: the same question, without the extrapolation risk</h3>
+
+  <p>The independence assumption behind a PDP, flagged above and in the pitfalls, has a direct fix for any feature where the modeller is unwilling to trust it: replace the synthetic averaging with an average over the <em>observed</em> data. A <strong>marginal plot</strong> (M plot) for feature $j$ bins the test set by the empirical values of $x_j$ (deciles are standard) and, within each bin, computes two quantities directly from the rows that actually fall in it: the average model prediction, and the average observed response. Formally, for a bin $B_k$ of $x_j$-values,</p>
+  $$\operatorname{M}(x_j \in B_k) = \frac{1}{|B_k|}\sum_{i \in B_k} f(x^{(i)}), \qquad \overline{Y}(x_j \in B_k) = \frac{1}{|B_k|}\sum_{i \in B_k} y^{(i)}.$$
+  <p>Because every row entering the average is a real, jointly plausible observation rather than a synthetic substitution, an M plot never extrapolates into implausible feature combinations the way a PDP can. The cost is that an M plot conflates the marginal effect of $x_j$ with the effect of anything $x_j$ happens to be correlated with in the data (if $x_j$ is correlated with $x_k$ and $x_k$ genuinely drives the response, the M plot for $x_j$ will show a spurious-looking slope inherited from $x_k$), which is exactly the opposite failure mode from the PDP's extrapolation risk. The two plots are complementary diagnostics for this reason: read together, a PDP and an M plot that broadly agree is reassuring evidence that neither the independence assumption nor the correlation confound is doing much damage; a PDP and an M plot that diverge sharply flags that one of the two assumptions is being violated and further investigation (checking the correlation structure, restricting the PDP's range to the jointly supported region) is needed before either is trusted. Including the observed-response line alongside the prediction line in the identical M plot, as the formula above does, is additionally a direct visual calibration check in the spirit of the actual-versus-predicted plot used elsewhere in the model-validation toolkit.</p>
+
+  <h3>Measuring interaction strength: the Friedman-Popescu H statistic</h3>
+
+  <p>The two-dimensional PDP surfaces an interaction visually; the <strong>Friedman-Popescu $H$ statistic</strong> (Friedman and Popescu, 2008) gives it a number. If features $j$ and $k$ do not interact in the fitted model, the joint partial dependence function decomposes additively into the two univariate partial dependence functions (each centred to mean zero),</p>
+  $$\operatorname{PDP}_{jk}(x_j, x_k) = \operatorname{PDP}_j(x_j) + \operatorname{PDP}_k(x_k) \quad \text{whenever there is no interaction.}$$
+  <p>The empirical deviation from this additive decomposition, evaluated at each observation and squared and summed, gives the (unnormalised) interaction measure; normalising by the total variability of the joint partial dependence surface gives</p>
+  $$H^2_{jk} = \frac{\sum_i \left[\operatorname{PDP}_{jk}(x_j^{(i)}, x_k^{(i)}) - \operatorname{PDP}_j(x_j^{(i)}) - \operatorname{PDP}_k(x_k^{(i)})\right]^2}{\sum_i \left[\operatorname{PDP}_{jk}(x_j^{(i)}, x_k^{(i)})\right]^2} \in [0, 1],$$
+  <p>read as the proportion of the joint effect's variability attributable to the interaction between $j$ and $k$ specifically, rather than to either feature acting alone. Two practical notes. First, $H^2_{jk}$ can look artificially large when the joint effect itself is weak (a small denominator inflates the ratio), so it is standard practice to also report an unnormalised, absolute version of the statistic on the scale of the predictions themselves, to distinguish "a large share of a negligible effect" from "a large share of a substantial effect". Second, exact computation requires $O(n^2)$ evaluations of the model per feature pair, which becomes prohibitive beyond a few hundred background rows and a handful of candidate feature pairs; in practice $H^2$ is computed on a random background sample of a few hundred rows and restricted to the pairs among the top features already flagged by permutation importance, rather than swept across every possible pair.</p>
+
+  <h3>SHAP: Shapley additive explanations</h3>
+
+  <p><strong>SHAP</strong> attributes a single prediction to its features by treating the prediction as the payout of a cooperative game in which the features are players. The mathematical object is the <strong>Shapley value</strong> from cooperative game theory, originally defined by Lloyd Shapley in 1953 to allocate the value of a cooperative game fairly among its players. Given a value function $v(S)$ that maps each subset of players $S \subseteq N$ to a payout, the Shapley value of player $j$ is</p>
+  $$\phi_j = \sum_{S \subseteq N \setminus \{j\}} \frac{|S|! \, (|N| - |S| - 1)!}{|N|!} \left[v(S \cup \{j\}) - v(S)\right].$$
+  <p>The formula is a weighted average of player $j$'s marginal contribution to every coalition $S$ that does not already contain $j$. The weights are chosen so that all possible orderings of the players are given equal weight, which is the property that makes the allocation fair.</p>
+
+  <p>Applied to a fitted predictor, the features are the players, the prediction $f(x)$ is the payout, and $v(S)$ needs to answer: what would the model predict if only the features in $S$ were known? There are two distinct, defensible ways to answer this, and the choice between them is a genuine modelling decision, not a detail. The <strong>conditional value function</strong>,</p>
+  $$v^{\text{cond}}(S) = \mathbb{E}\!\left[f(X) \mid X_S = x_S\right],$$
+  <p>averages over the true conditional distribution of the missing features given the known ones, respecting whatever dependence exists between them; it is the theoretically purer choice but is itself a genuine, hard estimation problem for a black-box $f$, because the conditional distribution $X_{S^c} \mid X_S$ is not directly observable and has to be approximated (typically by a further model or by a conditional sampling scheme). The <strong>interventional (marginal) value function</strong>,</p>
+  $$v^{\text{interv}}(S) = \mathbb{E}_{Z \sim P}\!\left[f(X_S, Z_{S^c})\right],$$
+  <p>instead averages over the missing features' unconditional (marginal) population distribution, independent of the known features $X_S$, exactly as if the unknown features had been intervened on rather than merely unobserved. This is computationally far simpler (it only requires the ability to sample $Z$ from the training distribution and does not need any conditional model) and is what <code>TreeExplainer</code> and <code>KernelExplainer</code> compute by default in the <code>shap</code> package, despite many introductions to SHAP writing the value function in the conditional form above. The practical consequence mirrors the PDP-versus-M-plot trade-off from earlier in this lecture: the interventional value function can construct implausible feature combinations when features are strongly correlated (the identical extrapolation risk a PDP carries), while the conditional value function respects the dependence structure but is harder to estimate reliably. TreeSHAP offers both a "tree path" mode (interventional, fast, exact) and a "conditional" mode when a background dataset with the true joint distribution is supplied; the choice should be made deliberately and documented, not left to the library default.</p>
+
+  <p>The Shapley value $\phi_j$ for feature $j$ at the input $x$, for whichever value function is chosen, is the contribution of feature $j$ to the deviation between the prediction $f(x)$ and the baseline expectation $\mathbb{E}[f(X)]$. The four axioms of cooperative game theory carry over directly. <strong>Efficiency:</strong> the Shapley values sum to the deviation, $\sum_j \phi_j = f(x) - \mathbb{E}[f(X)]$. <strong>Symmetry:</strong> if two features contribute the same marginal value to every coalition, their Shapley values are equal. <strong>Dummy:</strong> a feature that adds nothing to any coalition gets a Shapley value of zero. <strong>Additivity:</strong> for an ensemble that averages two models, the Shapley value is the average of the two models' Shapley values. SHAP is the unique attribution method that satisfies all four axioms simultaneously; any method that violates one of them is provably distinct from SHAP and can be challenged on that axiom.</p>
+
+  <p>The catch is that the Shapley sum has $2^{|N|}$ terms and is computationally infeasible to evaluate exactly for any non-trivial feature set. Four implementations cover the practical cases. <strong>TreeSHAP</strong> exploits the tree structure of a decision tree, random forest, or gradient-boosted tree to compute exact Shapley values in polynomial time, $O(TLD^2)$ where $T$ is the number of trees, $L$ is the maximum number of leaves, and $D$ is the maximum depth; this is what the <code>shap</code> Python package's <code>TreeExplainer</code> uses for any tree-ensemble model. <strong>LinearSHAP</strong> exploits the linear structure of a linear or logistic regression to compute Shapley values in closed form, with $\phi_j = \beta_j (x_j - \mathbb{E}[X_j])$; the package's <code>LinearExplainer</code> implements this. <strong>KernelSHAP</strong> is the model-agnostic fallback: it approximates the Shapley values by sampling subsets of features, weighting them with a specially chosen kernel, and fitting a weighted linear regression to the perturbed predictions. KernelSHAP is expensive (the cost grows quickly with the number of features) but works for any predictor, including neural networks. There is also <strong>DeepSHAP</strong>, a neural-network-specific approximation that uses backpropagation along a reference baseline, broadly analogous to integrated gradients.</p>
+
+  <div class="defcard tint-lavender">
+    <div class="term">Permutation SHAP and paired sampling</div>
+    <div class="def">A fifth route to the identical Shapley values, useful whenever none of TreeSHAP's, LinearSHAP's, or KernelSHAP's structural assumptions apply, rewrites the Shapley sum as an average over feature orderings rather than over coalitions. For a random permutation $\pi$ of the feature indices, let $C_{\pi,j}$ be the set of features preceding $j$ in $\pi$; the Shapley value equals the average, over all $n!$ orderings, of the marginal contribution of adding $j$ to $C_{\pi,j}$, $\phi_j = \frac{1}{n!}\sum_\pi \left[v(C_{\pi,j} \cup \{j\}) - v(C_{\pi,j})\right]$. Sampling $K$ random orderings and averaging the marginal contribution of each feature as it is added gives <strong>permutation (Monte Carlo) SHAP</strong>, an unbiased estimator with no restriction on the model class. Evaluating each sampled ordering together with its exact reverse, <strong>paired-sampling permutation SHAP</strong>, substantially reduces the estimator's variance for a fixed computational budget and, for value functions with only pairwise (no higher-order) interactions, recovers the exact Shapley values from a single ordering and its reverse. This is the standard fallback in the <code>shap</code> package's <code>PermutationExplainer</code> for model classes that KernelSHAP handles poorly (very high-dimensional inputs) or where an interventional TreeSHAP-style shortcut is unavailable.</div>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A SHAP waterfall plot showing how features push a single prediction from baseline to final value">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A SHAP waterfall: how features push one prediction from baseline to final score</text>
+      <text x="410" y="40" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">Predicted PD = 0.18, baseline E[f(X)] = 0.07, deviation = +0.11</text>
+
+      <!-- Baseline bar -->
+      <rect x="100" y="80" width="160" height="22" fill="#E4E4E7" stroke="#52525b" stroke-width="1"/>
+      <text x="180" y="96" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#27272a">baseline 0.070</text>
+
+      <!-- Feature 1: loan_to_income +0.05 (red, pushes up) -->
+      <rect x="260" y="120" width="100" height="22" fill="#FCA5A5" stroke="#991b1b" stroke-width="1"/>
+      <text x="20" y="136" font-family="Inter" font-size="10" fill="#52525b">loan_to_income = 4.8</text>
+      <text x="370" y="136" font-family="Inter" font-size="10" font-weight="600" fill="#991b1b">+0.050</text>
+
+      <!-- Feature 2: months_since_default +0.04 (red) -->
+      <rect x="260" y="155" width="80" height="22" fill="#FCA5A5" stroke="#991b1b" stroke-width="1"/>
+      <text x="20" y="171" font-family="Inter" font-size="10" fill="#52525b">months_since_default = 6</text>
+      <text x="370" y="171" font-family="Inter" font-size="10" font-weight="600" fill="#991b1b">+0.040</text>
+
+      <!-- Feature 3: credit_utilisation +0.035 (red) -->
+      <rect x="260" y="190" width="70" height="22" fill="#FCA5A5" stroke="#991b1b" stroke-width="1"/>
+      <text x="20" y="206" font-family="Inter" font-size="10" fill="#52525b">credit_utilisation = 0.88</text>
+      <text x="370" y="206" font-family="Inter" font-size="10" font-weight="600" fill="#991b1b">+0.035</text>
+
+      <!-- Feature 4: employment_years -0.01 (blue, pushes down) -->
+      <rect x="240" y="225" width="20" height="22" fill="#93C5FD" stroke="#1e3a8a" stroke-width="1"/>
+      <text x="20" y="241" font-family="Inter" font-size="10" fill="#52525b">employment_years = 9</text>
+      <text x="370" y="241" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">-0.010</text>
+
+      <!-- Feature 5: savings_balance -0.005 (blue) -->
+      <rect x="250" y="260" width="10" height="22" fill="#93C5FD" stroke="#1e3a8a" stroke-width="1"/>
+      <text x="20" y="276" font-family="Inter" font-size="10" fill="#52525b">savings_balance = £4,200</text>
+      <text x="370" y="276" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">-0.005</text>
+
+      <!-- Final bar -->
+      <rect x="100" y="300" width="380" height="22" fill="#FECACA" stroke="#7f1d1d" stroke-width="1.5"/>
+      <text x="290" y="316" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">f(x) = 0.180</text>
+
+      <!-- Right-hand panel: properties -->
+      <rect x="540" y="70" width="240" height="240" rx="8" fill="#FAFAFA" stroke="#D4D4D8" stroke-width="1"/>
+      <text x="560" y="92" font-family="Inter" font-size="11" font-weight="700" fill="#27272a">The four axioms in this picture</text>
+      <text x="560" y="118" font-family="Inter" font-size="10" fill="#52525b">Efficiency: bars sum to 0.110,</text>
+      <text x="560" y="132" font-family="Inter" font-size="10" fill="#52525b">closing the gap from 0.070 to 0.180.</text>
+      <text x="560" y="156" font-family="Inter" font-size="10" fill="#52525b">Symmetry: two features with equal</text>
+      <text x="560" y="170" font-family="Inter" font-size="10" fill="#52525b">marginal contribution get equal bars.</text>
+      <text x="560" y="194" font-family="Inter" font-size="10" fill="#52525b">Dummy: a feature that never moves</text>
+      <text x="560" y="208" font-family="Inter" font-size="10" fill="#52525b">the prediction has a zero-length bar.</text>
+      <text x="560" y="232" font-family="Inter" font-size="10" fill="#52525b">Additivity: for an ensemble, the bar</text>
+      <text x="560" y="246" font-family="Inter" font-size="10" fill="#52525b">is the average of the components'.</text>
+      <text x="560" y="278" font-family="Inter" font-size="10" font-style="italic" fill="#71717a">SHAP is the unique allocation</text>
+      <text x="560" y="292" font-family="Inter" font-size="10" font-style="italic" fill="#71717a">satisfying all four together.</text>
+    </svg>
+    <figcaption>A SHAP waterfall plot for a single declined application. The grey bar is the population baseline. Red bars are features pushing the predicted PD upward, blue bars are features pushing it downward, and their lengths sum (by the efficiency axiom) to the deviation between baseline and final prediction. This artefact is the basis of the adverse-action letter: the three or four largest red bars name the reasons for the decline, in language a customer can act on.</figcaption>
+  </figure>
+
+  <p>SHAP's local outputs aggregate to a global summary in a natural way. The <strong>global importance of feature $j$</strong> is the mean absolute SHAP value across the population,</p>
+  $$I_j^{\text{SHAP}} = \frac{1}{n} \sum_{i=1}^{n} \left| \phi_j^{(i)} \right|.$$
+  <p>This quantity has the same units as the prediction and is directly comparable across features. The <code>shap.summary_plot</code> visualisation, universally known by its shape as the <strong>beeswarm plot</strong>, shows every observation's SHAP value for every feature as a single point, features stacked vertically and ordered by global importance, coloured by the feature's own value (typically low to high on a blue-to-red scale) and jittered vertically within each feature's row so overlapping points fan out like a swarm rather than stacking invisibly on top of each other. Reading a beeswarm plot answers three questions simultaneously that a bar chart of mean absolute SHAP values cannot: which features matter most (the vertical ordering), which direction each feature pushes the prediction (the horizontal position, left of zero versus right), and whether that direction depends on the feature's own value (the colour gradient within each row, a clean colour separation left-to-right meaning a monotonic relationship, a mixed or reversed pattern meaning the feature's effect depends on something else, an interaction the plot flags without naming). The <strong>dependence plot</strong> scatters SHAP value against feature value for one feature at a time, with optional colouring by a second feature to expose interactions; it is the SHAP analogue of a partial dependence plot and is preferred over PDP in regulated settings because the points are real data rather than synthetic averages. The <strong>force plot</strong> arranges the SHAP values of a single row in a horizontal bar showing the push from baseline to prediction; the <strong>waterfall plot</strong> is the same information arranged vertically, which is what auditors and customers find easier to read.</p>
+
+  <p>Two practical points close the SHAP discussion. First, the baseline matters: the choice of $\mathbb{E}[f(X)]$ defines what "average" means in the explanation, and TreeSHAP defaults to the empirical mean over the explainer's background dataset. A background dataset that does not match the production population produces SHAP values whose interpretation is misleading even when the arithmetic is correct, which is the failure mode in the vignette. Second, the <code>shap</code> Python package is the standard implementation; <code>shap.TreeExplainer</code> handles xgboost, lightgbm, scikit-learn tree ensembles, and catboost out of the box, and <code>shap.Explainer</code> is the auto-selecting top-level interface that dispatches to the right backend.</p>
+
+  <h3>LIME: local interpretable model-agnostic explanations</h3>
+
+  <p><strong>LIME</strong> explains a single prediction by fitting a sparse linear surrogate model in a small neighbourhood around the input. The procedure is short to state. Pick the input $x^*$ to be explained. Sample synthetic points $\tilde{x}^{(1)}, \ldots, \tilde{x}^{(M)}$ around $x^*$ by perturbing each feature; for continuous features this is typically a Gaussian draw around the observed value, for categorical features a multinomial draw from the empirical distribution of levels. Score the predictor on each synthetic point to obtain $f(\tilde{x}^{(m)})$. Assign each synthetic point a proximity weight $\pi_{x^*}(\tilde{x}^{(m)})$, usually an exponential kernel on the distance from $x^*$,</p>
+  $$\pi_{x^*}(\tilde{x}) = \exp\!\left(-\frac{d(x^*, \tilde{x})^2}{\sigma^2}\right).$$
+  <p>Fit a sparse linear model (lasso or ridge) to the weighted dataset of $(\tilde{x}^{(m)}, f(\tilde{x}^{(m)}))$, optimising</p>
+  $$\hat{g} = \arg\min_{g \in G} \sum_{m=1}^{M} \pi_{x^*}(\tilde{x}^{(m)}) \left(f(\tilde{x}^{(m)}) - g(\tilde{x}^{(m)})\right)^2 + \Omega(g),$$
+  <p>where $G$ is the class of linear models and $\Omega(g)$ is a sparsity penalty (typically L1, to force a small number of non-zero coefficients). The fitted coefficients of $\hat{g}$ are the local explanation: feature $j$'s coefficient is the local marginal effect of $x_j$ on the prediction in the neighbourhood of $x^*$. The <code>lime</code> Python package's <code>LimeTabularExplainer</code> is the standard implementation.</p>
+
+  <p>LIME's appeal is intuitive: a linear approximation around a point is what calculus is built on, and a sparse linear approximation around a customer's profile gives a short list of "the three or four features that explain this decision". The implementation is genuinely model-agnostic and works for tabular data, text, and images (where the perturbation is over superpixels rather than columns). The output of <code>explanation.show_in_notebook()</code> is a customer-readable bar chart of contributions, comparable in spirit to a SHAP waterfall.</p>
+
+  <p>LIME's limitations are why it has lost ground to SHAP in regulated settings. The most damaging is <strong>instability:</strong> two runs of LIME on the same input with different random seeds for the perturbation step can produce visibly different coefficient lists, sometimes flipping the sign of a top feature. Stability across re-runs is not optional in production; an explanation that disagrees with itself between two batches of adverse-action letters is not a defensible explanation. The cause is structural: LIME's perturbation distribution is a hyperparameter (Gaussian standard deviation, sample size, kernel width), and small changes in those hyperparameters change the local model's fit. SHAP's instability budget is far smaller because the Shapley axioms pin down the answer to a unique value, with sampling variance the only remaining randomness. The second limitation is the <strong>choice of proximity kernel:</strong> the kernel width $\sigma$ controls how local "local" is, and there is no principled way to choose it; different widths produce different explanations of the same prediction, and the modeller's choice is unconstrained. The third is that LIME's surrogate is <strong>only locally faithful</strong> by construction; aggregating LIME explanations across the population to obtain a global summary is not a valid operation because the local surrogates are fit independently and their coefficients are not comparable across points.</p>
+
+  <p>The summary verdict in regulated practice is that LIME is a defensible exploratory tool but rarely the production explainer. Where SHAP applies (any tree ensemble, any linear model, any neural network with a manageable feature set), it wins on every axis that matters to a model risk committee: theoretical grounding, stability, global aggregation, and clarity of the artefact handed to the customer or the auditor. Where SHAP genuinely does not apply (text or image models with vocabulary or pixel features in the thousands, where KernelSHAP is computationally hopeless), LIME remains useful as a sanity-check on individual predictions, with the proviso that the documentation explicitly flags the instability.</p>
+
+  <h3>Comparison of the four methods</h3>
+
+  <p>The table below collects the operational distinctions the previous subsections covered, in a form that a model owner can hand to a validator. The "regulatory acceptability" column reflects the practical position in UK and EU credit risk supervision as of 2026; the column is not a property of the method but of the regulatory environment, and is subject to change as supervisory expectations evolve.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Scope</th>
+          <th>Model assumption</th>
+          <th>Output</th>
+          <th>Cost</th>
+          <th>Regulatory acceptability</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Permutation importance</strong></td>
+          <td>Global</td>
+          <td>None; treats $f$ as a callable</td>
+          <td>Feature ranking by mean drop in test-set metric</td>
+          <td>Low; $B \times p$ scoring passes</td>
+          <td>Universally accepted as a sanity check</td>
+        </tr>
+        <tr>
+          <td><strong>Partial dependence (with ICE)</strong></td>
+          <td>Global, marginal</td>
+          <td>Approximate independence of $X_j$ and $X_{-j}$</td>
+          <td>Marginal-effect curve per feature; ICE curves per row</td>
+          <td>Moderate; grid size $\times$ test-set size</td>
+          <td>Accepted with explicit independence check</td>
+        </tr>
+        <tr>
+          <td><strong>SHAP</strong></td>
+          <td>Local and global</td>
+          <td>None for TreeSHAP and LinearSHAP; sampling for KernelSHAP</td>
+          <td>Per-row attributions summing to deviation from baseline; global aggregates by mean absolute value</td>
+          <td>Low for trees and linear; high for KernelSHAP</td>
+          <td>De facto standard for adverse-action reasoning in credit</td>
+        </tr>
+        <tr>
+          <td><strong>LIME</strong></td>
+          <td>Local</td>
+          <td>Local linearity of $f$ around $x^*$</td>
+          <td>Sparse linear coefficients local to one prediction</td>
+          <td>Moderate; perturbation sample $\times$ scoring</td>
+          <td>Exploratory only; rarely accepted in production explainers</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Five failure modes account for almost every interpretation-related production incident. Each is invisible at validation time, obvious in retrospect, and increasingly something model risk committees actively look for.</p>
+
+  <div class="callout warn">
+    <span class="tag">Reporting tree-based feature importance as a final ranking</span>
+    The default <code>feature_importances_</code> on a scikit-learn random forest or gradient-boosted tree is mean impurity decrease, computed on training data. It is biased toward high-cardinality features (a postcode column with thousands of levels will dominate the ranking regardless of true predictive power), inflated by training-set overfitting, and silently agnostic to the test-set metric the model is actually optimising. Use permutation importance on the test set as the headline ranking and cite the tree-internal importance only as a corroborating diagnostic. Any model documentation that ranks features by training-set impurity reduction will be challenged at validation.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Partial dependence beyond the joint support of the features</span>
+    A PDP for $\text{loan\_amount}$ swept from £1,000 to £1,000,000 will dutifully produce a curve across the full range; the rows constructed at the £1,000,000 candidate value will pair that loan amount with the empirical distribution of incomes, employment lengths, and credit utilisations, most of which are not jointly plausible with a £1,000,000 loan. The model has no training data in that region and the prediction is whatever the model's extrapolation logic produces. The fix is to clip the PDP's x-axis to the percentile range that is jointly supported (a 5th-to-95th percentile rule is conservative; combine with an explicit visual of the feature's empirical distribution under the curve) and to flag any segment of the curve that depends on extrapolation.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">SHAP baselines that drift from the production population</span>
+    The vignette in section 2 is this pitfall in operational form. SHAP attributions are deviations from a baseline $\mathbb{E}[f(X)]$ that is computed over the background dataset passed to the explainer. If the background dataset is the development sample but the production population has drifted (a higher approval rate, a different segment mix, a shifted feature distribution), the baseline is stale and the local SHAP values are technically correct against a baseline that no longer matches reality. The adverse-action reasoning that flows from those values is then misleading to the customer. The fix is to monitor the explainer's background dataset as a model artefact, refresh on the same schedule as the model, and document the baseline date alongside the explanation.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">LIME instability across random seeds</span>
+    LIME's perturbation step is stochastic; two runs with different random seeds will produce different sparse linear models and different top-feature lists. If a LIME explanation is the basis of an adverse-action letter, two letters generated on consecutive days for the same applicant can list different reasons. The fix is to either fix the random seed (which suppresses the symptom but does not address the cause) or, preferably, to replace LIME with SHAP for any artefact that is going to a customer. Where LIME survives in production, the documentation must include a stability analysis (typically by re-running across a grid of seeds and reporting the rank correlation of top-five features).
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating model-agnostic methods as causal claims</span>
+    Every method in this lecture describes the model's behaviour, not the world's. A SHAP value of $+0.05$ on $\text{credit\_utilisation}$ says the model's prediction is higher for this customer because credit utilisation is high; it does not say that reducing credit utilisation would reduce the customer's true default probability. The model may have learned a spurious correlation; the feature may be a proxy for an unobserved confounder; the relationship may not be invariant to the intervention. Causal claims need the apparatus from <a href="../03_supervised_learning/06-causal_models.html">lecture 34</a>, which is different in kind from anything in this lecture. The single most damaging misuse of SHAP in retail credit is to treat the explanation as financial advice ("we declined you because of credit utilisation, so pay down your cards"); the bank may be making a claim it cannot defend.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Model-agnostic interpretation is the sixth and final stage of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>, and the stage that has changed most over the last decade. Four methods do almost all of the practical work. Permutation importance gives a global, unbiased ranking of features by their contribution to the model's performance metric, at the cost of confusing correlated features and creating implausible feature combinations during the shuffle. Partial dependence describes the marginal effect of a feature on the prediction, with ICE plots exposing the heterogeneity the average hides, on the assumption that the feature is approximately independent of the others. SHAP attributes each prediction to its features through Shapley values, the unique allocation satisfying efficiency, symmetry, dummy, and additivity; it produces both local explanations and a defensible global aggregation, and is the de facto regulatory standard for credit-risk adverse-action reasoning. LIME explains a single prediction by fitting a sparse linear surrogate locally, which is intuitive but unstable across re-runs and rarely accepted in production explainers where SHAP applies. The choice among the four is not editorial; the regulatory environment, the model class, and the audience for the artefact each constrain the choice, and SHAP wins more often than not.</p>
+
+  <p>This lecture closes the machine learning course. The six pipeline stages, taken end to end, are the spine of every supervised modelling project: feature engineering (sub-module 01) prepares the matrix; dimensionality reduction (also sub-module 01) controls its width; train/test/validation splitting (sub-module 02) protects against leakage; supervised, unsupervised, and deep learning methods (sub-modules 03 to 05) fit the predictor; hyperparameter tuning (sub-module 06) selects the best configuration; evaluation (sub-module 07) measures performance; interpretation (this sub-module) recovers the human-readable account that lets the model be deployed in any setting where a customer, an auditor, or a supervisor will demand one. A model that traverses all six stages without a leak, an overfit, an unmeasured failure mode, or an unexplainable prediction is a model that ships. Most of the failures in production are at the seams between stages, which is why the pipeline framing is doing more work than any single technique.</p>
+
+  <p>The natural continuation is the credit risk modelling track in the applied curriculum, where these six stages are operationalised under the regulatory documentation expectations of A-IRB capital modelling, IFRS 9 expected credit loss, and application scorecards. The track at <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">credit risk modelling</a> picks up where this course ends: the same six-stage pipeline, the same techniques, with the added constraints of supervisory documentation, monotonic binning, regulatory backtesting, and lifetime point-in-time conversion. SHAP in particular is now embedded in IFRS 9 ECL model documentation as the standard local-explanation method, and the credit-risk track develops that integration in operational detail. The actuarial syllabus (F107) and the applied work converge on the same toolkit; this course has built the foundation in domain-agnostic form, and the applied track puts it under regulatory load.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the permutation importance procedure in three sentences, naming the metric, the population on which the procedure is run, and the standard remedy for correlated features.</li>
+      <li>You build a PDP for $\text{loan\_amount}$ in a retail PD model and the curve is essentially flat for loan amounts above £150,000, despite a clear signal in the data. Name two distinct mechanisms that could produce a flat segment in a PDP and how you would distinguish between them.</li>
+      <li>State the four axioms that uniquely characterise the Shapley value. For a binary classifier with $f(x) = 0.32$, $\mathbb{E}[f(X)] = 0.12$, and three features with SHAP values $\phi_1 = 0.10$ and $\phi_2 = 0.07$, what must $\phi_3$ equal? Name the axiom that forces this answer.</li>
+      <li>Why is TreeSHAP polynomial-time exact while KernelSHAP is sampling-based and expensive? In a SHAP-based adverse-action pipeline on a LightGBM PD model with 60 features, which explainer should you choose and why?</li>
+      <li>A colleague proposes generating a global feature ranking by averaging LIME coefficients across the population. Explain in one paragraph why this is not a valid operation and what the SHAP analogue is.</li>
+      <li>The SHAP TreeExplainer in production was built on the model development sample and has not been refreshed in eighteen months; the approval rate has drifted upward by 8 percentage points since then. What is the operational risk, and what is the fix?</li>
+      <li>A regulator asks why your gradient-boosted PD model attributes $+0.04$ of the predicted PD to "months since last enquiry" for a particular declined applicant, given that the applicant has not made an enquiry in 14 months. Explain how you would use the SHAP dependence plot to corroborate or challenge the local attribution.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 40 (<a href="02-model_specific_methods.html">model-specific methods</a>) covered the interpretation tools that come for free with linear models, decision trees, and ensembles: coefficients, odds ratios, tree splits, internal impurity-decrease importance. The current lecture picks up where those tools stop, which is every model class where the internal structure is too rich to read directly.</li>
+      <li><strong>Framing:</strong> Lecture 39 (<a href="01-explaining_models.html">explaining models</a>) set the white-box vs black-box distinction and the regulatory expectations that decide which methods are admissible. The four methods in this lecture are the black-box toolkit that framing made necessary.</li>
+      <li><strong>Models being explained:</strong> The non-linear ensembles from <a href="../03_supervised_learning/05-ensemble_learning.html">lecture 32</a> and the neural networks from <a href="../05_deep_learning/01-neural_networks.html">lecture 35</a> are the principal targets of these methods; both are too rich to be interpretable by construction, and both are the model classes where SHAP and permutation importance earn their keep.</li>
+      <li><strong>Causality:</strong> The methods in this lecture explain the model, not the world. Causal interpretation needs the apparatus from <a href="../03_supervised_learning/06-causal_models.html">lecture 34</a>, which separates association in the model from intervention on the underlying system. Treating a SHAP value as a causal effect is the single most damaging misreading of the toolkit.</li>
+      <li><strong>Outside this course:</strong> The applied <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">credit risk modelling</a> track operationalises these methods under supervisory documentation requirements. SHAP is the standard for adverse-action reasoning in A-IRB and IFRS 9; permutation importance is the standard sanity check in model validation packs; partial dependence with ICE is the standard diagnostic for monotonicity in regulated scorecards. The track is the next step after this course.</li>
+      <li><strong>Calibration companion:</strong> This lecture asks why a model scores a prediction the way it does; a related but distinct question, whether the level of that score is correct, is developed in sub-module 09, <a href="../09_forecast_evaluation/index.html">calibration and forecast evaluation</a>. A model can have a perfectly defensible SHAP explanation for a prediction that is, at the same time, badly miscalibrated; the two diagnostics are complementary, not substitutes.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Model interpretation course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 41 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

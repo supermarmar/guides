@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 44: non-parametric recalibration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Calibration</a></div>
+  <h1>Non-parametric recalibration</h1>
+  <p class="subtitle">Lecture 43 defined the recalibration step $\mu^{\text{rc}}(X) = E[Y \mid \mu(X)]$ and asserted it is always auto-calibrated. This lecture supplies the two standard ways to actually estimate it from data: local regression, a flexible but hyperparameter-sensitive smoother, and isotonic regression, a rank-preserving, hyperparameter-free alternative solved by the pool-adjacent-violators algorithm. Isotonic regression is the production default for a specific, provable reason: it repairs a model's calibration without touching its ranking of risks, the one property a recalibration step must never disturb.</p>
+  <div class="meta">
+    <span>Lecture 44 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part VII: calibration and forecast evaluation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Local regression</strong> estimates $\mu^{\text{loc}}(x)$ by fitting a low-order polynomial (typically quadratic) to the subset of observations whose covariate lies in a window around $x$, down-weighting observations near the edge of the window with a tricube kernel; the window width is a hyperparameter, the <strong>nearest-neighbour fraction</strong> $\alpha$, and the fit is sensitive to it in both directions: too narrow and the curve chases noise, too wide and it smooths over genuine structure. <strong>Isotonic regression</strong> estimates the same quantity under a single structural assumption, monotonicity ($X_i \leq X_{i'} \Rightarrow \mu(X_i) \leq \mu(X_{i'})$), and needs no bandwidth at all: the constrained least-squares problem it solves has a unique, exactly-computable solution via the <strong>pool-adjacent-violators (PAV) algorithm</strong>, which merges neighbouring groups of observations whenever their sample means violate monotonicity, until the entire sequence is monotone. Applied to the recalibration problem of lecture 43, with $X$ replaced by the original model's own prediction $\mu(X)$, isotonic regression produces a recalibrated function that is provably auto-calibrated, satisfies the balance property automatically, and preserves the original model's ranking exactly, because a monotone transformation of a score cannot reorder it. This is why isotonic regression, not local regression, is the standard tool for repairing calibration in production.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You have a model's raw scores for a thousand borrowers, sorted from safest to riskiest, and you know the scores are somewhat miscalibrated, the actual default rate does not quite match what the scores claim at every point along the scale. You want to fix the levels without ever changing which borrower is riskier than which other borrower, because the ranking is the genuinely hard-won part of the model and the levels are just a scaling problem. Isotonic regression is exactly the tool built for this: it finds the closest possible step function to the actual outcomes that never reorders the sequence, guaranteeing the fix touches only the levels and never the order.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture supplies the machinery lecture 43 promised: a concrete, computable estimator of $E[Y \mid \mu(X)]$. It also revisits two general-purpose non-parametric regression tools, useful well beyond recalibration, and closes the calibration half of this sub-module before the discrimination half begins with the Gini score.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the choice between these two tools is not a matter of taste.</p>
+
+  <p>First, <strong>a recalibration step that disturbs the model's ranking has undone the model's genuine work</strong>. If a lender's PD model correctly identifies that borrower A is riskier than borrower B, a post-hoc calibration fix that reverses this ordering to improve an aggregate calibration statistic has made the model worse where it matters most for a credit decision, which is precisely the ranking. Isotonic regression is the tool that structurally cannot do this; local regression carries no such guarantee.</p>
+
+  <p>Second, <strong>a hyperparameter-free method is a materially lower-risk choice in a regulated context</strong>. Every choice a modeller makes that requires tuning (a bandwidth, a nearest-neighbour fraction) is a choice a validator will ask to see justified, and a choice that can be gamed, deliberately or not, to produce a more flattering-looking calibration curve. Isotonic regression removes this entire category of challenge from the conversation.</p>
+
+  <p>Third, <strong>the isotonic recalibration step is not just convenient, it is provably correct for the job</strong>: it produces an auto-calibrated function by construction, a claim this lecture proves rather than asserts, which means passing the actual-versus-predicted check from lecture 43 after an isotonic recalibration is not an accident to be re-verified, it is guaranteed.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team recalibrating a churn-risk score used local regression with a bandwidth selected by eyeballing "what looked smooth" on a single validation plot. The resulting recalibrated score reordered roughly six per cent of customers relative to the original ranking, entirely a side-effect of the smoothing bandwidth rather than any genuine change in relative risk, and this reordering was only caught when a downstream retention-offer allocation process flagged customers receiving offers inconsistent with their original risk tier. Switching to isotonic recalibration eliminated the reordering entirely, by construction, and the resulting curve needed no bandwidth justification in the model documentation.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold two contrasting pictures: a smooth local-regression curve whose shape depends on a tunable window, and a jagged isotonic step function built by merging neighbouring groups until nothing violates monotonicity, with no tunable knob at all.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Local regression versus isotonic regression as two recalibration estimators">
+      <defs>
+        <marker id="nprArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two estimators of the recalibration step E[Y | μ(X)]</text>
+
+      <g transform="translate(40, 55)">
+        <rect x="0" y="0" width="380" height="255" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="190" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Local regression</text>
+        <line x1="30" y1="220" x2="350" y2="220" stroke="#92400e" stroke-width="1"/>
+        <line x1="30" y1="220" x2="30" y2="50" stroke="#92400e" stroke-width="1"/>
+        <path d="M 40 190 Q 120 130 190 120 T 340 70" fill="none" stroke="#b45309" stroke-width="2.5"/>
+        <circle cx="60" cy="205" r="3" fill="#78716c"/>
+        <circle cx="90" cy="175" r="3" fill="#78716c"/>
+        <circle cx="130" cy="150" r="3" fill="#78716c"/>
+        <circle cx="170" cy="135" r="3" fill="#78716c"/>
+        <circle cx="210" cy="110" r="3" fill="#78716c"/>
+        <circle cx="260" cy="95" r="3" fill="#78716c"/>
+        <circle cx="310" cy="80" r="3" fill="#78716c"/>
+        <text x="190" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">shape depends on bandwidth α; no rank guarantee</text>
+      </g>
+
+      <g transform="translate(460, 55)">
+        <rect x="0" y="0" width="380" height="255" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="190" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Isotonic regression (PAV)</text>
+        <line x1="30" y1="220" x2="350" y2="220" stroke="#115e59" stroke-width="1"/>
+        <line x1="30" y1="220" x2="30" y2="50" stroke="#115e59" stroke-width="1"/>
+        <path d="M 30 200 L 100 200 L 100 165 L 190 165 L 190 130 L 250 130 L 250 95 L 320 95 L 320 65 L 350 65" fill="none" stroke="#0d9488" stroke-width="2.5"/>
+        <circle cx="60" cy="205" r="3" fill="#78716c"/>
+        <circle cx="90" cy="195" r="3" fill="#78716c"/>
+        <circle cx="130" cy="150" r="3" fill="#78716c"/>
+        <circle cx="170" cy="170" r="3" fill="#78716c"/>
+        <circle cx="210" cy="110" r="3" fill="#78716c"/>
+        <circle cx="260" cy="100" r="3" fill="#78716c"/>
+        <circle cx="310" cy="80" r="3" fill="#78716c"/>
+        <text x="190" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">no hyperparameter; step function, exactly rank-preserving</text>
+      </g>
+    </svg>
+    <figcaption>Local regression (left) fits a smooth quadratic spline within a sliding window, weighted by a tricube kernel, with the window width chosen by the modeller. Isotonic regression (right) makes no smoothness assumption and no bandwidth choice; it merges adjacent groups of observations whose sample means would otherwise violate monotonicity, via the pool-adjacent-violators algorithm, producing a step function that is, by construction, never out of order relative to the original scores.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Local regression trades a hyperparameter for smoothness; isotonic regression trades smoothness for a guarantee.</strong> Neither is strictly superior; the guarantee (rank preservation, no tuning) is what makes isotonic regression the default for recalibration specifically, where preserving the model's ranking is the priority. <strong>Isotonic regression is PAV, and PAV is just averaging until it behaves.</strong> Every operation the algorithm performs is a weighted mean of adjacent groups; the only cleverness is knowing which groups to merge and when to stop.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Local regression: bandwidth, tricube weights, and the bias-variance trade-off</h3>
+
+  <p>To estimate a value $\mu^{\text{loc}}(x)$ at a fixed point $x$ using a one-dimensional covariate (here, the original model's score $\mu(X)$), select a bandwidth $\Delta(x) &gt; 0$ defining the smoothing window $(x - \Delta(x), \, x + \Delta(x))$, and a weighting function, typically the <strong>tricube kernel</strong> $w(u) = (1 - |u|^3)^3$ on $u \in [-1, 1]$, applied to the relative distance $u_i = (X_i - x)/\Delta(x)$ of each observation inside the window. Fitting a low-order polynomial (a quadratic is standard) by weighted least squares within the window, and evaluating it at $x$, gives $\mu^{\text{loc}}(x)$.</p>
+
+  <p>The bandwidth is chosen as a <strong>nearest-neighbour fraction</strong> $\alpha \in (0, 1]$: the fraction of the total sample that falls inside the smoothing window at each point. Small $\alpha$ means a narrow window; the fit chases the noise in the handful of nearby points and becomes highly variable. Large $\alpha$ means a wide window; the fit averages over a broad range and can smooth away genuine local structure, introducing bias. There is no formula that hands you the correct $\alpha$; it is selected by cross-validation or by inspection, and different reasonable choices of $\alpha$ can produce visibly different recalibration curves from the identical data, the practical liability section 2 raised.</p>
+
+  <h3>Isotonic regression: the constrained optimisation problem</h3>
+
+  <p>Assume, without loss of generality, that observations are labelled so that $X_1 &lt; X_2 &lt; \ldots &lt; X_n$ (ties are handled by merging tied observations into a single instance with combined weight and weighted-mean response before proceeding). The <strong>isotonic regression</strong> solution is</p>
+
+  $$\hat\mu^{\text{iso}} = \arg\min_{\mu_1 \leq \mu_2 \leq \ldots \leq \mu_n} \sum_{i=1}^n v_i (Y_i - \mu_i)^2,$$
+
+  <p>the closest sequence, in weighted squared-error distance, to the observed responses, subject to the sequence being non-decreasing. Crucially, the identical solution is obtained regardless of which strictly consistent loss function (in the sense of the statistics track's lecture on that topic) is used in place of the square loss above; the isotonic solution is a genuinely rank-based construction, not an artefact of the square-loss choice.</p>
+
+  <div class="defcard tint-mint">
+    <div class="term">The pool-adjacent-violators algorithm</div>
+    <div class="def">PAV solves the constrained problem exactly and efficiently. Initialise with every observation as its own group. Scan the groups in order; whenever a group's weighted mean exceeds the following group's weighted mean (a "violation" of monotonicity), merge the two groups into one, replacing them with a single group whose response is the combined weighted mean and whose weight is the sum of the two weights. Repeat the scan from the point of the merge, because a merge can create a new violation with the group before it, until no violations remain. The resulting sequence of group means is the isotonic regression solution, and it is unique.</div>
+  </div>
+
+  <p>Applied to the recalibration problem, the covariate in the isotonic regression is the original model's own prediction $\mu(X_t)$ on the test sample, and the response is the observed outcome $Y_t$; the resulting step function $X \mapsto \hat\mu^{\text{iso}}$ is the recalibrated model. Because the algorithm never reorders the sequence of group means relative to the sequence of predictions that generated them, the recalibrated function preserves the original ranking exactly: if $\mu(X_i) &lt; \mu(X_{i'})$, then $\hat\mu^{\text{iso}}(X_i) \leq \hat\mu^{\text{iso}}(X_{i'})$, always.</p>
+
+  <h3>Why the isotonic recalibration step is automatically auto-calibrated</h3>
+
+  <p>Within each group the PAV algorithm settles on, the group's fitted value is exactly the group's own weighted-mean response, by construction. This means the recalibrated function satisfies</p>
+
+  $$\hat\mu^{\text{iso}}(X_i) = \frac{\sum_j v_j Y_j \, \mathbb{1}\{\hat\mu^{\text{iso}}(X_j) = \hat\mu^{\text{iso}}(X_i)\}}{\sum_j v_j \, \mathbb{1}\{\hat\mu^{\text{iso}}(X_j) = \hat\mu^{\text{iso}}(X_i)\}},$$
+
+  <p>which is exactly the empirical version of the auto-calibration identity from lecture 43, group by group. This is not a coincidence to be checked after the fact; it is a direct consequence of how PAV constructs its groups, and it is the formal reason isotonic recalibration is guaranteed to pass the actual-versus-predicted test that motivated this whole sub-module, as well as the portfolio-wide balance property from lecture 42 (which is the special case of a single group covering everyone).</p>
+
+  <h3>Three practical caveats</h3>
+
+  <p>Isotonic recalibration comes with three limitations worth naming explicitly, none of which outweighs its advantages for the recalibration use case but all of which affect how it is deployed. First, the recalibrated function <strong>drops out of the original model class</strong>: even if the original model was a GLM, the isotonic-recalibrated version is a non-parametric step function, no longer explainable by a set of coefficients and harder to adjust manually if expert judgement needs to override a specific segment. Second, the raw output is a <strong>discontinuous step function</strong>, which is not always acceptable for a customer-facing quoted price; the standard remedy is to replace the step function with a linear interpolation between the group means, restoring continuity without disturbing the ranking. Third, the algorithm tends to <strong>over-fit at the extremes</strong> of the covariate range, where the lowest and highest groups can end up defined by very few observations; the standard practice is to manually merge the smallest and largest few bins to avoid the resulting instability, exactly analogous to the fine-binning pitfall the actual-versus-predicted plot warned against in lecture 43.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Treating recalibration as a fix for a badly ranked model</span>
+    Both local and isotonic regression can only ever fix the level of a prediction as a function of the prediction itself; neither can improve a model whose fundamental ranking of risks is wrong, because isotonic regression is explicitly rank-preserving and local regression, even where it might reorder slightly, is not designed to correct systematic ranking failures. A model with poor discrimination (the subject of the next lecture) needs better features or a better architecture, not a recalibration step, which only ever addresses the level, never the ranking.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Reporting a local-regression bandwidth choice without a sensitivity check</span>
+    Because the nearest-neighbour fraction is a genuine hyperparameter, presenting a single local-regression recalibration curve without showing how it changes across a reasonable range of bandwidths invites exactly the challenge the vignette in section 2 illustrates: a validator, or a competitor's model, can produce a materially different calibration story from the same data by choosing a different, equally defensible bandwidth. Isotonic regression sidesteps this entire category of challenge and is the safer default for that reason alone.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Leaving the extreme bins unmerged</span>
+    The lowest and highest isotonic groups are typically defined by the fewest observations and are the most likely to be driven by one or two atypical points rather than genuine structure; deploying an unmerged isotonic recalibration straight from the algorithm risks a materially wrong prediction for exactly the extreme cases (the highest-risk or lowest-risk segment) where getting the level right matters most. Manual merging of the extreme bins, checked against a minimum-exposure threshold, is standard practice, not an optional refinement.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Deploying the raw step function where continuity is required</span>
+    A discontinuous, step-shaped price schedule can create arbitrage-like discontinuities at the boundary between two adjacent groups (two customers with almost identical risk profiles receiving materially different quoted prices purely because they fall either side of a group boundary), which is operationally and sometimes contractually awkward. Linear interpolation between group means, applied after the isotonic fit rather than instead of it, is the standard fix and does not disturb the underlying ranking guarantee.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Local regression and isotonic regression are the two standard estimators of the recalibration step $E[Y \mid \mu(X)]$ that lecture 43 introduced. Local regression is flexible and smooth but depends on a bandwidth hyperparameter that materially affects the result and carries no guarantee against reordering the model's predictions. Isotonic regression, solved exactly by the pool-adjacent-violators algorithm, needs no hyperparameter, produces a solution that is provably auto-calibrated by construction, and never reorders the original model's ranking, which is exactly why it is the standard production tool for repairing a model's calibration: it fixes the level while leaving the one property, discrimination, that no recalibration step should touch, untouched by construction.</p>
+
+  <p>This closes the calibration half of the sub-module. The next lecture turns to the property recalibration deliberately leaves alone, discrimination, introduces the Gini score built from the Lorenz curve and the cumulative accuracy profile, and proves the point flagged repeatedly across the last two lectures: Gini is only a valid model-selection criterion once the candidates being compared are auto-calibrated.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Describe the local-regression estimator: what role does the bandwidth (nearest-neighbour fraction) play, and what happens at the two extremes of its range?</li>
+      <li>State the constrained optimisation problem isotonic regression solves, and describe the pool-adjacent-violators algorithm that solves it.</li>
+      <li>Prove, in your own words, why an isotonic-regression recalibration is automatically auto-calibrated.</li>
+      <li>Why can isotonic regression never reorder the original model's predictions? Why does this matter for a credit or insurance application?</li>
+      <li>Name the three practical caveats of isotonic recalibration and the standard remedy for each.</li>
+      <li>Explain why neither recalibration tool can repair a model whose fundamental ranking of risks is poor.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 43 (<a href="02-auto_calibration.html">auto-calibration</a>) defined the recalibration step this lecture makes computable.</li>
+      <li><strong>Next:</strong> Lecture 4 (<a href="04-discrimination_and_gini.html">discrimination and the Gini score</a>) turns to the property this lecture's tools deliberately leave untouched.</li>
+      <li><strong>Used by:</strong> Lecture 5 (<a href="05-score_decomposition_and_lift.html">score decomposition and lift charts</a>), which uses the recalibrated function $\mu^{\text{rc}}$ from this lecture as the reference point for decomposing prediction error into uncertainty, discrimination, and miscalibration.</li>
+      <li><strong>Outside this course:</strong> Isotonic recalibration (often called "Platt scaling's non-parametric cousin" in the machine-learning literature) is a standard post-processing step for probability calibration of classifiers generally, well beyond the credit and insurance context this course emphasises.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Calibration course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 44 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

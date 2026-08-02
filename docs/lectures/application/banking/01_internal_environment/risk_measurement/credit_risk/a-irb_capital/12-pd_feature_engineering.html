@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PD feature engineering: reduction and transformation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Feature engineering: reduction and transformation</h1>
+  <p class="subtitle">From a thousand raw MRD columns to a few dozen model-ready features. Two pipelines run in series: reduction strips down the candidate set by predictive power, correlation and collinearity; transformation conditions the survivors so each one is well-behaved in log-odds space. Both pipelines are explicit, auditable and reproducible.</p>
+  <div class="meta">
+    <span>A-IRB 12 of n &mdash; PD 4 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Sources: <code>04_feature_engineering/pd/04-variable-reduction.md</code>, <code>05-variable-transformation.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A typical retail MRD ships with around 1,000 candidate features once you count behavioural roll-ups, bureau attributes and engineered trend variables. The PD scorecard ends up using 20 to 40. Feature engineering is the disciplined funnel between the two: a five-step <strong>reduction</strong> pipeline (data quality, predictive-power screening, correlation clustering, variable clustering via PCA, collinearity assessment) followed by a five-step <strong>transformation</strong> pipeline (special-value treatment, missing-value imputation, outlier capping, scaling, monotonising transformation). Both pipelines have explicit thresholds and produce auditable artefacts at every step.</p>
+
+  <p>The work is anchored in two ideas. <strong>Reduction protects model stability</strong>: keeping highly correlated features destabilises coefficients (multicollinearity) and inflates variance; keeping weak features adds noise without adding signal. The reduction pipeline drops, in order, the obviously broken (quality), the weak (predictive screening), the redundant (correlation clustering), the over-similar (PCA clustering) and the destabilising (collinearity). <strong>Transformation enforces the modelling assumption</strong>: logistic regression assumes a linear relationship between features and the log-odds of default. Most raw features do not satisfy this assumption out of the box. Transformation maps each surviving feature into a form where the assumption holds, using Tukey's Ladder of Power and the Bulging Rule as the diagnostic.</p>
+
+  <p>Both pipelines are run per segment. The PiT model is segmented (delinquency, MoB, utilisation; see lecture 13) and feature behaviour can differ materially across segments. Running a single feature-engineering pipeline over the whole portfolio and then segmenting downstream is a common modelling shortcut that produces silently sub-optimal scorecards.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Feature engineering is what separates "this is the data we have" from "this is what the model is allowed to see". A junior modeller's instinct is to feed everything in and let the regression sort it out; the regression then over-fits, multicollinearity destabilises the coefficients, and the resulting scorecard fails the validator. The five-step reduction pipeline is the discipline of removing material before it reaches the model. The five-step transformation pipeline is the discipline of making sure what survives is in a form the model can use. Skipping either is the most common cause of scorecard failure at validation.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Multicollinearity is the silent killer of logistic regression. Two features that are 95% correlated will have unstable coefficients: small changes in the training sample produce large swings in the relative weights. The supervisor's challenge is then mechanical: rebuild the model on a different random sample of the same data, observe that coefficients have moved, and require a rebuild. The collinearity-assessment step (Step 4 of reduction) exists to stop this happening before the model is fit.</p>
+
+  <p>The transformation pipeline addresses the related problem of <strong>linearity</strong>. Logistic regression models log-odds as a linear function of features. A feature that has a U-shaped relationship with the observed default rate (low ODR at both extremes, high ODR in the middle) cannot be used directly: the linear fit averages out to a flat coefficient and the variable looks insignificant when in fact it is informative. The transformation pipeline detects this and either splines the variable, transforms it, or splits it into two monotone half-features. None of this happens by accident.</p>
+
+  <p>Both pipelines are also where the use test gets enforced operationally. Every transformation, every drop, every cap is documented; the same documentation is used by the credit-risk-control unit when explaining the model to the credit committee. If a feature is dropped because it has a non-monotone relationship with ODR, the bank must be able to explain that to a credit officer in plain terms. The documentation discipline that emerges from this work is what passes supervisory review.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The two pipelines form a funnel. Raw MRD features enter at the top; model-ready features emerge at the bottom. At each step, an explicit criterion either drops a feature or transforms it. The diagram traces the flow.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The feature-engineering funnel">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The feature-engineering funnel: from ~1000 raw features to ~25 model-ready features</text>
+
+      <!-- Reduction column left -->
+      <g>
+        <rect x="40" y="50" width="380" height="380" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.3"/>
+        <text x="230" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Reduction pipeline (5 steps)</text>
+
+        <!-- Step 1 -->
+        <rect x="60" y="90" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="108" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">1. Data quality</text>
+        <text x="230" y="124" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">drop: no-variance, &gt;20% missing, &gt;100 categories, dates</text>
+
+        <!-- Step 2 -->
+        <rect x="60" y="155" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="173" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">2. Predictive power screen</text>
+        <text x="230" y="189" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">IV, Gini, R&sup2;; drop below 50th percentile</text>
+
+        <!-- Step 3 -->
+        <rect x="60" y="220" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="238" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">3. Correlation clustering (3 iterations)</text>
+        <text x="230" y="254" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">cut at 99%, 85%, 70%; keep highest-Gini per cluster</text>
+
+        <!-- Step 4 -->
+        <rect x="60" y="285" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="303" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">4. PCA-based variable clustering</text>
+        <text x="230" y="319" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">PCA into max 35 clusters; keep top + dissimilar within cluster</text>
+
+        <!-- Step 5 -->
+        <rect x="60" y="350" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="368" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">5. Collinearity assessment</text>
+        <text x="230" y="384" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">condition index &gt; 30; one-drop on highest variance proportion</text>
+
+        <text x="230" y="420" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a" font-style="italic">~1000 &rarr; ~50 features</text>
+      </g>
+
+      <!-- Transformation column right -->
+      <g>
+        <rect x="480" y="50" width="380" height="380" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="670" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">Transformation pipeline (5 steps)</text>
+
+        <!-- T1 -->
+        <rect x="500" y="90" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="670" y="108" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">1. Special-value treatment</text>
+        <text x="670" y="124" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">codes 997/998/999; check ODR monotonicity; impute if needed</text>
+
+        <!-- T2 -->
+        <rect x="500" y="155" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="670" y="173" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">2. Missing-value imputation</text>
+        <text x="670" y="189" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">MAR / structural &rarr; nearest decile; MNAR &rarr; 0</text>
+
+        <!-- T3 -->
+        <rect x="500" y="220" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="670" y="238" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">3. Outlier treatment</text>
+        <text x="670" y="254" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">cap at 1st / 99th percentile if spurious or unstable</text>
+
+        <!-- T4 -->
+        <rect x="500" y="285" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="670" y="303" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">4. Scaling / normalisation</text>
+        <text x="670" y="319" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">log, sqrt for concentrated extremes that aren't outliers</text>
+
+        <!-- T5 -->
+        <rect x="500" y="350" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="670" y="368" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">5. Monotonising transformation</text>
+        <text x="670" y="384" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">Tukey's ladder + Bulging rule; splines for non-monotone</text>
+
+        <text x="670" y="420" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a" font-style="italic">~50 features, each well-behaved in log-odds space</text>
+      </g>
+
+      <!-- Arrow between pipelines -->
+      <path d="M 420 240 L 480 240" fill="none" stroke="#475569" stroke-width="2"/>
+      <polygon points="480,240 472,236 472,244" fill="#475569"/>
+      <text x="450" y="230" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">survivors</text>
+    </svg>
+    <figcaption>Two pipelines in series. The reduction pipeline (left) drops material at every step using explicit thresholds. The transformation pipeline (right) conditions each surviving feature so it is well-behaved in log-odds space. The output is a few dozen features ready for the logistic regression in lecture 13.</figcaption>
+  </figure>
+
+  <p>Three properties to hold. First, <strong>both pipelines are run per segment</strong>, not over the whole portfolio. A feature that is highly predictive in the transactor segment may be uninformative in the revolver segment; running the pipeline once on a pooled sample averages out segment-specific signal. Second, <strong>each step has a documented justification per feature dropped or transformed</strong>: the development document records which step the variable failed at, what the metric value was, and why the threshold applies. Third, the <strong>order matters</strong>: reduction strictly precedes transformation, because there is no point conditioning a feature you are about to drop, and a transformation applied to a feature that fails reduction in a later iteration is wasted effort.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Reduction Step 1: data quality screening</h3>
+
+  <p>Some features fail the most basic quality checks and need not enter the rest of the pipeline. The screening rules:</p>
+
+  <ul>
+    <li><strong>No variance</strong>. A feature with a single unique value carries no information; drop unconditionally.</li>
+    <li><strong>Excessive cardinality</strong>. Categorical features with more than around 100 categories (some banks set 50) cannot be encoded into a stable logistic regression without dimension reduction; drop or aggregate.</li>
+    <li><strong>Date / time fields</strong>. Raw dates are not predictors and should not enter the model; drop or replace with derived age / vintage features.</li>
+    <li><strong>High missingness</strong>. Numeric features with more than around 20% missing values are dropped, because imputation at high missingness rates introduces enough noise to outweigh the variable's signal.</li>
+  </ul>
+
+  <p>Certain features are <strong>protected from the reduction pipeline entirely</strong> on business grounds: the default flag and its components (target / target-derived), account identifiers (needed for joins), product type (needed for segmentation), external bureau scores (highest single-feature predictive power; supervisory expectation), and application-form variables (use-test alignment with origination). Protected features bypass Steps 1 to 5 and go straight to transformation.</p>
+
+  <h3>Reduction Step 2: predictive-power screening</h3>
+
+  <p>Each surviving feature is scored on its bivariate relationship with the target. Three metrics dominate:</p>
+
+  <p><strong>Information Value (IV)</strong>. For a binned feature with k bins, with good-rate g_i (1 - default rate) and bad-rate b_i in bin i:</p>
+
+  <pre><code>WoE_i = ln( g_i / b_i )
+
+IV = sum_i (g_i - b_i) * WoE_i
+</code></pre>
+
+  <p>Standard interpretation: IV &lt; 0.02 weak; 0.02 to 0.10 medium; 0.10 to 0.30 strong; &gt; 0.30 very strong (occasionally too strong, indicating leakage). The Weight of Evidence (WoE) per bin is what some banks use directly as the transformed feature; we keep IV for screening and re-derive the transformation in the transformation pipeline.</p>
+
+  <p><strong>Gini coefficient</strong>. The bivariate Gini for a numeric feature against the binary target is the ratio of the area under the Lorenz curve to the maximum possible area. Gini = 2 * AUC - 1, and for a binary target with a numeric predictor it is computed by ranking the predictor, accumulating the bad-rate, and comparing to a uniform diagonal. Typical retail bureau features score 0.15 to 0.40 Gini against the 12-month default flag.</p>
+
+  <p><strong>R-squared</strong>. The univariate R-squared from regressing the target on the feature; complementary to Gini and IV. Use as a cross-check rather than a primary criterion.</p>
+
+  <p>The standard cut-off: drop features below the 50th percentile of the predictive-power distribution within the segment. Where two features score identically, one is dropped to avoid duplicate information. The choice of which to drop is documented (typically the one less stable across time or less explainable to credit officers).</p>
+
+  <h3>Reduction Step 3: correlation clustering (three iterations)</h3>
+
+  <p>The standard reduction approach is iterative, with progressively looser thresholds. The reason: a single hard threshold either keeps too many correlated variables (loose threshold) or drops too many small but informative ones (tight threshold). Iterating addresses both ends.</p>
+
+  <table>
+    <thead>
+      <tr><th>Iteration</th><th>Pearson correlation cut</th><th>Keep per cluster</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>&gt; 99%</td><td>1 (highest Gini)</td></tr>
+      <tr><td>2</td><td>&gt; 85%</td><td>2 if cluster &gt; 10 variables; 1 otherwise</td></tr>
+      <tr><td>3</td><td>&gt; 70%</td><td>3 if cluster &gt; 10; 2 if 5 to 9; 1 if &lt; 5</td></tr>
+    </tbody>
+  </table>
+
+  <p>Within each cluster the highest-Gini variable is retained; ties are broken on IV. Variables removed at each iteration are determined independently of previous iterations (the cluster is re-formed each time). For segments with low default counts or unusual structure, IV may be used alongside Gini as the ranking criterion, and the independence assumption may be relaxed.</p>
+
+  <p>Pearson correlation is the standard. Some banks supplement with Spearman (for non-linear monotone relationships) or distance correlation (for general dependence). The choice is documented and stays consistent across iterations within a single model build.</p>
+
+  <h3>Reduction Step 4: PCA-based variable clustering</h3>
+
+  <p>Pearson correlation only captures pairwise linear association. Variables can be jointly redundant without being pairwise highly correlated: three variables that all reflect "customer's overall financial health" may each pairwise correlate at only 60% but share most of their information. PCA-based clustering catches this.</p>
+
+  <p>The procedure: run PCA on the remaining feature set; form clusters that maximise within-cluster correlation and minimise between-cluster correlation; iterate by splitting any cluster whose second eigenvalue exceeds 1 (a sign that two underlying factors are present); continue until at most around 35 clusters remain.</p>
+
+  <p>Within each cluster, four metrics are computed for each variable: <strong>RS Own</strong> (1 - R-squared with own cluster, where lower is better because it indicates the variable is well-explained by its cluster), <strong>IV</strong>, <strong>Gini</strong>, <strong>R-squared</strong>. Variables are ranked on a combined IV-Gini score; the top variable per cluster is kept. A second variable is kept where it provides complementary information:</p>
+
+  <ul>
+    <li>If the top variable has a low RS Own rank (well-explained by the cluster), keep a second variable that has a high RS Own rank (less typical of the cluster) plus high IV and Gini.</li>
+    <li>Reverse case: if the top variable has high RS Own (atypical), keep a second variable that has low RS Own (typical) plus high IV and Gini.</li>
+  </ul>
+
+  <p>This ensures both the most representative and the most informative-but-divergent variables survive. <strong>Judgemental adjustments</strong> are also permitted: where multiple variables share a business meaning (different roll-up windows of the same underlying signal, for example "balance trend 3-month" versus "balance trend 6-month"), the development team picks the most predictive one and drops the rest.</p>
+
+  <h3>Reduction Step 5: collinearity assessment</h3>
+
+  <p>The final reduction step targets multicollinearity that survived Steps 3 and 4. Two related diagnostics:</p>
+
+  <p><strong>Variance Inflation Factor (VIF)</strong>. For each feature, fit it as a function of the others and take VIF = 1 / (1 - R-squared). Standard threshold: VIF &gt; 10 indicates severe multicollinearity; some banks use a stricter VIF &gt; 5. Drop the feature with the highest VIF first, refit, repeat.</p>
+
+  <p><strong>Condition index and variance decomposition</strong>. The more diagnostic approach for collinearity. Compute the eigenvalues of the standardised correlation matrix; the condition index for the k-th eigenvalue is sqrt(lambda_max / lambda_k). Values above 30 indicate severe multicollinearity. For each high condition index, the variance decomposition matrix shows how much each variable's coefficient variance is associated with that eigenvalue. Where two or more variables contribute more than 0.5 to the same condition index, the variable with the highest variance proportion is removed. Iterate until no condition index exceeds 30.</p>
+
+  <p>After Step 5 the candidate feature set is typically down to 30 to 50 variables. A final univariate review (sometimes called Step 6) examines each survivor for distributional anomalies, univariate predictive strength, bivariate monotonicity with ODR, and stability across time and segments. Variables with non-monotone or unstable ODR relationships are flagged for either transformation (next pipeline) or removal.</p>
+
+  <h3>Transformation Step 1: special-value treatment</h3>
+
+  <p>Many external data feeds encode missing data and "no hit" results as specific sentinel values rather than nulls. Experian's 997 / 998 / 999 series is the classic example. These values are syntactically valid numbers but semantically not part of the variable's range; including them untransformed pulls regression coefficients in the wrong direction.</p>
+
+  <p>The treatment rule:</p>
+
+  <ul>
+    <li>If the special value occurs in less than 1% of the sample, treat as immaterial and proceed.</li>
+    <li>Otherwise: bin the valid range into deciles, compute the ODR per decile, and inspect the trend.</li>
+    <li>If the ODR is monotonic across deciles, leave the special value as-is (the regression will sort it out).</li>
+    <li>If the ODR is non-monotonic, replace the special value with a negative value outside the valid range (for an Experian variable with valid range [0, ...], use 998 &rarr; -1, 999 &rarr; -2) to force the special-value rows to fall outside the trend.</li>
+  </ul>
+
+  <p>Validate by re-plotting the post-imputation ODR series and confirming monotonicity is restored.</p>
+
+  <h3>Transformation Step 2: missing-value imputation</h3>
+
+  <p>Three missingness mechanisms call for different treatments:</p>
+
+  <ul>
+    <li><strong>Missing at random (MAR)</strong>: missingness is unrelated to the value but may correlate with other variables. Impute into the <strong>nearest decile</strong> of non-missing values, where "nearest" means the decile whose ODR is closest to the missing-group ODR (or the more conservative decile if multiple are tied).</li>
+    <li><strong>Missing not at random (MNAR)</strong>: missingness is informative (high-risk customers more likely to leave the field blank). Impute with 0 (or a distinguishing sentinel) and rely on the regression to pick up the differential.</li>
+    <li><strong>Structurally missing</strong>: the field is genuinely undefined for some obligors (LTV for unsecured loans). Treat as MAR with explicit documentation; alternative is to add a presence indicator as an auxiliary feature.</li>
+  </ul>
+
+  <p>Validate post-imputation ODR series for monotonicity and absence of imputation-induced discontinuities.</p>
+
+  <h3>Transformation Step 3: outlier treatment</h3>
+
+  <p>Standard rule: examine values below the 1st percentile and above the 99th percentile of each variable's distribution. For each tail, decide whether the values are:</p>
+
+  <ul>
+    <li><strong>Data errors</strong> (impossible values, input mistakes): cap at the 1st / 99th percentile unconditionally.</li>
+    <li><strong>Genuine but sparse extremes</strong>: cap if their small count creates instability in coefficient estimation, retain if they represent meaningful risk patterns with consistent ODR.</li>
+  </ul>
+
+  <p>The decision is judgemental and documented per variable. A frequent source of false outliers in retail data: balance values immediately after a large purchase or a credit-line increase, which are unusual but not erroneous and carry genuine information.</p>
+
+  <h3>Transformation Step 4: scaling and normalisation</h3>
+
+  <p>Some variables have a concentrated mass at an extreme value (zero balance, maximum utilisation, hundreds of recent enquiries) where the values are not outliers but where the raw scale produces unintuitive coefficients. Scale the variable down by a constant factor or apply log / square-root to compress the tail without distorting rank-ordering.</p>
+
+  <p>Monotonic transformations do not change discriminatory power: a Gini computed on the raw variable equals the Gini computed on the log of the variable. What changes is the regression coefficient: a one-unit change in the log of a count is a doubling, which is a more meaningful "unit" than a one-count increase. Coefficient interpretability matters for the use test.</p>
+
+  <h3>Transformation Step 5: monotonising transformation</h3>
+
+  <p>The final and most important step. The logistic regression assumes a linear relationship between the feature and the log-odds of default. Most raw features satisfy this only approximately. Three diagnostics drive the transformation choice:</p>
+
+  <ol>
+    <li><strong>Plot the variable against ODR or against log-odds</strong>. The visual is the primary tool.</li>
+    <li><strong>Apply Tukey's Ladder of Power</strong>: try x^p for p in {-1, -0.5, log, 0.5, 1, 2, 3} and pick the one that produces the best linearity in log-odds space.</li>
+    <li><strong>Apply the Bulging Rule</strong>. If the plotted ODR-vs-feature curve bulges <strong>upwards</strong> (rises and then flattens), apply a transformation in the lower half of Tukey's ladder (log, square-root) to compress the right tail. If the curve bulges <strong>downwards</strong> (flat then rising), apply a transformation in the upper half (square, cube) to expand the right tail.</li>
+  </ol>
+
+  <p>Where no power transformation produces a monotonic linear relationship in log-odds, the feature is either spline-transformed (piecewise linear in log-odds with knots chosen by ODR breakpoints), binary-encoded (indicator of exceeding a threshold), or dropped. Splining preserves more information than binary encoding and is the standard for variables with a clean non-monotone but interpretable relationship (utilisation rate has a well-known U-shape in some portfolios because both zero-balance and at-limit obligors are higher risk).</p>
+
+  <p>Validate by re-fitting the univariate logistic regression on the transformed variable and confirming the residuals are approximately normal and the relationship is monotone.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The single most consequential lesson in feature engineering is that <strong>more variables do not produce better models</strong>. Past the point of diminishing returns (typically around 30 to 50 variables for a retail PD scorecard), adding features increases multicollinearity, instability and over-fit faster than it adds discrimination. A scorecard with 25 well-chosen, well-transformed features outperforms one with 100 raw features at every metric the validator looks at. The reduction pipeline is the discipline that gets you to the sweet spot; the temptation to skip steps "because we have so much data" is the most common cause of scorecard failure at validation.</p>
+
+  <p>The second lesson is on <strong>over-compression versus over-expansion</strong>. The transformation pipeline can damage data as easily as it can fix it. A log transformation applied to a variable that does not need it compresses meaningful variation into a narrow range; a square transformation applied to a roughly-linear variable expands noise. The Bulging Rule and Tukey's Ladder are not formulas to apply blindly; they are visual diagnostics that read the data. A modeller who applies log() to every variable because "log() usually helps" is producing transformations on autopilot rather than on the data.</p>
+
+  <p>The third lesson is on <strong>monotonicity</strong>. Logistic regression is a linear model in log-odds; if a feature has a U-shape relationship with the target, the linear fit averages to flat and the variable looks insignificant when it is in fact informative. The standard fixes are splining (piecewise monotone) or binary encoding (indicator of being on the high-risk side). Both are valid; the choice depends on whether the underlying relationship has meaningful gradations (split) or just two regimes (binary). Examination questions on this should test understanding of why monotonicity matters, not just memorisation of the bulging rule.</p>
+
+  <p>The fourth lesson is operational: <strong>the documentation that emerges from feature engineering is what the supervisor reviews first</strong>. Every drop, every cap, every transformation has a row in the development document. The development document is what the validator marks up, the credit-risk-control unit signs off, and the supervisor reads at SREP. Banks that treat feature engineering as a coding task to be cleaned up "later" end up with documentation that does not match the production scorecard, which fails review. The discipline is to write the document as you go.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>List the five steps of the reduction pipeline and the five steps of the transformation pipeline, in order.</li>
+    <li>Why is the reduction pipeline run per segment rather than over the whole portfolio?</li>
+    <li>Write the IV formula. State the four standard interpretation bands (weak, medium, strong, very strong / suspicious).</li>
+    <li>The correlation-clustering step uses three iterations with progressively looser thresholds. Why iterate rather than apply a single threshold?</li>
+    <li>What is the difference between VIF and the condition index as collinearity diagnostics? Which is the more rigorous?</li>
+    <li>An Experian feature has 4% of rows coded as 998 (no-hit). The ODR by decile across the valid range is monotonic. What treatment applies?</li>
+    <li>Distinguish MAR, MNAR and structural missingness. What imputation rule applies to each?</li>
+    <li>Explain the Bulging Rule. Given an ODR-vs-feature curve that bulges upwards, what side of Tukey's Ladder should the transformation come from?</li>
+    <li>A feature has a U-shaped relationship with ODR. Why is using the raw variable in the logistic regression a problem? Name two fixes.</li>
+    <li>A junior modeller's instinct is to include all 1,000 raw features and let regularisation sort them out. State three reasons this is a bad approach for IRB capital.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/pd/04-variable-reduction.md</code> &mdash; the five-step reduction pipeline.</li>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/pd/05-variable-transformation.md</code> &mdash; the five-step transformation pipeline including Tukey's Ladder and the Bulging Rule.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="10-pd_target_and_data.html">Target and data</a> &mdash; the four feature families and data-leakage rules that feed this lecture.</li>
+      <li><a href="11-pd_sampling_and_representativeness.html">Sampling and representativeness</a> &mdash; the development sample these pipelines run over.</li>
+    </ul>
+
+    <p><strong>Forward references inside the PD sequence:</strong></p>
+    <ul>
+      <li>13-pd_risk_differentiation (planned) &mdash; the logistic regression that consumes the transformed features.</li>
+      <li>14-pd_risk_quantification (planned) &mdash; grade construction and LRA calibration using the model's scores.</li>
+      <li>15-pd_testing (planned) &mdash; back-testing the model on OOS and OOT samples.</li>
+    </ul>
+
+    <p><strong>Adjacent context:</strong></p>
+    <ul>
+      <li><a href="../../../../../../fundamentals/machine_learning/01_feature_engineering/index.html">Fundamentals: feature engineering</a> (planned) &mdash; the general ML treatment without the IRB-specific framing.</li>
+      <li>EAD feature engineering (planned, lecture 26) &mdash; the same pipeline with R-squared / Lift in place of IV / Gini for the univariate screen.</li>
+      <li>LGD feature engineering (planned, lecture 19) &mdash; the same pipeline with LGD-specific feature families.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>Anderson, R. (2007), <em>The Credit Scoring Toolkit</em>, chapters 7 and 8. The standard reference for IV, WoE and bin-based feature engineering.</li>
+      <li>Belsley, Kuh and Welsch (1980), <em>Regression Diagnostics</em>. The original treatment of condition indices and variance-decomposition collinearity diagnostics.</li>
+      <li>Tukey, J. (1977), <em>Exploratory Data Analysis</em>, chapter 4. The Ladder of Power and the Bulging Rule.</li>
+      <li>Mosteller and Tukey (1977), <em>Data Analysis and Regression</em>. Companion to the above; same vocabulary, applied to regression.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 12 of n &middot; PD 4 of 7.</span>
+  <span><a href="11-pd_sampling_and_representativeness.html">Previous: sampling and representativeness</a> &middot; <a href="13-pd_risk_differentiation.html">Next: risk differentiation</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

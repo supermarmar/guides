@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 9: chains, memory and state</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Chains, memory and state</h1>
+  <p class="subtitle">Part III begins by building systems out of the pieces from Part II, and the first thing to confront is that there is no state anywhere. A model has no memory of your previous message. Every conversation that appears to remember something is a program re-sending it, and once you see that, the three standard memory strategies stop being library features and become what they actually are: three answers to a cost problem with a quadratic shape.</p>
+  <div class="meta">
+    <span>Lecture 9 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part III: building systems</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A transformer forward pass, as lecture 4 set out, conditions on exactly one thing: the sequence of tokens it is given. Nothing persists between calls. So a chatbot that remembers your name is not a model with a memory, it is <strong>a program that puts your name back into the prompt every single time</strong>, and every design question in this lecture follows from that.</p>
+
+  <p>Running models locally becomes practical through <strong>quantisation</strong>, and the arithmetic is simple enough to do in your head. Weights dominate memory, so bytes equal parameters times bytes per parameter. A seven-billion-parameter model at sixteen-bit precision needs <strong>14.0 GB</strong> and will not fit an eight-gigabyte consumer card; the same model at four bits needs <strong>3.5 GB</strong> and does.</p>
+
+  <p>A <strong>prompt template</strong> is a string with holes, which sounds trivial and is the unit that makes composition possible: once a prompt is a function of variables, the output of one call can be the input to the next, and that is all a chain is.</p>
+
+  <p>Memory is where the real engineering sits, because re-sending the history has a cost that grows. Sending everything means turn $n$ carries $n$ turns of text, so cumulative tokens follow $T \cdot n(n+1)/2$, which is <strong>quadratic</strong>. Over thirty turns at 150 tokens each that is <strong>69,750 tokens against 24,750</strong> for a six-turn window, and the full buffer <strong>breaks the 4,096-token context window at turn 27</strong>. Summarising is cheaper still but costs an extra model call per turn, and on these figures it does not pay for itself until <strong>turn 24</strong>.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The model forgets everything the instant it replies. If a conversation seems to remember, some code kept a transcript and pasted it back in. The only real questions are how much of the transcript to paste, and who pays for the pasting.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that statelessness is the most consequential fact about these systems and the one most thoroughly hidden by the interfaces built on top of them. Frameworks offer a <code>memory</code> object; hosted chat products keep a thread; both create the impression of an entity that remembers. Every debugging session on a conversational system that goes badly wrong ends at the same realisation, which is that the model saw a different prompt from the one the developer imagined.</p>
+
+  <p>The second reason is cost, and it is the reason the memory strategies exist at all. If re-sending history were free there would be one strategy: send everything. It is not free, it grows quadratically, and it eventually hits a hard wall rather than a soft one.</p>
+
+  <p>The third reason is that quantisation is what puts a capable model on a laptop, and the trade is understandable rather than mysterious. Fewer bits per weight means less memory and faster arithmetic, at some cost in fidelity. Knowing the byte arithmetic tells you immediately which models are available to you and which are not.</p>
+
+  <p>And a fourth reason that carries into the rest of Part III. A chain is just function composition over prompt templates, and an agent, in lecture 10, is a chain with a loop and a branch. Nothing in either is conceptually harder than what this lecture builds; the difficulty is entirely in what happens when the pieces fail, which is why lecture 10 spends its length on failure modes.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>One stateless function, one template that makes it composable, and three ways to decide what to feed it.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A stateless model with a program holding the transcript. The program decides how much of the transcript to re-send at each turn under three strategies: full buffer, sliding window, and running summary.">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The memory lives in your program. The model is a pure function.</text>
+
+      <rect x="620" y="40" width="240" height="120" rx="10" fill="#EDE9FE" stroke="#5B47E0" stroke-width="2"/>
+      <text x="740" y="62" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#4c1d95">THE MODEL</text>
+      <text x="740" y="82" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#4c1d95">output = f(tokens_in)</text>
+      <text x="740" y="104" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#5B47E0">no state, no history, no memory</text>
+      <text x="740" y="120" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#5B47E0">identical input, identical distribution</text>
+      <text x="740" y="142" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">the weights never change at inference</text>
+
+      <rect x="20" y="40" width="260" height="120" rx="10" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="150" y="62" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#713f12">YOUR PROGRAM</text>
+      <text x="150" y="82" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#713f12">holds the transcript</text>
+      <text x="150" y="98" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#713f12">decides what to re-send</text>
+      <text x="150" y="114" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#713f12">fills the template</text>
+      <text x="150" y="136" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#a16207">this is where "memory" actually is</text>
+
+      <line x1="280" y1="86" x2="612" y2="86" stroke="#71717a" stroke-width="2"/>
+      <polygon points="620,86 610,81 610,91" fill="#71717a"/>
+      <text x="446" y="78" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#3f3f46">the entire prompt, rebuilt every turn</text>
+      <line x1="612" y1="128" x2="284" y2="128" stroke="#71717a" stroke-width="1.6" stroke-dasharray="5 3"/>
+      <polygon points="280,128 290,123 290,133" fill="#71717a"/>
+      <text x="446" y="144" text-anchor="middle" font-family="Inter" font-size="9" fill="#3f3f46">the reply, which your program appends and keeps</text>
+
+      <text x="440" y="192" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#18181b">THREE WAYS TO DECIDE WHAT TO RE-SEND</text>
+
+      <rect x="20" y="206" width="270" height="118" rx="9" fill="#FFFFFF" stroke="#be185d" stroke-width="2"/>
+      <text x="155" y="226" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#831843">FULL BUFFER</text>
+      <text x="155" y="244" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#3f3f46">send the entire transcript</text>
+      <text x="155" y="262" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#831843">cost per turn = n x T</text>
+      <text x="155" y="278" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#831843">cumulative = T n(n+1)/2</text>
+      <text x="155" y="296" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#be185d">perfect recall, quadratic cost</text>
+      <text x="155" y="313" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">and it hits the context wall</text>
+
+      <rect x="305" y="206" width="270" height="118" rx="9" fill="#FFFFFF" stroke="#0F62FE" stroke-width="2"/>
+      <text x="440" y="226" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#0b4bbd">SLIDING WINDOW</text>
+      <text x="440" y="244" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#3f3f46">send only the last k turns</text>
+      <text x="440" y="262" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#0b4bbd">cost per turn = min(n,k) x T</text>
+      <text x="440" y="278" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#0b4bbd">cumulative is LINEAR</text>
+      <text x="440" y="296" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#0F62FE">bounded cost, hard forgetting</text>
+      <text x="440" y="313" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">turn k+1 erases turn 1 completely</text>
+
+      <rect x="590" y="206" width="270" height="118" rx="9" fill="#FFFFFF" stroke="#3E7A45" stroke-width="2"/>
+      <text x="725" y="226" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#14532d">RUNNING SUMMARY</text>
+      <text x="725" y="244" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#3f3f46">send a summary plus recent turns</text>
+      <text x="725" y="262" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#14532d">cost per turn is ~constant</text>
+      <text x="725" y="278" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#14532d">plus one extra call per turn</text>
+      <text x="725" y="296" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#3E7A45">graceful forgetting, lossy</text>
+      <text x="725" y="313" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">pays for itself only after ~24 turns</text>
+    </svg>
+    <figcaption>The left box is the part that is easy to forget exists. Frameworks name it "memory", which is a description of what it achieves rather than of what it is: a variable in your process holding text that gets pasted into the next request.</figcaption>
+  </figure>
+
+  <div class="defcard">
+    <div class="term">Prompt template</div>
+    <div class="def">A string with named holes, filled at call time. Turning a prompt into a function of its variables is what allows one call's output to become another call's input, and therefore what makes chains possible at all.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Chain</div>
+    <div class="def">Two or more calls where the output of one is an input to the next. Function composition, with a language model as the function and a template as the calling convention. Nothing more.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Quantisation</div>
+    <div class="def">Storing weights at reduced numerical precision, typically eight or four bits instead of sixteen. Cuts memory proportionally and speeds arithmetic, at some cost in output quality. GGUF is the file format that made four-bit local inference routine.</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Quantised local models: the arithmetic that decides what you can run</h3>
+
+  <p>Model weights dominate the memory footprint, and the calculation is one multiplication: bytes equal the parameter count times the bytes per parameter. Sixteen-bit precision is two bytes, eight-bit is one, four-bit is a half.</p>
+
+  <div class="worked">WHAT FITS ON WHAT
+
+    precision      bytes/param    7B        13B       70B
+    fp32              4.0        28.0 GB   52.0 GB  280.0 GB
+    fp16 / bf16       2.0        14.0 GB   26.0 GB  140.0 GB
+    int8              1.0         7.0 GB   13.0 GB   70.0 GB
+    4-bit             0.5         3.5 GB    6.5 GB   35.0 GB
+
+  READ THE 7B COLUMN
+    at fp16 it needs 14.0 GB and will NOT fit an 8 GB consumer
+    card. At 4-bit it needs 3.5 GB and comfortably will.
+    That single row is why local inference became ordinary.
+
+  ADD OVERHEAD BEFORE BELIEVING THE NUMBER
+    activations, the key-value cache and framework overhead
+    add roughly 15 to 20 per cent:
+
+      7B  at 4-bit:  3.5 GB of weights, about 4.1 GB in use
+      13B at 4-bit:  6.5 GB of weights, about 7.7 GB in use
+
+    and the KV cache grows with the conversation, which is the
+    same context-length pressure that drives the rest of this
+    lecture, appearing here as a memory constraint rather than
+    a cost one.
+
+  THE TRADE
+    fewer bits means a coarser representation of each weight.
+    Modern 4-bit schemes quantise in small blocks with their
+    own scale factors, which keeps the damage small, and the
+    honest summary is that 8-bit is close to lossless for most
+    uses while 4-bit is usually acceptable and occasionally
+    is not. Test on your own task rather than trusting a
+    benchmark average.</div>
+
+  <p>The practical route is the GGUF format with a runtime such as <code>llama-cpp-python</code>, introduced in lecture 8 for the same reason it matters here: a local model makes iteration free, which matters a great deal when a chain calls a model five times per user request.</p>
+
+  <h3>Templates, and why they are the unit of composition</h3>
+
+  <p>A prompt template is a string with variables. That is genuinely all it is, and it is worth being clear about why it deserves a name. Once the prompt is a function of its inputs, three things become possible that were not: the same prompt can be applied to many inputs, the output of one call can be substituted into another, and the prompt itself becomes a versionable artefact separate from the code that calls it.</p>
+
+  <pre><code>summarise = "Summarise the following in one sentence:\n\n{text}"
+classify  = "Classify the sentiment of this sentence as positive, "
+            "negative or neutral. Answer with one word only.\n\n{sentence}"
+
+# a two-step chain: the second call consumes the first call's output
+brief = model(summarise.format(text=document))
+label = model(classify.format(sentence=brief))</code></pre>
+
+  <p>That is a chain. Frameworks add error handling, retries, streaming, parallel branches and tracing, all of which are worth having in production and none of which changes the shape. When a chain misbehaves, the diagnostic is always the same and always sufficient: print the fully rendered prompt that was actually sent.</p>
+
+  <div class="callout warn">
+    <span class="tag">The failure this creates</span>
+    Chains compound errors. If each step is right nine times in ten, a three-step chain is right about seven times in ten, and a five-step chain about six. That is not a criticism of chaining, it is the arithmetic of independent steps, and it is the reason lecture 8's constrained output matters so much here: a step whose format is guaranteed cannot fail in the way that breaks the step after it.
+  </div>
+
+  <h3>Memory: three strategies and their cost curves</h3>
+
+  <p>Since the model holds nothing, the program must decide each turn how much of the conversation to include. The three standard answers differ in what they keep and, more importantly, in how their cost behaves as the conversation lengthens.</p>
+
+  <div class="worked">THIRTY TURNS, THREE STRATEGIES
+
+  ASSUMPTIONS
+    150 tokens per exchange, a window of 6 turns, a running
+    summary of 200 tokens, a 4,096-token context window,
+    input priced at &#36;3.00 per million tokens
+
+  TOKENS SENT ON A GIVEN TURN
+
+     turn   full buffer   windowed   summarised
+       1         150         150        350
+       2         300         300        500
+       5         750         750        500
+      10       1,500         900        500
+      20       3,000         900        500
+      27       4,050         900        500
+      28       4,200         900        500   &lt;- context exceeded
+      30       4,500         900        500
+
+  CUMULATIVE OVER 30 TURNS
+    full buffer   69,750 tokens   &#36;0.2092
+    windowed      24,750 tokens   &#36;0.0742
+    summarised    14,850 tokens   &#36;0.0445
+
+    the full buffer sends 2.8 times the windowed volume.
+
+  THE SHAPES MATTER MORE THAN THE LEVELS
+    full buffer   per-turn cost grows linearly, so cumulative
+                  cost is T x n(n+1)/2, QUADRATIC in turns.
+                  Check: 150 x 30 x 31 / 2 = 69,750.
+    windowed      per-turn cost caps at 900, so cumulative
+                  cost is LINEAR.
+    summarised    per-turn cost is roughly constant, so
+                  cumulative cost is LINEAR, plus one extra
+                  model call per turn.
+
+  AND THE WALL IS HARD, NOT SOFT
+    at 150 tokens a turn a 4,096-token window is exhausted at
+    turn 27. What happens then is not gradual degradation:
+    the request is rejected, or the history is truncated from
+    the front, which silently deletes the system prompt and
+    changes the model's behaviour with no error raised.
+
+      context   4,096  ->  27 turns
+      context   8,192  ->  54 turns
+      context  32,768  -> 218 turns
+      context 128,000  -> 853 turns
+
+    a longer context postpones the wall and does not remove
+    it, and the cost is still quadratic on the way there.</div>
+
+  <h3>What summarisation actually costs</h3>
+
+  <p>Summarisation looks strictly better than the alternatives in the table above, and the table is incomplete: it counts only the main call. Each turn also needs a second model call to fold the latest exchange into the running summary, and that call has both input and output tokens, with output typically priced several times higher.</p>
+
+  <div class="worked">THE BREAK-EVEN
+
+  ON THE SAME ASSUMPTIONS, ADDING &#36;15.00 PER MILLION OUTPUT
+  TOKENS FOR THE SUMMARISING CALL
+
+    turns   full buffer   summarised, all in   verdict
+       5      &#36;0.0067          &#36;0.0273         buffer wins
+      10      &#36;0.0248          &#36;0.0551         buffer wins
+      15      &#36;0.0540          &#36;0.0828         buffer wins
+      20      &#36;0.0945          &#36;0.1106         buffer wins
+      24      &#36;0.1350          &#36;0.1328         summary wins
+      30      &#36;0.2092          &#36;0.1661         summary wins
+      60      &#36;0.8235          &#36;0.3326         summary wins
+
+  SUMMARISATION FIRST PAYS FOR ITSELF AT TURN 24.
+
+  WHICH GIVES A CLEAN DESIGN RULE
+    for short interactions, send everything: it is cheaper,
+    simpler, and loses nothing.
+    for long ones, the quadratic term dominates and the extra
+    call is worth paying.
+    for interactions of unknown length, the window is the
+    safe default because its cost is bounded and it needs no
+    extra call.
+
+  AND A CAVEAT ON THE FIGURES
+    the exact break-even depends on the token prices, the
+    summary length and the turn size, all of which vary. The
+    SHAPE does not: a quadratic curve always eventually
+    crosses a linear one, so the only question is where.</div>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The organising fact is that the model is a pure function of its input tokens and holds nothing between calls, so every appearance of memory is a program re-sending text. Quantisation is what makes running that function locally practical, and the arithmetic is one multiplication: a seven-billion-parameter model needs 14.0 GB at sixteen-bit precision and 3.5 GB at four, which is the difference between impossible and routine on consumer hardware. A prompt template is a string with holes, and it earns its name because turning a prompt into a function of its variables is exactly what allows one call to feed another; a chain is that composition and nothing more, with the caveat that independent steps multiply their failure rates.</p>
+
+  <p>Memory strategy is a cost decision with a shape. Re-sending the whole transcript gives perfect recall at quadratic cost and hits a hard context wall at turn 27 on the worked assumptions. A sliding window bounds the cost linearly and forgets abruptly. A running summary bounds it too and forgets gracefully, at the price of an extra call per turn that does not pay for itself until turn 24. Choose by expected conversation length, and default to the window when the length is unknown.</p>
+
+  <p>Lecture 10 keeps everything here and adds two things to the chain: a loop, and the ability to call something that is not a model. That is an agent, and the reasoning-acting pattern that structures it is a direct descendant of the chain-of-thought from lecture 8. The lecture is mostly about failure modes, because a loop that can act is a loop that can act wrongly, repeatedly, and expensively.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State precisely what a model retains between two calls, and what that implies about conversational memory.</li>
+      <li>Compute the memory needed for a 13-billion-parameter model at sixteen-bit and at four-bit precision.</li>
+      <li>Why should you add fifteen to twenty per cent to the weight calculation, and which component of that overhead grows during a conversation?</li>
+      <li>Explain what a prompt template makes possible that a fixed prompt does not.</li>
+      <li>Give the single most useful diagnostic when a chain misbehaves.</li>
+      <li>If each step in a chain succeeds nine times in ten, what is the success rate of a five-step chain, and what does that imply about output control?</li>
+      <li>Write the cumulative token cost of a full-buffer conversation over <em>n</em> turns and state its order of growth.</li>
+      <li>At 150 tokens per turn, at which turn does a full buffer exhaust a 4,096-token context, and what happens at that point?</li>
+      <li>Contrast how a sliding window and a running summary forget.</li>
+      <li>Why does summarisation not pay for itself immediately, and roughly when does it?</li>
+      <li>Which strategy is the right default when the conversation length is unknown, and why?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 8 (<a href="08-reasoning_and_output_control.html">reasoning and output control</a>) introduced the GGUF and <code>llama-cpp-python</code> tooling used here, and its constrained decoding is what stops a chain step from breaking the step after it. Lecture 4 (<a href="04-inside_the_forward_pass.html">inside the forward pass</a>) is where statelessness comes from.</li>
+      <li><strong>Extends:</strong> The chain prompting sketched at the end of lecture 7 (<a href="07-prompt_engineering.html">prompt engineering</a>) becomes a proper construct here.</li>
+      <li><strong>Next:</strong> Lecture 10 (<a href="10-agents_and_react.html">agents and ReAct</a>) adds a loop and tool use to the chain, and inherits every cost curve in this lecture with an unpredictable number of turns.</li>
+      <li><strong>Forward:</strong> Retrieval in lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>) is the fourth memory strategy in disguise: instead of re-sending the transcript, fetch only the relevant part of a much larger store.</li>
+      <li><strong>Cost companion:</strong> The quadratic-versus-linear reasoning here is the same shape that governs attention itself, covered in the machine learning track's <a href="../machine_learning/11_large_language_models/index.html">large language models</a> module.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 9 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

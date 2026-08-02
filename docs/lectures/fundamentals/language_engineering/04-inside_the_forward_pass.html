@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 4: inside the forward pass</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Inside the forward pass</h1>
+  <p class="subtitle">The machine learning track derives what attention computes. This lecture is about what happens when you actually run the thing: that a paragraph is not one computation but hundreds, each a full pass through the network; that the model's real output is a probability over every token in its vocabulary and something else entirely decides which one you get; and that the single optimisation making generation tolerable, caching the attention keys and values, is also the reason serving a long conversation costs so much memory. Nearly every architectural change since 2017 has been an attack on one of those costs.</p>
+  <div class="meta">
+    <span>Lecture 4 of 18</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part I: what is under the bonnet</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A generative model produces one token per <strong>forward pass</strong>, appends it to the input, and runs again; that loop, and not the network, is what produces a paragraph. Three components make up the pass: the tokenizer, a stack of <strong>transformer blocks</strong>, and the <strong>language modelling head</strong>, a single linear layer projecting the final hidden vector onto one score per vocabulary entry. What the model returns is therefore a distribution over the whole vocabulary, and a separate <strong>decoding strategy</strong> chooses from it, either greedily by taking the maximum or by sampling. Every input token gets its own computation stream and the number of streams available is the <strong>context length</strong>, a hard architectural ceiling; only the last stream's output reaches the language modelling head, but all of them must be computed because attention reads them. Recomputing them at every step would be ruinous, so the <strong>key-value cache</strong> stores each position's attention keys and values once, turning a quadratic amount of repeated work into a linear amount of stored memory. That memory is the binding constraint on serving, which is why the significant architectural changes since 2017, <strong>sparse attention</strong>, <strong>multi-query</strong> and <strong>grouped-query attention</strong>, <strong>flash attention</strong>, and <strong>rotary positional embeddings</strong>, are almost all attacks on the cost of attention rather than improvements to what it computes.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine a scribe who can only ever write one word, and to do it must reread the entire document from the beginning. Write a word, hand the page back, and the scribe rereads everything and writes one more. That's the generation loop, and it explains why output arrives at a steady drip rather than all at once. Now notice the obvious inefficiency: the scribe is rereading identical text hundreds of times. So the scribe keeps notes about each sentence already read, and on each new pass only reads the newest word and consults the notes for the rest. That is the key-value cache, and it's the difference between a paragraph taking twenty seconds and taking four. The catch is that the notes keep growing. On a very long document they eventually fill the desk, which is precisely the constraint that decides how many conversations a server can hold at once.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the track</span>
+    This closes Part I. Lectures 2 and 3 took you from text to token IDs to vectors; this one follows the vectors through the network and back out to text. It deliberately does not re-derive attention, which the machine learning track's <a href="../machine_learning/05_deep_learning/08-transformers.html">transformers</a> lecture does properly. Everything here is what that lecture leaves out because it only becomes visible once a model is running: the loop, the head, the cache, and the engineering that has grown up around their costs.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Four consequences that shape how you design, cost and debug anything built on a generative model.</p>
+
+  <p>First, <strong>generation cost is per output token, not per request, and the two behave completely differently</strong>. Reading a long prompt is one pass over many positions, done in parallel and therefore fast. Writing a long answer is many sequential passes, each of which must wait for the last. A request with a 10,000-token prompt and a 50-token answer is far cheaper and faster than one with a 100-token prompt and a 2,000-token answer, which is the reverse of most people's intuition. When you're optimising latency, the first question is always how many tokens you're asking the model to write.</p>
+
+  <p>Second, <strong>the model's actual output is a distribution, and the thing that turns it into text is not the model</strong>. Understanding that the same model with the same prompt can give different answers, or perfectly reproducible ones, purely by the choice of decoding strategy is what makes the temperature and <code>top_p</code> parameters of lecture 7 comprehensible rather than magical. It's also what makes constrained generation possible in lecture 8: if you can see the distribution before a token is chosen, you can forbid choices that would break your output format.</p>
+
+  <p>Third, <strong>the key-value cache is usually what limits how many users you can serve</strong>. Model weights are a fixed cost, loaded once. The cache is a per-conversation cost that grows with every token, and on a busy server it can exceed the weights. This is why context length is priced the way it is, why providers meter it so carefully, and why grouped-query attention was adopted so quickly across the industry: it reduces cache size directly.</p>
+
+  <p>Fourth, <strong>the context length is a hard ceiling and not a soft one</strong>. There are only as many computation streams as the architecture provides. Text beyond the limit is not attended to weakly, it is not part of the computation at all, and the usual symptom is silent truncation rather than an error. Any pipeline handling documents of unpredictable length has to count tokens explicitly, which is the direct reason chunking and retrieval exist as disciplines.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team deployed an internal assistant on a single GPU and load-tested it with short questions. Throughput looked comfortable, so they released it. Within a week it was falling over at a fraction of the tested concurrency, and the pattern made no sense at first: the failures came in the afternoons, and restarting the service fixed it for a while. The cause was that real users held long conversations rather than asking one-off questions, and each conversation's key-value cache grew with every turn. Model weights had been sized carefully against available memory; the cache had not been budgeted at all, because in the load test every conversation was two turns long. The eventual fix was three unglamorous changes: a cap on conversation length, eviction of idle sessions, and moving to a model using grouped-query attention, which cut cache per token substantially. None of that is visible from the model card, and all of it is predictable from the picture in this lecture.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a loop around a three-part pipeline, in which the network runs once per output token and the last thing it does is score every word it knows.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The generation loop: tokenizer, transformer stack, language modelling head, distribution over the vocabulary, decoding strategy, and the append step that closes the loop">
+      <defs>
+        <marker id="fwdArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+        <marker id="loopArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#be185d"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">One pass through the pipeline produces exactly one token</text>
+
+      <!-- prompt -->
+      <rect x="20" y="42" width="130" height="44" rx="8" fill="#FFFFFF" stroke="#a1a1aa" stroke-width="1.5"/>
+      <text x="85" y="61" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">prompt (+ what has</text>
+      <text x="85" y="76" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">been written so far)</text>
+
+      <!-- tokenizer -->
+      <rect x="180" y="42" width="110" height="44" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="235" y="61" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">TOKENIZER</text>
+      <text x="235" y="76" text-anchor="middle" font-family="Inter" font-size="9" fill="#a16207">lecture 2</text>
+
+      <!-- stack -->
+      <rect x="320" y="30" width="200" height="130" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="420" y="50" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">TRANSFORMER BLOCKS</text>
+      <rect x="340" y="60" width="160" height="20" rx="4" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+      <text x="420" y="74" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#5b21b6">block 32: attention + feedforward</text>
+      <text x="420" y="94" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c3aed">&#8942;</text>
+      <rect x="340" y="100" width="160" height="20" rx="4" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+      <text x="420" y="114" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#5b21b6">block 2: attention + feedforward</text>
+      <rect x="340" y="124" width="160" height="20" rx="4" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+      <text x="420" y="138" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#5b21b6">block 1: attention + feedforward</text>
+
+      <!-- lm head -->
+      <rect x="550" y="42" width="110" height="44" rx="8" fill="#FCE7F3" stroke="#be185d" stroke-width="2"/>
+      <text x="605" y="61" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#831843">LM HEAD</text>
+      <text x="605" y="76" text-anchor="middle" font-family="Inter" font-size="9" fill="#be185d">3072 &#8594; 32,064</text>
+
+      <line x1="150" y1="64" x2="180" y2="64" stroke="#71717a" stroke-width="1.8" marker-end="url(#fwdArrow)"/>
+      <line x1="290" y1="64" x2="320" y2="64" stroke="#71717a" stroke-width="1.8" marker-end="url(#fwdArrow)"/>
+      <line x1="520" y1="64" x2="550" y2="64" stroke="#71717a" stroke-width="1.8" marker-end="url(#fwdArrow)"/>
+
+      <text x="605" y="104" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">reads only the</text>
+      <text x="605" y="115" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">last position's vector</text>
+
+      <!-- distribution -->
+      <rect x="690" y="30" width="170" height="130" rx="10" fill="#FFFFFF" stroke="#be185d" stroke-width="2"/>
+      <text x="775" y="50" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#831843">A DISTRIBUTION</text>
+      <text x="775" y="63" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#be185d">over all 32,064 tokens</text>
+      <g font-family="JetBrains Mono" font-size="8.5">
+        <text x="704" y="82" fill="#831843">"Dear"</text><rect x="760" y="74" width="60" height="10" rx="2" fill="#be185d"/><text x="826" y="82" fill="#831843">0.40</text>
+        <text x="704" y="98" fill="#831843">"Hi"</text><rect x="760" y="90" width="34" height="10" rx="2" fill="#e879b9"/><text x="826" y="98" fill="#831843">0.22</text>
+        <text x="704" y="114" fill="#831843">"To"</text><rect x="760" y="106" width="18" height="10" rx="2" fill="#f3b6d8"/><text x="826" y="114" fill="#831843">0.12</text>
+        <text x="704" y="130" fill="#831843">"I"</text><rect x="760" y="122" width="9" height="10" rx="2" fill="#f8d5e8"/><text x="826" y="130" fill="#831843">0.06</text>
+        <text x="704" y="146" fill="#71717a">&#8230; 32,060 more</text>
+      </g>
+      <line x1="660" y1="64" x2="690" y2="64" stroke="#71717a" stroke-width="1.8" marker-end="url(#fwdArrow)"/>
+
+      <!-- decoding -->
+      <rect x="620" y="196" width="240" height="52" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="740" y="216" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">DECODING STRATEGY</text>
+      <text x="740" y="232" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">greedy (take the max) or sample</text>
+      <text x="740" y="244" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#b45309">not part of the model. lecture 7.</text>
+      <line x1="775" y1="160" x2="775" y2="196" stroke="#71717a" stroke-width="1.8" marker-end="url(#fwdArrow)"/>
+
+      <!-- chosen token -->
+      <rect x="440" y="200" width="130" height="44" rx="8" fill="#FFFFFF" stroke="#be185d" stroke-width="1.5"/>
+      <text x="505" y="219" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#831843">one token</text>
+      <text x="505" y="234" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#831843">"Dear"</text>
+      <line x1="620" y1="222" x2="570" y2="222" stroke="#71717a" stroke-width="1.8" marker-end="url(#fwdArrow)"/>
+
+      <!-- loop back -->
+      <path d="M 440 222 L 85 222 L 85 90" fill="none" stroke="#be185d" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#loopArrow)"/>
+      <text x="255" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#be185d">append it to the input and run the whole pipeline again</text>
+      <text x="255" y="256" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#be185d">this loop, repeated once per token, is what "generating a paragraph" means</text>
+
+      <!-- streams panel -->
+      <line x1="20" y1="278" x2="860" y2="278" stroke="#d4d4d8" stroke-width="1"/>
+      <text x="20" y="300" font-family="Inter" font-size="10" font-weight="700" fill="#3f3f46">AND INSIDE ONE PASS: PARALLEL STREAMS</text>
+
+      <g>
+        <rect x="30" y="312" width="60" height="58" rx="6" fill="#F4F4F2" stroke="#a1a1aa"/>
+        <text x="60" y="332" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#52525b">"The"</text>
+        <text x="60" y="350" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">computed</text>
+        <text x="60" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">discarded</text>
+
+        <rect x="98" y="312" width="60" height="58" rx="6" fill="#F4F4F2" stroke="#a1a1aa"/>
+        <text x="128" y="332" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#52525b">"capital"</text>
+        <text x="128" y="350" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">computed</text>
+        <text x="128" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">discarded</text>
+
+        <rect x="166" y="312" width="60" height="58" rx="6" fill="#F4F4F2" stroke="#a1a1aa"/>
+        <text x="196" y="332" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#52525b">"of"</text>
+        <text x="196" y="350" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">computed</text>
+        <text x="196" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">discarded</text>
+
+        <rect x="234" y="312" width="60" height="58" rx="6" fill="#F4F4F2" stroke="#a1a1aa"/>
+        <text x="264" y="332" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#52525b">"France"</text>
+        <text x="264" y="350" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">computed</text>
+        <text x="264" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">discarded</text>
+
+        <rect x="302" y="312" width="60" height="58" rx="6" fill="#FCE7F3" stroke="#be185d" stroke-width="2"/>
+        <text x="332" y="332" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#831843">"is"</text>
+        <text x="332" y="350" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#831843">this one goes</text>
+        <text x="332" y="362" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#831843">to the LM head</text>
+      </g>
+
+      <text x="390" y="330" font-family="Inter" font-size="9" fill="#52525b">Every position gets its own stream through the whole stack. Only the last stream's</text>
+      <text x="390" y="343" font-family="Inter" font-size="9" fill="#52525b">output vector reaches the LM head, yet all the others must still be computed,</text>
+      <text x="390" y="356" font-family="Inter" font-size="9" fill="#52525b">because attention in every block reads them. The number of streams available</text>
+      <text x="390" y="369" font-family="Inter" font-size="9" font-weight="600" fill="#5b21b6">is the context length: a fixed architectural ceiling, not a setting.</text>
+    </svg>
+    <figcaption>The upper half is the loop: tokenise, run the stack, project to a score per vocabulary entry, choose one, append it, and repeat. The lower half is what happens inside a single pass: every input position is processed in parallel through its own stream, but only the final position's output vector is scored, because that's the position whose continuation you want. The other streams are computed anyway, since attention in each block consults them.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>The model predicts one token; the loop writes the text.</strong> Almost every property of generation that surprises people, the drip-feed latency, the cost asymmetry between reading and writing, the way a single bad token derails everything after it, follows from that separation. <strong>Attention is where the money goes.</strong> The feedforward layers hold most of the parameters, but attention is what scales badly with sequence length and what consumes the memory, so it's what every optimisation since 2017 has targeted.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The three components, read off a real model</h3>
+
+  <p>Printing a loaded model gives you its architecture directly, and it is worth learning to read.</p>
+
+  <div class="worked">
+    <h4>print(model), lightly trimmed: Phi-3-mini</h4>
+Phi3ForCausalLM(
+  (model): Phi3Model(
+    (embed_tokens): Embedding(32064, 3072)        &#8592; the embedding matrix, lecture 3
+    (layers): ModuleList(
+      (0-31): 32 x Phi3DecoderLayer(              &#8592; 32 identical blocks
+        (self_attn): Phi3Attention(
+          (qkv_proj): Linear(3072 -&gt; 9216)        &#8592; queries, keys, values: 3 x 3072
+          (o_proj):   Linear(3072 -&gt; 3072)
+          (rotary_emb): Phi3RotaryEmbedding()     &#8592; RoPE, discussed below
+        )
+        (mlp): Phi3MLP(
+          (gate_up_proj): Linear(3072 -&gt; 16384)   &#8592; the feedforward layer:
+          (down_proj):    Linear(8192 -&gt; 3072)       wider than the model, then back
+          (activation_fn): SiLU()                 &#8592; not ReLU
+        )
+        (input_layernorm):          Phi3RMSNorm() &#8592; normalisation before, not after
+        (post_attention_layernorm): Phi3RMSNorm()
+      )
+    )
+  )
+  (lm_head): Linear(3072 -&gt; 32064)                &#8592; one score per vocabulary entry
+)
+  </div>
+
+  <p>Read it top to bottom and you have the whole pipeline. An embedding matrix of 32,064 rows by 3,072 columns, matching the tokenizer's vocabulary. Thirty-two identical decoder blocks, each with an attention layer and a feedforward layer. Then <code>lm_head</code>, a single linear layer from the model's 3,072-dimensional hidden space to 32,064 outputs, one per vocabulary entry.</p>
+
+  <p>That last layer is the <strong>language modelling head</strong>, and calling it a head is meaningful: it's one of several things you can bolt onto the same stack of blocks. Attach a sequence classification head instead and you get a document classifier; attach a token classification head and you get an entity recogniser. Lecture 16 does exactly this. The stack of blocks is the general-purpose part; the head is what determines the task.</p>
+
+  <h3>What the head returns, and who chooses</h3>
+
+  <p>You can run the stack and the head separately and look at what sits between them.</p>
+
+  <pre><code>prompt = "The capital of France is"
+input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to("cuda")
+
+model_output = model.model(input_ids)          # the stack, without the head
+lm_head_output = model.lm_head(model_output[0])  # the head
+
+model_output[0].shape    # torch.Size([1, 6, 3072])   6 positions, 3072 dims each
+lm_head_output.shape     # torch.Size([1, 6, 32064])  6 positions, one score per token
+
+token_id = lm_head_output[0, -1].argmax(-1)    # 0 = batch, -1 = last position
+tokenizer.decode(token_id)                      # 'Paris'</code></pre>
+
+  <p>The shapes tell the story. Six tokens went in, six vectors of 3,072 came out of the stack, and the head expanded each into 32,064 scores. The indices <code>[0, -1]</code> select the batch's only item and its last position, because the last position is the one whose continuation you want. Taking <code>argmax</code> over those 32,064 scores gives "Paris".</p>
+
+  <p>Taking the maximum is <strong>greedy decoding</strong>, and it's one choice among several. Because the head's output is a distribution, you can instead <em>sample</em> from it: if "Dear" carries 40% of the probability mass, pick it 40% of the time. Greedy decoding is deterministic and tends towards repetitive, flat text. Sampling introduces variety at the cost of reproducibility. Neither is part of the model, and switching between them changes nothing about the weights. Lecture 7 works through what <code>temperature</code> and <code>top_p</code> do to the distribution before the sample is drawn.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why this matters more than it looks</span>
+    Two facts follow directly from the head returning a full distribution rather than a token. The model always has an opinion about every token in its vocabulary, including the ones it considers absurd, so there is always a probability attached to a wrong answer and the interesting question is how much. And because something outside the model does the choosing, you can intervene there: forbid tokens that would produce invalid JSON, force the next token to be one of a fixed set of category labels, or require the output to match a grammar. That's constrained generation, and lecture 8 shows what it buys you.
+  </div>
+
+  <h3>Streams, context length, and why all of them are computed</h3>
+
+  <p>Inside a single forward pass every input position is processed in parallel along its own stream: in at one end as an embedding vector, out at the other as a vector of the same size. The model's <strong>context length</strong> is simply how many such streams the architecture provides, and the ceiling is architectural rather than configurable.</p>
+
+  <p>Only the last stream's output reaches the language modelling head, which raises the obvious question of why the others are computed at all. The answer is that they are consumed inside the stack rather than at the end. Attention in every block reads the intermediate representations of every earlier position, so the final position's vector can only be computed if all the earlier ones have been. Their outputs are discarded; their intermediate states were the point.</p>
+
+  <p>This is also where the reading-versus-writing asymmetry comes from. Processing a long prompt happens in one pass with all positions computed in parallel, which GPUs are extremely good at. Writing a long answer requires one sequential pass per token, and no amount of parallel hardware removes the dependency between them.</p>
+
+  <h3>The key-value cache</h3>
+
+  <p>Now put the loop and the streams together and the waste becomes obvious. To generate token 101, you append token 100 to the input and run the whole pass again, recomputing every stream from position 1 onwards, all of which produced exactly the same intermediate values last time because their inputs have not changed. The causal mask guarantees this: earlier positions cannot see later ones, so nothing about them changes when a token is appended at the end.</p>
+
+  <p>The <strong>key-value cache</strong> exploits that. Each attention layer computes a key vector and a value vector for every position; store them the first time and reuse them on every subsequent step. Then generating the next token requires computing just one new stream, for the newly appended token, plus reading the cache for everything before it.</p>
+
+  <p>The difference is not marginal. Generating 100 tokens from the same prompt on a Colab T4 takes about 4.5 seconds with caching enabled and about 21.8 seconds with it disabled, a factor of roughly five, and the factor grows with sequence length because the wasted work grows quadratically while the cached work grows linearly.</p>
+
+  <pre><code>generation_output = model.generate(
+    input_ids=input_ids,
+    max_new_tokens=100,
+    use_cache=True,     # the default. Setting False is a useful demonstration
+)                       # and a terrible idea in production.</code></pre>
+
+  <p>The cost is memory, and it's the cost that bites. The cache holds two vectors per position, per attention head, per layer, and it grows with every token generated. For a model with many layers and many heads, a long conversation's cache can rival or exceed the model weights, and unlike the weights it's paid per concurrent conversation rather than once. Everything about how long contexts are priced and rationed traces back to this.</p>
+
+  <p>One more observation from the numbers. Even 4.5 seconds is a long time to watch a blank screen, and the wait scales with answer length. This is why essentially every provider streams tokens to the client as they're generated rather than returning the completed answer: the total time is unchanged, but the first token arrives in a fraction of a second.</p>
+
+  <h3>Inside the block: two layers with two jobs</h3>
+
+  <p>Each of the thirty-two blocks contains an attention layer and a feedforward layer, and the division of labour between them is worth naming even though the mechanics belong to the machine learning track.</p>
+
+  <div class="defcard">
+    <span class="term">Attention layer</span>
+    <span class="def">Brings in information from other positions. Two steps: score how relevant each earlier position is to the current one, by multiplying the current position's query vector against the keys of all previous positions and normalising with a softmax; then combine, by taking the weighted sum of those positions' value vectors. This is what resolves "the dog chased the squirrel because it" by pulling information from whichever noun the training data suggests. Run several times in parallel as <strong>attention heads</strong>, so different heads can track different kinds of relationship at once.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">Feedforward layer</span>
+    <span class="def">Holds most of the parameters and most of what the model knows. It's the component that supplies "Redemption" after "The Shawshank", and it does more than lookup: the same machinery interpolates between things it saw in training, which is what generalisation to unseen input actually consists of. Note in the printout that it widens 3,072 to 16,384 before projecting back down; that expansion is where the capacity lives.</span>
+  </div>
+
+  <p>A useful shorthand: attention decides <em>which</em> information is relevant, and the feedforward layer decides <em>what to do</em> with it. The machine learning track's <a href="../machine_learning/05_deep_learning/08-transformers.html">transformers</a> lecture derives the query, key and value projections properly, including why the scaling factor is there and how multi-head attention is implemented.</p>
+
+  <h3>Making attention cheaper: three approaches</h3>
+
+  <p>Attention is quadratic in sequence length, because every position may attend to every previous position, and it's the dominant cost at long contexts. Three families of fix have stuck.</p>
+
+  <p><strong>Sparse and local attention</strong> attacks the problem directly by restricting which earlier positions a given position may attend to, typically a sliding window of recent tokens rather than everything. Restricting every layer this way degrades quality badly, since the model then genuinely cannot see far back. The workable pattern, used by GPT-3, is to interleave: alternate blocks use full attention and sparse attention, so information can still propagate a long way through the stack while most layers pay the cheaper cost.</p>
+
+  <p><strong>Multi-query and grouped-query attention</strong> attack the cache rather than the computation. In standard multi-head attention, each head has its own query, key and value projections, so a model with 32 heads caches 32 sets of keys and values per position per layer. Multi-query attention shares one key and value set across all heads, cutting the cache by a factor equal to the head count. That turns out to be too aggressive at scale, costing noticeable quality, so grouped-query attention takes the middle position: divide the heads into groups and share keys and values within each group. It's the default in the Llama family and most current open models, for the straightforward reason that it retains nearly all the quality for most of the memory saving.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Multi-head, grouped-query and multi-query attention compared by how many key and value sets each caches">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Same queries, fewer keys and values: the cache shrinks by the sharing factor</text>
+
+      <!-- MHA -->
+      <rect x="15" y="36" width="275" height="200" rx="10" fill="#FFFFFF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="152" y="58" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">MULTI-HEAD</text>
+      <text x="152" y="73" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#7c3aed">the original, 2017</text>
+      <g>
+        <rect x="35" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="65" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="95" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="125" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="155" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="185" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="215" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="245" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+      </g>
+      <text x="152" y="101" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#5b21b6">8 query heads</text>
+      <g stroke="#a1a1aa" stroke-width="1">
+        <line x1="48" y1="108" x2="48" y2="140"/><line x1="78" y1="108" x2="78" y2="140"/>
+        <line x1="108" y1="108" x2="108" y2="140"/><line x1="138" y1="108" x2="138" y2="140"/>
+        <line x1="168" y1="108" x2="168" y2="140"/><line x1="198" y1="108" x2="198" y2="140"/>
+        <line x1="228" y1="108" x2="228" y2="140"/><line x1="258" y1="108" x2="258" y2="140"/>
+      </g>
+      <g>
+        <rect x="35" y="140" width="26" height="22" rx="3" fill="#FCE7F3" stroke="#be185d"/>
+        <rect x="65" y="140" width="26" height="22" rx="3" fill="#FCE7F3" stroke="#be185d"/>
+        <rect x="95" y="140" width="26" height="22" rx="3" fill="#FCE7F3" stroke="#be185d"/>
+        <rect x="125" y="140" width="26" height="22" rx="3" fill="#FCE7F3" stroke="#be185d"/>
+        <rect x="155" y="140" width="26" height="22" rx="3" fill="#FCE7F3" stroke="#be185d"/>
+        <rect x="185" y="140" width="26" height="22" rx="3" fill="#FCE7F3" stroke="#be185d"/>
+        <rect x="215" y="140" width="26" height="22" rx="3" fill="#FCE7F3" stroke="#be185d"/>
+        <rect x="245" y="140" width="26" height="22" rx="3" fill="#FCE7F3" stroke="#be185d"/>
+      </g>
+      <text x="152" y="155" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#831843">8 key/value sets</text>
+      <text x="152" y="186" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#831843">cache: 8 units per position</text>
+      <text x="152" y="204" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">best quality, worst memory</text>
+      <text x="152" y="222" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">fine until contexts got long</text>
+
+      <!-- GQA -->
+      <rect x="302" y="36" width="275" height="200" rx="10" fill="#FFFFFF" stroke="#0d9488" stroke-width="2"/>
+      <text x="439" y="58" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">GROUPED-QUERY</text>
+      <text x="439" y="73" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#0d9488">Llama 2 and 3, most current open models</text>
+      <g>
+        <rect x="322" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="352" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="382" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="412" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="442" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="472" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="502" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="532" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+      </g>
+      <text x="439" y="101" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#5b21b6">8 query heads</text>
+      <g stroke="#a1a1aa" stroke-width="1">
+        <line x1="335" y1="108" x2="380" y2="140"/><line x1="365" y1="108" x2="380" y2="140"/>
+        <line x1="395" y1="108" x2="380" y2="140"/><line x1="425" y1="108" x2="380" y2="140"/>
+        <line x1="455" y1="108" x2="500" y2="140"/><line x1="485" y1="108" x2="500" y2="140"/>
+        <line x1="515" y1="108" x2="500" y2="140"/><line x1="545" y1="108" x2="500" y2="140"/>
+      </g>
+      <rect x="322" y="140" width="116" height="22" rx="3" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+      <rect x="442" y="140" width="116" height="22" rx="3" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="439" y="155" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#115e59">2 key/value sets, one per group</text>
+      <text x="439" y="186" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">cache: 2 units per position</text>
+      <text x="439" y="204" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">nearly all the quality, most of the saving</text>
+      <text x="439" y="222" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">the current default, and for good reason</text>
+
+      <!-- MQA -->
+      <rect x="589" y="36" width="275" height="200" rx="10" fill="#FFFFFF" stroke="#b45309" stroke-width="2"/>
+      <text x="726" y="58" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">MULTI-QUERY</text>
+      <text x="726" y="73" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#b45309">one write-head is all you need</text>
+      <g>
+        <rect x="609" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="639" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="669" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="699" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="729" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="759" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="789" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+        <rect x="819" y="86" width="26" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+      </g>
+      <text x="726" y="101" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#5b21b6">8 query heads</text>
+      <g stroke="#a1a1aa" stroke-width="1">
+        <line x1="622" y1="108" x2="726" y2="140"/><line x1="652" y1="108" x2="726" y2="140"/>
+        <line x1="682" y1="108" x2="726" y2="140"/><line x1="712" y1="108" x2="726" y2="140"/>
+        <line x1="742" y1="108" x2="726" y2="140"/><line x1="772" y1="108" x2="726" y2="140"/>
+        <line x1="802" y1="108" x2="726" y2="140"/><line x1="832" y1="108" x2="726" y2="140"/>
+      </g>
+      <rect x="609" y="140" width="236" height="22" rx="3" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+      <text x="726" y="155" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#92400e">1 key/value set, shared by all</text>
+      <text x="726" y="186" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#92400e">cache: 1 unit per position</text>
+      <text x="726" y="204" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">cheapest, and at scale it shows</text>
+      <text x="726" y="222" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">too punishing for large models</text>
+
+      <text x="440" y="266" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">The queries are untouched in all three. Only the keys and values are shared, and it is exactly the keys and values that the cache stores.</text>
+      <text x="440" y="282" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">Head counts here are illustrative; a real model has more.</text>
+    </svg>
+    <figcaption>All three keep the same number of query heads, so the model can still attend to many kinds of relationship at once. What changes is how many distinct key and value sets exist, and since those are exactly what the key-value cache stores, sharing them cuts serving memory proportionately. Grouped-query attention sits between the two extremes and has become the default because the quality loss is small and the memory saving is not.</figcaption>
+  </figure>
+
+  <p><strong>Flash attention</strong> attacks neither the computation nor the cache but the movement of data. A GPU has a small, very fast on-chip memory and a much larger, much slower one, and a naive attention implementation shuttles large intermediate matrices between them repeatedly. Flash attention reorganises the calculation so intermediates stay in fast memory, producing a substantial speed-up in both training and inference. It computes exactly the same attention: the result is numerically the same, only obtained without the wasted traffic. It is worth knowing about mainly because enabling it is often a one-line configuration change with no downside.</p>
+
+  <h3>Other changes in a current block</h3>
+
+  <p>Comparing the 2017 block with the printout above shows three quieter changes that have become standard.</p>
+
+  <p>Normalisation moved from after each sub-layer to before it. Pre-normalisation makes training more stable and faster to converge, and it's why <code>input_layernorm</code> appears ahead of the attention layer rather than behind it. The normaliser itself changed from LayerNorm to <strong>RMSNorm</strong>, which drops the mean-centring step and is simpler and cheaper for no measured loss. And the activation function moved from ReLU to gated variants in the SwiGLU family, visible in the printout as <code>SiLU</code> paired with a <code>gate_up_proj</code>. None of these change what the architecture can express; all three make it cheaper or more stable to train.</p>
+
+  <h3>Rotary positional embeddings</h3>
+
+  <p>Attention has no inherent notion of order, so position must be supplied. The original transformer added an absolute positional vector to each token's embedding at the very start: position 1, position 2, and so on. That works, and it has a specific problem at scale.</p>
+
+  <p>Training a model with a 4,000-token context on documents that are mostly much shorter would waste most of every batch on padding, so documents are <strong>packed</strong> together, several per context window. Now consider a document that happens to start at position 50. Absolute positional embeddings tell the model this is the fiftieth token of something, implying forty-nine tokens of preceding context that in fact belong to an entirely unrelated document. The model is being told something false about its input.</p>
+
+  <p><strong>Rotary positional embeddings</strong>, or RoPE, address this by encoding position as a rotation applied to the query and key vectors, in a way that makes the attention score between two positions depend on their <em>relative</em> distance rather than their absolute indices. Two tokens five apart interact the same way whether they sit at positions 10 and 15 or at 1,010 and 1,015. Two structural details are worth remembering: RoPE is applied inside the attention layer immediately before the relevance scoring step, not added to the embeddings at the start of the pass, which is why <code>rotary_emb</code> appears inside <code>Phi3Attention</code> in the printout; and because the encoding is relative, it extrapolates to sequence lengths beyond those seen in training far better than absolute schemes do. That property is a large part of why context windows grew as quickly as they did.</p>
+
+  <div class="callout warn">
+    <span class="tag">Extrapolation is graceful, not free</span>
+    RoPE degrading gracefully beyond its training length is not the same as working. A model advertised with a long context may have been trained on far shorter sequences and extended afterwards, and quality often falls off well before the stated limit. If a long-context capability matters to your application, measure it on your own data rather than trusting the number on the model card. Retrieval, in lecture 11, is frequently the better answer than a very long prompt even when the long prompt technically fits.
+  </div>
+
+  <h3>Beyond the transformer</h3>
+
+  <p>Two directions are worth knowing by name even though they sit outside this track. <strong>Mixture-of-experts</strong> models replace the single feedforward layer in each block with many parallel expert layers and a router that activates only a couple per token; the model has a very large total parameter count but activates a small fraction of it per token, buying capacity without proportional compute. Several prominent current models are built this way. Separately, <strong>Mamba</strong> and <strong>RWKV</strong> revisit the recurrent idea with modern machinery, aiming for transformer-quality results with cost linear rather than quadratic in sequence length. Neither has displaced the transformer, and both are live enough that the shape of this lecture may need revisiting.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Generation is a loop around a three-part pipeline, and the network runs once per output token. The tokenizer converts text to IDs, a stack of identical blocks turns embeddings into contextual vectors, and the language modelling head projects the last position's vector onto one score per vocabulary entry; a decoding strategy outside the model then picks a token, which is appended before the next pass. Every position gets a parallel stream and the number of streams is the fixed context length. The key-value cache removes the quadratic recomputation this loop would otherwise entail, at the price of memory that grows with every token and is paid per concurrent conversation, which is the real constraint on serving. Nearly every architectural refinement since 2017 targets one of those costs: sparse attention restricts what may be attended to, grouped-query attention shrinks the cache, flash attention removes wasted memory traffic, and RoPE encodes position relatively, which is what let context windows grow.</p>
+
+  <p>Part I is complete: you can now follow a string from your keyboard to token IDs, to vectors, through the stack, back to a distribution, and out as text. Part II turns to using this. Lecture 5 takes a single task, sentiment classification, and solves it five different ways, from a task-specific representation model to a hosted generative one, then compares the results. It's the lecture that makes the representation-versus-generative choice concrete rather than theoretical.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Explain why a request with a long prompt and a short answer is cheaper than one with a short prompt and a long answer.</li>
+      <li>Name the three components of the forward pass and state what the language modelling head's output and input dimensions are, and why.</li>
+      <li>State what the model returns before a token is chosen, and name two decoding strategies.</li>
+      <li>Explain why all the computation streams are calculated when only the last one's output reaches the head.</li>
+      <li>Describe what the key-value cache stores, why the causal mask is what makes it valid, and what it costs.</li>
+      <li>State the division of labour between the attention layer and the feedforward layer in a block.</li>
+      <li>Explain what grouped-query attention shares, what it does not share, and which resource it saves.</li>
+      <li>Explain the packing problem with absolute positional embeddings, and how RoPE avoids it.</li>
+      <li>In the assistant vignette, explain why the load test failed to reveal the problem.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Assumed:</strong> The machine learning track's <a href="../machine_learning/05_deep_learning/08-transformers.html">transformers</a> lecture derives scaled dot-product attention, multi-head attention and causal masking; its <a href="../machine_learning/10_generative_models/04-decoder_transformers.html">decoder transformers</a> lecture derives the autoregressive factorisation, the softmax over logits, and perplexity.</li>
+      <li><strong>Previous:</strong> Lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>) supplied the vectors that enter the stack and named the contextual vectors that leave it.</li>
+      <li><strong>Next:</strong> Lecture 5 (<a href="05-text_classification.html">text classification</a>) opens Part II by comparing five ways to solve one task.</li>
+      <li><strong>Forward:</strong> The decoding strategy is developed in lecture 7 (<a href="07-prompt_engineering.html">prompt engineering</a>) and exploited in lecture 8 (<a href="08-reasoning_and_output_control.html">reasoning and output control</a>), where intervening in the distribution is what makes constrained output possible. The context ceiling is why lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>) exists at all.</li>
+      <li><strong>Theory companion:</strong> The machine learning track's <a href="../machine_learning/11_large_language_models/01-from_decoders_to_llms.html">from decoders to LLMs</a> lecture treats the context window as a governance and design constraint and covers what happens to capability as these models scale.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 4 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

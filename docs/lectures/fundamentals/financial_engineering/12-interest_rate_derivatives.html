@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 12: interest rate derivatives</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>Interest rate derivatives</h1>
+  <p class="subtitle">Every pricing argument so far has rested on a traded underlying and a single, given, risk-free rate. Interest rate derivatives break both assumptions at once: the "underlying" is a rate, not a traded asset, and the discount rate used to value everything else is itself the random object under study. This lecture rebuilds the term structure from first principles, derives the Vasicek and CIR short-rate models, and delivers the forward-futures convexity adjustment that lecture 1 promised thirteen lectures ago.</p>
+  <div class="meta">
+    <span>Lecture 12 of 13</span>
+    <span>Reading time, 60 minutes</span>
+    <span>Source: <code>UP / 12 - Interest Rates.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Every model since lecture 6 has treated the risk-free rate <code>r</code> as a known constant used to discount a random asset. In this lecture <code>r</code> becomes the random object, and there is no single traded asset called "the rate" to replicate anything with. What is traded instead is a whole family of zero-coupon bonds <code>P(t,T)</code>, one for every maturity <code>T</code>, and the entire yield curve moves at once. Pricing a bond under a stochastic short rate is a direct application of the Feynman-Kac theorem from lecture 8: $P(t,T) = \mathbb{E}^{\mathbb{Q}}[e^{-\int_t^T r_s\,ds} \mid \mathcal{F}_t]$, an expected discount factor rather than an expected payoff. Because the market has more sources of randomness (one entire curve) than it has hedging instruments in the simplest models (one factor, the short rate itself), a quantity called the <strong>market price of risk</strong> survives in the pricing equation and cannot be hedged away by replication alone: it has to be estimated or calibrated.</p>
+
+  <p>The workhorse models, Vasicek and Cox-Ingersoll-Ross (CIR), are both direct applications of stochastic processes already built in this course. Vasicek is exactly the Ornstein-Uhlenbeck process from lecture 7, aimed at the short rate. CIR keeps the mean reversion but replaces the constant diffusion with a square-root diffusion, trading a closed-form path for a guarantee that the rate never goes negative. Hull-White generalises Vasicek with a time-dependent drift so that the model can match today's observed curve exactly, which is the property a trading desk actually needs.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Try to price a bond the way you priced a call option in lecture 9. You would want to write down a stochastic process for "the price of money" and hedge the bond with a position in the underlying. But there is no traded asset called "the interest rate": you cannot buy ten units of <code>r</code> on an exchange. What you can trade is bonds of different maturities, and every one of those bonds is itself driven by the same rate you are trying to model. The replicating portfolio in this lecture is built out of two bonds of different maturities, not out of a rate and a bank account, and that single substitution is the reason interest rate theory needs its own chapter rather than a footnote to Black-Scholes.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP source (13 pages) covers the definitional groundwork for the term structure, the market price of risk, the term-structure PDE, a toy constant-coefficient model, and the Vasicek model in full derivation, closing with a list of five further named models and a guided exercise on CIR. It stops there: no forward rate agreements, no swaps, no caps and floors, no swaptions, no duration or convexity, and no forward-futures convexity adjustment. Every one of those, plus Hull-White's exact curve fit and the post-2008 multi-curve story in the grandmaster section, is added here from standard references (Hull, Brigo and Mercurio) and marked explicitly where it appears.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Interest rate products dwarf every other derivatives market by notional outstanding, and they sit under nearly every other valuation in finance. Discount every cash flow anywhere, whether it belongs to a bond, a swap, an insurance liability, or an equity option's funding leg, and you are using a curve built from exactly the objects this lecture defines: zero-coupon bond prices, spot rates, and forward rates. Get the term structure wrong and every downstream valuation in the institution inherits the error.</p>
+
+  <p>The theoretical reason this needs its own machinery, rather than a relabelling of Black-Scholes, is the organising difficulty stated in section 1. Black-Scholes assumes a traded underlying with its own price process and a separate, constant discount rate. Here, the discount rate is the stochastic process, the "asset" being modelled has no spot price to speak of (only a curve of bond prices derived from it), and hedging one bond requires trading other bonds driven by the same source of risk, not a bank account. This is precisely why lecture 8's Feynman-Kac theorem earns its keep here: it is the bridge between a PDE in <code>(t,r)</code> and an expectation of a stochastic discount factor, which is the natural object once "the rate" is a process rather than a number.</p>
+
+  <p>For a credit risk practitioner the material also has direct professional relevance. IFRS 9 effective interest rate calculations, A-IRB exposure-at-default profiles on floating-rate facilities, and economic capital models for the banking book all embed assumptions about how the curve moves. Vasicek's name in particular survives into credit risk through an entirely different route: the single-factor Gaussian copula used for portfolio credit loss (the ASRF model underlying A-IRB capital) borrows its mean-reverting, normally distributed machinery from the same Ornstein-Uhlenbeck construction used here for rates. Lecture 13 picks that thread up directly.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures anchor the lecture. The first lays out the term structure itself: how a single family of bond prices <code>P(t,T)</code> generates a spot rate for every maturity, a forward rate for every future period, and, in the limit, an instantaneous short rate. The second shows what the short rate actually does under the Vasicek model: it wanders, but it is pulled back toward a long-run level, and after enough time its distribution settles down and stops changing.</p>
+
+  <h3>Picture one: spot, forward and short rates all come from the same curve</h3>
+
+  <p>At a fixed time <code>t</code>, the market quotes a whole curve of zero-coupon bond prices <code>P(t,T)</code>, one for every maturity <code>T ≥ t</code>. Every rate concept in this lecture is a transformation of that one curve: the spot rate <code>Y(t,T)</code> is the annualised yield of the single bond maturing at <code>T</code>; the forward rate <code>R(t;S,T)</code> is the rate contracted today for money borrowed between two future dates <code>S</code> and <code>T</code>; and the short rate <code>r(t)</code> is what the forward rate becomes as its two endpoints collapse onto <code>t</code> itself.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A yield curve with the short rate, a forward rate over a future period, and the spot rate to a distant maturity all marked on the same time axis">
+      <defs>
+        <marker id="axArrIR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+        <linearGradient id="curveFillIR" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ccfbf1" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#ccfbf1" stop-opacity="0.05"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">The yield curve and the three rates it generates</text>
+
+      <!-- Chart axes: x = maturity, y = rate -->
+      <line x1="90" y1="330" x2="740" y2="330" stroke="#71717a" stroke-width="1.5" marker-end="url(#axArrIR)"/>
+      <line x1="90" y1="330" x2="90" y2="60" stroke="#71717a" stroke-width="1.5" marker-end="url(#axArrIR)"/>
+      <text x="745" y="335" font-family="Inter" font-size="12" fill="#71717a">maturity T</text>
+      <text x="60" y="55" text-anchor="middle" font-family="Inter" font-size="12" fill="#71717a">Y(t,T)</text>
+
+      <!-- Upward-sloping yield curve, quadratic-ish -->
+      <path d="M 100 300 C 250 260, 400 160, 700 100" fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round"/>
+      <path d="M 100 300 C 250 260, 400 160, 700 100 L 700 330 L 100 330 Z" fill="url(#curveFillIR)"/>
+      <text x="705" y="95" font-family="Inter" font-weight="600" font-size="12" fill="#0f766e">yield curve Y(t,T)</text>
+
+      <!-- t marker at origin of curve -->
+      <line x1="100" y1="325" x2="100" y2="335" stroke="#18181b" stroke-width="2"/>
+      <text x="100" y="352" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#18181b">t</text>
+
+      <!-- short rate r(t): tangent point at the very start of the curve -->
+      <circle cx="100" cy="300" r="6" fill="#b91c1c"/>
+      <text x="100" y="278" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#b91c1c">r(t) = f(t,t)</text>
+      <text x="100" y="264" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">the curve's own starting slope</text>
+
+      <!-- S and T markers for a forward period -->
+      <line x1="380" y1="325" x2="380" y2="335" stroke="#18181b" stroke-width="2"/>
+      <text x="380" y="352" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#18181b">S</text>
+      <line x1="560" y1="325" x2="560" y2="335" stroke="#18181b" stroke-width="2"/>
+      <text x="560" y="352" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#18181b">T</text>
+
+      <!-- Forward rate R(t;S,T) bracket between S and T, offset below axis label -->
+      <path d="M 380 372 L 380 380 L 560 380 L 560 372" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="470" y="398" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#7c3aed">R(t; S, T), locked in at t for the future period [S,T]</text>
+
+      <!-- Spot rate to a distant maturity: bracket from t to T with the point on the curve -->
+      <circle cx="560" cy="180" r="6" fill="#b45309"/>
+      <line x1="560" y1="180" x2="560" y2="330" stroke="#b45309" stroke-width="1" stroke-dasharray="3,3"/>
+      <text x="600" y="175" font-family="Inter" font-weight="600" font-size="11" fill="#b45309">Y(t,T): the yield of the single</text>
+      <text x="600" y="190" font-family="Inter" font-size="10" fill="#92400e">T-maturity bond, read off the curve</text>
+
+      <!-- instantaneous forward at T, tangent line -->
+      <line x1="500" y1="230" x2="640" y2="130" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="2,4"/>
+      <text x="645" y="128" font-family="Inter" font-weight="600" font-size="11" fill="#1d4ed8">f(t,T): the curve's local slope at T</text>
+    </svg>
+    <figcaption>One curve, three readings. The short rate is the curve's own starting slope at <code>t</code>; a forward rate is the rate for a future interval read off two points on the curve; the instantaneous forward rate is the curve's local slope at any single future maturity; the spot rate is the average rate to a given maturity, read directly off the curve's height.</figcaption>
+  </figure>
+
+  <h3>Picture two: the Vasicek short rate mean-reverts and settles into a distribution</h3>
+
+  <p>Once the short rate is modelled as an Ornstein-Uhlenbeck process, its sample paths do something qualitatively different from the geometric Brownian motion of lecture 6: they do not wander off to infinity or collapse to zero, they oscillate around a long-run level <code>k</code> with a pull strength governed by <code>a</code>. Far enough into the future, the distribution of <code>r(t)</code> stops changing shape and becomes stationary.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Simulated Vasicek short-rate paths mean-reverting toward a long-run level, with the stationary normal distribution sketched at the right edge">
+      <defs>
+        <marker id="axArr2IR" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+        <linearGradient id="statFillIR" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#ddd6fe" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#ddd6fe" stop-opacity="0.75"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Vasicek short-rate paths, pulled toward k, with the stationary distribution at the right edge</text>
+
+      <line x1="70" y1="360" x2="640" y2="360" stroke="#71717a" stroke-width="1.5" marker-end="url(#axArr2IR)"/>
+      <line x1="70" y1="360" x2="70" y2="50" stroke="#71717a" stroke-width="1.5" marker-end="url(#axArr2IR)"/>
+      <text x="650" y="365" font-family="Inter" font-size="12" fill="#71717a">time</text>
+      <text x="45" y="55" text-anchor="middle" font-family="Inter" font-size="12" fill="#71717a">r(t)</text>
+
+      <!-- long-run level k, dashed horizontal -->
+      <line x1="70" y1="210" x2="640" y2="210" stroke="#18181b" stroke-width="1.5" stroke-dasharray="5,4"/>
+      <text x="76" y="203" font-family="Inter" font-weight="600" font-size="12" fill="#18181b">k, the long-run mean</text>
+
+      <!-- three sample paths, mean reverting toward y=210 from different starts -->
+      <path d="M 70 90 C 150 140, 200 260, 260 230 C 320 205, 360 190, 420 215 C 480 235, 540 205, 600 212 C 615 213, 625 210, 640 210"
+            fill="none" stroke="#0f766e" stroke-width="2"/>
+      <path d="M 70 320 C 140 290, 190 200, 250 220 C 310 238, 350 195, 410 205 C 470 213, 530 225, 600 208 C 615 206, 625 209, 640 210"
+            fill="none" stroke="#b45309" stroke-width="2"/>
+      <path d="M 70 210 C 130 170, 180 250, 240 205 C 300 165, 360 235, 420 200 C 480 180, 540 220, 600 211 C 615 210, 625 210, 640 210"
+            fill="none" stroke="#7c3aed" stroke-width="2"/>
+
+      <!-- start markers -->
+      <circle cx="70" cy="90" r="4" fill="#0f766e"/>
+      <circle cx="70" cy="320" r="4" fill="#b45309"/>
+      <circle cx="70" cy="210" r="4" fill="#7c3aed"/>
+      <text x="20" y="93" font-family="Inter" font-size="10" fill="#0f766e">r(0) high</text>
+      <text x="20" y="323" font-family="Inter" font-size="10" fill="#b45309">r(0) low</text>
+
+      <!-- stationary distribution sketched as a rotated bell curve at right edge -->
+      <path d="M 660 360 C 660 330, 675 300, 690 270 C 705 240, 705 180, 690 150 C 675 120, 660 90, 660 60
+               L 660 60 C 690 90, 700 150, 700 210 C 700 270, 690 330, 660 360 Z"
+            fill="url(#statFillIR)" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="715" y="130" font-family="Inter" font-weight="600" font-size="11" fill="#5b21b6" transform="rotate(90 715 130)"></text>
+      <text x="705" y="90" font-family="Inter" font-weight="600" font-size="11" fill="#5b21b6">stationary</text>
+      <text x="705" y="103" font-family="Inter" font-size="10" fill="#5b21b6">N(k, σ²/2a)</text>
+
+      <line x1="640" y1="360" x2="640" y2="60" stroke="#a1a1aa" stroke-width="1" stroke-dasharray="2,3"/>
+      <text x="640" y="378" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">t large</text>
+    </svg>
+    <figcaption>Three Vasicek paths starting from different levels all converge on the same long-run mean <code>k</code>, and by the time the paths reach the right edge of the picture their distribution has settled into the stationary normal law $N(k, \sigma^2/2a)$ derived in section 4. The stationary distribution has no memory of where the path started.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The term structure: definitions built one on top of the next</h3>
+
+  <p>A zero-coupon bond, or <code>T</code>-bond, pays exactly $1 at its maturity <code>T</code> and nothing before then. Its value at any earlier time <code>t ≤ T</code> is written <code>P(t,T)</code>, with the trivial boundary condition <code>P(T,T) = 1</code>. No-arbitrage forces <code>P(t,S) ≥ P(t,T)</code> whenever <code>S ≤ T</code>: a bond that pays $1 sooner cannot be worth less than one that pays the same $1 later, because the earlier-maturing bond dominates it (the holder could always reinvest the earlier $1 and end up with at least as much by <code>T</code>). Every zero-coupon bond price is assumed differentiable in its maturity argument, and, for a fixed <code>T</code>, the value process <code>P(t,T)</code> as <code>t</code> varies is itself a stochastic process.</p>
+
+  <p>Fix two future dates <code>S ≤ T</code>. A simple replication argument pins down the continuously compounded rate the market is implicitly offering for money borrowed between <code>S</code> and <code>T</code>, contracted today at <code>t</code>. Short one <code>S</code>-bond at <code>t</code>, receiving <code>P(t,S)</code> in cash, and invest the proceeds in $\tfrac{P(t,S)}{P(t,T)}$ units of the <code>T</code>-bond. The portfolio costs nothing to set up. At <code>S</code> the short position matures and $1 must be paid; at <code>T</code> the <code>T</code>-bond holding matures and pays $\tfrac{P(t,S)}{P(t,T)}$. The whole trade has therefore locked in a deterministic rate of return over $[S,T]$, contracted at <code>t</code>, defined by</p>
+
+  <p>$$ e^{R(t;S,T)(T-S)} = \frac{P(t,S)}{P(t,T)}, \qquad \text{so} \qquad R(t;S,T) = -\frac{\ln P(t,T) - \ln P(t,S)}{T-S}. $$</p>
+
+  <p><code>R(t;S,T)</code> is the <strong>continuously compounded forward rate</strong> for the period $[S,T]$, contracted at <code>t</code>. Two special cases matter. Setting <code>S = t</code> gives the <strong>spot rate</strong>, the yield of the single bond maturing at <code>T</code>:</p>
+
+  <p>$$ Y(t,T) = R(t;t,T) = -\frac{\ln P(t,T)}{T-t}, \qquad \text{equivalently} \qquad P(t,T) = e^{-Y(t,T)(T-t)}. $$</p>
+
+  <p>The mapping $T \mapsto Y(t,T)$ is the <strong>yield curve</strong>, the object plotted in every financial newspaper. Taking the other limit, $S \to T$, collapses the forward period onto a single instant and gives the <strong>instantaneous forward rate</strong>:</p>
+
+  <p>$$ f(t,T) = \lim_{S \to T} R(t;S,T) = -\frac{\partial}{\partial T} \ln P(t,T). $$</p>
+
+  <p>Finally setting <code>T = t</code> in the instantaneous forward rate collapses the maturity onto today and gives the <strong>short rate</strong>, $r(t) = f(t,t) = -\left(\partial \ln P(t,T)/\partial T\right)_{T=t}$, the quantity everyday usage calls simply "the interest rate". Two identities follow immediately by integrating the definition of <code>f</code>, and both are used repeatedly later in the lecture:</p>
+
+  <p>$$ P(t,T) = P(t,S)\, e^{-\int_S^T f(t,u)\,du}, \qquad P(t,T) = e^{-\int_t^T f(t,s)\,ds}. $$</p>
+
+  <div class="defcard">
+    <div class="term">Money account</div>
+    <div class="def">The riskless cash account earning the short rate continuously, defined by $B_t = \exp\!\left(\int_0^t r(s)\,ds\right)$, equivalently $dB(t) = r(t) B(t)\,dt$, $B(0)=1$. Depending on the model, $r(t)$ may be constant, a deterministic function of time, or a stochastic process. When it is stochastic, <code>B_t</code> is a bank account with a random rate of return, and it plays the role in this lecture that the constant $e^{r(T-t)}$ played from lecture 1 onward.</div>
+  </div>
+
+  <h3>Bond pricing as a Feynman-Kac expectation</h3>
+
+  <p>Lecture 8 established that the price of a claim paying $\Phi(X_T)$ at <code>T</code>, when a single riskless rate <code>r</code> discounts every cash flow, equals the risk-neutral expectation $e^{-r(T-t)}\mathbb{E}^{\mathbb{Q}}[\Phi(X_T) \mid \mathcal{F}_t]$. A zero-coupon bond is the special case $\Phi \equiv 1$, but the discount rate is no longer a constant pulled outside the expectation: it is the short rate process $r_s$ itself, evolving stochastically over $[t,T]$. The natural generalisation, and the one this lecture takes as its starting point for pricing under a stochastic short rate, is</p>
+
+  <p>$$ \boxed{\, P(t,T) = \mathbb{E}^{\mathbb{Q}}\!\left[ \exp\!\left(-\int_t^T r_s\,ds\right) \Bigm| \mathcal{F}_t \right]. \,} $$</p>
+
+  <p>This is precisely a Feynman-Kac expectation, with the discounting term moved inside the expectation because it is no longer safe to move outside it. The corresponding PDE side of the duality, derived below, is the term-structure PDE: solve it, and the solution is guaranteed by Feynman-Kac to equal the expectation above, exactly as lecture 8 guaranteed that a Black-Scholes PDE solution equals a discounted risk-neutral expectation of the option payoff.</p>
+
+  <h3>The market price of risk: why the incompleteness cannot be hedged away</h3>
+
+  <p>Two auxiliary results, both direct consequences of no-arbitrage, are needed before the term-structure PDE can be written down. First, if a self-financing portfolio's dynamics are riskless, $d\Pi(t) = k(t)\Pi(t)\,dt$ with no diffusion term, then <code>k(t)</code> must equal the short rate <code>r(t)</code>: any traded object with a bank-account price dynamic is the bank account, on pain of arbitrage. Second, and more consequential, if two tradable assets $S^{(1)}$ and $S^{(2)}$ are driven by the same source of randomness,</p>
+
+  <p>$$ dS^{(1)} = \mu_1 S^{(1)}\,dt + \sigma_1 S^{(1)}\,dW_t, \qquad dS^{(2)} = \mu_2 S^{(2)}\,dt + \sigma_2 S^{(2)}\,dW_t, $$</p>
+
+  <p>then a self-financing portfolio long $\sigma_2 S^{(2)}$ units of $S^{(1)}$ and short $\sigma_1 S^{(1)}$ units of $S^{(2)}$ cancels the diffusion term entirely, becomes riskless, and by the first result must earn exactly <code>r(t)</code>. Working through the resulting algebra collapses to</p>
+
+  <p>$$ \frac{\mu_1 - r}{\sigma_1} = \frac{\mu_2 - r}{\sigma_2}. $$</p>
+
+  <p>Any two assets whose randomness comes from the same Brownian motion carry the same excess return per unit of volatility. That common ratio is the <strong>market price of risk</strong>, <code>λ(t,r_t)</code>: the compensation, in units of expected excess return per unit of risk, that the market demands for bearing exposure to that particular source of randomness.</p>
+
+  <p>Every zero-coupon bond of every maturity is driven by the same short rate <code>r_t</code>, hence the same Brownian motion, hence all bonds of all maturities share one common market price of risk. This is the fact that makes a closed-form theory of the term structure possible at all: without it, every maturity would need its own separately calibrated risk premium with no relationship to any other maturity.</p>
+
+  <p>The deeper point is what the market price of risk represents economically. A stock and a bank account are both traded assets: their relative pricing is pinned down by a replicating portfolio, and no free parameter survives once volatility is known. Here, the "underlying" (the short rate) is not itself a traded asset; only bonds built on top of it are traded, and there is exactly one source of randomness (<code>r_t</code>) driving infinitely many traded instruments (one bond per maturity). This is a textbook incomplete market: more effective degrees of freedom in the risk than can be spanned by trading a single underlying, so replication pins down relative prices between bonds of different maturities but cannot pin down <code>λ</code> itself from no-arbitrage alone. <code>λ</code> has to come from outside the model, either estimated from historical bond returns or backed out by calibrating the model to today's observed curve.</p>
+
+  <h3>The term-structure PDE</h3>
+
+  <p>Assume the short rate follows a general Ito diffusion, $dr_t = \mu(t,r_t)\,dt + \sigma(t,r_t)\,dW_t$, and that for a fixed maturity <code>T</code> the bond price is a function $P(t,r_t)$. Applying Ito's lemma from lecture 7, substituting the short-rate dynamics, and reading off the drift and diffusion of the resulting bond-price process gives the same structural form as every asset in this course: $dP = \mu_P P\,dt + \sigma_P P\,dW$, with</p>
+
+  <p>$$ \mu_P(t,r) = \frac{1}{P}\Bigl(P_1 + P_2\,\mu(t,r) + \tfrac{1}{2}P_{22}\,\sigma(t,r)^2\Bigr), \qquad \sigma_P(t,r) = \frac{\sigma(t,r)}{P}\,P_2, $$</p>
+
+  <p>where subscripts denote partial derivatives ($P_1 = \partial P/\partial t$, $P_2 = \partial P/\partial r$, $P_{22} = \partial^2 P/\partial r^2$). Since every bond of every maturity is driven by the same <code>W_t</code>, all of them share the one market price of risk derived above:</p>
+
+  <div class="worked">Setting the excess return of the bond, per unit of its own
+volatility, equal to the common market price of risk lambda:
+
+  mu_P(t,r) - r
+  -------------  =  lambda(t,r)
+    sigma_P(t,r)
+
+Substitute the expressions for mu_P and sigma_P:
+
+  ( P_1 + P_2 mu(t,r) + (1/2) P_22 sigma(t,r)^2 ) - r P
+  ------------------------------------------------------  =  lambda(t,r)
+                  sigma(t,r) P_2
+
+Clear the denominator and rearrange into the term-structure PDE:
+
+  P_1 + ( mu(t,r) - sigma(t,r) lambda(t,r) ) P_2
+        + (1/2) sigma(t,r)^2 P_22  -  r P  =  0
+
+with terminal condition P(T,r) = 1 for all r (the bond is worth $1
+at its own maturity, whatever the short rate happens to be then).</div>
+
+  <p>This looks like the Black-Scholes PDE from lecture 9, and the resemblance is not an accident: both arise from exactly the same argument, a self-financing portfolio whose diffusion term is cancelled and whose residual drift must equal <code>r</code>. The difference worth spotting is the drift term. Black-Scholes has $r x\,\partial V/\partial x$: the risk-neutral drift is simply the risk-free rate, because the stock is a traded asset and its risk-neutral drift is pinned down by the money account alone. Here the drift is $\bigl(\mu(t,r) - \sigma(t,r)\lambda(t,r)\bigr) P_2$: the real-world drift <code>μ</code> of the short rate, adjusted downward by a market-price-of-risk term, because <code>r</code> itself is not a traded asset and its risk-neutral drift has to be constructed rather than assumed.</p>
+
+  <div class="defcard">
+    <div class="term">Affine term structure</div>
+    <div class="def">A short-rate model is said to have an affine term structure if the resulting bond price can be written $P(t,r) = e^{A(t,T) - B(t,T)\,r}$ for deterministic functions $A$ and $B$ that do not depend on the current level of $r$. When this ansatz is substituted into the term-structure PDE, the PDE collapses into a pair of ordinary differential equations in $A$ and $B$, avoiding the harder job of solving a partial differential equation directly. Vasicek, CIR, Ho-Lee and Hull-White are all affine; this is precisely why they remain the standard teaching and calibration models despite their simplifying assumptions.</div>
+  </div>
+
+  <h3>A toy model first: constant coefficients</h3>
+
+  <p>Before Vasicek, the source works a simpler warm-up: $dr_t = \mu\,dt + \sigma\,dW_t$ with <code>μ</code> and <code>σ</code> constant, and the market price of risk <code>λ</code> also assumed constant, so that $a := \mu - \sigma\lambda$ is a constant. Guessing the affine ansatz $P(t,r) = e^{A(t) - B(t)r}$ and substituting into the term-structure PDE (with the constant-coefficient drift <code>a</code> replacing $\mu - \sigma\lambda$) splits the PDE into terms that multiply <code>r</code> and terms that do not, each of which must vanish separately for the equation to hold for every value of <code>r</code>. That splitting produces two ordinary differential equations, $B' + 1 = 0$ and $A' - aB + \tfrac{1}{2}\sigma^2 B^2 = 0$, solved backward from $A(T)=B(T)=0$ to give $B(t) = T-t$ and $A(t) = -\tfrac{1}{2}a(T-t)^2 + \tfrac{1}{6}\sigma^2(T-t)^3$, hence</p>
+
+  <p>$$ P(t,r_t) = \exp\!\left( -\tfrac{1}{2}a(T-t)^2 + \tfrac{1}{6}\sigma^2(T-t)^3 - r_t(T-t) \right). $$</p>
+
+  <p>The model is admitted by its own author to be "totally unrealistic": an arithmetic Brownian motion for the short rate has no mean reversion at all and wanders off to $\pm\infty$. Its purpose is purely pedagogical, to demonstrate the affine-ansatz technique on the simplest possible case before applying it to a model worth using.</p>
+
+  <h3>The Vasicek model: Ornstein-Uhlenbeck applied to the short rate</h3>
+
+  <p>Vasicek keeps the constant volatility of the toy model but replaces the drift with mean reversion. In the notation of this course, the short rate is exactly the mean-reverting Ornstein-Uhlenbeck process derived in lecture 7, $dX = \alpha(\theta - X)\,dt + \sigma\,dW$, relabelled with the market's own symbols: reversion speed <code>a</code>, long-run level <code>k</code>, so that</p>
+
+  <p>$$ dr_t = a(k - r_t)\,dt + \sigma\,dW_t. $$</p>
+
+  <p>Lecture 7 solved this equation in general, by the integrating-factor substitution $Y(t) = e^{at}(r_t - k)$, and the solution transfers here without change:</p>
+
+  <p>$$ r_t = k + (r_0 - k)\,e^{-at} + \sigma \int_0^t e^{-a(t-s)}\,dW_s. $$</p>
+
+  <p>Being a linear combination of a deterministic term and a Wiener integral, $r_t$ is normally distributed for every <code>t</code>, with</p>
+
+  <p>$$ \mathbb{E}[r_t] = k + (r_0-k)e^{-at}, \qquad \operatorname{Var}(r_t) = \frac{\sigma^2}{2a}\bigl(1 - e^{-2at}\bigr). $$</p>
+
+  <p>As $t \to \infty$ the mean converges to <code>k</code> and the variance converges to $\sigma^2/2a$, giving the stationary distribution $r_\infty \sim N\bigl(k,\, \sigma^2/2a\bigr)$ sketched in section 3's second figure: however far the rate has wandered, its long-run behaviour forgets the starting point entirely and settles into one fixed normal law.</p>
+
+  <p>Assuming, as with the toy model, that the market price of risk <code>λ</code> is constant, the term-structure PDE becomes $P_1 + (b - ar)P_2 + \tfrac{1}{2}\sigma^2 P_{22} - rP = 0$ with the substitution $b = ak - \lambda\sigma$ absorbing the risk adjustment into a single constant. Substituting the affine ansatz $P(t,r) = e^{A(t)-B(t)r}$ and again separating the terms that multiply <code>r</code> from those that do not gives $B' - aB + 1 = 0$ and $A' = bB - \tfrac{1}{2}\sigma^2 B^2$, solved backward from $A(T) = B(T) = 0$:</p>
+
+  <p>$$ B(t) = \frac{1}{a}\bigl(1 - e^{-a(T-t)}\bigr), \qquad A(t) = \frac{\bigl(B(t)-(T-t)\bigr)\bigl(ab - \tfrac{1}{2}\sigma^2\bigr)}{a^2} - \frac{\sigma^2 B(t)^2}{4a}, $$</p>
+
+  <p>giving the closed-form Vasicek bond price $P(t,r_t) = \exp\bigl(A(t) - B(t)\,r_t\bigr)$, worked numerically below.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Because $r_t$ is normally distributed, it has strictly positive probability of falling below zero for any finite variance, whatever the current level or mean-reversion strength. This was, for decades, cited as Vasicek's defining flaw: a model that permits an economically nonsensical negative rate. The 2010s changed the practical force of that objection. Sustained negative policy rates in the eurozone, Switzerland, Japan and Sweden showed that negative nominal rates are a real, investable phenomenon, not merely a modelling artefact to be engineered away. The theoretical objection to Vasicek is unchanged; its practical sting has weakened considerably.
+  </div>
+
+  <h3>Cox-Ingersoll-Ross: keeping the rate non-negative</h3>
+
+  <p>CIR keeps Vasicek's linear mean-reverting drift but replaces the constant diffusion coefficient with a square-root term that shrinks to zero as the rate approaches zero:</p>
+
+  <p>$$ dr_t = a(k - r_t)\,dt + \sigma\sqrt{r_t}\,dW_t. $$</p>
+
+  <p>This is exactly the CIR row of lecture 7's table of standard SDEs. As noted there, the square-root diffusion is not linear in <code>r</code>, so no integrating factor reduces it to an arithmetic Brownian motion in disguise the way Vasicek's linear SDE does: CIR has no closed-form path solution, only a known transition density (a scaled non-central chi-squared distribution). It remains affine, however, so the bond price formula retains the same $P(t,r) = e^{A(t)-B(t)r}$ structure, with <code>A</code> and <code>B</code> now solving a Riccati-type ODE rather than the simpler linear ODE of the Vasicek case.</p>
+
+  <p>The property that makes CIR worth its extra algebraic cost is the <strong>Feller condition</strong>, $2ak \ge \sigma^2$: when it holds, the mean-reverting pull toward <code>k</code>, scaled by <code>2a</code>, dominates the diffusive push near zero, scaled by <code>σ²</code>, and the process never reaches zero. When it fails, zero is reached with positive probability, but the square-root coefficient still keeps the SDE well-defined there (the diffusion term itself vanishes exactly at the boundary). Either way, <code>r_t ≥ 0</code> almost surely under CIR, which is precisely the property Vasicek lacks.</p>
+
+  <h3>Hull-White: fitting today's curve exactly</h3>
+
+  <p>Vasicek and CIR both have constant long-run levels, so the theoretical yield curve they generate at time <code>0</code> is a fixed function of the model's three or four parameters. Real market curves rarely match that shape exactly. Hull-White's extension replaces the constant long-run level with a deterministic, time-varying function <code>Θ(t)</code>, chosen specifically so that the model's own initial curve reproduces the observed one, bond for bond:</p>
+
+  <p>$$ dr_t = \bigl(\Theta(t) - a(t)\,r_t\bigr)\,dt + \sigma(t)\,dW_t \qquad \text{(Hull-White, extended Vasicek)}, $$</p>
+
+  <p>with the corresponding square-root extension of CIR, $dr_t = \bigl(\Theta(t) - a(t)r_t\bigr)dt + \sigma(t)\sqrt{r_t}\,dW_t$, listed alongside it. Both remain affine, and <code>Θ(t)</code> is solved for analytically once the initial curve is treated as an input rather than an output of the model, which is the calibration property discussed further in section 5.</p>
+
+  <h3>Comparing the four standard short-rate models</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Model</th><th>SDE for <code>r_t</code></th><th>Mean reversion</th><th>Sign of <code>r_t</code></th><th>Affine</th><th>Fits initial curve exactly</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Vasicek</td><td>$dr = a(k-r)\,dt + \sigma\,dW$</td><td>Yes, constant speed <code>a</code>, level <code>k</code></td><td>Can go negative (normal distribution)</td><td>Yes</td><td>No, one fixed curve shape per parameter set</td></tr>
+        <tr><td>Cox-Ingersoll-Ross (CIR)</td><td>$dr = a(k-r)\,dt + \sigma\sqrt{r}\,dW$</td><td>Yes, constant speed <code>a</code>, level <code>k</code></td><td>Non-negative if the Feller condition $2ak \ge \sigma^2$ holds</td><td>Yes</td><td>No, one fixed curve shape per parameter set</td></tr>
+        <tr><td>Ho-Lee</td><td>$dr = \Theta(t)\,dt + \sigma\,dW$</td><td>None, pure drift, no pull-back term</td><td>Can go negative (normal distribution)</td><td>Yes</td><td>Yes, <code>Θ(t)</code> solved from the initial curve</td></tr>
+        <tr><td>Hull-White (extended Vasicek)</td><td>$dr = \bigl(\Theta(t)-a(t)r\bigr)dt + \sigma(t)\,dW$</td><td>Yes, time-varying speed <code>a(t)</code></td><td>Can go negative (normal distribution)</td><td>Yes</td><td>Yes, <code>Θ(t)</code> solved from the initial curve</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Duration and convexity: the fixed-income Greeks</h3>
+
+  <p>Lecture 11 defined delta and gamma as the first and second derivatives of an option's value with respect to the spot price of its underlying. A bond portfolio has an exact analogue, with the yield taking the place of the spot. For a bond (or portfolio) with price <code>P</code> as a function of its own yield <code>y</code>, <strong>modified duration</strong> is the negative log-sensitivity to yield,</p>
+
+  <p>$$ D_{\text{mod}} = -\frac{1}{P}\frac{\partial P}{\partial y}, \qquad \text{so that} \qquad \frac{\Delta P}{P} \approx -D_{\text{mod}} \cdot \Delta y, $$</p>
+
+  <p>playing exactly the role delta played for an option: a first-order, linear approximation to how much the price moves for a small move in the risk factor. <strong>Convexity</strong> is the second derivative,</p>
+
+  <p>$$ C = \frac{1}{P}\frac{\partial^2 P}{\partial y^2}, \qquad \text{so that} \qquad \frac{\Delta P}{P} \approx -D_{\text{mod}} \cdot \Delta y + \tfrac{1}{2} C \cdot (\Delta y)^2, $$</p>
+
+  <p>the same second-order correction gamma supplied in lecture 11's delta-gamma expansion. The economic content is identical in both cases: duration says how exposed the position is to a first-order move in the risk factor, convexity says whether that exposure gets better or worse as the move gets larger. A bond price is a convex function of its yield (<code>C &gt; 0</code> always, since $P$ is decreasing and its slope flattens as $y$ rises), which is why a long bond position benefits from yield volatility in the same directional sense that a long option position benefits from volatility: both are long convexity.</p>
+
+  <h3>Interest rate derivative instruments</h3>
+
+  <p>A <strong>forward rate agreement (FRA)</strong> is the direct instrument realisation of the forward rate <code>R(t;S,T)</code> derived above: two counterparties agree today, at <code>t</code>, to exchange at <code>T</code> the difference between a fixed rate <code>K</code> and the rate actually realised over $[S,T]$, applied to a notional <code>N</code> and the accrual fraction $\delta = T-S$. The FRA's fair fixed rate is exactly the market forward rate for that period; entering an FRA at any other rate has a value away from zero, computed by discounting the expected difference.</p>
+
+  <p>An <strong>interest rate swap</strong> is a portfolio of FRAs sharing one fixed rate across all periods: one party pays a fixed rate on a notional at a sequence of dates, the other pays a floating rate reset at the start of each period, over the same schedule. Because a swap is a strip of FRAs bundled at a single fixed rate rather than one fixed rate per period, its fair fixed rate (the <strong>par swap rate</strong>) is not simply an average of the individual forward rates; it is the rate that makes the present value of the fixed leg equal the present value of the floating leg, weighting each period's forward rate by that period's discount factor. Writing $\delta_i = T_i - T_{i-1}$ for the accrual fractions and $L_i$ for the simple-compounded forward rate over $[T_{i-1},T_i]$ implied by the discount curve, $L_i = \bigl(P(0,T_{i-1})/P(0,T_i) - 1\bigr)/\delta_i$, the par swap rate is</p>
+
+  <p>$$ K_{\text{swap}} = \frac{\sum_{i=1}^{n} \delta_i\, L_i\, P(0,T_i)}{\sum_{i=1}^{n} \delta_i\, P(0,T_i)}, $$</p>
+
+  <p>worked numerically below. The floating leg's present value telescopes neatly to $1 - P(0,T_n)$, a useful identity for checking any swap valuation by hand.</p>
+
+  <p>A <strong>cap</strong> is a strip of call options on a floating rate, one per accrual period (each individual option is a <strong>caplet</strong>), paying $\delta_i \max(L_i - K, 0)$ at the end of period <code>i</code> if the realised rate exceeds the strike <code>K</code>. A <strong>floor</strong> is the mirror-image strip of puts, paying $\delta_i \max(K - L_i, 0)$. A <strong>swaption</strong> is an option to enter a swap at a fixed rate at a future date, giving the holder the right (not the obligation) to lock in the fixed rate <code>K</code> for the underlying swap's remaining life. Caplets are typically priced with <strong>Black's formula</strong>, treating the forward rate <code>L_i</code> as lognormally distributed under the appropriate forward measure with volatility <code>σ_i</code>:</p>
+
+  <p>$$ \text{Caplet} = \delta_i\, P(0,T_i)\, \bigl[ L_i\, N(d_1) - K\, N(d_2) \bigr], \qquad d_{1,2} = \frac{\ln(L_i/K) \pm \tfrac{1}{2}\sigma_i^2 T_{i-1}}{\sigma_i\sqrt{T_{i-1}}}, $$</p>
+
+  <p>the same option-pricing structure as lecture 9's Black-Scholes formula, with the forward rate playing the role of the forward stock price and the discount factor $P(0,T_i)$ replacing the constant discount term.</p>
+
+  <h3>The forward-futures convexity adjustment</h3>
+
+  <p>Lecture 1 flagged, without deriving it, that daily settlement makes an interest rate futures price diverge from the corresponding forward price. The mechanism is the margining process itself. A futures contract on a rate settles gains and losses in cash every day rather than in one lump sum at maturity, as a forward does. Whether that daily cash flow helps or hurts the long side depends on whether interest rates in general are correlated with the rate the futures contract references, because that daily cash has to be reinvested (if it is a gain) or refinanced (if it is a loss) at whatever the prevailing short rate happens to be on that day.</p>
+
+  <p>Rate futures are conventionally quoted as (roughly) 100 minus the rate, so a position that profits when rates fall is "long" the futures price. When rates and the general level of short-term financing rates move together, as they typically do, a long futures position tends to receive its daily gains precisely on days when reinvestment rates are high (gains earn more), and tends to fund its daily losses precisely on days when refinancing rates are low (losses cost less to fund). A forward, settling only once at maturity, gets none of this benefit. To keep the two contracts fairly priced against each other, the futures price must be adjusted downward relative to the forward price, which, because futures prices and futures rates move in opposite directions, means the <strong>futures rate ends up higher than the forward rate</strong>. The standard first-order approximation for the size of the adjustment, under a constant-volatility short-rate model such as Ho-Lee, is</p>
+
+  <p>$$ \text{Futures rate} \approx \text{Forward rate} + \tfrac{1}{2}\sigma^2 T_1 T_2, $$</p>
+
+  <p>where <code>σ</code> is the assumed (constant) volatility of the short rate, $T_1$ is the time to the futures contract's own expiry, and $T_2$ is the time to the maturity of the rate it references ($T_2 = T_1 + \delta$ for a futures contract on a $\delta$-length rate). The adjustment grows with the square of the horizon, which is why it is negligible for short-dated contracts and material for the longer-dated eurodollar and SOFR futures used to build multi-year curves.</p>
+
+  <h3>Worked numerical example: a curve, a swap, and a Vasicek bond</h3>
+
+  <p>Take a continuously compounded zero curve observed today ($t=0$) at four semi-annual maturities:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Maturity T (years)</th><th>Spot rate Y(0,T)</th><th>Discount factor P(0,T)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0.5</td><td>4.00%</td><td>0.980199</td></tr>
+        <tr><td>1.0</td><td>4.20%</td><td>0.958870</td></tr>
+        <tr><td>1.5</td><td>4.35%</td><td>0.936833</td></tr>
+        <tr><td>2.0</td><td>4.45%</td><td>0.914846</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Each discount factor is $P(0,T) = e^{-Y(0,T)\,T}$; for example $P(0,2.0) = e^{-0.0445 \times 2} = 0.914846$. From this curve, section 4's continuously compounded forward-rate formula, $R(0;S,T) = -\bigl(\ln P(0,T) - \ln P(0,S)\bigr)/(T-S)$, gives the forward rate for each semi-annual period:</p>
+
+  <div class="worked">Continuously compounded forward rates R(0;S,T), read off the curve:
+
+  [0.0, 0.5]:  R = 4.0000%   (= the spot rate to 0.5y, trivially)
+  [0.5, 1.0]:  R = 4.4000%
+  [1.0, 1.5]:  R = 4.6500%
+  [1.5, 2.0]:  R = 4.7500%
+
+The rising sequence of forward rates is exactly what an upward-
+sloping (steepening) yield curve implies: each successive forward
+period is priced at a higher rate than the last, consistent with
+Y(0,T) itself rising from 4.00% to 4.45% across the curve.</div>
+
+  <p>Swaps and FRAs settle on a simple, money-market accrual basis rather than a continuously compounded one, so the floating leg of a swap references the simple-compounded forward rate implied by the same discount factors, $L_i = \bigl(P(0,T_{i-1})/P(0,T_i) - 1\bigr)/\delta_i$, not the continuously compounded $R(0;S,T)$ above. Computing $L_i$ for each period and applying the par-swap-rate formula for a two-year, semi-annual swap:</p>
+
+  <div class="worked">Simple-compounded forward rates L(S,T), the market floating reference:
+
+  [0.0, 0.5]:  L = 4.040268%
+  [0.5, 1.0]:  L = 4.448757%
+  [1.0, 1.5]:  L = 4.704478%
+  [1.5, 2.0]:  L = 4.806855%
+
+Floating leg PV (per unit notional), sum of delta_i * L_i * P(0,T_i):
+
+  0.5*0.04040268*0.980199 + 0.5*0.04448757*0.958870
+  + 0.5*0.04704478*0.936833 + 0.5*0.04806855*0.914846
+  = 0.019804 + 0.021327 + 0.022038 + 0.021985
+  = 0.085154
+
+Check by telescoping identity, floating PV = 1 - P(0,2.0):
+
+  1 - 0.914846 = 0.085154   (matches exactly, as it must)
+
+Annuity, sum of delta_i * P(0,T_i):
+
+  0.5*(0.980199 + 0.958870 + 0.936833 + 0.914846) = 1.895374
+
+Par swap rate = floating PV / annuity:
+
+  0.085154 / 1.895374 = 4.4928%</div>
+
+  <p>The par swap rate, 4.4928%, sits close to the final spot rate Y(0,2.0) = 4.45% but not exactly on it, because the fixed rate has to average across four periods of rising forward rates weighted by their (falling) discount factors, rather than simply matching the endpoint yield.</p>
+
+  <p>Separately, and unrelated to the specific curve above, a Vasicek bond price is computed directly from the closed-form <code>A(t)</code>, <code>B(t)</code> formulas, using illustrative risk-neutral parameters $a = 0.5$, $k = 4.5\%$, $\sigma = 1.5\%$, current short rate $r_0 = 4\%$, and maturity $T = 2$ years (taking the market price of risk as already absorbed into <code>k</code>, so that $b = ak$ in the notation of the derivation above):</p>
+
+  <div class="worked">Vasicek bond price, a=0.5, k=4.5%, sigma=1.5%, r0=4%, T=2, t=0:
+
+  B(0) = (1/a)(1 - exp(-a*T)) = 2*(1 - exp(-1)) = 2*0.632121
+       = 1.264242
+
+  b = a*k = 0.5 * 0.045 = 0.0225
+  ab - sigma^2/2 = 0.5*0.0225 - 0.0001125 = 0.0111375
+  divided by a^2 = 0.25:                    0.044550
+
+  first term  = (B(0) - T) * 0.044550 = (1.264242 - 2) * 0.044550
+              = -0.735758 * 0.044550 = -0.032778
+
+  second term = sigma^2 * B(0)^2 / (4a)
+              = 0.000225 * 1.598308 / 2.0 = 0.000180
+
+  A(0) = first term - second term = -0.032778 - 0.000180
+       = -0.032958
+
+  P(0, r0) = exp(A(0) - B(0)*r0)
+           = exp(-0.032958 - 1.264242*0.04)
+           = exp(-0.083532)
+           = 0.919866
+
+  Implied continuously compounded yield: -ln(P)/T = 4.1764% p.a.</div>
+
+  <p>The Vasicek-implied yield, 4.18% for a two-year zero under these parameters, is lower than the illustrative market curve's own two-year spot rate of 4.45% above, which is exactly the point of keeping the two examples separate: an arbitrary set of Vasicek parameters will not, in general, reproduce an arbitrary observed curve. Forcing the model to match the observed curve exactly is precisely the job Hull-White's time-dependent <code>Θ(t)</code> was built to do, taken up further in section 5.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Why the desk moved from short-rate models to LIBOR market models</h3>
+
+  <p>Vasicek, CIR and Hull-White all describe the entire yield curve through a single state variable, the instantaneous short rate. A one-factor model of this kind forces every point on the curve to move in lockstep, driven by the same source of randomness: the curve can shift up or down, or tilt somewhat as mean reversion pulls different maturities back toward the long-run level at different speeds, but it cannot do much more than that. Trading desks pricing caps, floors and swaptions need to calibrate directly to the market-quoted volatilities of the specific forward rates (the <code>L_i</code> of section 4) that those products actually reference, and Black's formula, given in section 4, already prices caplets off an observable forward rate and an observable implied volatility without ever mentioning a short rate at all. The <strong>LIBOR market model (LMM)</strong>, developed in the mid-1990s, formalised this by modelling the joint dynamics of the observed forward rates themselves, each with its own lognormal volatility and pairwise correlation to every other forward rate, rather than deriving all of them from one latent short-rate process. The practical gain is a model whose parameters (forward-rate volatilities and correlations) are the same objects the market already quotes prices in terms of, which is much easier to calibrate to a full grid of cap and swaption prices than a one- or two-factor short-rate model can be.</p>
+
+  <h3>2008, OIS discounting, and the end of the single curve</h3>
+
+  <p>Every formula in section 4 was written using one discount curve to derive both discount factors and forward rates. Before the 2008 financial crisis this was standard practice: LIBOR-based discounting and LIBOR-based forward rates came off the same curve, because the spread between LIBOR and a genuinely risk-free overnight rate was assumed negligible. The crisis widened LIBOR-OIS spreads (the gap between interbank term lending rates and overnight indexed swap rates) to levels that could no longer be ignored, and it stayed structurally wider afterwards because LIBOR embeds bank credit and liquidity risk that a genuinely collateralised overnight rate does not. The market's response was <strong>multi-curve discounting</strong>: use one curve, built from OIS or, later, the relevant risk-free overnight rate, purely for discounting cash flows, and separate curves per floating-rate tenor purely for generating the forward rates that determine those cash flows' size. A single-curve framework, of the kind this lecture's worked example uses for simplicity, is no longer how a trading desk actually marks a swap book; it survives here as the pedagogically necessary first step before the multi-curve extension.</p>
+
+  <h3>LIBOR to SOFR: a benchmark, not just a number, was replaced</h3>
+
+  <p>LIBOR was set by panel-bank submissions of estimated, largely unsecured borrowing costs, a construction later shown to be manipulable and, after several benchmark-rigging scandals, judged not to be a robust foundation for hundreds of trillions of notional in outstanding contracts. Its replacement in US dollar markets, SOFR (the Secured Overnight Financing Rate), is calculated from actual, observed transactions in the overnight Treasury repurchase market: it is transaction-based rather than submission-based, and it is an overnight rate rather than a term rate with an embedded credit and liquidity spread. The transition, substantially completed by the mid-2020s, changed more than a name. Term structure had to be rebuilt for a rate that natively has no forward-looking term fixings (a SOFR-linked loan needs a mechanism to compound or average overnight fixings, or to reference a market-derived term SOFR rate, in place of the simple forward-looking term rate LIBOR always was), and every model in this lecture, Vasicek and CIR included, is agnostic to which specific short rate it is modelling, so the underlying mathematics carried over unchanged even as the reference rate itself changed underneath it.</p>
+
+  <h3>Why Hull-White's exact curve fit is a requirement, not a nicety</h3>
+
+  <p>A model that cannot reproduce today's observed bond prices is unusable for pricing anything else, because it would imply an arbitrage against the market's own quoted curve on day one, before a single derivative has even been priced off it. If a Vasicek calibration to some option-implied volatility surface produces a two-year zero yield that disagrees with the two-year yield actually observed in the market (exactly the discrepancy the worked example in section 4 flagged between the illustrative Vasicek price and the illustrative market curve), every price computed from that model inherits a built-in, avoidable mispricing relative to the traded curve itself. Hull-White's time-dependent <code>Θ(t)</code> exists specifically to remove this failure mode: it is solved so that the model's own zero-coupon curve at time zero matches the observed one, bond for bond, before any option is priced. This is why Hull-White, despite being the least elegant of the four models in section 4's table, remains the standard choice on a trading desk: elegance of the SDE is a secondary concern next to the requirement of not being arbitraged by the desk's own curve construction team.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    A one-factor short-rate model, Vasicek, CIR or Hull-White alike, moves the entire curve with a single source of randomness. It can price instruments whose value depends only on the curve's level (a simple bond, a simple swap) reasonably well once calibrated. It struggles badly with instruments whose value depends on the curve's <em>shape</em>, its slope or its curvature, rather than its level: a steepener trade, a CMS (constant maturity swap) product referencing a long-dated swap rate reset against a short-dated one, or any spread option between two points on the curve. Pricing these correctly needs a genuinely multi-factor model, where different maturities can move independently (or a full LIBOR market model with a rich enough correlation structure), because a one-factor model structurally cannot generate the decorrelation between different parts of the curve that these products are sensitive to. Using a one-factor model here is not merely less accurate, it is missing the entire risk the product exists to trade.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State, in one sentence each, the three reasons interest rate derivatives cannot simply reuse the Black-Scholes machinery of lecture 9.</li>
+      <li>Derive the instantaneous forward rate <code>f(t,T)</code> from the continuously compounded forward rate <code>R(t;S,T)</code> by taking the limit $S \to T$, and then derive the short rate <code>r(t)</code> from <code>f(t,T)</code>. Which limit collapses which variable?</li>
+      <li>Write the bond-pricing formula $P(t,T) = \mathbb{E}^{\mathbb{Q}}[e^{-\int_t^T r_s\,ds}\mid\mathcal{F}_t]$ and explain in two sentences why this is a Feynman-Kac expectation rather than a simple discounted expectation of a terminal payoff.</li>
+      <li>Two zero-coupon bonds of different maturities are both driven by the same short-rate Brownian motion. State the market-price-of-risk identity that must relate their drifts and volatilities, and explain why the identity would fail to pin down a unique price if only one bond, rather than a family of bonds sharing one <code>λ</code>, were traded.</li>
+      <li>Why does an incomplete market (more sources of randomness than traded hedging instruments) force the market price of risk to remain an external input rather than something derived purely from no-arbitrage?</li>
+      <li>State the Vasicek SDE for the short rate in the notation of this lecture, identify its reversion speed and long-run level, and give its stationary distribution. Why is this exactly the Ornstein-Uhlenbeck process of lecture 7?</li>
+      <li>Explain, without reproducing the full algebra, why CIR has no closed-form path solution even though it is, like Vasicek, mean-reverting and affine. State the Feller condition and explain what it guarantees.</li>
+      <li>A two-year zero curve gives $P(0,1.0) = 0.958870$ and $P(0,1.5) = 0.936833$. Compute the simple-compounded forward rate for the period $[1.0, 1.5]$, and separately the continuously compounded forward rate for the same period. Explain why they differ.</li>
+      <li>Explain, in your own words, the margining mechanism that makes an interest rate futures rate exceed the corresponding forward rate, and state the standard first-order approximation for the size of the adjustment.</li>
+      <li>Why is a one-factor short-rate model, however well calibrated to today's curve, structurally unable to price a CMS spread option correctly? What kind of model is needed instead, and why?</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="13-credit_risk_models.html">Credit risk models (planned)</a>, the final lecture, where the same Ornstein-Uhlenbeck construction used here for the short rate reappears as the single systematic factor in the Gaussian copula underlying A-IRB regulatory capital, and where the mean-reversion machinery of this lecture recurs in intensity-based default models.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 12 - Interest Rates.pdf</code> (primary source, 13 pages, image-only scan)</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 5 (interest rates and bonds), which carries the formula summary for this material</li>
+      <li>Lecture 7, <a href="07-sdes_and_itos_lemma.html">SDEs and Ito's lemma</a>, for the Ornstein-Uhlenbeck derivation this lecture reuses directly for Vasicek, and for the CIR row of its standard-SDEs table</li>
+      <li>Lecture 8, <a href="08-feynman_kac.html">the Feynman-Kac theorem</a>, for the PDE-expectation duality underlying the bond-pricing formula in section 4</li>
+      <li>Lecture 9, <a href="09-black_scholes.html">Black-Scholes</a>, for the PDE-derivation technique this lecture's term-structure PDE mirrors, and for the pricing structure Black's formula for caplets reuses</li>
+      <li>Lecture 11, <a href="11-hedging_and_greeks.html">hedging and the Greeks</a>, for the delta-gamma analogy this lecture draws on for duration and convexity</li>
+      <li>Hull, <em>Options, Futures and Other Derivatives</em>, chapter 6 (interest rate futures and the convexity adjustment) and chapter 7 (swaps), for the instrument mechanics beyond the source's scope</li>
+      <li>Brigo and Mercurio, <em>Interest Rate Models: Theory and Practice</em>, for the LIBOR market model and multi-curve framework discussed in section 5</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The source's opening inequality is printed as $P(t,S) \le P(t,T)$ for $S \le T$, which is the wrong direction: a bond maturing sooner cannot be worth less than one maturing later under positive rates. The source itself flags this by striking the printed line through and hand-annotating the corrected direction, $P(t,S) \ge P(t,T)$. This lecture adopts the corrected, standard direction throughout and flags the printed error explicitly here rather than silently reproducing or silently fixing it.</li>
+      <li>The source stops at the definitional and Vasicek material. It lists CIR, Dothan, Ho-Lee, Hull-White (both the extended-Vasicek and extended-CIR forms) and Black-Derman-Toy by name and SDE only, leaving their derivations as guided exercises rather than worked results. This lecture supplies the missing derivations (Feller condition, non-negativity argument, exact curve-fitting property) that the source leaves as an exercise.</li>
+      <li>No instrument beyond the implicit forward rate is covered: FRAs, swaps, caps, floors and swaptions are entirely absent from the source, as are Black's formula for a caplet and the par-swap-rate identity. All of section 4's instruments block and worked swap example are added from standard references.</li>
+      <li>The forward-futures convexity adjustment, promised explicitly in lecture 1 as content for this lecture, does not appear anywhere in the source. It is delivered in full in section 4 from Hull's standard treatment.</li>
+      <li>Duration and convexity, the fixed-income analogues of delta and gamma, are not discussed in the source at all and are added here to complete the parallel with lecture 11.</li>
+      <li>The 2008 multi-curve transition, the LIBOR-to-SOFR transition, and the LIBOR market model are all post-dated or simply out of scope for a source built around the classical single-curve short-rate framework; all three are added in section 5 as essential context for a practitioner, not as content the source itself contains.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 12: interest rate derivatives</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

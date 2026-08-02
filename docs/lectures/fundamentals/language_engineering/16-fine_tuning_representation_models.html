@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 16: fine-tuning representation models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Fine-tuning representation models</h1>
+  <p class="subtitle">Lecture 5 kept every model frozen and got 0.85 F1 by training a logistic regression on its output. This lecture unfreezes, and the interesting result is that full fine-tuning also gets 0.85, while a method using 32 labelled examples instead of 8,530 gets 0.8364. Along the way: what freezing layers actually costs, how to adapt a model to your vocabulary with no labels, and the sub-token alignment problem that quietly breaks most first attempts at entity recognition.</p>
+  <div class="meta">
+    <span>Lecture 16 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part V: training your own</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Attach a classification head to a pretrained BERT and train both together, and the Rotten Tomatoes sentiment task from lecture 5 goes from <strong>0.80</strong> with a frozen off-the-shelf model to <strong>0.85</strong> F1, in a few minutes on one GPU.</p>
+
+  <p><strong>Freezing</strong> layers trades quality for compute, and the curve is sharply non-linear. Freeze everything except the classification head and the score collapses to <strong>0.63</strong>, a 25.9 per cent fall. Unfreeze just the top encoder block and it recovers to <strong>0.80</strong>. About five of the twelve blocks gets close to training all of them, so the useful reading is that the last few blocks do nearly all the task-specific adapting.</p>
+
+  <p><strong>SetFit</strong> handles the case where you have almost no labels. Take 16 examples per class, generate contrastive pairs by combining them within and across classes, fine-tune a sentence embedding model on those pairs, then fit an ordinary classifier on the resulting embeddings. From <strong>32 labelled documents</strong> it manufactures <strong>1,280 training pairs</strong> and reaches <strong>0.8364</strong>, which is 98.4 per cent of the full fine-tune from 0.375 per cent of the labels.</p>
+
+  <p><strong>Continued pretraining</strong> is the no-labels option: keep training the pretrained model on your own corpus with masked language modelling before fine-tuning it on anything. And <strong>named-entity recognition</strong> classifies every token rather than every document, which forces the sub-token alignment problem into the open: ten words become eleven sub-tokens plus two special tokens, and every label has to be placed correctly or the model learns nonsense.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A specialist who has read widely can be adapted to your job in three ways. Let them read your files and update everything they think, which works best. Or forbid them from changing their mind about anything and only let them adjust the final judgement, which is fast and much worse. Or, when you can only show them thirty examples, have them study which pairs of examples are alike and which differ, which turns thirty examples into a thousand comparisons.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that the freezing curve tells you where to spend a limited GPU budget. It is not a smooth trade where half the layers gives half the quality. Almost all the task-specific adaptation happens in the top few blocks, so freezing the bottom two-thirds costs a few points and saves most of the backward pass. Knowing the shape of that curve is the difference between an informed compromise and an arbitrary one.</p>
+
+  <p>The second reason is that SetFit changes what counts as a feasible project. The usual answer to "we have no labelled data" is a labelling exercise costing weeks. Sixteen examples per class is an afternoon, and it gets within two per cent of the full-data result. Any classification project should try that before commissioning annotation, in the same way lecture 5 argued for measuring the zero-shot baseline first.</p>
+
+  <p>The third reason is that continued pretraining is the cheapest domain adaptation available and is routinely skipped. You already have the documents. Running masked language modelling over them costs one GPU session, requires no annotation, and produces a base model that knows your vocabulary before any task-specific training begins.</p>
+
+  <p>And a fourth reason about correctness. Token classification is where the tokenisation of lecture 2 stops being background and becomes something you must handle explicitly. A label list aligned to words does not align to sub-tokens, and the resulting off-by-one errors do not raise exceptions. They just train the model on the wrong targets.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>One dial controlling how much of the model may change, and one procedure for when there is almost nothing to learn from.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 350" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three freezing configurations of a twelve-block BERT with a classification head, showing which parts are trainable and the resulting F1 score. Below, the three steps of SetFit turning 32 labelled documents into 1,280 contrastive pairs and then a classifier.">
+      <rect x="0" y="0" width="880" height="350" fill="#FFFFFF"/>
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">How much of the model may change, and what to do when you have no data</text>
+
+      <!-- FREEZING -->
+      <rect x="20" y="32" width="840" height="146" rx="9" fill="#FFFFFF" stroke="#5B47E0" stroke-width="2"/>
+      <text x="440" y="51" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#4c1d95">FREEZING: THE CURVE IS NOT LINEAR</text>
+      <text x="150" y="66" font-family="Inter" font-size="7.5" fill="#71717a">encoder blocks 0 to 11</text>
+      <text x="638" y="66" font-family="Inter" font-size="7.5" fill="#71717a">head</text>
+      <text x="700" y="66" font-family="Inter" font-size="7.5" font-weight="600" fill="#71717a">F1</text>
+
+      <!-- row 1 all trainable -->
+      <text x="140" y="84" text-anchor="end" font-family="Inter" font-size="8.5" font-weight="600" fill="#14532d">train everything</text>
+      <g>
+        <rect x="150" y="72" width="38" height="16" rx="2" fill="#5B47E0"/><rect x="190" y="72" width="38" height="16" rx="2" fill="#5B47E0"/>
+        <rect x="230" y="72" width="38" height="16" rx="2" fill="#5B47E0"/><rect x="270" y="72" width="38" height="16" rx="2" fill="#5B47E0"/>
+        <rect x="310" y="72" width="38" height="16" rx="2" fill="#5B47E0"/><rect x="350" y="72" width="38" height="16" rx="2" fill="#5B47E0"/>
+        <rect x="390" y="72" width="38" height="16" rx="2" fill="#5B47E0"/><rect x="430" y="72" width="38" height="16" rx="2" fill="#5B47E0"/>
+        <rect x="470" y="72" width="38" height="16" rx="2" fill="#5B47E0"/><rect x="510" y="72" width="38" height="16" rx="2" fill="#5B47E0"/>
+        <rect x="550" y="72" width="38" height="16" rx="2" fill="#5B47E0"/><rect x="590" y="72" width="38" height="16" rx="2" fill="#5B47E0"/>
+        <rect x="632" y="72" width="38" height="16" rx="2" fill="#3E7A45"/>
+      </g>
+      <text x="700" y="84" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#14532d">0.85</text>
+      <text x="748" y="84" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">the reference. Minutes on one GPU.</text>
+
+      <!-- row 2 head only -->
+      <text x="140" y="110" text-anchor="end" font-family="Inter" font-size="8.5" font-weight="600" fill="#9f1239">head only</text>
+      <g>
+        <rect x="150" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="190" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="230" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="270" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="310" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="350" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="390" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="430" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="470" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="510" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="550" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="590" y="98" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="632" y="98" width="38" height="16" rx="2" fill="#3E7A45"/>
+      </g>
+      <text x="700" y="110" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#9f1239">0.63</text>
+      <text x="748" y="110" font-family="Inter" font-size="8" font-weight="600" fill="#DC2855">&#8722;25.9%. Fast and not worth it.</text>
+
+      <!-- row 3 top block -->
+      <text x="140" y="136" text-anchor="end" font-family="Inter" font-size="8.5" font-weight="600" fill="#4c1d95">top block + head</text>
+      <g>
+        <rect x="150" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="190" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="230" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="270" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="310" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="350" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="390" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="430" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="470" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="510" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/>
+        <rect x="550" y="124" width="38" height="16" rx="2" fill="#e4e4e7"/><rect x="590" y="124" width="38" height="16" rx="2" fill="#5B47E0"/>
+        <rect x="632" y="124" width="38" height="16" rx="2" fill="#3E7A45"/>
+      </g>
+      <text x="700" y="136" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#4c1d95">0.80</text>
+      <text x="748" y="136" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">&#8722;5.9% for one block of gradients</text>
+
+      <text x="440" y="162" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#4c1d95">One unfrozen block recovers 77 per cent of what freezing everything gave away. The adaptation lives at the top.</text>
+      <text x="440" y="173" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">purple = trainable &#183; grey = frozen &#183; green = classification head, always trainable</text>
+
+      <!-- SETFIT -->
+      <rect x="20" y="188" width="840" height="146" rx="9" fill="#FFFFFF" stroke="#0F62FE" stroke-width="2"/>
+      <text x="440" y="207" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#0b4bbd">SETFIT: 32 LABELLED DOCUMENTS, 1,280 TRAINING PAIRS</text>
+
+      <rect x="40" y="220" width="230" height="72" rx="7" fill="#DEEAFB" stroke="#0F62FE" stroke-width="1.5"/>
+      <text x="155" y="238" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#0b4bbd">1. SAMPLE PAIRS</text>
+      <text x="155" y="254" text-anchor="middle" font-family="Inter" font-size="8" fill="#0b4bbd">16 per class &#215; 2 classes = 32 docs</text>
+      <text x="155" y="268" text-anchor="middle" font-family="Inter" font-size="8" fill="#0b4bbd">same class &#8594; positive</text>
+      <text x="155" y="280" text-anchor="middle" font-family="Inter" font-size="8" fill="#0b4bbd">different class &#8594; negative</text>
+
+      <line x1="270" y1="256" x2="290" y2="256" stroke="#71717a" stroke-width="1.8"/><polygon points="295,256 287,252 287,260" fill="#71717a"/>
+
+      <rect x="300" y="220" width="230" height="72" rx="7" fill="#EDE9FE" stroke="#5B47E0" stroke-width="1.5"/>
+      <text x="415" y="238" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#4c1d95">2. FINE-TUNE THE EMBEDDINGS</text>
+      <text x="415" y="254" text-anchor="middle" font-family="Inter" font-size="8" fill="#4c1d95">contrastive training, lecture 14</text>
+      <text x="415" y="268" text-anchor="middle" font-family="Inter" font-size="8" fill="#4c1d95">the space is reshaped so that</text>
+      <text x="415" y="280" text-anchor="middle" font-family="Inter" font-size="8" fill="#4c1d95">"similar" means "same class"</text>
+
+      <line x1="530" y1="256" x2="550" y2="256" stroke="#71717a" stroke-width="1.8"/><polygon points="555,256 547,252 547,260" fill="#71717a"/>
+
+      <rect x="560" y="220" width="230" height="72" rx="7" fill="#DCFCE7" stroke="#3E7A45" stroke-width="1.5"/>
+      <text x="675" y="238" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#14532d">3. FIT A CLASSIFIER</text>
+      <text x="675" y="254" text-anchor="middle" font-family="Inter" font-size="8" fill="#14532d">logistic regression on the new</text>
+      <text x="675" y="268" text-anchor="middle" font-family="Inter" font-size="8" fill="#14532d">embeddings, exactly as lecture 5</text>
+      <text x="675" y="282" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#14532d">F1 0.8364</text>
+
+      <text x="440" y="310" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#18181b">20 pairs per sample x 32 samples = 640, x 2 for one positive and one negative each = 1,280 pairs</text>
+      <text x="440" y="326" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#0b4bbd">98.4 per cent of the full fine-tune, from 0.375 per cent of its labels</text>
+    </svg>
+    <figcaption>The top panel is one dial with a sharply non-linear response: the difference between training nothing and training one block is worth 0.17 F1, while the remaining eleven blocks are worth 0.05. The bottom panel is the trick that makes tiny label sets usable, which is to stop treating 32 documents as 32 training examples and start treating them as 1,280 comparisons.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Full fine-tuning, and what it beats</h3>
+
+  <p>The setup is the Rotten Tomatoes dataset from lecture 5, 8,530 training reviews, with <code>bert-base-cased</code> and a two-class head. The head is a small feedforward network on top of the encoder, and the difference from lecture 5 is only that gradients now flow through both.</p>
+
+  <pre><code>from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer
+
+model = AutoModelForSequenceClassification.from_pretrained("bert-base-cased", num_labels=2)
+
+training_args = TrainingArguments("model", learning_rate=2e-5,
+    per_device_train_batch_size=16, num_train_epochs=1, weight_decay=0.01)
+
+Trainer(model=model, args=training_args, train_dataset=tokenized_train,
+        eval_dataset=tokenized_test, compute_metrics=compute_metrics).train()
+# eval_f1: 0.8492</code></pre>
+
+  <div class="worked">EVERY RESULT ON THIS ONE TASK, ACROSS THE TRACK
+
+    approach                          labels      F1
+    ------------------------------------------------
+    zero-shot by embedding (L5)            0   0.78
+    frozen task-specific model (L5)        0   0.80
+    freeze all but the head               8,530  0.63
+    freeze all but the top block          8,530  0.80
+    SetFit                                   32  0.8364
+    frozen embeddings + logistic reg (L5) 8,530  0.85
+    FULL FINE-TUNE                        8,530  0.85
+
+  THREE READINGS
+
+  1. FULL FINE-TUNING BEATS THE OFF-THE-SHELF MODEL
+       0.85 against 0.80, +6.3%, for a few minutes of GPU.
+       A model trained on YOUR distribution beats one trained
+       on somebody else's, even when theirs was purpose-built
+       for the same task.
+
+  2. IT DOES NOT BEAT THE FROZEN PIPELINE FROM LECTURE 5
+       Both reach 0.85. Fine-tuning needed a GPU and produced
+       a model you must now host and version; the frozen
+       pipeline needed a CPU and a scikit-learn object.
+       On this task, unfreezing bought nothing. That will not
+       always hold, and it is worth measuring rather than
+       assuming.
+
+  3. SETFIT REACHES 0.8364 FROM 32 LABELS
+       32 / 8,530  = 0.375% of the labels
+       0.8364/0.85 = 98.4% of the score
+       This is the row that should change what you do first.</div>
+
+  <h3>Freezing: where the adaptation actually happens</h3>
+
+  <p>A pretrained BERT is twelve encoder blocks over an embedding layer, and any subset can be held fixed. Freezing removes those parameters from the backward pass, which is where most of the training cost sits.</p>
+
+  <pre><code>for name, param in model.named_parameters():
+    param.requires_grad = name.startswith("classifier")   # head only -> F1 0.63
+
+# or, freeze everything before encoder block 11:
+for index, (name, param) in enumerate(model.named_parameters()):
+    if index &lt; 165:
+        param.requires_grad = False                        # top block  -> F1 0.80</code></pre>
+
+  <div class="worked">WHAT FREEZING COSTS
+
+    trainable                   F1      change vs full
+    -----------------------------------------------------
+    everything                 0.85          --
+    top block + head           0.80        -5.9%
+    head only                  0.63       -25.9%
+
+  THE NON-LINEARITY
+    going from "head only" to "top block + head"
+      0.80 - 0.63 = 0.17 F1, for ONE block of gradients
+    going from "top block + head" to everything
+      0.85 - 0.80 = 0.05 F1, for ELEVEN more blocks
+
+    one block recovers 0.17/0.22 = 77% of what full freezing
+    gave away.
+
+  WHY
+    with everything frozen, the encoder's representation is
+    fixed and the head can only draw a linear boundary through
+    a space that was never arranged for this task. One
+    unfrozen block lets the representation itself move.
+    Lower blocks encode general syntax and word sense, which
+    your task does not need to change.
+
+  IN PRACTICE
+    around five of the twelve blocks gets close to training
+    all twelve. Freeze from the bottom, unfreeze from the top,
+    and always leave frozen layers BELOW trainable ones rather
+    than interleaved.
+
+  AND THE GAP WIDENS WITH EPOCHS
+    these figures are one epoch. Over several epochs the
+    compute saved by freezing grows, and so does the quality
+    difference. Neither stays fixed.</div>
+
+  <h3>SetFit: turning 32 documents into 1,280 comparisons</h3>
+
+  <p>When labels are scarce, the ordinary supervised framing wastes them. Thirty-two documents give thirty-two training signals. Treating them contrastively gives every pair of documents a signal, and the number of pairs grows much faster than the number of documents.</p>
+
+  <p>The three steps are worth reading against the rest of Part V, because SetFit is assembled entirely from pieces already covered. Step one builds pairs by pairing documents with the same label as positives and documents with different labels as negatives, which is the contrastive data construction of lecture 14 with the class label standing in for entailment. Step two fine-tunes a sentence embedding model on those pairs, which is lecture 15's supervised fine-tuning. Step three fits a classifier on the resulting embeddings, which is lecture 5's frozen-embeddings-plus-logistic-regression pipeline. Nothing here is new; the assembly is.</p>
+
+  <div class="worked">THE PAIR ARITHMETIC
+
+    16 examples per class x 2 classes  =    32 documents
+    default 20 pair combinations each  =   640
+    one positive and one negative each = 1,280 training pairs
+
+    so 32 labelled documents become 1,280 supervised
+    comparisons, a 40-fold amplification, without anyone
+    labelling anything further.
+
+  WHAT STEP 2 ACTUALLY CHANGES
+    a general embedding model places documents by SEMANTIC
+    similarity. After step 2 it places them by CLASS
+    similarity: two negative reviews about entirely different
+    films become neighbours. This is the point lecture 15 made
+    about steering the space, applied to a classification
+    objective.
+
+  RESULT
+    F1 0.8364 from 32 labels
+    against 0.85 from 8,530
+
+  AND WITH NO LABELS AT ALL
+    SetFit can also run zero-shot by synthesising examples
+    from the label names themselves: for labels "happy" and
+    "sad" it generates sentences like "The example is happy"
+    and trains on those. Weaker than 16 real examples, and it
+    costs nothing.</div>
+
+  <h3>Continued pretraining with masked language modelling</h3>
+
+  <p>The two-step paradigm from lecture 1 is pretrain then fine-tune, and the pretraining was done for you on general text. Insert a third step in the middle: continue the pretraining objective, masked language modelling, on your own unlabelled corpus. No annotation is involved, so the only requirement is documents.</p>
+
+  <p>The effect is easiest to see qualitatively. Ask the model to fill a blank before and after continued pretraining on film reviews.</p>
+
+  <div class="worked">"What a horrible [MASK]!"
+
+  BEFORE, general bert-base-cased
+    >>> What a horrible idea!
+    >>> What a horrible dream!
+    >>> What a horrible thing!
+    >>> What a horrible day!
+    >>> What a horrible thought!
+
+  AFTER, continued pretraining on the review corpus
+    >>> What a horrible movie!
+    >>> What a horrible film!
+    >>> What a horrible mess!
+    >>> What a horrible comedy!
+    >>> What a horrible story!
+
+  The model's sense of what words go together has moved into
+  the domain. Nothing was labelled to achieve this.
+
+  WHERE IT FITS
+    1. general pretraining      (done for you)
+    2. CONTINUED PRETRAINING    (your corpus, no labels)  <- new
+    3. task fine-tuning         (your labels)
+
+  and step 3 then starts from a model that already knows the
+  vocabulary. This is the masked-language-modelling branch of
+  the domain adaptation lecture 15 described; TSDAE is the
+  other, and the choice between them is largely whether you
+  want a better base model for a task head (MLM) or a better
+  sentence embedding (TSDAE).
+
+  THE EXAMPLE HERE IS UNDERPOWERED ON PURPOSE
+    film reviews are close to general English, so the shift is
+    stylistic. On genuinely specialised text, policy wordings
+    or clinical notes, where the general model has never seen
+    the vocabulary, the gain is much larger. That is the
+    situation this step exists for.</div>
+
+  <h3>Named-entity recognition, and the alignment problem</h3>
+
+  <p>Everything so far classified whole documents. <strong>Named-entity recognition</strong> classifies every token, using <code>AutoModelForTokenClassification</code> rather than <code>AutoModelForSequenceClassification</code>: the same encoder with a head that emits one label per position rather than one per sequence.</p>
+
+  <p>The labels use the <strong>BIO scheme</strong>, where <code>B-</code> marks the beginning of an entity and <code>I-</code> marks a continuation inside the same one. That prefix is what distinguishes "Dean Palmer" as one person from "Dean" and "Palmer" as two. With four entity types plus the outside label, CoNLL-2003 has nine labels: <code>O</code>, and <code>B-</code>/<code>I-</code> for person, organisation, location and miscellaneous.</p>
+
+  <p>Then the problem. Your labels are one per word. The tokenizer produces sub-tokens, and adds special tokens at both ends. The two lists are different lengths, and nothing checks that you lined them up.</p>
+
+  <div class="worked">ONE SENTENCE, TWO LENGTHS
+
+  WORDS (10)      Dean Palmer hit his 30th homer for the Rangers .
+  ner_tags (10)     1     2    0   0    0     0   0   0       3  0
+                  B-PER I-PER  O   O    O     O   O   O   B-ORG  O
+
+  AFTER TOKENISATION (13)
+    [CLS] Dean Palmer hit his 30 ##th homer for the Rangers . [SEP]
+
+    10 words -> 11 sub-tokens, because "30th" splits into
+    "30" and "##th", plus 2 special tokens = 13 positions.
+
+  ALIGNED LABELS (13)
+    -100    1     2    0   0   0   0     0   0   0      3   0  -100
+      ^                             ^                            ^
+      |                             |                            |
+   [CLS] ignored          sub-token inherits              [SEP] ignored
+                          its word's label
+
+  THE -100 CONVENTION
+    the loss function skips any position labelled -100, so
+    special tokens and, if you choose, continuation sub-tokens
+    contribute nothing to training or evaluation.
+
+  WHAT GOES WRONG WITHOUT THIS
+    pass the original 10 labels against 13 positions and
+    either you get a shape error, if you are lucky, or a
+    silent off-by-one in which "Palmer" is labelled with what
+    belongs to "hit" and every subsequent label is shifted.
+    Nothing raises. The model trains happily on nonsense and
+    the F1 is merely disappointing rather than obviously
+    broken.
+
+  TWO MORE THINGS THAT CHANGE FOR TOKEN CLASSIFICATION
+    DataCollatorForTokenClassification, not
+    DataCollatorWithPadding: padding must extend the LABEL
+    sequence too.
+
+    seqeval, not plain accuracy: entity-level scoring, so a
+    two-token person found as one token counts as wrong. That
+    is the right severity, because half an entity is not half
+    an answer.</div>
+
+  <p>At inference the sub-tokens come back individually, and the BIO prefixes are what let you reassemble them.</p>
+
+  <pre><code>token_classifier("My name is Maarten.")
+# [{'entity': 'B-PER', 'word': 'Ma',     'score': 0.995},
+#  {'entity': 'I-PER', 'word': '##arte', 'score': 0.993},
+#  {'entity': 'I-PER', 'word': '##n',    'score': 0.995}]</code></pre>
+
+  <p>One name, three sub-tokens, correctly chained by one <code>B-</code> and two <code>I-</code>s. Aggregating those back into "Maarten" is a post-processing step, and the pipeline can do it for you, but it is worth seeing the raw output once so the shape of the task is clear.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Unfreezing a pretrained BERT and training it jointly with a classification head takes the Rotten Tomatoes task from 0.80 with an off-the-shelf model to 0.85, though it only matches, rather than beats, lecture 5's frozen embeddings with a logistic regression on top. Freezing is a dial with a sharply non-linear response: head only collapses to 0.63, one unfrozen block recovers to 0.80, and the remaining eleven are worth 0.05, because the task-specific adaptation happens near the top. SetFit sidesteps the label requirement by treating 16 examples per class as 1,280 contrastive pairs, reaching 0.8364 from 0.375 per cent of the labels, and it is assembled entirely from lecture 14's pair construction, lecture 15's embedding fine-tuning, and lecture 5's classifier on frozen features. Continued pretraining with masked language modelling adapts the base model to your vocabulary using no labels at all. And named-entity recognition moves classification to the token level, which forces you to align word-level labels onto sub-tokens explicitly, using <code>-100</code> for positions the loss should ignore, or train silently on shifted targets.</p>
+
+  <div class="callout insight">
+    <span class="tag">The order to try things in</span>
+    Nothing in Part V argues for reaching straight for a full fine-tune. Measure the zero-shot baseline (lecture 5). Try frozen embeddings with a classifier, which on this task equalled the fine-tune. If labels are scarce, label sixteen per class and run SetFit. If your vocabulary is specialised, continue pretraining before anything else. Full fine-tuning is the last rung, not the first, and its main cost is not the GPU hour but that you now own a model to host, version and revalidate.
+  </div>
+
+  <p>Part V's remaining two lectures move from representation models to generative ones, where the same instinct, leave the large thing alone and train something small beside it, returns as the dominant technique. Lecture 17 covers the three training stages, LoRA's rank decomposition, and the 4-bit quantisation that makes fine-tuning a multi-billion-parameter model possible on one consumer GPU.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State what changes between lecture 5's frozen approach and full fine-tuning, and what F1 each reaches.</li>
+      <li>Explain why full fine-tuning beat the off-the-shelf task-specific model but only matched the frozen-embeddings pipeline.</li>
+      <li><strong>Do the arithmetic.</strong> Give the F1 for head-only, top-block, and full training, and express the first two as percentage changes against full.</li>
+      <li><strong>Do the arithmetic.</strong> What fraction of the loss from full freezing does one unfrozen block recover?</li>
+      <li>Explain, in terms of what the head can and cannot do, why freezing everything collapses the score.</li>
+      <li>State the rule about where frozen layers should sit relative to trainable ones.</li>
+      <li>Why does the freezing trade-off change when you train for several epochs?</li>
+      <li>Name SetFit's three steps and, for each, the earlier lecture it reuses.</li>
+      <li><strong>Do the arithmetic.</strong> From 16 examples per class over 2 classes, derive the 1,280 training pairs.</li>
+      <li><strong>Do the arithmetic.</strong> Express SetFit's labels and score as percentages of the full fine-tune.</li>
+      <li>Explain how step 2 changes what "similar" means in the embedding space.</li>
+      <li>Describe how SetFit handles the case of no labels at all.</li>
+      <li>State where continued pretraining sits in the training sequence and what it requires.</li>
+      <li>Give the before-and-after mask predictions in the worked example, and say what the shift demonstrates.</li>
+      <li>When is continued pretraining worth much more than the film-review example suggests?</li>
+      <li>Explain the BIO scheme and what the <code>B-</code> prefix disambiguates.</li>
+      <li><strong>Do the arithmetic.</strong> Ten words become how many positions after tokenisation in the worked example, and why?</li>
+      <li>State what <code>-100</code> does, and describe precisely what fails if labels are not realigned.</li>
+      <li>Name the two other things that change for token classification, and why entity-level scoring is the right severity.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 15 (<a href="15-training_embedding_models.html">training embedding models</a>) named masked language modelling as the other adaptive-pretraining option; this lecture runs it. Lecture 14 (<a href="14-contrastive_learning_and_sbert.html">contrastive learning and SBERT</a>) supplied the pair construction SetFit reuses.</li>
+      <li><strong>Compares against:</strong> Lecture 5 (<a href="05-text_classification.html">text classification</a>) ran the same dataset with everything frozen; every figure here is directly comparable to that scoreboard.</li>
+      <li><strong>Resolves:</strong> Lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>) noted that a tokenizer adds special tokens and splits words, and that aligning outputs back to words is fiddly. Token classification is where it has to be done properly.</li>
+      <li><strong>Next:</strong> Lecture 17 (<a href="17-supervised_fine_tuning_with_qlora.html">supervised fine-tuning with QLoRA</a>) takes the freeze-the-large-thing instinct to generative models.</li>
+      <li><strong>Pattern:</strong> The frozen-encoder-plus-small-trainable-adapter arrangement is the one lecture 13 (<a href="13-multimodal_models.html">multimodal models</a>) used for BLIP-2's Q-Former.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 16 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

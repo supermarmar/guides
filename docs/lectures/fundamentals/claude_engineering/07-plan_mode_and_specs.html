@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 7: plan mode and spec-first work</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Plan mode and spec-first work: brainstorm, plan, execute</h1>
+  <p class="subtitle">A wrong understanding produces a plan so internally consistent that its wrongness is invisible. Separating research from planning and planning from execution exists to catch that error while it is still one sentence, rather than after it has been faithfully implemented across nine files.</p>
+  <div class="meta">
+    <span>Lecture 7 of 22</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part II: steering the agent</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The documented workflow has four phases and they are worth naming precisely. <strong>Explore</strong>: the agent reads and answers questions, changing nothing. <strong>Plan</strong>: it proposes what to change and why, and you argue with the proposal. <strong>Implement</strong>: it executes the agreed plan and verifies against it. <strong>Commit</strong>: the change lands with a message and a pull request. Plan mode enforces the boundary between the first two phases and the third, blocking edits until you approve a plan.</p>
+
+  <p>The value is concentrated almost entirely in the first boundary, and this is the part people skip. Letting the agent research and plan in one motion produces a plan built on whatever it inferred, and because a plan reads as coherent regardless of whether its premises are right, you have no signal. Reading a research summary takes two minutes and catches the class of error that costs an afternoon. That is the highest-return habit in the whole practice, and it is one extra prompt.</p>
+
+  <p>The documentation is equally clear that plan mode has a cost and is not always worth paying. Its stated test is precise and worth memorising: <em>if you could describe the diff in one sentence, skip the plan</em>. Planning earns its overhead when you are uncertain about the approach, when the change spans multiple files, or when you are unfamiliar with the code being modified. For a typo, a log line, or a rename, it is pure ceremony.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Planning is cheap error-correction, and its value scales with how expensive the error would be to correct later. A wrong sentence in a research summary costs a sentence to fix. The same wrong assumption, discovered after implementation, costs the implementation. The question is never "should I plan?" in the abstract but "how far will this mistake have travelled before I see it?"
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    This is the oldest result in software engineering, rediscovered in new clothes. Boehm's cost-of-change curve, that a defect introduced in requirements and caught in requirements costs orders of magnitude less than the same defect caught in production, is the entire argument for planning, and it did not stop being true when the implementer became a machine. What changed is the shape of the curve. Implementation got dramatically cheaper, which flattens the middle of the curve and, counter-intuitively, makes the <em>requirements</em> end relatively more expensive than it used to be. When building is cheap, deciding what to build correctly is where the remaining cost lives.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that solving the wrong problem is the most expensive failure available and the hardest to detect. Every other failure mode announces itself: a bug fails a test, a broken build fails to build, a bad style choice is visible in review. A correct implementation of a misunderstood requirement passes all of those. It is discovered by a human eventually noticing that the thing does not do what anyone wanted, and by then it has tests, documentation, and dependents.</p>
+
+  <p>The second reason is that plan mode is the enforced version of a discipline that is otherwise pure willpower. You can always resolve to research before acting; you will not always do it, particularly when the task feels obvious. Plan mode makes edits impossible until a plan is approved, moving the discipline from the advisory side to the enforced side of the line from Lecture 3. That is why habitual use beats intentional use.</p>
+
+  <p>The third reason is that a written plan is reusable in a way a conversation is not. It can be edited in your own editor, argued over by a colleague, checked against afterwards to see whether the implementation actually did what was agreed, and carried into a fresh session with none of the exploratory context that produced it. A plan on disk is the note-taking pattern from Lecture 2 applied to the highest-value content in the session.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The four phases and what each is for</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four-phase workflow with checkpoints">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two checkpoints, and the cost of a mistake past each</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <rect x="40"  y="48" width="150" height="56" rx="9" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="115" y="72" text-anchor="middle" font-weight="600" fill="#2A3A78">1. Explore</text>
+        <text x="115" y="90" text-anchor="middle" font-size="10.5" fill="#2A3A78">reads, reports back</text>
+
+        <rect x="220" y="48" width="150" height="56" rx="9" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="295" y="72" text-anchor="middle" font-weight="600" fill="#3D2EB5">2. Plan</text>
+        <text x="295" y="90" text-anchor="middle" font-size="10.5" fill="#3D2EB5">proposes, you argue</text>
+
+        <rect x="400" y="48" width="150" height="56" rx="9" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="475" y="72" text-anchor="middle" font-weight="600" fill="#1E9D54">3. Implement</text>
+        <text x="475" y="90" text-anchor="middle" font-size="10.5" fill="#1E9D54">executes the plan</text>
+
+        <rect x="580" y="48" width="140" height="56" rx="9" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="650" y="72" text-anchor="middle" font-weight="600" fill="#C76B2A">4. Commit</text>
+        <text x="650" y="90" text-anchor="middle" font-size="10.5" fill="#C76B2A">message, PR</text>
+
+        <line x1="190" y1="76" x2="214" y2="76" stroke="#71717a" stroke-width="1.5" marker-end="url(#pa)"/>
+        <line x1="370" y1="76" x2="394" y2="76" stroke="#71717a" stroke-width="1.5" marker-end="url(#pa)"/>
+        <line x1="550" y1="76" x2="574" y2="76" stroke="#71717a" stroke-width="1.5" marker-end="url(#pa)"/>
+
+        <line x1="205" y1="118" x2="205" y2="140" stroke="#C76B2A" stroke-width="2"/>
+        <text x="205" y="158" text-anchor="middle" font-weight="600" fill="#C76B2A">checkpoint 1</text>
+        <text x="205" y="175" text-anchor="middle" font-size="10.5" fill="#C76B2A">a wrong premise costs</text>
+        <text x="205" y="190" text-anchor="middle" font-size="10.5" fill="#C76B2A">one sentence to fix</text>
+
+        <line x1="385" y1="118" x2="385" y2="140" stroke="#C76B2A" stroke-width="2"/>
+        <text x="385" y="158" text-anchor="middle" font-weight="600" fill="#C76B2A">checkpoint 2</text>
+        <text x="385" y="175" text-anchor="middle" font-size="10.5" fill="#C76B2A">a wrong plan costs</text>
+        <text x="385" y="190" text-anchor="middle" font-size="10.5" fill="#C76B2A">a paragraph to fix</text>
+
+        <text x="620" y="158" text-anchor="middle" font-weight="600" fill="#a1a1aa">no checkpoint</text>
+        <text x="620" y="175" text-anchor="middle" font-size="10.5" fill="#a1a1aa">a wrong premise now</text>
+        <text x="620" y="190" text-anchor="middle" font-size="10.5" fill="#a1a1aa">costs the branch</text>
+      </g>
+
+      <defs>
+        <marker id="pa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>Most people use checkpoint two and skip checkpoint one, which is the wrong way round: the first is cheaper to run and catches the more expensive class of error.</figcaption>
+  </figure>
+
+  <p>In <strong>explore</strong>, the instruction that matters is the prohibition. "Read <code>src/auth/</code> and tell me how sessions and login are handled. Do not write any code yet." Without the final clause the agent will helpfully begin, and you lose the checkpoint. What you are buying is a statement of the agent's understanding in a form you can check against knowledge it does not have.</p>
+
+  <p>In <strong>plan</strong>, you are arguing about approach while arguing is cheap. The plan can be opened in your own editor and edited directly before the agent proceeds, which is worth doing: editing a plan is faster than describing the edit, and it produces a document you have actually read rather than one you skimmed.</p>
+
+  <p>In <strong>implement</strong>, the interesting property is that this phase is now the least interesting. All the decisions were made upstream; what remains is application, checkable against the plan. This is also why it is the phase most amenable to a cheaper model, as Lecture 4 discussed, and why that split works better here than it does on exploratory work.</p>
+
+  <h3>The interview pattern, for work too large to prompt</h3>
+
+  <p>Some features are too large to specify in a prompt because you do not yet know what you want in sufficient detail. The documented remedy inverts the usual direction: rather than you specifying to the agent, the agent interviews you.</p>
+
+  <pre><code class="language-text">I want to build [brief description]. Interview me in detail using the
+AskUserQuestion tool.
+
+Ask about technical implementation, UI/UX, edge cases, concerns, and
+tradeoffs. Don't ask obvious questions, dig into the hard parts I might
+not have considered.
+
+Keep interviewing until we've covered everything, then write a complete
+spec to SPEC.md.</code></pre>
+
+  <p>Then, and this is the part that carries the value, <em>start a fresh session to execute it</em>. The new session has clean context focused entirely on implementation, and you have a written specification to reference rather than a conversation to remember. The documented properties of a good spec are worth holding: self-contained, naming the files and interfaces involved, stating what is out of scope, and ending with an end-to-end verification step that proves the feature works. Time spent making the spec precise pays off more than time spent watching the implementation.</p>
+
+  <div class="defcard">
+    <strong>Plan mode.</strong> A permission mode in which the agent reads and explores but cannot edit source until you approve a plan. The enforced version of research-before-execution.
+  </div>
+
+  <div class="defcard">
+    <strong>Spec-first work.</strong> Producing a written specification in one session and executing it in another, so that implementation begins with clean context and a document rather than an accumulated conversation.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Reading a plan properly</h3>
+
+  <p>A plan is easy to skim and skimming defeats the purpose. Four questions catch most of what goes wrong, and they take under two minutes between them.</p>
+
+  <p><strong>Does the account of the current state match reality?</strong> This is the checkpoint-one question surviving into checkpoint two. If the plan says a module does something it does not, everything downstream is wrong and confidently expressed.</p>
+
+  <p><strong>Is anything conspicuously absent?</strong> Plans are more often wrong by omission than by error. The migration nobody mentioned, the caller in another service, the test fixture that will need updating. Ask what the change touches that the plan has not named.</p>
+
+  <p><strong>Does the scope match what I asked for?</strong> A plan that has grown a refactor, a dependency upgrade, and a bit of cleanup is a plan that will produce an unreviewable diff. Cut it here, where cutting is free.</p>
+
+  <p><strong>Does it end in something checkable?</strong> If the final step is "verify the feature works", it is not a plan, it is a hope. The end-to-end verification step should name a command, a test, or an observable outcome.</p>
+
+  <h3>When to skip planning entirely</h3>
+
+  <p>The one-sentence test is the primary guide, and two further cases are worth naming. <strong>Exploratory work</strong> where you want to see how the agent interprets the problem before constraining it: planning here forecloses the thing you were trying to observe. And <strong>genuinely reversible work</strong> where trying is cheaper than deciding: with checkpointing available, "try the risky approach and rewind if it fails" is often faster than planning your way to certainty. The documentation makes this point explicitly, and it is a real counterweight to planning discipline rather than an exception to it.</p>
+
+  <p>What does <em>not</em> justify skipping is time pressure, which is when the instinct is strongest and the reasoning weakest. Planning is a net time saving on any task where it was warranted; skipping it under pressure is borrowing from the correction round at an unfavourable rate.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Approving a plan you have skimmed is worse than not planning at all, because it manufactures confidence. Having read a plan, you review the resulting diff less carefully, on the reasonable-seeming grounds that you already agreed to it. If you are not going to read the plan properly, you are better off skipping the phase and reviewing the diff with full attention. The failure mode is not the unread plan; it is the unread plan plus the reduced scrutiny it buys.
+  </div>
+
+  <h3>Worked example: the plan behind this course</h3>
+
+  <div class="worked">
+    <strong>Worked example: planning a 22-lecture course rather than writing one</strong>
+    <p>This course began in plan mode, and the shape of that session is a fair illustration of where the value sat.</p>
+    <p><strong>The research phase was structural, not topical.</strong> The first questions were not about agentic coding at all. They were: what does an existing lecture in this repository look like, what CSS classes exist, how do the landing pages register a course, what is the section structure? That research was cheap and it determined everything downstream. An agent that had invented its own markup would have produced pages that render as unstyled text in the browser, and would have done so confidently, because nothing in the generation step checks that a class exists.</p>
+    <p><strong>The plan phase was mostly argument about scope.</strong> Four questions decided the shape: course size, whether to build everything or a first module, where the centre of gravity should sit, and whether to use real configuration as worked examples. Each answer changed a substantial amount of work. Getting them wrong would have been discovered after several lectures were written, and rewriting a lecture is considerably more expensive than answering a question.</p>
+    <p><strong>What the written plan bought after approval.</strong> Two things that a conversation would not have. It named the verification steps, which is why the finished lectures were checked against a list rather than by recollection: every relative path resolved, every CSS class cross-referenced, no em dashes, git status showing exactly the expected files. And it recorded the decision to concentrate version-volatile material into four specific lectures, which is a constraint that had to survive across many hours of writing and would otherwise have quietly evaporated.</p>
+    <p><strong>Where planning was skipped, correctly.</strong> The individual lectures were not separately planned. Once the syllabus, the format, and the sources were fixed, each lecture was a task whose diff could be described in one sentence: write this file in that structure about that topic. Planning each one would have been ceremony. The distinction is worth generalising: plan the thing that determines many downstream choices, and then execute the downstream choices directly, because a plan for each of them would just be a restatement of the first plan.</p>
+    <p><strong>The honest limitation.</strong> The plan was written by the same agent that executed it, which means the checkpoint depended entirely on the human reading it. An agent's plan cannot catch its own misunderstanding; only a reader with knowledge the agent lacks can. If you approve plans without that knowledge, the phase is theatre, and adding it to your workflow has made things slightly worse rather than better.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Explore, plan, implement, commit, with the first boundary carrying most of the value and receiving least of the attention. Plan mode enforces the discipline rather than relying on your intention to follow it. The overhead is real and the test for whether to pay it is whether you could describe the diff in one sentence. For work too large to prompt, invert the direction and have the agent interview you into a written spec, then execute it in a fresh session. Read plans with four questions: does the current-state account match reality, what is missing, has the scope grown, and does it end in something checkable.</p>
+
+  <p>The wider point is that every technique in this part of the course is a way of moving a decision earlier, to where correcting it is cheap. Instruction files move standing decisions to before the session; specifications move design decisions to before the implementation; plans move approach decisions to before the diff. The next lecture moves <em>procedures</em> earlier in the same way: when the same multi-step process keeps being retyped into chat, it has stopped being a prompt and become something that should live in a file.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the four phases. Which boundary carries most of the value, and why is it the one people skip?</li>
+      <li>Why does a plan built on a wrong understanding fail to announce itself?</li>
+      <li>State the test for whether planning is worth the overhead. Give two further cases where skipping is correct.</li>
+      <li>Describe the interview pattern. Why execute the spec in a fresh session rather than continuing?</li>
+      <li>List the properties of a good specification. Which one makes it verifiable?</li>
+      <li>Give the four questions for reading a plan. Which class of error does the second one catch?</li>
+      <li>Why is approving a skimmed plan worse than not planning?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="06-prompting_for_code.html">Lecture 6 (prompting for code)</a> handled requests that fit in a prompt; this one handles those that do not.</li>
+      <li><strong>Next:</strong> Lecture 8 (skills) moves repeated procedures out of chat and into files.</li>
+      <li><strong>Cross-link:</strong> <a href="03-the_harness.html">Lecture 3 (the harness)</a> covers plan mode's place among the permission modes.</li>
+      <li><strong>Cross-link:</strong> <a href="02-context_engineering.html">Lecture 2 (context engineering)</a> explains why a fresh session for execution outperforms a continued one.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/14-code_review_and_prs.html">Software engineering, Lecture 14 (code review and pull requests)</a> covers the commit phase this lecture only names.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "Best practices for Claude Code" and "Choose a permission mode", code.claude.com/docs (the four-phase workflow, the one-sentence test, and the interview pattern); Barry Boehm, <em>Software Engineering Economics</em> (Prentice Hall, 1981) for the cost-of-change curve.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 7 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

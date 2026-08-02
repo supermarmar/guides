@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Application scoring lecture 5: modelling</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / Application scoring</div>
+  <h1>Modelling: a fifty-year-old technique that keeps winning, and why</h1>
+  <p class="subtitle">A credit score is a linear transformation of the log-odds, so the number itself carries no information and only differences mean anything. The technique that produces it is logistic regression on binned variables, and both limitations the source attributes to it turn out to be either removed by the standard methodology or smaller than advertised. The closing lecture of the track, and of the credit risk collection.</p>
+  <div class="meta">
+    <span>Application scoring 5 of 5</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Sources: <code>docs/wiki/.../application_scoring/05_modelling/</code>, King and Zeng (2001)</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The scaling is the whole of the score's meaning. A probability becomes a score through $\text{Score} = \text{Offset} + \text{Factor} \times \ln(\text{odds})$, where the factor is fixed by the <strong>points to double the odds</strong>: $\text{Factor} = \text{PDO}/\ln 2$. Change the two presentation constants and the same portfolio scores from 418 to 733, or from 609 to 766, or from 372 to 593. The ordering never moves. <strong>The score's range carries no information at all</strong>, and only differences in score mean anything.</p>
+
+  <p>One precision point worth having. The PDO is points to double the <em>odds</em>, not the probability, and the two coincide only when the probability is small. Doubling from 1 to 2 per cent moves the odds by 2.01 and the score by 20.15 points; doubling from 16 to 32 per cent moves the odds by 2.47 and the score by 26.10.</p>
+
+  <p>The source lists two limitations of logistic regression, and both need adjusting. It assumes a linear relationship between features and the log-odds, which is true of the raw variables and <strong>false after weight-of-evidence coding</strong>, because replacing a value with the log-odds of its own bin makes the relationship linear by construction. That is what the standard scorecard methodology is for.</p>
+
+  <p>And on rare defaults, resampling turns out to change almost nothing that matters. Fitting the same data naturally and balanced gives slopes of 1.1008 and 1.0909, an intercept shifted by exactly $\ln k$ where $k$ is the sampling ratio, and an area under the curve <strong>identical to five decimal places</strong>. Resampling is a computational convenience, not a statistical improvement, and it demands an offset correction that is not optional if the output is a probability.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Work out the odds that someone repays, take the logarithm, multiply by a number that makes it look like a credit score, and add another number so it lands in a familiar range. Both of those last numbers are decoration.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that the score's arbitrariness is routinely misunderstood, including by people who use it daily. A bank comparing its scores against a bureau score, or against a competitor's cut-off, or across two of its own products, is comparing numbers whose scales were chosen for presentation. The only comparable quantities are the probability of default and the differences within one scale.</p>
+
+  <p>The second reason is that the two limitations named in the source are the standard reasons given for reaching past logistic regression toward machine learning. If one of them is removed by the binning step that every scorecard already performs and the other is a calibration offset with a closed form, the case for the more complex model has to rest on something else, namely interactions, and that case should be made on its own terms.</p>
+
+  <p>The third reason is that the additive points structure is not a presentational nicety. It is what makes an adverse-action reason code computable without approximation: the applicant lost forty points at this characteristic, and that is a fact about the model rather than an interpretation of it. A model without that structure has to reconstruct explanations after the fact, and the reconstruction is an approximation whose stability is itself a question.</p>
+
+  <p>And a fourth reason, since this closes the collection. Fifty-four lectures of credit risk have found errors in covariances, in benchmarks, in aggregation shortcuts and in sampling frames. Almost none of them were in the model-fitting step. That is worth stating explicitly at the end, because the instinct when a number is wrong is to rebuild the model, and the evidence across this collection is that the model is rarely where the problem lives.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>One transformation, one binning step that earns its keep, and one trade against a more flexible model class.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 760 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scorecard modelling. A pipeline runs from raw attributes through weight of evidence binning to logistic regression, then a log-odds to score transformation and finally risk bands. A panel shows that changing the presentation constants moves the score range while leaving the ordering identical. A further panel shows a U-shaped bad rate that a linear term cannot capture but weight of evidence can. A final panel compares logistic regression with gradient boosting.">
+      <rect x="0" y="0" width="760" height="700" fill="#FFFFFF"/>
+
+      <text x="20" y="22" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#37352F">THE PIPELINE</text>
+
+      <g font-family="Inter, sans-serif" font-size="8.5">
+        <rect x="20" y="32" width="128" height="66" rx="6" fill="#FBF7F0" stroke="#C2C1BD" stroke-width="1.3"/>
+        <text x="30" y="50" font-size="9" font-weight="600" fill="#5C5B57">RAW ATTRIBUTES</text>
+        <text x="30" y="66" fill="#37352F">age, income, bureau</text>
+        <text x="30" y="78" fill="#37352F">history, utilisation</text>
+        <text x="30" y="92" fill="#5C5B57">arbitrary units</text>
+
+        <rect x="156" y="32" width="150" height="66" rx="6" fill="#DEEAFB" stroke="#0F62FE" stroke-width="1.5"/>
+        <text x="166" y="50" font-size="9" font-weight="600" fill="#0F62FE">WoE BINNING</text>
+        <text x="166" y="66" fill="#37352F">replace each value with</text>
+        <text x="166" y="78" fill="#37352F">the log-odds of its bin</text>
+        <text x="166" y="92" font-weight="600" fill="#0F62FE">now linear in log-odds</text>
+
+        <rect x="314" y="32" width="150" height="66" rx="6" fill="#F1EEFB" stroke="#5B47E0" stroke-width="1.5"/>
+        <text x="324" y="50" font-size="9" font-weight="600" fill="#5B47E0">LOGISTIC REGRESSION</text>
+        <text x="324" y="66" font-family="JetBrains Mono, monospace" font-size="8.5" fill="#37352F">z = a + sum b_i WoE_i</text>
+        <text x="324" y="80" font-family="JetBrains Mono, monospace" font-size="8.5" fill="#37352F">p = 1 / (1 + e^-z)</text>
+        <text x="324" y="93" fill="#5C5B57">minimises log-loss</text>
+
+        <rect x="472" y="32" width="150" height="66" rx="6" fill="#F7F2D8" stroke="#B5540E" stroke-width="1.5"/>
+        <text x="482" y="50" font-size="9" font-weight="600" fill="#B5540E">SCALE TO A SCORE</text>
+        <text x="482" y="66" font-family="JetBrains Mono, monospace" font-size="8" fill="#37352F">Offset + Factor ln(odds)</text>
+        <text x="482" y="80" font-family="JetBrains Mono, monospace" font-size="8" fill="#37352F">Factor = PDO / ln 2</text>
+        <text x="482" y="93" font-weight="600" fill="#DC2855">constants are decoration</text>
+
+        <rect x="630" y="32" width="110" height="66" rx="6" fill="#F4F6EF" stroke="#3E7A45" stroke-width="1.5"/>
+        <text x="640" y="50" font-size="9" font-weight="600" fill="#3E7A45">RISK BANDS</text>
+        <text x="640" y="66" fill="#37352F">approve, price,</text>
+        <text x="640" y="78" fill="#37352F">portfolio analysis</text>
+        <text x="640" y="92" fill="#5C5B57">lecture 2</text>
+      </g>
+
+      <text x="20" y="128" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#DC2855">THE SCORE'S RANGE IS A PRESENTATION CHOICE</text>
+
+      <rect x="20" y="140" width="352" height="118" rx="7" fill="#FFFFFF" stroke="#B5540E" stroke-width="1.5"/>
+      <g font-family="JetBrains Mono, monospace" font-size="9" fill="#37352F">
+        <text x="34" y="160">PDO 20, anchor 600 at 50:1 odds</text>
+        <text x="34" y="178">  PD      odds     score</text>
+        <text x="34" y="193">  0.20%   499.00   666.38</text>
+        <text x="34" y="207">  1.00%    99.00   619.71</text>
+        <text x="34" y="221">  4.00%    24.00   578.82</text>
+        <text x="34" y="235"> 16.00%     5.25   534.97</text>
+        <text x="34" y="249"> 32.00%     2.12   508.87</text>
+      </g>
+
+      <rect x="388" y="140" width="352" height="118" rx="7" fill="#FCE9EE" stroke="#DC2855" stroke-width="1.5"/>
+      <text x="402" y="158" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#DC2855">CHANGE ONLY THE TWO CONSTANTS</text>
+      <g font-family="JetBrains Mono, monospace" font-size="9" fill="#37352F">
+        <text x="402" y="178">PDO 40, anchor 600  ->  range 418 to 733</text>
+        <text x="402" y="194">PDO 20, anchor 700  ->  range 609 to 766</text>
+        <text x="402" y="210">PDO 28, anchor 500  ->  range 372 to 593</text>
+      </g>
+      <text x="402" y="230" font-family="Inter, sans-serif" font-size="8.5" fill="#37352F">identical model, identical ordering, identical</text>
+      <text x="402" y="242" font-family="Inter, sans-serif" font-size="8.5" fill="#37352F">probabilities. only DIFFERENCES in score mean</text>
+      <text x="402" y="254" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#DC2855">anything, and only within one scale.</text>
+
+      <text x="20" y="288" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#0F62FE">WHY THE BINNING STEP REMOVES THE LINEARITY LIMITATION</text>
+
+      <rect x="20" y="300" width="352" height="150" rx="7" fill="#FFFFFF" stroke="#C2C1BD" stroke-width="1.3"/>
+      <text x="34" y="318" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#37352F">A U-SHAPED BAD RATE IN THE RAW VALUE</text>
+      <line x1="56" y1="420" x2="350" y2="420" stroke="#5C5B57" stroke-width="1.2"/>
+      <line x1="56" y1="420" x2="56" y2="332" stroke="#5C5B57" stroke-width="1.2"/>
+      <polyline points="70,344 128,384 186,398 244,374 302,338" fill="none" stroke="#DC2855" stroke-width="2.4"/>
+      <circle cx="70" cy="344" r="3" fill="#DC2855"/><circle cx="128" cy="384" r="3" fill="#DC2855"/>
+      <circle cx="186" cy="398" r="3" fill="#DC2855"/><circle cx="244" cy="374" r="3" fill="#DC2855"/>
+      <circle cx="302" cy="338" r="3" fill="#DC2855"/>
+      <line x1="70" y1="372" x2="302" y2="380" stroke="#5C5B57" stroke-width="1.8" stroke-dasharray="5 3"/>
+      <text x="150" y="366" font-family="Inter, sans-serif" font-size="8" fill="#5C5B57">a linear term fits this</text>
+      <text x="34" y="336" font-family="Inter, sans-serif" font-size="8" fill="#5C5B57">bad rate</text>
+      <text x="34" y="438" font-family="Inter, sans-serif" font-size="8.5" fill="#37352F">bad rates 8.0 / 4.0 / 3.0 / 5.0 / 9.0 per cent</text>
+
+      <rect x="388" y="300" width="352" height="150" rx="7" fill="#DEEAFB" stroke="#0F62FE" stroke-width="1.5"/>
+      <text x="402" y="318" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#0F62FE">THE SAME ATTRIBUTE, WoE CODED</text>
+      <g font-family="JetBrains Mono, monospace" font-size="8.5" fill="#37352F">
+        <text x="402" y="338">bin          bad rate      WoE</text>
+        <text x="402" y="354">very low       8.00%     -0.3452</text>
+        <text x="402" y="369">low            4.00%     +0.3905</text>
+        <text x="402" y="384">mid            3.00%     +0.6885</text>
+        <text x="402" y="399">high           5.00%     +0.1569</text>
+        <text x="402" y="414">very high      9.00%     -0.4739</text>
+      </g>
+      <text x="402" y="434" font-family="Inter, sans-serif" font-size="8.5" font-weight="600" fill="#0F62FE">information value 0.1842, a usable predictor.</text>
+      <text x="402" y="446" font-family="Inter, sans-serif" font-size="8.5" fill="#DC2855">a linear term on the raw code gets a slope of -0.049 and captures nothing.</text>
+
+      <text x="20" y="480" font-family="Inter, sans-serif" font-size="12.5" font-weight="600" fill="#37352F">AND THE TRADE AGAINST A MORE FLEXIBLE MODEL CLASS</text>
+
+      <rect x="20" y="492" width="352" height="126" rx="7" fill="#F1EEFB" stroke="#5B47E0" stroke-width="1.5"/>
+      <text x="34" y="510" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#5B47E0">LOGISTIC REGRESSION ON WoE</text>
+      <g font-family="Inter, sans-serif" font-size="8.5" fill="#37352F">
+        <text x="34" y="528">+ points are ADDITIVE, so a reason code is a fact</text>
+        <text x="34" y="542">&nbsp;&nbsp;about the model, not an approximation of it</text>
+        <text x="34" y="558">+ direction of every bin is checkable and enforceable</text>
+        <text x="34" y="574">+ recalibration is one intercept</text>
+        <text x="34" y="592" fill="#DC2855">&minus; interactions must be specified by hand</text>
+        <text x="34" y="608" fill="#5C5B57">the fifty-year-old default, and still the default</text>
+      </g>
+
+      <rect x="388" y="492" width="352" height="126" rx="7" fill="#F7F2D8" stroke="#B5540E" stroke-width="1.5"/>
+      <text x="402" y="510" font-family="Inter, sans-serif" font-size="9.5" font-weight="600" fill="#B5540E">GRADIENT BOOSTED TREES</text>
+      <g font-family="Inter, sans-serif" font-size="8.5" fill="#37352F">
+        <text x="402" y="528">+ finds non-linearity and interactions unaided</text>
+        <text x="402" y="542">+ feature importance falls out of the fit</text>
+        <text x="402" y="558" fill="#DC2855">&minus; explanations must be reconstructed afterwards</text>
+        <text x="402" y="574" fill="#DC2855">&minus; monotonicity is not guaranteed, hence the source's</text>
+        <text x="402" y="588" fill="#DC2855">&nbsp;&nbsp;own spot check: actuary against nurse</text>
+        <text x="402" y="606" fill="#5C5B57">buys discrimination, loses a guarantee</text>
+      </g>
+
+      <rect x="20" y="630" width="720" height="58" rx="7" fill="#F4F6EF" stroke="#3E7A45" stroke-width="1.6"/>
+      <text x="34" y="650" font-family="Inter, sans-serif" font-size="10.5" font-weight="600" fill="#3E7A45">AND ON RARE DEFAULTS: RESAMPLING MOVES THE INTERCEPT AND NOTHING ELSE</text>
+      <g font-family="JetBrains Mono, monospace" font-size="9" fill="#37352F">
+        <text x="34" y="668">natural sample    intercept -3.1946   slope +1.1008   AUC 0.77350</text>
+        <text x="34" y="682">balanced sample   intercept -0.4988   slope +1.0909   AUC 0.77350       shift = ln(14.97) = +2.706</text>
+      </g>
+    </svg>
+    <figcaption>The binning step in the second box is what makes the whole thing work: it converts every attribute into a log-odds quantity, so the model that follows is linear in exactly the scale it needs to be linear in.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The scaling, and the constant that is not arbitrary</h3>
+
+  <p>The source gives the transformation as $\text{Score} = \text{Base Score} + \text{Factor} \times \ln((1-\text{PD})/\text{PD})$, with a typical range of 300 to 900. The quantity inside the logarithm is the good-to-bad odds, so a higher score means a safer applicant, and the whole construction is a monotone transformation of the probability. Nothing is added by the transformation and nothing is lost.</p>
+
+  <p>Two constants fix it. The <strong>factor</strong> is determined by the points to double the odds: if adding PDO points doubles the odds then $\text{Factor} \times \ln 2 = \text{PDO}$, so $\text{Factor} = \text{PDO}/\ln 2$. The <strong>offset</strong> is fixed by anchoring a chosen score at chosen odds. Neither is estimated from data and neither affects any decision.</p>
+
+  <div class="worked">THE SCALE, AND WHAT THE PDO ACTUALLY DOUBLES
+
+  CHOOSE 20 POINTS TO DOUBLE THE ODDS, AND A SCORE OF 600 AT
+  ODDS OF 50 TO 1
+
+    Factor = 20 / ln 2 = 28.8539
+    Offset = 600 - 28.8539 x ln 50 = 487.1229
+
+     PD        odds      score     change   odds ratio
+    0.20%    499.00    666.38
+    0.50%    199.00    639.86    -26.53      2.508
+    1.00%     99.00    619.71    -20.15      2.010
+    2.00%     49.00    599.42    -20.29      2.020
+    4.00%     24.00    578.82    -20.59      2.042
+    8.00%     11.50    557.59    -21.23      2.087
+   16.00%      5.25    534.97    -22.62      2.190
+   32.00%      2.12    508.87    -26.10      2.471
+
+  A PRECISION POINT WORTH HAVING
+    the rows above DOUBLE THE PROBABILITY each time, and the
+    score falls by 20 points only in the middle of the table.
+
+    the PDO is points to double the ODDS, not the probability.
+    at low PD the two nearly coincide, because odds are
+    approximately PD when PD is small. at 16% to 32% the odds
+    ratio is 2.47 and the score falls 26.10 points.
+
+    a candidate who says "20 points doubles the risk" is right
+    for a prime book and wrong for a subprime one.
+
+  AND NOW CHANGE ONLY THE PRESENTATION CONSTANTS
+    PDO 40, anchor 600  ->  the same portfolio spans 418 to 733
+    PDO 20, anchor 700  ->  the same portfolio spans 609 to 766
+    PDO 28, anchor 500  ->  the same portfolio spans 372 to 593
+
+    identical model, identical ordering, identical
+    probabilities. THE RANGE IS DECORATION.
+
+  WHICH HAS THREE PRACTICAL CONSEQUENCES
+    a score cannot be compared across banks, across products,
+    or against a bureau score, without the scaling constants;
+
+    a "score of 650" in a policy document is meaningless
+    unless the scale is stated alongside it;
+
+    and only DIFFERENCES within one scale carry information,
+    which is why the PDO is quoted at all.</div>
+
+  <h3>Why the points are additive, and what that buys</h3>
+
+  <p>With weight-of-evidence coding the linear predictor is $z = \alpha + \sum_i \beta_i \, \text{WoE}_i$, and the score is an affine function of $z$. So the score decomposes into a constant plus a contribution from each characteristic, and each contribution is a fixed number of points attached to the bin the applicant falls in. That structure is why a scorecard can be printed as a table and why an applicant can be told which characteristics cost them points.</p>
+
+  <p>It also makes an <strong>adverse-action reason code</strong> exact rather than approximate. The characteristics on which the applicant lost the most points relative to a reference profile are the reasons for decline, and that statement is a fact about the arithmetic of the model. No reconstruction, no attribution method, no dependence on a baseline choice. Step 5 returns to what happens when the model class does not have this property.</p>
+
+  <h3>Logistic regression, and the two limitations the source names</h3>
+
+  <p>The source's treatment is accurate and worth recording. The model builds a linear predictor $z = \alpha + \beta_1 X_1 + \ldots + \beta_n X_n$, transforms it through the logistic function to a probability, and is fitted by minimising log-loss, the negative log-likelihood. It is chosen for simplicity, interpretability and effectiveness on binary outcomes, gives a continuous score rather than a binary result so that risk-based pricing is possible, and is easy to explain to stakeholders. Different models may be built for different segments.</p>
+
+  <p>The two limitations are given as the linearity of the relationship between features and log-odds, and poor performance on imbalanced data without adjustments such as oversampling or weighting. Both are worth examining rather than accepting, and step 5 does that.</p>
+
+  <h3>Gradient boosting, and the check the source insists on</h3>
+
+  <p>The source's description of gradient boosting is correct: an ensemble that builds decision trees sequentially, each correcting the errors of its predecessors, using the gradient and the Hessian of the loss to optimise at each step. It captures complex non-linear relationships and interactions that logistic regression must be told about, and it produces feature importances as a by-product. Its costs are interpretability, computation, and sensitivity to tuning of the learning rate, tree count and depth.</p>
+
+  <p>The most interesting line in the note is a practical instruction rather than a property: it "can make some incorrect inferences so you have to do some spot checks e.g. Actuary vs Nurse and their PDs". That sentence is doing more work than it appears to. It is saying that a flexible model can learn an ordering between two occupations that the bank could not defend, and that a human must therefore inspect the fitted relationship for plausibility. The reason the check is necessary is that the model class provides no guarantee the scorecard methodology provides by construction, which step 5 develops.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The linearity limitation is removed by the step before the model</h3>
+
+  <p>Logistic regression does assume the log-odds are linear in the covariates. That is a real restriction on raw variables and it is not a restriction on the model as actually built, because weight-of-evidence coding replaces each raw value with the log-odds of its own bin before fitting.</p>
+
+  <div class="worked">A U-SHAPED PREDICTOR, BOTH WAYS
+
+  AN ATTRIBUTE WHOSE BAD RATE IS U-SHAPED IN THE RAW VALUE,
+  which is the usual shape for age and for income
+
+    bin         share   bad rate   dist good  dist bad     WoE
+    very low     20%      8.00%     0.1953     0.2759   -0.3452
+    low          20%      4.00%     0.2038     0.1379   +0.3905
+    mid          20%      3.00%     0.2059     0.1034   +0.6885
+    high         20%      5.00%     0.2017     0.1724   +0.1569
+    very high    20%      9.00%     0.1932     0.3103   -0.4739
+
+    information value 0.1842, comfortably a usable predictor
+
+  FIT A LINEAR TERM IN THE RAW VALUE INSTEAD
+    coding the bins 1 to 5 and regressing the WoE on the code
+    gives a slope of -0.049. The U is symmetric, so a linear
+    term captures essentially NOTHING and the variable would
+    be dropped as uninformative.
+
+  SO THE SAME ATTRIBUTE IS EITHER A USEFUL PREDICTOR OR
+  WORTHLESS DEPENDING ENTIRELY ON THE CODING STEP.
+
+  WHAT WoE IS DOING
+    it replaces a value with the log-odds of its bin. The
+    model is then linear in a quantity that is itself a
+    log-odds, so the linearity assumption holds BY
+    CONSTRUCTION rather than by luck.
+
+  WHICH REFRAMES THE LIMITATION
+    "logistic regression assumes linearity in the log-odds"
+    is true and is a limitation of logistic regression on RAW
+    variables. The scorecard methodology has already removed
+    it before the model is fitted, which is precisely why
+    that methodology exists and why it has survived fifty
+    years of alternatives.
+
+  WHAT IS NOT REMOVED
+    INTERACTIONS. WoE linearises each variable separately and
+    says nothing about their joint behaviour, so an
+    interaction still has to be specified by hand. That is
+    the genuine remaining advantage of a tree ensemble, and
+    it is a much narrower claim than "logistic regression
+    cannot handle non-linearity".</div>
+
+  <h3>The imbalance limitation is an intercept, and it has a closed form</h3>
+
+  <p>The claim that rare events degrade logistic regression is widely repeated and mostly wrong in the way that matters. King and Zeng's 2001 treatment of rare-events logistic regression establishes that the small-sample bias falls on the intercept, and that the effect of case-control style sampling is a known offset rather than a distortion of the slopes. It is worth demonstrating rather than citing.</p>
+
+  <div class="worked">FITTING THE SAME DATA TWICE
+
+  SIMULATION
+    60,000 applicants, true intercept -3.20, true slope 1.10
+    3,758 bads, a 6.26% default rate
+
+  FIT ON THE NATURAL SAMPLE
+    intercept -3.1946    slope +1.1008
+
+  FIT ON A BALANCED SAMPLE
+    all bads kept, goods downsampled by a factor of 14.97
+    intercept -0.4988    slope +1.0909
+
+  THREE COMPARISONS
+
+  1  THE SLOPE IS UNCHANGED
+       1.0909 against 1.1008, a difference of 0.0099, which
+       is well inside sampling error.
+
+  2  THE INTERCEPT MOVES BY EXACTLY ln(k)
+       ln(14.97) = 2.7058
+       predicted -3.1946 + 2.7058 = -0.4888
+       observed                     -0.4988
+       agreeing to 0.0101
+
+  3  THE DISCRIMINATION IS IDENTICAL
+       natural-sample model    AUC 0.77350
+       balanced-sample model   AUC 0.77350
+       difference              0.00000
+
+  SO WHAT DOES RESAMPLING ACHIEVE?
+    It makes the fit faster and the optimiser better
+    conditioned on very rare outcomes. It does not improve
+    discrimination, it does not fix the slopes, and it
+    changes the intercept by a constant you must subtract
+    back if the output is a probability rather than a rank.
+
+  THE PRACTICAL RULE
+    resample for tractability if you like, then correct the
+    intercept by ln(k). If the score is used only ordinally,
+    for a cut-off, the correction is optional. If the score
+    becomes a probability of default for capital, provisions
+    or pricing, omitting it overstates every probability by
+    a factor of roughly k.
+
+  AND A WARNING ABOUT THE COMBINATION
+    lecture 4 showed the reject sample already understates
+    the through-the-door probability by 46.6%. An uncorrected
+    oversampled model overstates it. Two large errors in
+    opposite directions, in the same pipeline, neither
+    documented, is how a scorecard can appear calibrated
+    while both of its calibration problems are live.</div>
+
+  <h3>What the actuary-against-nurse check is really testing</h3>
+
+  <p>The source's spot check deserves the last word on model choice. A gradient boosted model can place two occupations in an order the bank cannot defend, and the recommended response is that a human inspect the fitted relationships for plausibility. That is sound advice and it is worth being precise about why the check is needed for one model class and not the other.</p>
+
+  <p>A weight-of-evidence scorecard is built with an explicit <strong>directionality</strong> step: each characteristic's bins are examined, their ordering is checked against economic reasoning, and bins that violate the expected direction are merged or the variable is rejected. So the plausibility constraint is imposed <em>during construction</em> and is visible in the scorecard table afterwards. A tree ensemble fits whatever pattern the data contain, including patterns that reflect historical selection rather than credit risk, and nothing in its construction rules any of them out.</p>
+
+  <p>Which means the trade is not really interpretability against accuracy. It is that one model class lets you <strong>impose a constraint</strong> and the other only lets you <strong>detect a violation</strong>, after the fact, if someone thinks to look. Monotonicity constraints in modern boosting libraries narrow that gap and do not close it, because they constrain the direction of a single feature and not the plausibility of an interaction. For a lending decision that must be explained to a declined applicant and defended to a regulator, the ability to impose is worth a good deal more than a small gain in discrimination.</p>
+
+  <h3>What fifty-four lectures of credit risk found</h3>
+
+  <p>This closes the credit risk collection, and there is a pattern across it worth stating plainly at the end.</p>
+
+  <div class="worked">WHERE THE ERRORS WERE
+
+  IN THE MODEL-FITTING STEP
+    almost none. The logistic regression is a solved problem.
+    The estimator in the IFRS 9 PD lecture was correct. The
+    Vasicek closed form is correct. The exposure metrics are
+    correct once named properly.
+
+  IN THE JOINT BEHAVIOUR OF THINGS ASSUMED INDEPENDENT
+    PD with LGD across scenarios              8.09%
+    PD, LGD and EAD together                 11.68%
+    prepayment with credit quality            5.10%
+    exposure with counterparty default   alpha 1.4
+
+  IN THE BENCHMARK A MEASURE IS TAKEN AGAINST
+    the Herfindahl ratio against equal weights rather than
+    infinite granularity                  21.7x understated
+    discrimination optimised where calibration was needed
+    the reject sample against the through-the-door population
+
+  IN AN AGGREGATION SHORTCUT
+    summing per-sector capital instead of taking a portfolio
+    quantile                              151% overstated
+
+  IN A DEFINITION QUIETLY SUBSTITUTED
+    delinquency standing in for deterioration
+    90 DPD standing in for the regulatory default
+
+  THE COMMON PROPERTY
+    every one of these sits at a boundary: between two
+    models, between a measure and its benchmark, between a
+    definition and its proxy. None of them is visible from
+    inside the component that contains it, and none is a
+    modelling error in the ordinary sense.
+
+  SO THE CLOSING RECOMMENDATION IS THE SAME ONE THE IFRS 9
+  TRACK REACHED, AND IT IS CHEAP
+    a validation plan organised by boundary rather than by
+    model. Three pairwise covariance sums, one dispersion
+    slope, one benchmark statement per metric, one query
+    that sums assigned losses per account, and one plot of
+    flagged share against realised default rate.
+
+    The instinct when a number looks wrong is to rebuild the
+    model. On this evidence, the model is the least likely
+    place for the problem to be.</div>
+
+  <div class="callout insight">
+    <span class="tag">Why the old technique keeps winning</span>
+    Logistic regression on binned variables survives not because it is the most accurate available method but because its structure delivers three things the alternatives must reconstruct: an exact additive decomposition for reason codes, an enforceable direction for every characteristic, and a recalibration that is a single intercept. A method that is slightly less accurate and structurally explicable beats one that is slightly more accurate and explicable only by approximation, whenever the output has to be defended to someone who was declined.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Where this goes wrong in practice</span>
+    A challenger model reported as a headline Gini improvement with no statement of what it gives up. The comparison that matters is not two Gini figures; it is two Gini figures alongside the reason-code method, the monotonicity guarantee, the recalibration procedure and the number of specifications tried before the winner emerged. Lecture 4 showed the last of those is worth two Gini points on its own, which is frequently the entire claimed improvement.
+  </div>
+
+  <div class="callout feynman">
+    <span class="tag">Exam tip</span>
+    If asked to compare logistic regression with machine learning for credit scoring, the weak answer is that one is interpretable and the other is accurate. The strong answer separates three things: weight-of-evidence binning already handles non-linearity, so the remaining statistical advantage of a tree ensemble is interactions specifically; interpretability differs in kind rather than degree, since one model permits an exact reason code and the other requires an attribution method; and the plausibility constraint can be imposed in one and only detected in the other.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Write the transformation from probability of default to score and identify the two constants.</li>
+      <li>Derive the factor from the points to double the odds.</li>
+      <li><strong>Do the arithmetic.</strong> With 20 points to double the odds and a score of 600 at odds of 50 to 1, compute the offset and the score at a 1 per cent default rate.</li>
+      <li><strong>Do the arithmetic.</strong> Show that doubling the probability from 16 to 32 per cent moves the score by more than the PDO, and explain why.</li>
+      <li>What does the PDO double, and when does the distinction stop mattering?</li>
+      <li><strong>Do the arithmetic.</strong> Recompute the score range under two different pairs of presentation constants. What is unchanged?</li>
+      <li>Give three practical consequences of the score's range carrying no information.</li>
+      <li>Why are scorecard points additive, and what exactly does that make an adverse-action reason code?</li>
+      <li>State the logistic regression model, its fitting criterion, and four reasons the source gives for using it.</li>
+      <li>Name the two limitations the source attributes to logistic regression.</li>
+      <li><strong>Do the arithmetic.</strong> For the five-bin U-shaped attribute, compute the weights of evidence and the information value.</li>
+      <li><strong>Do the arithmetic.</strong> Fit a linear term to the same attribute on a raw code. What slope results, and what would happen to the variable?</li>
+      <li>Explain precisely how weight-of-evidence coding makes the linearity assumption hold by construction.</li>
+      <li>What limitation of logistic regression does binning <em>not</em> remove, and why is that a narrower claim than the usual one?</li>
+      <li><strong>Do the arithmetic.</strong> Fitting the same data naturally and balanced, what happens to the slope, the intercept and the area under the curve?</li>
+      <li>State the offset correction and when it is optional.</li>
+      <li>What two calibration errors could be present in one pipeline at once, and in which directions do they run?</li>
+      <li>Describe gradient boosting as the source does, with its three named costs.</li>
+      <li>What is the actuary-against-nurse spot check actually testing?</li>
+      <li>Explain why a weight-of-evidence scorecard needs no such check, referring to the directionality step.</li>
+      <li>Restate the model choice as a difference between imposing a constraint and detecting a violation. Why do monotonicity constraints narrow rather than close the gap?</li>
+      <li>Across the credit risk collection, where did the errors turn out to live, and where did they not?</li>
+      <li>Give the four categories of error identified in the closing block, with one example of each.</li>
+      <li>What should a challenger model be reported alongside, beyond its Gini?</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <h4>This completes the track and the collection</h4>
+    <ul>
+      <li>Five lectures from <a href="01-underwriting.html">underwriting judgement</a> through the <a href="02-application_scorecards.html">application scorecard</a> and its decision chain, the <a href="03-behavioural_scorecards.html">behavioural handover</a>, the <a href="04-data_and_sampling.html">data foundations</a>, and the modelling techniques here.</li>
+      <li>With it the credit risk collection closes: notation, the 32-lecture A-IRB capital chain, the 12-lecture IFRS 9 chain, counterparty credit risk, credit concentration risk and application scoring. Fifty-four lectures, and the closing block in step 5 records what they found.</li>
+    </ul>
+
+    <h4>What this depends on</h4>
+    <ul>
+      <li><a href="04-data_and_sampling.html">Application scoring lecture 4</a> for the reject bias that combines with the resampling offset, and for the selection-bias arithmetic behind the warning about challenger models.</li>
+      <li><a href="02-application_scorecards.html">Lecture 2</a> for the risk bands this score feeds and for the discrimination-against-calibration split that determines when the offset correction matters.</li>
+      <li><a href="../a-irb_capital/12-pd_feature_engineering.html">A-IRB lecture 12</a> for weight-of-evidence binning, information value and the transformation machinery, and <a href="../a-irb_capital/13-pd_risk_differentiation.html">lecture 13</a> for the directionality check and the five-criterion refinement loop.</li>
+    </ul>
+
+    <h4>Where this reappears</h4>
+    <ul>
+      <li>Logistic regression, gradient boosting, log-loss and the bias-variance trade are developed properly in <a href="../../../../../../fundamentals/machine_learning/index.html">the machine learning track</a>, along with SHAP and the attribution methods a tree ensemble needs for explanation.</li>
+      <li>Rare-events estimation, case-control sampling and the offset correction belong to <a href="../../../../../../fundamentals/statistics/index.html">the statistics track</a>, where the King and Zeng result sits alongside the general theory of retrospective sampling.</li>
+      <li>The score-to-grade mapping and its use in capital connects to <a href="../a-irb_capital/14-pd_risk_quantification.html">A-IRB lecture 14</a>, where grades are constructed and calibrated to a long-run average.</li>
+    </ul>
+
+    <h4>Source material</h4>
+    <ul>
+      <li>Wiki: <code>credit_risk/application_scoring/05_modelling/01-model_methodology.md</code> for the score transformation, the 300 to 900 range and the three uses of risk bands, and <code>02-orgination_pd_model.md</code> for the logistic regression specification, the sigmoid, the log-loss criterion, the four advantages, both limitations, the gradient boosting description with its sequential trees and gradient and Hessian optimisation, the worked tree sequence, the three benefits and three limitations, and the actuary-against-nurse spot check.</li>
+      <li>King and Zeng (2001), "Logistic Regression in Rare Events Data", <em>Political Analysis</em>, for the result that the small-sample bias falls on the intercept and that case-control sampling shifts it by a known constant.</li>
+    </ul>
+
+    <h4>Cross-references</h4>
+    <ul>
+      <li>Every figure in the four worked blocks was computed for this lecture and verified numerically: the scaling constants and the score at eight default rates with the odds ratios that explain the varying step size, the score ranges under three alternative constant pairs, the weights of evidence and information value for the five-bin attribute together with the linear slope on the raw code, and a 60,000-observation simulation fitting the same data naturally and balanced with the intercept shift compared against the predicted logarithm of the sampling ratio. All parameter values, bad rates and bin shares are invented for illustration; the transformation, the model specifications and the spot check are the source's own.</li>
+      <li>The demonstration that weight-of-evidence coding removes the linearity limitation the source names, the narrowing of the remaining advantage of tree ensembles to interactions specifically, the resampling result and the offset correction, the observation that the reject bias and an uncorrected resampling offset run in opposite directions in one pipeline, the reading of the spot check as a constraint that one model class can impose and the other can only detect, and the closing synthesis of where the collection's errors were found are derived here rather than stated in the source.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All application scoring lectures</a> &middot; <a href="../index.html">Credit risk</a></span>
+  <span>Application scoring 5 of 5: modelling, and the close of the credit risk collection</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

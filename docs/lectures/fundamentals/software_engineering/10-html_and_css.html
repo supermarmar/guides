@@ -1,0 +1,451 @@
+﻿<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 10: HTML, CSS, and the visual layer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+  <style>
+    /* Lecture-local demo styles. Real call-outs live in lecture.css. */
+    .demo-box {
+      border: 1px solid var(--hairline);
+      border-radius: var(--r-md);
+      padding: var(--s-md);
+      background: var(--surface-soft);
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--charcoal);
+      margin: var(--s-md) 0;
+    }
+    .demo-swatches { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 0; }
+    .demo-swatches span {
+      display: inline-block; width: 64px; height: 32px; border-radius: 6px;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+    }
+  </style>
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>HTML, CSS, and the visual layer</h1>
+  <p class="subtitle">Every documentation pipeline, every Markdown engine, every Jupyter renderer, eventually emits HTML and styles it with CSS. This lecture is the practical, working-analyst's view of that stack: the document tree, the cascade, web fonts, SVG, KaTeX, and the syntax-highlighting layer, with attention to the parts that actually break when a doc site goes wrong.</p>
+  <div class="meta">
+    <span>Lecture 10 of 16</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part III: documentation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>HTML</strong> (HyperText Markup Language, Tim Berners-Lee, 1990) is the document model of the web: a tree of nested elements with semantic tags. <strong>CSS</strong> (Cascading Style Sheets, Håkon Wium Lie, 1994) is the stylesheet language that decorates that tree: selectors target elements, declarations set properties, and a deterministic cascade resolves conflicts. Together they are the rendering target for almost everything in the documentation toolchain. Markdown compiles to HTML; MkDocs and Sphinx emit HTML; the Jupyter notebook displays HTML; a PDF produced by Pandoc started life as HTML. Knowing how the stack works is the difference between a documentation site that you can debug and one that you cannot.</p>
+
+  <p>The author of documentation rarely writes HTML or CSS by hand. The Markdown engine writes it for them. What the author does is configure the toolchain (theme, fonts, math, syntax highlighting, custom call-outs) and, when something renders wrong, read the rendered HTML and the applied CSS to diagnose the problem. That diagnostic skill is the goal of this lecture. By the end you should be able to open the browser's developer tools on any documentation page in this course, identify the elements, identify the rules styling them, and change the result.</p>
+
+  <p>The five layers that matter in practice are the <strong>document tree</strong> (HTML structure and semantic elements); the <strong>cascade</strong> (CSS selectors, specificity, and inheritance); the <strong>typographic stack</strong> (web fonts and the rules that load them); <strong>SVG</strong> (the vector-graphics dialect that lives inside HTML, used for the figures in lectures 7 and 8); and the two add-ons that almost every technical site needs, <strong>KaTeX</strong> for mathematics and <strong>Prism</strong> (or one of its rivals) for syntax highlighting.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A web page is a tree, a stylesheet, and a renderer. The tree (HTML) says what the elements are. The stylesheet (CSS) says how they look. The renderer (your browser) walks the tree, looks up every applicable rule, resolves conflicts by the cascade, and paints the result. If you can describe what happens to the heading <code>&lt;h1&gt;Introduction&lt;/h1&gt;</code> on its way from source to screen, you can hold a useful opinion on every layout, font, or syntax-highlighting question.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The deep reason HTML and CSS endure, after thirty-five years, is that they are <em>declarative</em>. The author describes what the document <em>is</em>, not how to draw it. The browser, the screen reader, the search-engine crawler, the e-reader, and the PDF converter all read the same source and adapt it to their medium. A page that renders well on Chrome usually also renders well in Reader Mode, in Pocket, in EPUB, and as a print PDF, because the same semantic structure carries through. The discipline behind a good documentation site is the same discipline behind a good Markdown source: write the meaning, let the renderer choose the appearance.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is debugging. Every Markdown-to-site pipeline produces HTML that the browser then styles. When a heading is the wrong size, a code block does not highlight, a table overflows the page, or a diagram renders blank, the diagnosis lives in the rendered HTML and the applied CSS. The right-click "Inspect Element" view in any modern browser is the most useful documentation tool you will ever learn. Without HTML literacy, you are reduced to changing settings at random and hoping; with it, you read the page, find the broken rule, and fix it.</p>
+
+  <p>The second reason is extension. The MkDocs Material theme is excellent out of the box, but every team eventually wants something it does not ship: a call-out class for a regulatory citation, a print stylesheet that hides the navigation, a custom Mermaid theme that matches the corporate palette. All of these are short pieces of CSS added in one file. A team that cannot read CSS treats the theme as a black box; a team that can extends it in an afternoon. The same applies to Sphinx, Jupyter, and any rendering surface you do not own outright.</p>
+
+  <p>The third reason is durability. The MkDocs theme of 2018 is not the MkDocs theme of 2026. Themes deprecate, plugins break, and corporate brand standards change every five years. The asset that survives is the underlying HTML structure: semantic tags, accessible markup, clean section hierarchy. A site whose Markdown produces good HTML can be re-themed in a day. A site whose Markdown depended on theme-specific hacks needs to be rewritten. Lehmann's first law of software evolution applies to documentation: anything that is used must change, and the structures that change cheaply are the ones built on durable foundations.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The document tree</h3>
+
+  <p>An HTML document is a tree. The root is the <code>&lt;html&gt;</code> element. Inside it, <code>&lt;head&gt;</code> contains metadata (title, links to stylesheets, font preconnect hints) and <code>&lt;body&gt;</code> contains the visible content. Inside the body, elements nest: a <code>&lt;section&gt;</code> wraps a heading and paragraphs, a <code>&lt;figure&gt;</code> wraps an image and its caption, a <code>&lt;table&gt;</code> wraps rows of cells. The browser parses the source linearly, builds the tree in memory (the <strong>DOM</strong>, document object model), and from then on every layout and styling decision is made by walking the tree.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Source to screen pipeline">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">From source to screen</text>
+
+      <g font-family="Inter" font-size="12">
+        <!-- HTML source -->
+        <rect x="40"  y="60" width="160" height="60" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2" rx="6"/>
+        <text x="120" y="86"  text-anchor="middle" font-weight="700" fill="#3D2EB5">HTML source</text>
+        <text x="120" y="105" text-anchor="middle" font-size="11" fill="#37352F">text, with tags</text>
+
+        <!-- DOM tree -->
+        <rect x="240" y="60" width="160" height="60" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2" rx="6"/>
+        <text x="320" y="86"  text-anchor="middle" font-weight="700" fill="#1E9D54">DOM tree</text>
+        <text x="320" y="105" text-anchor="middle" font-size="11" fill="#37352F">parsed structure</text>
+
+        <!-- CSS rules -->
+        <rect x="240" y="160" width="160" height="60" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2" rx="6"/>
+        <text x="320" y="186" text-anchor="middle" font-weight="700" fill="#C76B2A">CSS rules</text>
+        <text x="320" y="205" text-anchor="middle" font-size="11" fill="#37352F">selectors + declarations</text>
+
+        <!-- Render tree -->
+        <rect x="440" y="110" width="160" height="60" fill="#FBEDE4" stroke="#F08C42" stroke-width="2" rx="6"/>
+        <text x="520" y="136" text-anchor="middle" font-weight="700" fill="#C76B2A">Render tree</text>
+        <text x="520" y="155" text-anchor="middle" font-size="11" fill="#37352F">styled, laid out</text>
+
+        <!-- Pixels -->
+        <rect x="640" y="110" width="100" height="60" fill="#F8E0DE" stroke="#DC2855" stroke-width="2" rx="6"/>
+        <text x="690" y="136" text-anchor="middle" font-weight="700" fill="#DC2855">Pixels</text>
+        <text x="690" y="155" text-anchor="middle" font-size="11" fill="#37352F">painted</text>
+
+        <line x1="200" y1="90"  x2="240" y2="90"  stroke="#71717a" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="400" y1="90"  x2="440" y2="135" stroke="#71717a" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="400" y1="190" x2="440" y2="145" stroke="#71717a" stroke-width="1.5" marker-end="url(#arr)"/>
+        <line x1="600" y1="140" x2="640" y2="140" stroke="#71717a" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <text x="220" y="280" text-anchor="middle" font-size="11" fill="#71717a">parse</text>
+        <text x="420" y="280" text-anchor="middle" font-size="11" fill="#71717a">style + layout</text>
+        <text x="620" y="280" text-anchor="middle" font-size="11" fill="#71717a">paint</text>
+      </g>
+
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>The browser parses the HTML into a tree, applies CSS to produce a render tree, lays it out, and paints pixels. Every documentation toolchain hands its output to this pipeline.</figcaption>
+  </figure>
+
+  <p>The tree has structural elements (containers like <code>section</code>, <code>article</code>, <code>nav</code>, <code>header</code>, <code>footer</code>, <code>main</code>, <code>aside</code>), text-level elements (<code>h1</code> to <code>h6</code>, <code>p</code>, <code>ul</code>, <code>ol</code>, <code>li</code>, <code>blockquote</code>), and inline elements (<code>strong</code>, <code>em</code>, <code>code</code>, <code>a</code>, <code>span</code>). The structural tags are not decoration; they are how screen readers, search-engine crawlers, and reading-mode tools understand the page. A site whose Markdown engine produces semantically correct HTML is automatically accessible, indexable, and printable; a site whose Markdown produces a wall of <code>&lt;div&gt;</code> tags is none of those things.</p>
+
+  <h3>The cascade</h3>
+
+  <p>CSS attaches style to the tree. A <strong>CSS rule</strong> has a selector and a block of declarations. The selector says which elements the rule applies to; each declaration is a <code>property: value</code> pair. The same property can be set by multiple rules for the same element, and the cascade resolves the conflict.</p>
+
+  <pre><code class="language-css">/* selector { property: value; property: value; } */
+section h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--charcoal);
+    margin-block: 2rem 0.5rem;
+}
+</code></pre>
+
+  <p>The resolution order for conflicting declarations is, in priority: (1) any rule marked <code>!important</code>, (2) inline styles on the element itself, (3) ID selectors, (4) class and pseudo-class selectors, (5) element selectors. Within the same specificity tier, the later rule wins. This is the <strong>specificity hierarchy</strong>, and it is the second-most-common source of "why isn't my CSS applying?" bugs. The first is forgetting that some properties (font, colour) are inherited from the parent, while others (margin, padding, border) are not.</p>
+
+  <div class="defcard">
+    <strong>Specificity.</strong> A four-part score (inline, IDs, classes, elements) computed for every CSS selector; the rule with the higher score wins. Roughly: <code>#hero</code> beats <code>.hero</code> beats <code>section</code>. <code>!important</code> trumps the whole hierarchy and is therefore the last weapon, not the first.
+  </div>
+
+  <div class="defcard">
+    <strong>The box model.</strong> Every element on the page is a rectangle with four nested boxes: content, padding, border, margin. Setting <code>width: 200px</code> sets the content box only; the padding and border add to the final rendered width unless <code>box-sizing: border-box</code> is in effect. The latter is the modern default and is set globally in almost every modern stylesheet, including the one for this course.
+  </div>
+
+  <h3>Layout: flexbox and grid</h3>
+
+  <p>Until 2017, CSS layout was a workaround. Two-column pages were built with floats; centred elements were built with table tricks. The modern answer is two layout modes that solve the problem properly. <strong>Flexbox</strong> (2012, widely supported by 2016) arranges items in one dimension, with rules for spacing, alignment, and wrapping. <strong>CSS Grid</strong> (2017) arranges items in two dimensions, with named tracks and explicit placement. The rule of thumb is: a row of items uses flexbox, a page layout with sidebars uses grid. Together they cover every layout this course needs.</p>
+
+  <pre><code class="language-css">/* Three-card row, equal columns, gap between them. */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--s-lg);
+}
+
+/* Header bar, items pushed to opposite ends. */
+.lecture-header .meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-md);
+}
+</code></pre>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>HTML, by structure</h3>
+
+  <p>The skeleton of every HTML document is fixed: a doctype, a root element, a head with metadata, and a body with content.</p>
+
+  <pre><code class="language-html">&lt;!doctype html&gt;
+&lt;html lang="en-GB"&gt;
+&lt;head&gt;
+    &lt;meta charset="utf-8" /&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1" /&gt;
+    &lt;title&gt;Lecture 9: HTML, CSS, and the visual layer&lt;/title&gt;
+    &lt;link rel="stylesheet" href="lecture.css" /&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;main&gt;
+        &lt;section&gt;
+            &lt;h1&gt;Heading&lt;/h1&gt;
+            &lt;p&gt;A paragraph.&lt;/p&gt;
+        &lt;/section&gt;
+    &lt;/main&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+  <p>The <code>lang</code> attribute on <code>&lt;html&gt;</code> tells the browser the natural language (<code>en-GB</code> here; screen readers and hyphenation rules use it). The two <code>&lt;meta&gt;</code> tags are non-negotiable: the first declares UTF-8 encoding, the second tells mobile browsers not to scale the page to desktop width. The <code>&lt;title&gt;</code> appears in the browser tab and in search results. The <code>&lt;link&gt;</code> attaches the stylesheet.</p>
+
+  <p>The semantic tags inside <code>&lt;body&gt;</code> matter more than they look. <code>&lt;header&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;main&gt;</code>, <code>&lt;article&gt;</code>, <code>&lt;section&gt;</code>, <code>&lt;aside&gt;</code>, and <code>&lt;footer&gt;</code> tell tools (screen readers, reading-mode plugins, search-engine crawlers) which part of the page is which. A page built entirely of <code>&lt;div&gt;</code> elements is, to all of those tools, indistinguishable from a sheet of paper turned into HTML. The course pages here use one <code>&lt;header&gt;</code>, one <code>&lt;main&gt;</code>, one <code>&lt;footer&gt;</code>, and a <code>&lt;section&gt;</code> per step of the lecture; that structure is what allows Reader Mode to extract the article cleanly.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Element</th><th>Role</th><th>When the renderer reads it</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>&lt;header&gt;</code></td><td>Introductory content for a page or section</td><td>Skipped to "main" content by accessibility tools</td></tr>
+      <tr><td><code>&lt;main&gt;</code></td><td>The unique primary content of the page</td><td>Target of the "skip to content" link</td></tr>
+      <tr><td><code>&lt;article&gt;</code></td><td>A self-contained piece of content (a post, a lecture)</td><td>Reader Mode extracts this</td></tr>
+      <tr><td><code>&lt;section&gt;</code></td><td>A thematic grouping with its own heading</td><td>Builds the page outline</td></tr>
+      <tr><td><code>&lt;nav&gt;</code></td><td>Navigation block</td><td>Screen readers announce as a landmark</td></tr>
+      <tr><td><code>&lt;figure&gt;</code> / <code>&lt;figcaption&gt;</code></td><td>A diagram or image with its caption</td><td>Caption announced alongside image alt-text</td></tr>
+      <tr><td><code>&lt;blockquote&gt;</code></td><td>An extended quotation</td><td>Indented and stylistically set apart</td></tr>
+      <tr><td><code>&lt;code&gt;</code> / <code>&lt;pre&gt;</code></td><td>Code inline; preformatted code block</td><td>Monospace font, syntax-highlighter target</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>CSS, by mechanism</h3>
+
+  <p>A CSS stylesheet has four moving parts: <strong>selectors</strong> (what to match), <strong>declarations</strong> (what to set), the <strong>cascade</strong> (which rule wins), and <strong>custom properties</strong> (variables that hold reusable values). The last is the part that turns a stylesheet from a list of rules into a design system.</p>
+
+  <p>A <strong>custom property</strong> is declared with a leading double dash and used through the <code>var()</code> function. The course stylesheet declares its palette this way, in the <code>:root</code> selector at the top of the file, so the same purple appears in every component without ever being repeated.</p>
+
+  <pre><code class="language-css">:root {
+    --primary:        #5B47E0;
+    --charcoal:       #37352F;
+    --hairline:       #E8E6E1;
+    --r-md:           8px;
+    --s-md:           16px;
+    --sans:           'Inter', system-ui, sans-serif;
+    --mono:           'JetBrains Mono', ui-monospace, monospace;
+}
+
+.callout {
+    background: var(--primary);
+    color: white;
+    border-radius: var(--r-md);
+    padding: var(--s-md);
+    font-family: var(--sans);
+}
+</code></pre>
+
+  <p>The benefit is immediate: change the value of <code>--primary</code> in one place, and every component that references it updates. The design tokens for this course (Notion-inspired palette, the 8/12/16 radius scale, the 4-then-8 spacing scale) are all variables of this kind. Dark mode, when added later, is a matter of redefining the variables inside a <code>@media (prefers-color-scheme: dark)</code> block.</p>
+
+  <div class="demo-box">
+    Sample swatch row using the course palette variables, rendered live in this page:
+    <div class="demo-swatches">
+      <span style="background: var(--primary)" title="--primary"></span>
+      <span style="background: var(--brand-pink)" title="--brand-pink"></span>
+      <span style="background: var(--brand-orange)" title="--brand-orange"></span>
+      <span style="background: var(--brand-green)" title="--brand-green"></span>
+      <span style="background: var(--brand-yellow)" title="--brand-yellow"></span>
+      <span style="background: var(--tint-lavender)" title="--tint-lavender"></span>
+      <span style="background: var(--tint-mint)" title="--tint-mint"></span>
+      <span style="background: var(--tint-peach)" title="--tint-peach"></span>
+    </div>
+  </div>
+
+  <h3>Typography and web fonts</h3>
+
+  <p>Default browser fonts are unattractive and inconsistent across operating systems. The standard solution is a <strong>web font</strong>: a typeface loaded over the network from a font hosting service (Google Fonts, Adobe Fonts, Bunny Fonts) or self-hosted from the project's own assets. The course uses two: <strong>Inter</strong> (Rasmus Andersson, 2017) for body text and headings, and <strong>JetBrains Mono</strong> (JetBrains, 2020) for code.</p>
+
+  <pre><code class="language-html">&lt;link rel="preconnect" href="https://fonts.googleapis.com" /&gt;
+&lt;link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /&gt;
+&lt;link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" /&gt;
+</code></pre>
+
+  <p>The two <code>preconnect</code> hints tell the browser to open a TCP connection to Google Fonts before the stylesheet is needed; this typically saves 100 to 300 ms on first paint. The <code>display=swap</code> directive tells the browser to render text in a fallback font immediately and swap in the web font when it arrives, rather than leaving the text invisible. Without that flag, slow networks produce the dreaded <strong>flash of invisible text (FOIT)</strong>; with it, you get the milder <strong>flash of unstyled text (FOUT)</strong>, which is the trade most teams prefer.</p>
+
+  <p>The pragmatic font stack always includes system fallbacks at the end, so the page is readable even if the web font fails entirely:</p>
+
+  <pre><code class="language-css">font-family: 'Inter', -apple-system, system-ui, 'Segoe UI', Helvetica, sans-serif;
+</code></pre>
+
+  <h3>SVG: vectors inside HTML</h3>
+
+  <p><strong>SVG</strong> (Scalable Vector Graphics, W3C 2001) is an XML dialect for vector drawing. It lives inside HTML; the lectures in this course use it for every diagram that is not a Mermaid block. An SVG element has a <code>viewBox</code> (the internal coordinate system), some shapes (<code>rect</code>, <code>circle</code>, <code>path</code>, <code>line</code>), and text. The pipeline figure earlier in this lecture is one of these. The benefits of SVG over a PNG are that it scales to any size without pixellation, is searchable, can be styled with CSS, and is small in bytes for line art.</p>
+
+  <pre><code class="language-html">&lt;svg viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg"
+     role="img" aria-label="A labelled box"&gt;
+    &lt;rect x="20" y="20" width="160" height="40"
+          fill="var(--tint-lavender)" stroke="var(--primary)"
+          stroke-width="2" rx="6" /&gt;
+    &lt;text x="100" y="46" text-anchor="middle"
+          font-family="Inter" font-size="12" fill="#3D2EB5"&gt;
+        Labelled box
+    &lt;/text&gt;
+&lt;/svg&gt;
+</code></pre>
+
+  <p>The <code>role="img"</code> and <code>aria-label</code> attributes make the SVG announce itself sensibly to screen readers. The <code>rx</code> attribute on the rectangle gives a rounded corner. The <code>fill</code> can reference a CSS variable, which means the same SVG palette automatically follows the rest of the design system.</p>
+
+  <h3>KaTeX: maths rendered in the browser</h3>
+
+  <p>Native HTML has no mathematical typesetting. <strong>KaTeX</strong> (Khan Academy, 2014) and the older <strong>MathJax</strong> (American Mathematical Society, 2009) fill the gap. Both read LaTeX-flavoured maths source and emit HTML and CSS that the browser then renders. KaTeX is faster, smaller, and rendered server-side or in one pass at page load; MathJax is more complete, supports more LaTeX features, but is slower. KaTeX is the right default for almost every documentation site, including this course.</p>
+
+  <pre><code class="language-html">&lt;!-- KaTeX assets, loaded in the head --&gt;
+&lt;link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" /&gt;
+&lt;script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"&gt;&lt;/script&gt;
+&lt;script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"&gt;&lt;/script&gt;
+</code></pre>
+
+  <p>With the auto-render extension configured to recognise <code>$...$</code> for inline maths and <code>$$...$$</code> for display maths, any LaTeX inside those delimiters is rendered automatically when the page loads. The A-IRB capital formula in the Markdown lecture, for example:</p>
+
+  <p>$$K = LGD \cdot \left[ \Phi\!\left( \frac{\Phi^{-1}(PD) + \sqrt{R}\,\Phi^{-1}(0.999)}{\sqrt{1-R}} \right) - PD \right]$$</p>
+
+  <p>is one LaTeX source line in the Markdown, and KaTeX produces the styled result you see above. The maths renders client-side in a few milliseconds; the source is searchable in the raw HTML. The Sphinx and MkDocs ecosystems each have a configuration switch that turns on KaTeX (or MathJax) for an entire site.</p>
+
+  <h3>Syntax highlighting</h3>
+
+  <p>A fenced Markdown code block, by default, renders as plain monospace text. Colourised, language-aware highlighting is a separate step performed by a JavaScript library: <strong>Prism</strong> (Lea Verou, 2012), <strong>highlight.js</strong> (Ivan Sagalaev, 2006), or the newer <strong>Shiki</strong> (Anthony Fu, 2020, Vue ecosystem). Prism and highlight.js run client-side at page load; Shiki runs server-side at build time, producing pre-highlighted HTML, which renders faster and never flashes unstyled.</p>
+
+  <pre><code class="language-html">&lt;link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css" /&gt;
+&lt;script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"&gt;&lt;/script&gt;
+</code></pre>
+
+  <p>Prism reads any <code>&lt;pre&gt;&lt;code class="language-python"&gt;...&lt;/code&gt;&lt;/pre&gt;</code> block on the page and rewrites the inner HTML with one <code>&lt;span&gt;</code> per token, each tagged by syntactic role. The accompanying stylesheet colours the spans. The course can write a one-line custom theme by overriding the CSS variables Prism exposes (<code>--prism-string</code>, <code>--prism-keyword</code>, etc.), keeping syntax colours in step with the rest of the palette.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Syntax-highlighting libraries that run client-side cause a visible flash on first load: the code appears in plain text, then re-paints with colour a few milliseconds later. The fix is one of three options: (1) move highlighting to build time with Shiki or a Pandoc filter; (2) set the code block's background to match the highlighter's theme so the flash is invisible; (3) accept the flash and prioritise smaller bundle size. The trade-off is real; the choice depends on how busy the site's code blocks are.
+  </div>
+
+  <h3>Responsive design and print stylesheets</h3>
+
+  <p>A documentation site is read on phones, on laptops, and as PDFs. Two CSS features handle the variation. <strong>Media queries</strong> let a stylesheet apply different rules depending on the viewport: a navigation column hides below a tablet width; a table switches to a stacked layout on mobile. <strong>Print stylesheets</strong> are a special media query (<code>@media print</code>) that hides everything that does not belong on paper (navigation, footer, dark backgrounds) and tunes typography for ink.</p>
+
+  <pre><code class="language-css">/* Tablet and narrower: the nav becomes a top bar */
+@media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+}
+
+/* Print: hide chrome, use serif body, switch links to footnotes */
+@media print {
+    .lecture-header, .lecture-footer, nav { display: none; }
+    body { font: 11pt/1.45 Georgia, serif; color: #000; }
+    a::after { content: " (" attr(href) ")"; font-size: 9pt; }
+}
+</code></pre>
+
+  <p>The print-stylesheet trick is the one most documentation teams forget. A lecture page like this one prints to PDF in two clicks if the rules are right, and prints into an ugly mess if they are not. The course stylesheet ships with a minimal print block; the test is to open the print preview pane and confirm the page comes out clean.</p>
+
+  <h3>Worked example: a custom call-out for regulatory citations</h3>
+
+  <div class="worked">
+    <strong>Worked example: adding a "Regulation" call-out class</strong>
+    <p>The course uses several call-out classes (<code>feynman</code>, <code>insight</code>, <code>warn</code>) defined in <code>lecture.css</code>. Suppose the brief is to add a new one, <code>regulation</code>, for inline citations of Basel rules, IFRS 9 paragraphs, or CRR articles. The reader should see a soft yellow background, a green left border, and a small "REG" tag in the top-left corner.</p>
+    <p>Step 1 (semantic HTML). Decide what the markup looks like in a lecture file. A call-out is a <code>&lt;div&gt;</code> with two classes: the generic <code>callout</code> and the specific <code>regulation</code>. Inside, a <code>&lt;span class="tag"&gt;</code> for the corner badge and the body text.</p>
+
+<pre><code class="language-html">&lt;div class="callout regulation"&gt;
+    &lt;span class="tag"&gt;Regulation&lt;/span&gt;
+    The 12-month PD floor of 0.03% is CRR Article 160(1).
+&lt;/div&gt;
+</code></pre>
+
+    <p>Step 2 (CSS). The generic <code>callout</code> class already sets padding, border-radius, and margins. The job is to override the colours.</p>
+
+<pre><code class="language-css">.callout.regulation {
+    background: var(--tint-yellow);
+    border-left: 4px solid var(--success);
+    color: var(--charcoal);
+}
+.callout.regulation .tag {
+    background: var(--success);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: var(--r-xs);
+}
+</code></pre>
+
+    <p>Step 3 (verify the cascade). The new <code>.callout.regulation</code> rule has the same specificity as <code>.callout.feynman</code> and the others, so the order in <code>lecture.css</code> matters: define <code>regulation</code> below the generic <code>callout</code> rules. Open the page, right-click the call-out, choose "Inspect", and confirm that the computed background is <code>#FBF1D4</code> (the resolved value of <code>--tint-yellow</code>).</p>
+    <p>Step 4 (responsive and print). On narrow screens the call-out should not break the line layout; the existing <code>.callout</code> rule already handles that. In print, the green border should remain visible because it carries information; the existing print stylesheet keeps borders, so nothing extra is needed.</p>
+    <p>Step 5 (commit and use). One CSS rule, eight lines of code, zero JavaScript. The new call-out is now available across the course; every lecture can cite a Basel rule with one line of HTML.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>HTML is the structure, CSS is the presentation, and together they are the rendering target of every documentation pipeline you will ever touch. The author of documentation rarely writes HTML by hand; the Markdown engine, the Sphinx builder, the Jupyter renderer, and the diagram tools all produce it on their behalf. The skill is to read what they produce, debug it when it breaks, and extend it when the toolchain stops short of what the team needs. Five layers carry that responsibility: the document tree, the cascade, the typographic stack, SVG for vector figures, and the KaTeX-and-Prism duo for maths and code colouring.</p>
+
+  <p>The deeper point is that the visual layer is just another part of the docs-as-code stack. Custom call-outs are CSS files in the repository. Themes are stylesheet overrides. Brand changes are token edits. The discipline is the same one as for prose and diagrams: text source, version control, pull-request review, CI build. The next lecture turns to the third documentation surface, the Jupyter notebook, where the prose-code-output triple becomes one file and the reproducibility problem comes into sharp focus.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Describe the three stages a browser goes through between receiving HTML and painting pixels. Which stage uses CSS?</li>
+      <li>What is the specificity hierarchy in CSS? Order these from weakest to strongest: <code>section h2</code>, <code>#hero h2</code>, <code>h2.headline</code>, <code>h2</code>.</li>
+      <li>Why does the course stylesheet declare a long list of <code>--primary</code>, <code>--charcoal</code>, etc. inside <code>:root</code>? What problem does that pattern solve?</li>
+      <li>What is the difference between FOIT and FOUT? Which one does <code>font-display: swap</code> produce?</li>
+      <li>Give the HTML for an SVG containing one rounded rectangle with a label inside it, sized to 200 by 80 viewBox units. Why does <code>role="img"</code> matter?</li>
+      <li>You add a maths formula to a lecture but it renders as raw LaTeX (the dollar signs are visible). Name three things you would check.</li>
+      <li>What does <code>@media print</code> do, and what is one rule you would put inside it?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="09-diagrams_as_code.html">Lecture 9 (diagrams as code)</a> covered the source of the visual elements; this lecture covers the renderer they hand their output to.</li>
+      <li><strong>Next:</strong> <a href="11-jupyter_and_reproducibility.html">Lecture 11 (Jupyter notebooks and reproducibility)</a> turns to the third documentation surface, where prose, code, and output share one file.</li>
+      <li><strong>Cross-link:</strong> <a href="08-markdown_and_docs.html">Lecture 8 (markdown and the documentation toolchain)</a> covered the source language that compiles to HTML; this lecture covers the target.</li>
+      <li><strong>Cross-link:</strong> <a href="15-ci_cd.html">Lecture 15 (continuous integration and delivery)</a> covers the build step that runs the Markdown-to-HTML compilation on every push.</li>
+      <li><strong>Outside this course:</strong> Mozilla Developer Network reference (developer.mozilla.org), the authoritative documentation for HTML, CSS, and SVG; KaTeX documentation (katex.org); Prism homepage (prismjs.com); Rasmus Andersson, Inter typeface (rsms.me/inter); W3C SVG 2.0 specification (w3.org/TR/SVG2); Eric Meyer and Estelle Weyl, <em>CSS: The Definitive Guide</em>, 5th edition (O'Reilly, 2023).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 10 of 16</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

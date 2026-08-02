@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PD risk quantification: grades, LRA, downturn and MoC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Risk quantification: grades, LRA, downturn and MoC</h1>
+  <p class="subtitle">The calibration stage. Take the PiT PDs from the risk-differentiation step, bin them into a small number of risk grades, calibrate each grade to the long-run average of observed default rates, add a margin of conservatism, and apply the regulatory floor. The output is a discrete, audited, regulator-grade PD per grade.</p>
+  <div class="meta">
+    <span>A-IRB 14 of n &mdash; PD 6 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Sources: <code>05_modelling/pd/02-model_design.md</code> (Phase 2), <code>07-risk-quantification.md</code>, <code>08-lra.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Risk quantification is the calibration phase of the PD build. The continuous PiT PDs from lecture 13 are first <strong>binned into discrete risk grades</strong> (typically 20 to 30 grades, around 26 in the reference build) using a four-step iterative process anchored in CRR Article 170(3). Each grade is then <strong>calibrated to its long-run average</strong> default rate, computed over a cycle-covering window that includes both expansion and contraction; this is the LRA PD required by CRR Article 180(2)(a). A <strong>margin of conservatism</strong> is added at the grade level to compensate for known weaknesses (MoC, covered fully in lecture 30), and the result is floored at 0.03% (retail) per the Basel 3.1 input-floor regime to produce the final regulatory PD.</p>
+
+  <p>Two design choices are central. First, <strong>joint calibration</strong>: under CRR Article 172(2) the same grade structure is applied across all segments rather than building a separate grade scale per segment. Grade boundaries are drawn from the PiT PD score distribution across the whole portfolio, which lets obligors migrate between grades as their risk drivers change. Second, the <strong>LRA period</strong>: selected so the window contains a representative mix of good and bad years anchored to macroeconomic variables, using a four-step process that derives an economic factor via PCA over MEVs, classifies good and bad periods, identifies the cycle, and tests ODR variability via an F-test (CRR Article 180(2)(e), PRA SS4/24 §11.13).</p>
+
+  <p>The output of this lecture is a fixed table of around 26 rows, each row containing a grade label, a PiT PD range that maps obligors into the grade, the LRA PD assigned to the grade, the MoC uplift, and the final regulatory PD. That table is the deliverable that goes into the K formula in lecture 31; it is what the supervisor inspects most closely at validation.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Lecture 13 produced a PiT PD that rank-orders obligors. By itself the rank-ordering is not a regulatory PD: the absolute level is wrong, the values are continuous rather than discrete, and there is no anchor to the long-run cycle. Risk quantification fixes all three: it discretises (grades), anchors (LRA), and conservatises (MoC plus floor). The 26-row grade table at the end of this lecture is the bridge between modelling and capital. Without it, the K formula has no PD to put in.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The regulatory PD is the input that drives the most capital. A 10 basis point shift in average portfolio PD typically moves RWA by 5 to 8% in retail; the same shift in average LGD moves it by 2 to 3%. The supervisor knows this, which is why the LRA calibration is the single most scrutinised number in the entire IRB build. The exam-classic question "what does CRR Article 180(2)(a) require" has one right answer: the PD assigned to each grade must equal the long-run average of one-year default rates for that grade across a representative window covering at least one full credit cycle.</p>
+
+  <p>The grade structure itself is the second most scrutinised choice. CRR Article 170(3) sets five tests every grade structure must pass: minimum and maximum volume per grade (1% to 30% of portfolio), homogeneity within grades (chi-square on default rates), heterogeneity between adjacent grades (z-test on default-rate differences), granularity (enough grades to discriminate, not so many that volumes are too small), and stability (migration patterns through the cycle consistent with the chosen PiT philosophy). A grade structure that fails any of the five is rebuilt; a grade structure that passes all five is what the supervisor approves.</p>
+
+  <p>The supervisor's standard challenge is on the LRA window itself: which periods were included, which were excluded, why, and what does the MoC overlay add to compensate. Banks that submit IRB packages with vague answers ("we used 10 years of data") get sent back; banks that submit with explicit dates, explicit reasons for exclusions, and an explicit MoC quantum for each known weakness in the calibration get approved. The discipline in this lecture is what produces the second outcome.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The quantification phase has two distinct workstreams: grade construction and LRA calibration. They run in series. The diagram below shows both.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Risk quantification workflow">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Risk quantification: from PiT PDs to regulatory PDs</text>
+
+      <!-- Input: PiT PDs -->
+      <rect x="40" y="60" width="180" height="60" fill="#eff6ff" stroke="#1e3a8a"/>
+      <text x="130" y="82" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">PiT PDs</text>
+      <text x="130" y="98" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">continuous, per obligor</text>
+      <text x="130" y="112" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">from lecture 13</text>
+
+      <!-- Arrow -->
+      <path d="M 220 90 L 250 90" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="250,90 244,87 244,93" fill="#475569"/>
+
+      <!-- Grade construction block -->
+      <g>
+        <rect x="250" y="50" width="280" height="160" fill="#fef9c3" stroke="#92400e" stroke-width="1.3"/>
+        <text x="390" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">A. Grade construction</text>
+        <text x="390" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">(CRR Art 170(3), 172(2))</text>
+
+        <rect x="270" y="100" width="240" height="22" fill="#fff" stroke="#92400e"/>
+        <text x="390" y="115" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">1. Back-score PiT model on history</text>
+
+        <rect x="270" y="128" width="240" height="22" fill="#fff" stroke="#92400e"/>
+        <text x="390" y="143" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">2. 200 initial grades (0.5% each)</text>
+
+        <rect x="270" y="156" width="240" height="22" fill="#fff" stroke="#92400e"/>
+        <text x="390" y="171" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">3. Combine to ~26 grades; enforce monotonicity</text>
+
+        <rect x="270" y="184" width="240" height="22" fill="#fff" stroke="#92400e"/>
+        <text x="390" y="199" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">4. Test on historical cohorts; iterate</text>
+      </g>
+
+      <!-- Arrow -->
+      <path d="M 530 130 L 560 130" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="560,130 554,127 554,133" fill="#475569"/>
+
+      <!-- LRA calibration block -->
+      <g>
+        <rect x="560" y="50" width="300" height="160" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="710" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">B. LRA calibration</text>
+        <text x="710" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">(CRR Art 180(2)(a), SS4/24 §11.13)</text>
+
+        <rect x="580" y="100" width="260" height="22" fill="#fff" stroke="#0f766e"/>
+        <text x="710" y="115" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">i. PCA over MEVs &rarr; single economic factor</text>
+
+        <rect x="580" y="128" width="260" height="22" fill="#fff" stroke="#0f766e"/>
+        <text x="710" y="143" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">ii. Classify good vs bad quarters</text>
+
+        <rect x="580" y="156" width="260" height="22" fill="#fff" stroke="#0f766e"/>
+        <text x="710" y="171" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">iii. Identify cycle (peak-to-peak)</text>
+
+        <rect x="580" y="184" width="260" height="22" fill="#fff" stroke="#0f766e"/>
+        <text x="710" y="199" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">iv. F-test ODR variability &rarr; select window</text>
+      </g>
+
+      <!-- Output row -->
+      <rect x="40" y="270" width="820" height="60" fill="#fee2e2" stroke="#991b1b" stroke-width="1.3"/>
+      <text x="450" y="292" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">Output: regulatory PD per grade</text>
+      <text x="450" y="308" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">grade label &mdash; PiT PD range &mdash; LRA PD &mdash; MoC uplift (lecture 30) &mdash; floor 0.03% (Basel 3.1) &mdash; final regulatory PD</text>
+      <text x="450" y="322" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">~26 rows; the input to the K formula in lecture 31</text>
+
+      <!-- Arrows from A and B to output -->
+      <path d="M 390 215 L 390 270" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="390,270 387,264 393,264" fill="#475569"/>
+      <path d="M 710 215 L 710 270" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="710,270 707,264 713,264" fill="#475569"/>
+
+      <!-- Bottom legend -->
+      <text x="450" y="365" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">Grade construction defines the grades; LRA calibration assigns each grade its PD. MoC and floor are applied last to produce the regulatory PD.</text>
+    </svg>
+    <figcaption>The risk-quantification workflow. Grade construction (block A) groups continuous PiT PDs into around 26 discrete grades through an iterative four-step process. LRA calibration (block B) selects the cycle-covering window via PCA over macroeconomic variables and an F-test on observed default-rate variability. The outputs combine into a regulatory-PD table per grade.</figcaption>
+  </figure>
+
+  <p>Two properties of the workflow matter for the rest of the lecture. First, <strong>grade construction comes before LRA calibration</strong>. The order is not optional: the LRA is computed per grade, so the grade definitions have to be fixed first. Second, the <strong>grade definitions are fixed once per recalibration cycle</strong> (typically annually for monitoring, every three to five years for full redevelopment). The LRA per grade is updated more frequently if cycle conditions shift materially; the grade structure itself changes only on full redevelopment.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Joint calibration</h3>
+
+  <p>CRR Article 172(2) requires that all exposures within an IRB perimeter are jointly calibrated rather than calibrated separately per segment. The implication: even though the PiT model has segments (lecture 13), the grade structure is a single scale across the whole portfolio. An obligor in segment 4 (inactive) and an obligor in segment 8 (mid-utilisation) are placed on the same grade scale and can fall into the same grade if their PiT PDs are similar. This lets obligors migrate between grades over time as their risk drivers change, which is the operational definition of a PiT rating system.</p>
+
+  <p>The grade boundaries are drawn from the distribution of PiT PD scores across the whole portfolio, not from per-segment distributions. The reference build uses the most recent cohort (e.g. June 2024) to define boundaries and then validates them by applying to historical cohorts back to the start of the development window.</p>
+
+  <h3>Grade construction: the four-step process</h3>
+
+  <p>The standard procedure produces a small number of grades (typically 20 to 30, settling around 26 in the reference build) that satisfy all five CRR Article 170(3) tests.</p>
+
+  <ol>
+    <li><strong>Back-score the PiT model.</strong> Apply the final segmented PiT PD model to every historical cohort in the development window to generate a PD per (obligor, snapshot).</li>
+    <li><strong>Create 200 initial granular grades.</strong> Rank the most recent cohort's PiT PDs and split into 200 equal-volume buckets of 0.5% each. The granularity provides flexibility for the next step.</li>
+    <li><strong>Combine into final grades.</strong> Merge adjacent granular grades to satisfy minimum-volume and monotonicity constraints. Adjacent grades whose observed default rates are not statistically distinguishable (heterogeneity test fails) are merged; large grades that violate the 30% maximum are split.</li>
+    <li><strong>Test on historical cohorts.</strong> Apply the constructed grade boundaries to every historical cohort and compute the five CRR Article 170(3) test metrics (rank-order breaks, homogeneity fails, heterogeneity fails, migration stability, concentration). If any test fails on a material number of cohorts, return to step 3 and adjust boundaries; iterate until all tests pass.</li>
+  </ol>
+
+  <h3>The five CRR Article 170(3) design tests</h3>
+
+  <table>
+    <thead>
+      <tr><th>Objective</th><th>Reference</th><th>Test / methodology</th><th>Target threshold</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Minimum volume per grade</td><td>CRR 170(3)(b)</td><td>Grade volume as % of portfolio</td><td>&ge; 1%</td></tr>
+      <tr><td>Maximum volume per grade</td><td>CRR 170(3)(b)</td><td>Grade volume as % of portfolio</td><td>&le; 30%</td></tr>
+      <tr><td>Homogeneity within grade</td><td>CRR 170(3)(c)</td><td>Chi-square test on the proportion of defaulters across sub-groups within the grade</td><td>&le; 5% difference</td></tr>
+      <tr><td>Heterogeneity between adjacent grades</td><td>CRR 170(3)(c)</td><td>Z-test on the difference in default rates between adjacent grades; check for rank-order breaks</td><td>&le; 5% breach; rank-order breaks &lt; 5%</td></tr>
+      <tr><td>Stability (migration)</td><td>CRR 170(3)(c)</td><td>Migration matrix analysis; ODR trend per grade</td><td>Migration consistent with PiT philosophy; no sudden discontinuities</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Selecting the candidate grade scheme</h3>
+
+  <p>Multiple candidate grade structures are typically tested. The reference build evaluates four schemes (25, 30, 46, 26 grades) on the same battery of tests and picks the one that scores best on the combined metric. A representative summary:</p>
+
+  <pre><code>Key metric                                Opt 1   Opt 2   Opt 3   Opt 4 (chosen)
+Number of grades                          25      30      46      26
+Average % rank-order reversals            0.6%    0.0%    4.1%    0.7%
+Average % homogeneity fails               5.6%    6.0%    5.5%    3.9%
+Average % heterogeneity fails             1.0%    0.3%    14.0%   1.0%
+Max % volume in any grade (cohort)        18.5%   32.0%   15.0%   20.0%
+Min % volume in any grade (cohort)        0.5%    0.5%    1.0%    1.0%
+</code></pre>
+
+  <p>Option 3 (46 grades) is over-fragmented (high heterogeneity fails, since adjacent grades default at indistinguishable rates). Option 2 (30 grades) has a concentration problem (a grade exceeds the 30% maximum). Options 1 and 4 are both viable; the chosen option (26 grades) trades a tiny increase in rank-order reversals for materially better homogeneity (3.9% vs 5.6%) and meets the minimum-volume threshold cleanly.</p>
+
+  <p>The final grade table is a 26-row block of (grade label, min PiT PD, max PiT PD, total volume, total defaults, % volume, % defaults, observed default rate). The first few rows of a representative output:</p>
+
+  <pre><code>Grade   Min PiT PD   Max PiT PD   Total Volume   Defaults    Obs DR
+1       0.00%        0.13%        3,342,860      2,483       0.07%
+2       0.13%        0.17%        1,254,329      1,946       0.16%
+3       0.17%        0.23%        1,255,992      2,712       0.22%
+4       0.23%        0.30%        1,065,989      3,131       0.29%
+5       0.30%        0.40%        1,086,742      4,275       0.39%
+... (21 more rows, monotone in PD up to grade 26)
+</code></pre>
+
+  <h3>LRA period selection: the four-step process</h3>
+
+  <p>CRR Article 180(2)(a) requires the PD per grade to equal the long-run average of observed default rates for that grade. CRR Article 180(2)(e) requires the observation window to cover at least 5 years and include both good and bad years. PRA SS4/24 §11.13 expands: firms must consider the variability of observed ODRs, the relative frequency of good and bad years against the macroeconomic variables that drive default for the exposures, and any structural changes in the economic, legal or business environment.</p>
+
+  <p>The four-step process delivers a defensible window selection:</p>
+
+  <ol>
+    <li><strong>Derive an economic factor.</strong> Identify the macroeconomic variables (MEVs) relevant to the exposure class: standard list is unemployment rate (UR), debt-to-income ratio (DTI), CPI, GDP, house-price index (HPI), consumer-confidence index (CCI), disposable income, industry charge-off rate. Apply transformations (quarter-on-quarter changes, 6 or 12-month moving averages) and run <strong>Principal Component Analysis (PCA)</strong> to collapse the MEVs into a single principal component that represents the economic cycle.</li>
+    <li><strong>Classify good and bad periods.</strong> Use the PCA score per quarter to classify each cohort: positive score = good period; negative score = bad period. The balance between good and bad quarters in the candidate window is checked.</li>
+    <li><strong>Identify the economic cycle.</strong> Define the reference cycle by linking peak-to-peak (or trough-to-trough) movements in the PCA factor. The cycle is the period that captures one full expansion plus one full contraction.</li>
+    <li><strong>F-test ODR variability.</strong> The candidate LRA window's ODR variability is tested against the full economic cycle's ODR variability:
+      <pre><code>H0: var(ODR | LRA window) = var(ODR | cycle)
+H1: var(ODR | LRA window) != var(ODR | cycle)
+</code></pre>
+      A p-value above 5% indicates the two variances are statistically indistinguishable, supporting the chosen window. Below 5% indicates the window is not representative; revise.</li>
+  </ol>
+
+  <p>Typical reference outcome for a retail card portfolio:</p>
+
+  <ul>
+    <li><strong>Exclusions:</strong> COVID-19 period (typically 2020 to 2022). Default rates were distorted by stimulus, payment holidays and forbearance suppression.</li>
+    <li><strong>Downturn (DT):</strong> the global financial crisis, typically 2008 to 2009.</li>
+    <li><strong>LRA period selected:</strong> a roughly 10-year window covering the downturn through the next peak. The reference build uses 2008 Q1 to 2017 Q1.</li>
+    <li><strong>Reference cycle:</strong> 2008 Q2 to 2018 Q1, peak-to-peak.</li>
+    <li><strong>Chosen MEV combination:</strong> UR plus CPI plus DTI in the reference build. Produces an approximately balanced split (around 48 good quarters versus 52 bad quarters in the chosen window) that mirrors the reference cycle and passes the F-test.</li>
+  </ul>
+
+  <h3>LRA calibration: assigning a PD per grade</h3>
+
+  <p>Once the window is selected, the LRA PD per grade is computed:</p>
+
+  <pre><code>LRA_PD(grade)  =  average over quarters in LRA window  of
+                  (count of obligors in this grade at quarter q
+                   that defaulted within q to q+12m)
+                  / (count of non-defaulted obligors in this grade at quarter q)
+</code></pre>
+
+  <p>Three subtleties.</p>
+
+  <p><strong>Overlapping windows.</strong> Each quarter's denominator is the opening non-defaulted population at q; each quarter's numerator is the count of defaults in (q, q+12m]. Consecutive quarters' performance windows overlap by 11 months. PRA SS4/24 §11.10c permits this but requires a bias check: the LRA is recomputed using non-overlapping windows (every 12 months) and compared. If the two values differ materially, the overlapping result is adjusted or the bias is recorded as an MoC item. Empirically, the overlap bias is small in well-behaved data and the overlapping LRA is the primary estimate.</p>
+
+  <p><strong>Monotonicity.</strong> PRA SS4/24 §11.31 requires the LRA PD to increase monotonically across grades. If a calibrated grade has an LRA PD below the previous grade's, the grade boundaries are revisited (the grade structure produced too-similar populations) or the grades are merged. Reporting a non-monotone calibration is a supervisory red flag.</p>
+
+  <p><strong>Portfolio-level back-test.</strong> The chart that every supervisor wants to see: quarterly portfolio-level observed default rate (the dashed line from the descriptive statistics in lecture 08) plotted alongside the calibrated LRA PD (a horizontal line at the portfolio-weighted average of per-grade LRA PDs). By construction:</p>
+
+  <ul>
+    <li>In downturn quarters, the LRA <strong>underestimates</strong> the observed default rate. This is by design: a long-run average is supposed to smooth across the cycle.</li>
+    <li>In benign quarters, the LRA <strong>overestimates</strong> the observed default rate. Also by design.</li>
+  </ul>
+
+  <p>The supervisor's question is not "does the LRA equal the realised rate every quarter" (it cannot; it is an average); the question is "does the LRA equal the time-average of realised rates over a representative window". The F-test in step 4 of LRA selection is the formal answer; the chart is the visual.</p>
+
+  <h3>Margin of conservatism (MoC) and floor</h3>
+
+  <p>The LRA per grade is the <strong>calibrated PD</strong>. Two further adjustments produce the <strong>regulatory PD</strong> that goes into K.</p>
+
+  <p><strong>MoC.</strong> Applied at the grade level. Three categories per EBA/GL/2017/16:</p>
+
+  <ul>
+    <li>Category A: <strong>data limitations</strong> (history gaps, sample exclusions, segment under-representation). The largest category for most banks; the limitations register from lecture 07 feeds this directly.</li>
+    <li>Category B: <strong>methodology weaknesses</strong> (known model limitations, simplifications, untested assumptions).</li>
+    <li>Category C: <strong>general estimation error</strong> (the residual statistical uncertainty in coefficient estimates).</li>
+  </ul>
+
+  <p>The MoC framework is covered fully in lecture 30; this lecture only requires that the calibrated PD be uplifted by the appropriate MoC quantum to produce a more conservative PD. The total MoC for a typical retail PD model adds 5 to 20% to the calibrated PD; banks with thinner data or known methodological gaps add more.</p>
+
+  <p><strong>Regulatory floor.</strong> Basel 3.1 introduced explicit input floors on PD per exposure class (BCBS d424, transposed to CRR Article 170(3)(d) and PRA SS3/24 §13). For retail exposures the floor is 0.03%. The final regulatory PD per grade is max(calibrated_PD + MoC, 0.03%). The floor applies grade by grade; in practice it binds for the lowest-risk one or two grades in retail and is non-binding above grade 3 or 4.</p>
+
+  <h3>The deliverable: the regulatory PD table</h3>
+
+  <p>The output of risk quantification is a single table of around 26 rows. Each row contains:</p>
+
+  <pre><code>grade  min_PiT_PD  max_PiT_PD  volume  defaults  obs_DR  LRA_PD  MoC  reg_PD
+1      0.00%       0.13%       3.34M   2,483     0.07%   0.07%   30%  0.09%  -> floored to 0.09% (or 0.03% if lower)
+2      0.13%       0.17%       1.25M   1,946     0.16%   0.16%   25%  0.20%
+...
+26     20.00%      100.00%     0.05M   38,200    65.00%  60.00%  10%  66.00%
+</code></pre>
+
+  <p>This table is the regulatory PD model. It is what goes into the K formula in lecture 31, what gets stress-tested in ICAAP, what feeds the IFRS 9 PiT model (with MoC and floor stripped out) in the IFRS 9 track, and what the supervisor reviews at SREP. The 21 earlier columns of work in lectures 6 through 13 all collapse into this 26-row block.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The hardest part of risk quantification is not the mathematics; it is the <strong>defence of the LRA window choice</strong>. The mathematics is deterministic: given a window, the LRA is just an average of observed default rates. The choice of window is where every modelling team's judgement is on display, and where the supervisor focuses the most challenge. A bank that has chosen a 10-year window starting in 2008 has captured the GFC downturn and made the LRA conservative; a bank that has chosen a 6-year window starting in 2016 has captured a benign period and the LRA is too low. Both are technically compliant with the 5-year minimum; only the first is supervisorily defensible. The four-step process exists to convert what looks like a judgement call into a structured argument; banks that skip the process and pick a window by intuition lose the supervisor's confidence even if their window happens to be right.</p>
+
+  <p>The second lesson is on the <strong>asymmetry of LRA against realised rates</strong>. The chart of LRA versus realised ODR will always show under-estimation in downturns and over-estimation in benign periods. This is correct, not a sign of model failure. The model the supervisor expects is one that smooths through the cycle; the realised rate is what the cycle delivers. A bank that "fixes" the asymmetry by, say, recalibrating annually toward the most recent realised rate is converting itself into a Dynamic PiT model (lecture 09), with all the procyclicality problems that approach carries. The PiT scorecard plus LRA calibration plus MoC is the regulatory equilibrium; deviating from it requires explicit justification.</p>
+
+  <p>The third lesson is on <strong>the role of MoC</strong>. The temptation is to view MoC as a tax on imperfect modelling; the right view is that MoC is the mechanism by which the bank acknowledges and quantifies its known weaknesses. A model with high MoC is not a worse model; it is a more honest one. The supervisor's preferred package contains an explicit limitations register (lecture 07) with each limitation paired with an explicit MoC quantum. A bank that submits a low MoC with no register is signalling either that no weaknesses exist (unlikely) or that the weaknesses have not been catalogued (which the supervisor will catch at inspection). Honest MoC is the bridge between honest data limitations and a defensible regulatory PD.</p>
+
+  <p>The fourth lesson is operational: the <strong>26-row table is the single most important artefact in the entire IRB build</strong>. Every other lecture in this sequence is producing inputs to that table or testing its outputs. When the supervisor asks "what is the bank's PD model", the right answer is to hand them the table, with the development document explaining where each column came from. The work of the previous five PD lectures, plus the MoC lecture and the monitoring lecture, all collapses into the table; the table is the model.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Distinguish joint calibration from per-segment calibration. Which is required under CRR Article 172(2) and why?</li>
+    <li>List the four steps of grade construction and the role each step plays.</li>
+    <li>State the five CRR Article 170(3) design tests for a grade structure. For each, name the statistical test or threshold applied.</li>
+    <li>Four candidate grade schemes are tested: 25, 30, 46 and 26 grades. The 46-grade scheme has high heterogeneity fails. What does this indicate, and why does it usually disqualify the scheme?</li>
+    <li>State the four steps of LRA period selection. What is the role of PCA in step 1, and what is the role of the F-test in step 4?</li>
+    <li>Why is the COVID period typically excluded from the LRA window? Why is the GFC downturn typically included?</li>
+    <li>Write the LRA PD formula for a single grade. Why do consecutive quarters' performance windows overlap by 11 months, and what bias does this introduce?</li>
+    <li>PRA SS4/24 §11.31 requires monotonicity. What does this mean, and what is the remediation if the calibrated LRA per grade is not monotone?</li>
+    <li>The portfolio-level chart shows the LRA under-estimating realised default rates in downturn quarters and over-estimating in benign quarters. Is this a sign that the model is wrong? Explain.</li>
+    <li>Define the three categories of MoC. Name one example of what would land in each category for a typical retail PD model.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/pd/02-model_design.md</code> &mdash; Phase 2 of the two-phase architecture.</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/pd/07-risk-quantification.md</code> &mdash; grade construction, candidate-scheme testing, the five CRR Art 170(3) design tests.</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/pd/08-lra.md</code> &mdash; LRA period selection (4-step PCA + F-test process), LRA calibration with overlap-bias check.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="08-portfolio_description.html">Portfolio description</a> &mdash; the historical ODR series this lecture calibrates the LRA against.</li>
+      <li><a href="09-pd_concept.html">PD concept</a> &mdash; the LRA anchor and PiT-philosophy framing.</li>
+      <li><a href="11-pd_sampling_and_representativeness.html">Sampling and representativeness</a> &mdash; the calibration window is drawn from the LRA sample defined there.</li>
+      <li><a href="13-pd_risk_differentiation.html">Risk differentiation</a> &mdash; the PiT PDs that this lecture grades and calibrates.</li>
+    </ul>
+
+    <p><strong>Forward references inside the PD sequence:</strong></p>
+    <ul>
+      <li>15-pd_testing (planned, next) &mdash; back-tests of the regulatory PD table: discrimination, calibration accuracy, stability.</li>
+    </ul>
+
+    <p><strong>Forward references inside A-IRB capital:</strong></p>
+    <ul>
+      <li>30-moc (planned) &mdash; MoC categories A, B, C and their quantification.</li>
+      <li>31-rwa (planned) &mdash; the K formula consumes this lecture's regulatory PD per grade.</li>
+      <li>32-monitoring (planned) &mdash; quarterly back-tests of the regulatory PD against realised default rates.</li>
+    </ul>
+
+    <p><strong>Cross-track:</strong></p>
+    <ul>
+      <li>IFRS 9 PiT PD (planned) &mdash; uses the PiT PD model from lecture 13 with MoC and floor stripped out and FIT macro overlays added.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Articles 169(3), 170(3), 171(1), 172(2), 180(2)(a) and (e). The legislative anchors for grade construction and LRA calibration.</li>
+      <li>PRA SS4/24, paragraphs 11.10c, 11.13, 11.31. UK supervisory expectations for window selection, overlap bias and monotonicity.</li>
+      <li>EBA/GL/2017/16, paragraphs 84 to 95. The European authority's interpretation of the LRA requirement.</li>
+      <li>BCBS d424. The Basel 3.1 input-floor regime that sets the 0.03% retail floor.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 14 of n &middot; PD 6 of 7.</span>
+  <span><a href="13-pd_risk_differentiation.html">Previous: risk differentiation</a> &middot; <a href="15-pd_testing.html">Next: testing</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

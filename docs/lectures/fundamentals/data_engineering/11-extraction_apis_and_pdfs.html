@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 11: extraction from awkward sources</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Extraction from awkward sources</h1>
+  <p class="subtitle">A PDF of a valuation report contains a table in the sense that a human eye assembles one from ink positioned on a page. The file itself contains no rows, no columns, and no cells: only glyphs with coordinates. Everything difficult about extracting from documents follows from that single fact, and everything responsible about it follows from never trusting the result until it has been checked.</p>
+  <div class="meta">
+    <span>Lecture 11 of 20</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part III: ingestion</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Not every source is a table you can query. Three families of awkward source recur, and each has its own discipline. <strong>HTTP APIs</strong> return data in pages, under rate limits, behind authentication, with no transactional view of the whole. <strong>Semi-structured files</strong> arrive as JSON, XML, or spreadsheets whose structure is a suggestion. <strong>Documents</strong>, overwhelmingly PDFs in banking, contain information a human can read and a machine must reconstruct.</p>
+
+  <p>Two principles cover all three. First, <strong>keep the raw response</strong>. The JSON body, the original spreadsheet, the PDF itself, stored with a checksum and a retrieval timestamp, is your evidence when the extracted figure is questioned, and re-extraction from a stored original is cheap while re-fetching from a source that has moved on is often impossible. Second, <strong>extraction is a measurement, so it needs a control</strong>. A number lifted from a document is an estimate of what the document says, and the estimate must be checked against something independent: a stated total, a count, a cross-foot, a second extraction method.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Photocopy a financial statement and hand it to a machine. The machine sees a grid of dark and light patches. It does not see that the second column is 2025 and the third is 2024, that the indented line belongs under the heading above it, or that the number in brackets is negative. A human reader supplies all of that from context. Every table extraction library is an attempt to reconstruct that context from geometry, and the reason you check the totals afterwards is that the reconstruction is a guess, however good.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">When to stop and ask for a feed</span>
+    Extraction is engineering effort spent because a source will not give you data properly. Before investing in a PDF parser, ask whether the underlying data exists in a database somebody could expose, whether the producer can send a CSV alongside the report, or whether the report is generated from a system you already have access to. In a bank the answer is often yes, and a week of negotiation beats a permanent parser whose failure mode is a wrong number in a report. Build the parser when the source is genuinely external and immovable, such as a regulator's published text or a counterparty's statement.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>A great deal of authoritative banking information exists only as documents.</strong> Regulatory texts and supervisory statements, credit agreements and term sheets, property valuation reports, rating agency opinions, audited financial statements of corporate borrowers, and trustee reports on securitisations. Most of this is re-keyed by hand today, which is slow, unauditable, and about as error-prone as you would expect from manual transcription of numbers. Automating it with provenance and controls is strictly better than automating nothing, and both are better than a spreadsheet with no record of where the figures came from.</p>
+
+  <p><strong>API extraction fails in ways that batch database extraction does not.</strong> There is no transaction, so a paginated read of a changing collection can miss or duplicate records as the underlying data shifts beneath you. There are rate limits, so a naive loop gets throttled or banned. There is no schema declaration, so a field can change type between calls. Each of these needs a specific countermeasure, and none of them is obvious to somebody whose instincts come from SQL.</p>
+
+  <p><strong>Silent extraction errors are the worst kind of data defect.</strong> A parser that misaligns a column produces a number that is real, plausible, and wrong. A parser that drops a row produces a total that is short by one line item. Neither raises an exception. This is why the discipline in this lecture is weighted towards validation rather than towards parsing cleverness: the parsing is the easy half.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>What a PDF actually contains</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="What a PDF contains against what a reader perceives">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same page, as a human sees it and as the file stores it</text>
+
+      <!-- human view -->
+      <text x="190" y="50" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">WHAT THE READER PERCEIVES</text>
+      <rect x="40" y="60" width="300" height="130" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <g font-family="JetBrains Mono" font-size="9.5" fill="#115e59">
+        <text x="56" y="82" font-weight="700">Exposure class        2025      2024</text>
+        <line x1="56" y1="88" x2="324" y2="88" stroke="#0d9488"/>
+        <text x="56" y="106">Retail mortgages    142,300   138,900</text>
+        <text x="56" y="122">SME                  38,450    41,200</text>
+        <text x="56" y="138">Corporate            91,780    88,010</text>
+        <line x1="56" y1="146" x2="324" y2="146" stroke="#0d9488"/>
+        <text x="56" y="162" font-weight="700">Total               272,530   268,110</text>
+      </g>
+      <text x="190" y="182" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#0d9488">rows, columns, headers, a total that foots</text>
+
+      <!-- file view -->
+      <text x="570" y="50" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">WHAT THE FILE CONTAINS</text>
+      <rect x="420" y="60" width="300" height="130" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <g font-family="JetBrains Mono" font-size="8.5" fill="#7c2d12">
+        <text x="434" y="80">Tj "Retail mortgages"  x=72.0  y=618.4</text>
+        <text x="434" y="94">Tj "142,300"           x=286.5 y=618.4</text>
+        <text x="434" y="108">Tj "138,900"           x=352.1 y=618.4</text>
+        <text x="434" y="122">Tj "SME"               x=72.0  y=604.2</text>
+        <text x="434" y="136">Tj "38,450"            x=290.1 y=604.2</text>
+        <text x="434" y="150">re  72.0 630.0 268.0 0.6   (a rule)</text>
+        <text x="434" y="164">Tj "272,530"           x=286.5 y=561.8</text>
+      </g>
+      <text x="570" y="182" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#b45309">glyph runs with coordinates, and some lines</text>
+
+      <!-- reconstruction -->
+      <rect x="40" y="208" width="680" height="118" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="380" y="230" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">WHAT AN EXTRACTOR MUST INFER</text>
+      <g font-family="Inter" font-size="10" fill="#5b21b6">
+        <text x="60" y="252">1. Rows: text runs sharing a y coordinate, within a tolerance, are one row.</text>
+        <text x="60" y="270">2. Columns: consistent x positions across rows, or the ruled lines if the table is bordered.</text>
+        <text x="60" y="288">3. Headers: the first row, unless it is a title, a continued-from-previous-page marker, or two rows deep.</text>
+        <text x="60" y="306">4. Semantics: that "(1,200)" is negative, that a blank cell is nil rather than missing, that the total is a total.</text>
+      </g>
+      <text x="380" y="322" text-anchor="middle" font-family="Inter" font-size="9.5" font-style="italic" fill="#7c3aed">Steps 1 and 2 are what libraries do. Steps 3 and 4 are yours, and are where the errors live.</text>
+    </svg>
+    <figcaption>A PDF stores positioned glyphs, not cells. Table extraction is geometric inference, and it is reliable for well-ruled tables, fragile for whitespace-aligned ones, and impossible for scanned images without optical character recognition first. The semantic layer, negatives in brackets, blanks meaning nil, continued headers, is never solved by the library.</figcaption>
+  </figure>
+
+  <p>Two kinds of PDF exist and the difference decides everything. A <strong>digital</strong> PDF, produced by software, contains a text layer: the characters are present with coordinates, and extraction is geometry. A <strong>scanned</strong> PDF is an image of a page, containing no text at all, and requires optical character recognition to produce a text layer first, with an error profile that includes confusing 8 for 3 and losing decimal points. Test which you have before designing anything: extract text from a page and see whether anything comes back.</p>
+
+  <h3>The API problems, and their standard answers</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Problem</th><th>Symptom</th><th>Standard answer</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Pagination</strong></td><td>Only the first hundred records arrive</td><td>Follow the cursor or link header until exhausted; never assume a fixed page count</td></tr>
+      <tr><td><strong>Drift during paging</strong></td><td>Records missed or duplicated across pages as the source changes</td><td>Prefer cursor or keyset pagination over offset; sort by an immutable key; deduplicate on arrival</td></tr>
+      <tr><td><strong>Rate limits</strong></td><td>HTTP 429, or silent throttling</td><td>Respect <code>Retry-After</code>; exponential backoff with jitter; a client-side rate limiter below the published ceiling</td></tr>
+      <tr><td><strong>Transient failure</strong></td><td>Timeouts, 502s, connection resets</td><td>Retry idempotent reads; for writes, send an idempotency key so a retry cannot duplicate</td></tr>
+      <tr><td><strong>Schema drift</strong></td><td>A field becomes a string, or disappears</td><td>Validate the response against a schema on arrival; store the raw body regardless</td></tr>
+      <tr><td><strong>Authentication</strong></td><td>Tokens expire mid-run</td><td>Refresh on 401 and retry once; never hard-code a credential, per Lecture 19</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>A defensible API client</h3>
+
+  <pre><code>import time, random, hashlib, json
+from pathlib import Path
+import requests
+
+def fetch_all(url: str, params: dict, token: str, raw_dir: Path) -&gt; list[dict]:
+    """Page through an API, persisting every raw response before parsing."""
+    session = requests.Session()
+    session.headers.update({"Authorization": f"Bearer {token}"})
+    records: list[dict] = []
+    cursor: str | None = None
+    page = 0
+
+    while True:
+        query = {**params, **({"cursor": cursor} if cursor else {})}
+        body = _get_with_retries(session, url, query)
+
+        # persist the raw response first: it is the evidence
+        payload = json.dumps(body, sort_keys=True).encode()
+        digest = hashlib.sha256(payload).hexdigest()[:16]
+        (raw_dir / f"page_{page:05d}_{digest}.json").write_bytes(payload)
+
+        records.extend(body["data"])
+        cursor = body.get("next_cursor")
+        page += 1
+        if not cursor:
+            return records
+
+
+def _get_with_retries(session, url, params, attempts: int = 5) -&gt; dict:
+    for attempt in range(attempts):
+        response = session.get(url, params=params, timeout=30)
+
+        if response.status_code == 429:
+            wait = float(response.headers.get("Retry-After", 2 ** attempt))
+            time.sleep(wait + random.uniform(0, 1))     # jitter avoids thundering herd
+            continue
+        if response.status_code &gt;= 500:
+            time.sleep(2 ** attempt + random.uniform(0, 1))
+            continue
+
+        response.raise_for_status()
+        return response.json()
+
+    raise RuntimeError(f"exhausted {attempts} attempts for {url}")</code></pre>
+
+  <p>Three details carry the weight. The raw body is written to disk before anything is parsed, so a parsing bug is fixable without refetching and a disputed figure can be traced to bytes. The retry loop distinguishes rate limiting, which has a stated wait, from server errors, which need backoff, and adds jitter so that many clients do not retry in lockstep. And pagination follows the server's cursor rather than incrementing an offset, which is what protects against records shifting between pages while you read.</p>
+
+  <h3>Extracting from PDFs with pdfplumber</h3>
+
+  <pre><code>import pdfplumber
+import pandas as pd
+
+with pdfplumber.open("basel_framework.pdf") as pdf:
+    page = pdf.pages[316]
+
+    # is there a text layer at all? if this is empty, the page is a scan
+    text = page.extract_text()
+
+    # tables: returns a list of tables, each a list of row lists
+    tables = page.extract_tables()
+
+    # and the geometry, when the defaults get it wrong
+    words = page.extract_words()          # each with x0, x1, top, bottom
+    lines = page.lines                    # ruled lines, useful as column hints
+
+frame = pd.DataFrame(tables[0][1:], columns=tables[0][0])</code></pre>
+
+  <p>When the default detection fails, the lever is <code>table_settings</code>. The two strategies are <code>"lines"</code>, which uses ruled lines to find cell boundaries and is accurate on bordered tables, and <code>"text"</code>, which infers columns from the alignment of words and is the only option for tables laid out with whitespace. Supplying explicit column positions, taken from the word coordinates of a known-good page, converts a fragile guess into a deterministic parse.</p>
+
+  <pre><code>settings = {
+    "vertical_strategy": "explicit",
+    "explicit_vertical_lines": [72, 286, 352, 420],   # from page geometry
+    "horizontal_strategy": "text",
+    "snap_tolerance": 3,
+}
+tables = page.extract_tables(settings)
+
+# crop to a region when a page holds several tables or unwanted furniture
+region = page.crop((72, 540, 420, 640))    # (x0, top, x1, bottom) in points
+tables = region.extract_tables(settings)</code></pre>
+
+  <h3>The cleaning layer that is always needed</h3>
+
+  <p>Extracted cells are strings shaped by typography, and every one of these transformations is required in practice: strip thousands separators; convert parenthesised numbers to negatives; treat dashes, blanks, and "n/a" as explicit nulls rather than zeros; join header rows that span two lines; drop repeated headers where a table continues across pages; and detect footnote markers glued to values. Write these as one tested function shared by every extractor, because they recur in every document and getting them slightly different per parser is how two reports disagree.</p>
+
+  <pre><code>def to_amount(cell: str | None) -&gt; float | None:
+    """Convert a rendered table cell to a number, or None if genuinely absent."""
+    if cell is None:
+        return None
+    value = cell.strip().replace(",", "").replace(" ", "")
+    if value in {"", "-", "–", "—", "n/a", "N/A", "nil"}:
+        return None
+    negative = value.startswith("(") and value.endswith(")")
+    value = value.strip("()")
+    value = value.rstrip("*†‡")          # footnote markers
+    number = float(value)
+    return -number if negative else number</code></pre>
+
+  <div class="callout insight">
+    <span class="tag">Provenance is part of the record</span>
+    Every row extracted from a document should carry where it came from: the source file name, its checksum, the page number, the table index on that page, the extraction timestamp, and the version of the extraction code. This costs six columns and it converts an unauditable number into a traceable one. When a figure is challenged eighteen months later, the question "which page of which version of which document, parsed by which code?" has an answer, and re-running that exact extraction is possible. Without provenance, a document-derived number is an assertion; with it, it is evidence.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: extracting a capital table from a regulatory PDF, with controls</strong>
+    <p>The task: pull an exposure-class table from a published regulatory document into a typed frame, reliably enough that a downstream calculation can use it. The document is digital, not scanned, and roughly a thousand pages.</p>
+    <p><em>1. Establish what kind of document this is.</em> Extract text from the target page. If it returns content, there is a text layer and geometry will work. If it returns nothing, stop and plan for optical character recognition, with a much stronger validation regime because the error profile changes from misalignment to misread digits.</p>
+    <p><em>2. Locate the table by content, not by page number.</em> Page indices shift between document versions, so hard-coding page 318 guarantees a wrong answer at the next revision. Search for the caption or the distinctive header text across pages, and record which page matched.</p>
+    <pre><code>target_pages = [i for i, p in enumerate(pdf.pages)
+                if (p.extract_text() or "").find("Exposure class") &gt;= 0]</code></pre>
+    <p><em>3. Extract, then immediately assert the shape.</em> Check the column count against expectation, check that the header row contains the expected labels, and check the row count is within a plausible band. A parse that yields three columns where four were expected must fail loudly at this point rather than producing a frame that is silently misaligned.</p>
+    <p><em>4. Coerce types through the shared cleaner, and count what it rejected.</em> Every cell that should be numeric and is not becomes a null, and the number of such cells is a quality metric. Zero is expected; a handful means a footnote marker or a new dash character; many means the column mapping is wrong.</p>
+    <p><em>5. Reconcile against the document's own arithmetic.</em> This is the control that makes the whole exercise defensible. The table has a stated total row; sum the extracted components and compare. Foot the columns and cross-foot the rows where both exist. If a published total and your sum of parts differ, the extraction is wrong, or the document has a footnote you have not read, and either way it is not usable yet.</p>
+    <pre><code>components = frame.loc[frame.exposure_class != "Total", "amount_2025"].sum()
+stated     = frame.loc[frame.exposure_class == "Total", "amount_2025"].iloc[0]
+assert abs(components - stated) &lt; 1.0, f"cross-foot failed: {components} vs {stated}"</code></pre>
+    <p><em>6. Attach provenance and store both artefacts.</em> The output frame carries file name, checksum, page, table index, extraction timestamp, and code version. The original PDF is retained in raw storage under its checksum. Both go to the bronze layer, and only the reconciled frame is promoted to silver.</p>
+    <p><em>7. Make the next version cheap.</em> Store the resolved page number and column positions as configuration keyed by document version, so a re-run against the same version is deterministic while a new version triggers rediscovery and a fresh cross-foot. When the cross-foot fails on a new version, a human looks once, updates the configuration, and the pipeline resumes; that is a supportable operating model, unlike a parser that silently adapts.</p>
+    <p><em>The general shape.</em> Notice that steps 3 to 5 are all validation and only step 4 touches the data. That ratio is correct for document extraction. The parse is a hypothesis about what the page says, and the controls are the test of the hypothesis. Where no independent control exists, no stated total, no cross-foot, no expected count, the extraction should be treated as indicative and never fed into a calculation that matters, because there is no way to know it is right.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Awkward sources are handled by the same two rules regardless of family: keep the raw artefact with a checksum, and treat every extracted value as a measurement requiring an independent control. For APIs that means cursor pagination, backoff with jitter, idempotency keys, and schema validation on arrival. For PDFs it means knowing whether a text layer exists, locating tables by content rather than page number, pinning geometry where the defaults are fragile, sharing one tested cell cleaner, and reconciling to the document's own totals before the numbers are allowed anywhere. Where no control exists, the figure is indicative, and saying so is part of the job.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What does a PDF actually store, and which two inference steps does a table extractor perform that a library cannot do for you?</li>
+      <li>How do you tell a digital PDF from a scanned one, and what changes in your validation approach if it is scanned?</li>
+      <li>Why is cursor pagination preferable to offset pagination when the underlying collection is changing?</li>
+      <li>Distinguish the correct response to HTTP 429 from the correct response to HTTP 502, and say why jitter is added.</li>
+      <li>Give four transformations that every extracted table cell needs, and say why they belong in one shared function.</li>
+      <li>List the provenance columns an extracted row should carry, and say what question they let you answer later.</li>
+      <li>Why locate a table by its caption rather than by page number?</li>
+      <li>What should you do with an extracted figure for which no independent control exists?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="10-batch_ingestion.html">Lecture 10</a> covered ingestion from systems that do have tables; this lecture handled the rest.</li>
+      <li><strong>Next:</strong> <a href="12-streaming.html">Lecture 12</a> closes Part III with unbounded data: Kafka, Flink, and when streaming is genuinely warranted.</li>
+      <li><strong>Cross-link:</strong> the raw-retention argument is <a href="02-data_and_file_formats.html">Lecture 02</a>; the cross-foot control is a validation rule in <a href="16-data_quality.html">Lecture 16</a>; credential handling is <a href="19-governance_and_privacy.html">Lecture 19</a>.</li>
+      <li><strong>Outside this course:</strong> <a href="../software_engineering/04-regular_expressions.html">regular expressions</a> for the text-shaping work, and <a href="../software_engineering/05-testing.html">testing</a> for the cell-cleaner unit tests, which are exactly the case where table-driven tests pay off.</li>
+      <li><strong>Further reading:</strong> the pdfplumber documentation, particularly the table-settings section; the PDF specification's text-showing operators if you ever need to understand why an extraction is failing at the glyph level.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 11 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

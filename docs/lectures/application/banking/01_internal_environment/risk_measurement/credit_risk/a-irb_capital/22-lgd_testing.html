@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LGD testing: discrimination, calibration and stability</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>LGD testing: discrimination, calibration and stability</h1>
+  <p class="subtitle">The closing lecture of the LGD sequence. Back-tests of the composite PiT LGD (discrimination, stability, robustness) and of the calibrated LGD and ELBE (calibration accuracy, reference-value compliance, ELBE convergence). The standard PD battery from lecture 15 transfers with three structural adjustments forced by LGD's continuous, mixture-modelled, principles-based-calibrated nature.</p>
+  <div class="meta">
+    <span>A-IRB 22 of n &mdash; LGD 7 of 7</span>
+    <span>Reading time, 32 minutes</span>
+    <span>Sources: (wiki gap) — drawn from <a href="15-pd_testing.html">lecture 15</a>, CRR Article 185, PRA SS4/24 §17, EBA/GL/2017/16 §215 to §240, BCBS Working Paper 14.</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">LGD testing is the back-test battery for everything the previous six LGD lectures produced. The same two-block structure as PD testing (lecture 15) applies. <strong>Block A differentiation tests</strong> validate the composite PiT LGD from lecture 20: discrimination via Spearman rho and Somers' D (continuous-target analogues of Gini), calibration accuracy via MAE / RMSE / MPE (continuous-target analogues of binary accuracy), component-level Gini for the two binary regressions, stability via PSI on the LGD distribution, parameter sensitivity, robustness across collateral types and vintages, and benchmarking against external pooled data. <strong>Block B calibration tests</strong> validate the regulatory LGD and ELBE from lecture 21: LRA accuracy, reference-value compliance (SS4/24 §15.7), downturn-LGD adequacy, ELBE convergence to realised losses, and monotonicity across calibration segments.</p>
+
+  <p>Three structural adjustments versus PD testing matter. First, <strong>continuous-target metrics replace binary metrics</strong>: Spearman ρ for rank-order quality, MAE for absolute accuracy, RMSE for variance-sensitive accuracy, MPE for systematic bias. Gini still appears, but only at the component level (P(Zero), P(Full | not Zero) are still binary so Gini still works). Second, <strong>tests have to run at both the component level and the composite level</strong>: a model that passes at the composite level can hide a weak component, and a model that passes at the component level can fail at the composite level if the mixture aggregation amplifies errors. Third, <strong>the reference-value test is the dominant calibration diagnostic</strong>: SS4/24 §15.7 sets a quantitative floor, and the supervisor's first calibration check is whether the bank's downturn LGD meets it.</p>
+
+  <p>The legal anchor is CRR Article 185 (validation of internal estimates, applied to LGD as it is to PD), the supervisory anchors are PRA SS4/24 §17 and EBA/GL/2017/16 paragraphs 215 to 240. The test battery is also the production monitoring battery, run quarterly, and is the trigger for material model change when amber findings turn red.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    PD testing asked whether the binary default flag could be predicted; LGD testing asks whether a continuous, noisy, bimodal-mixture-modelled loss rate matches realised outcomes within tolerance. The continuous-target framing changes the metrics; the mixture architecture changes the per-component validation; the principles-based calibration changes the supervisor's first question (reference value compliance, not LRA match). Everything else &mdash; the green / amber / red protocol, the OOS / OOT sample design, the limitations-register / MoC pathway &mdash; transfers from PD testing with no adjustment.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>LGD validation has historically been the weaker leg of IRB validation. The supervisory literature (BCBS Working Paper 14, EBA GL/2017/16, PRA SS4/24 §17) explicitly acknowledges that LGD models are harder to validate than PD models for three structural reasons: the continuous target is noisier than a binary target, the sample size is one to two orders of magnitude smaller, and the calibration is principles-based rather than prescriptive. A model that scores Gini 75% on PD and Spearman ρ 60% on LGD is performing similarly well on a sensible metric scale, but supervisors trained on PD-style Gini benchmarks sometimes read the LGD numbers as weak. Practitioners need to be able to explain why the LGD numbers <em>should</em> be lower than PD numbers, which is the point of the comparison framing later in this lecture.</p>
+
+  <p>The reference-value compliance test (SS4/24 §15.7) is the supervisor's first calibration check at SREP. It is quantitative, comparable across banks, and gives the supervisor a hard floor on downturn LGD. Banks whose downturn LGD does not meet the reference value at the calibration-segment level are sent to remediation; banks who meet it cleanly proceed to the rest of the validation discussion. Practitioners therefore design their downturn LGD construction (the max-over-candidates approach in lecture 21) precisely to ensure the reference-value check passes.</p>
+
+  <p>ELBE testing is the supervisor's second calibration concern. The K formula for defaulted exposures subtracts ELBE from downturn LGD, so an over-stated ELBE under-capitalises and an under-stated ELBE double-counts loss in capital and provisions. The standard back-test is to compare ELBE at month t to the realised remaining loss observed by month t + N for a sample of defaulted facilities. Banks with weak ELBE back-tests typically have to add an MoC overlay specifically for ELBE estimation uncertainty.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The two-block battery from lecture 15 maps onto LGD with minor adjustments. The diagram below lists each test, its method and its target object.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The LGD testing battery">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The LGD testing battery: differentiation block and calibration block</text>
+
+      <!-- Block A: Differentiation -->
+      <g>
+        <rect x="40" y="50" width="400" height="380" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.3"/>
+        <text x="240" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Block A: Differentiation tests</text>
+        <text x="240" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">validates the composite PiT LGD from lecture 20</text>
+
+        <rect x="60" y="105" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="124" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A1. Composite accuracy</text>
+        <text x="410" y="124" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">MAE, RMSE, MPE on OOS / OOT</text>
+
+        <rect x="60" y="140" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="159" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A2. Composite discrimination</text>
+        <text x="410" y="159" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">Spearman &rho;, Somers' D on OOS / OOT</text>
+
+        <rect x="60" y="175" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="194" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A3. Component-level Gini</text>
+        <text x="410" y="194" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">P(Zero) and P(Full | not Zero) regressions</text>
+
+        <rect x="60" y="210" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="229" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A4. Stability (PSI)</text>
+        <text x="410" y="229" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">PSI on composite LGD distribution</text>
+
+        <rect x="60" y="245" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="264" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A5. Stability (CSI)</text>
+        <text x="410" y="264" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">CSI on per-component model variables</text>
+
+        <rect x="60" y="280" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="299" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A6. Parameter sensitivity</text>
+        <text x="410" y="299" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">re-fit each component on OOS; check signs</text>
+
+        <rect x="60" y="315" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="334" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A7. Robustness (collateral / vintage)</text>
+        <text x="410" y="334" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">per-collateral / per-vintage performance</text>
+
+        <rect x="60" y="350" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="369" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A8. Stress (workout-rate, collateral shocks)</text>
+        <text x="410" y="369" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">application sample</text>
+
+        <rect x="60" y="385" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="404" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A9. External benchmarking</text>
+        <text x="410" y="404" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">vs Global Credit Data / S&amp;P LossStat</text>
+      </g>
+
+      <!-- Block B: Calibration -->
+      <g>
+        <rect x="460" y="50" width="400" height="380" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="660" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">Block B: Calibration tests</text>
+        <text x="660" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">validates the regulatory LGD and ELBE from lecture 21</text>
+
+        <rect x="480" y="105" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="124" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B1. LRA accuracy</text>
+        <text x="830" y="124" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">LRA LGD vs realised average per segment</text>
+
+        <rect x="480" y="140" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="159" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B2. Reference value compliance</text>
+        <text x="830" y="159" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">SS4/24 §15.7; per segment</text>
+
+        <rect x="480" y="175" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="194" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B3. Downturn LGD adequacy</text>
+        <text x="830" y="194" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">vs realised LGD in downturn period</text>
+
+        <rect x="480" y="210" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="229" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B4. ELBE convergence</text>
+        <text x="830" y="229" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">ELBE(t) vs realised loss observed by t+N</text>
+
+        <rect x="480" y="245" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="264" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B5. Segment monotonicity</text>
+        <text x="830" y="264" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">CRR Art 170(3) tests applied to segments</text>
+
+        <rect x="480" y="280" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="299" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B6. Concentration (HHI)</text>
+        <text x="830" y="299" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">across calibration segments</text>
+
+        <rect x="480" y="315" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="334" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B7. Migration analysis</text>
+        <text x="830" y="334" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">segment-to-segment transitions per cohort</text>
+      </g>
+    </svg>
+    <figcaption>The LGD test battery in two blocks. Block A applies continuous-target diagnostics (MAE, Spearman, MPE) to the composite PiT LGD plus binary Gini at the component level. Block B applies LGD-specific calibration tests (LRA accuracy, reference-value compliance, downturn adequacy, ELBE convergence) to the regulatory outputs. Both blocks run quarterly in production as the monitoring framework.</figcaption>
+  </figure>
+
+  <p>Three properties of the battery. First, <strong>composite-level and component-level tests both run</strong>: a model that passes A1 (composite accuracy) but fails A3 (component-level Gini for P(Full | not Zero)) has a weak full-payer component that the aggregation has averaged out; the supervisor will probe. Second, <strong>the reference-value test is the dominant calibration diagnostic</strong>: B2 is the supervisor's first check and the primary green / amber / red signal. Third, <strong>ELBE testing has a unique convergence structure</strong>: ELBE is updated each period as the workout progresses, so the test asks whether ELBE(t) converges to realised loss as t approaches resolution.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Block A: differentiation testing</h3>
+
+  <h4>A1. Composite accuracy: MAE, RMSE, MPE</h4>
+
+  <p>Three complementary metrics on the composite PiT LGD versus realised LGD:</p>
+
+  <pre><code>MAE   = mean over facilities of  | predicted_LGD - realised_LGD |
+RMSE  = sqrt( mean over facilities of  ( predicted_LGD - realised_LGD )^2 )
+MPE   = mean over facilities of  ( predicted_LGD - realised_LGD ) / realised_LGD
+</code></pre>
+
+  <p>Typical retail benchmarks: MAE 10 to 15 pp, RMSE 15 to 20 pp, MPE within ±10% at the segment level. MAE is the robust metric (insensitive to outliers); RMSE penalises large errors more (sensitive to mixture-model failure on extremes); MPE captures systematic bias direction (positive = over-prediction, negative = under-prediction). All three are reported per segment, per sub-population, per sample.</p>
+
+  <h4>A2. Composite discrimination: Spearman rho, Somers' D</h4>
+
+  <p>Continuous-target analogues of Gini. <strong>Spearman ρ</strong> is the rank correlation between predicted and realised LGD; it equals Pearson correlation between the ranks. <strong>Somers' D</strong> is closely related but treats one variable as the dependent and the other as the predictor. Both are insensitive to monotone transformations of the variables, which is appropriate for an LGD model where the prediction's rank ordering matters more than its absolute level. Typical retail benchmarks: Spearman ρ 0.5 to 0.7 on the development sample, with no more than 0.05 of decay on OOS / OOT.</p>
+
+  <h4>A3. Component-level Gini</h4>
+
+  <p>The two binary components (P(Zero), P(Full | not Zero)) are still binary classifiers, so Gini and AUC apply. Typical benchmarks:</p>
+
+  <ul>
+    <li>P(Zero) Gini: 0.50 to 0.70 on retail unsecured (collateral type alone explains most of it).</li>
+    <li>P(Full | not Zero) Gini: 0.30 to 0.50 on retail unsecured (weaker because the sample is smaller and the signal more diffuse).</li>
+    <li>E[r(Partial)] is continuous, so Spearman ρ rather than Gini: typical 0.4 to 0.6.</li>
+  </ul>
+
+  <p>A composite model with strong A1 metrics but weak A3 component Gini values is investigated: the composite may be passing by luck, with the mixture aggregation averaging out poor component fits.</p>
+
+  <h4>A4 and A5. Stability (PSI and CSI)</h4>
+
+  <p>Same machinery as PD testing (lecture 15). PSI on the predicted LGD distribution between development and OOT / application samples; CSI on each model variable (per component since the components have different variable sets). Same threshold interpretation: under 0.10 stable, 0.10 to 0.25 watch, over 0.25 material drift.</p>
+
+  <h4>A6. Parameter sensitivity</h4>
+
+  <p>Each of the three regressions is re-fit on the OOS sample alone; coefficients compared to development. Sign stability and significance stability checked, same as PD. For the GLM component (regression C), the dispersion parameter and link-function diagnostics are also inspected for stability.</p>
+
+  <h4>A7. Robustness: collateral type, vintage, sub-populations</h4>
+
+  <p>Standard sub-populations: collateral type (residential property by region, commercial property, vehicle, securities, unsecured), cure / no-cure subgroups, exposure-size bands, default vintage, strategic partners or product lines. MAE / Spearman computed per sub-population; persistent under-performance triggers segment-specific re-modelling or partner-flag interactions.</p>
+
+  <h4>A8. Stress tests</h4>
+
+  <p>Distinct from PD stress because the inputs are different. LGD stress shocks:</p>
+
+  <ul>
+    <li><strong>Workout-rate shocks</strong>: assume realised recoveries are 10% or 20% lower than the model predicts.</li>
+    <li><strong>Collateral-value shocks</strong>: for secured portfolios, shock the regional house-price index down by 10% or 20% and re-derive the LGD.</li>
+    <li><strong>Discount-rate shocks</strong>: increase the discount rate by 200 to 500 bps and re-discount the recovery cash flows.</li>
+    <li><strong>Recovery-period shocks</strong>: extend the MRP by 12 to 24 months and re-aggregate.</li>
+  </ul>
+
+  <p>Each shock produces an LGD-uplift response; the response is mapped to scenario severities for ICAAP and stress-testing input.</p>
+
+  <h4>A9. External benchmarking</h4>
+
+  <p>The bank's LGD is compared to pooled external benchmarks:</p>
+
+  <ul>
+    <li><strong>Global Credit Data (GCD)</strong> for corporate and commercial. Reports pooled realised LGDs by region, industry, collateral type, default vintage.</li>
+    <li><strong>S&amp;P LossStat</strong> for large-corporate bond and leveraged-loan defaults.</li>
+    <li><strong>ECB AnaCredit pooled defaults</strong> for European retail and SME.</li>
+  </ul>
+
+  <p>The bank's per-segment LGD should sit within a defensible range of the external benchmark for comparable portfolios. Material deviation (the bank's LGD 10 pp below an external benchmark for the same collateral type) triggers either a documented justification or an MoC overlay.</p>
+
+  <h3>Block B: calibration testing</h3>
+
+  <h4>B1. LRA accuracy</h4>
+
+  <p>Per segment, the calibrated LRA LGD is compared to the empirically observed realised LGD over the calibration window. The MPE of LRA versus realised:</p>
+
+  <pre><code>MPE_LRA(segment)  =  ( LRA_LGD(segment) - realised_avg_LGD(segment) ) / realised_avg_LGD(segment)
+</code></pre>
+
+  <p>By construction this should be close to zero, since the LRA is computed as the realised average over the calibration window. Non-zero MPE indicates the calibration sample's weighting (EAD-weighted vs default-count-weighted) is being applied inconsistently or that an MoC overlay has shifted the LRA.</p>
+
+  <h4>B2. Reference-value compliance (SS4/24 §15.7)</h4>
+
+  <p>The supervisor's first calibration check. Per calibration segment, the downturn LGD must equal or exceed the SS4/24 §15.7 reference value (the simple average of the two years with the highest balance-weighted LGD). The test:</p>
+
+  <pre><code>LGD_downturn(segment)  >=  reference_value(segment)
+</code></pre>
+
+  <p>Reported as a green / amber / red status per segment. Segments where downturn LGD falls below the reference value are red and trigger remediation; segments where downturn LGD is at or modestly above the reference value are green; segments materially above the reference value (more than 10 pp) may be amber as over-conservative.</p>
+
+  <h4>B3. Downturn LGD adequacy</h4>
+
+  <p>Beyond the reference-value test, the downturn LGD is compared to the realised LGD averaged over the bank's identified downturn period (typically 2008 to 2009, sometimes extended to 2010 to 2011). The downturn LGD should not under-predict the downturn-period realised LGD by more than a few percentage points.</p>
+
+  <h4>B4. ELBE convergence</h4>
+
+  <p>The unique LGD2 calibration test. ELBE is updated each period as the workout progresses; the test asks whether ELBE(t) converges to the realised remaining loss as t approaches resolution. For a cohort of defaulted facilities at default-month 0, the test plots:</p>
+
+  <ul>
+    <li>ELBE(t) per facility, t = 0, 1, 2, ..., MRP months</li>
+    <li>Realised remaining loss observed in (t, t + N] for some short horizon N (e.g. 6 months)</li>
+  </ul>
+
+  <p>As t approaches MRP the two should converge: ELBE at month MRP-1 should equal the realised loss over the next month within tolerance. Persistent divergence indicates ELBE is biased and triggers MoC adjustment.</p>
+
+  <h4>B5. Segment monotonicity</h4>
+
+  <p>The CRR Article 170(3) tests from PD's grade construction apply to LGD calibration segments. Per cohort:</p>
+
+  <ul>
+    <li>The calibrated LGD per segment should rank-order consistently with realised LGD (monotonicity).</li>
+    <li>Homogeneity within segment (chi-square test on sub-sample realised LGDs).</li>
+    <li>Heterogeneity between segments (binomial z-test or Mann-Whitney U-test on realised LGD distributions).</li>
+    <li>Volume per segment between 1% and 30% (CRR 170(3)(b)).</li>
+  </ul>
+
+  <h4>B6. Concentration (HHI)</h4>
+
+  <p>Same construction as PD: HHI = sum over segments of (volume_share)². Threshold 0.25; line chart over time. Reported as part of the routine calibration pack.</p>
+
+  <h4>B7. Migration analysis</h4>
+
+  <p>Per cohort transition, count the share of facilities that move between calibration segments. Because LGD segments are typically driven by collateral type and product (which are static) plus cure status (which moves only on cure / re-default events), migration rates are lower than for PD grades. Material migration in segments where it should not occur (e.g. collateral-type segments) indicates a data-quality issue rather than a credit phenomenon and is investigated.</p>
+
+  <h3>The reporting pack</h3>
+
+  <p>The standard LGD test report contains seven artefacts in addition to the six PD ones:</p>
+
+  <ol>
+    <li>A summary scoreboard with one row per test, columns for metric values, thresholds and traffic-light status.</li>
+    <li>Per-test detailed pages with tables (per segment, per cohort, per sub-population) and visualisations (predicted-vs-realised scatter, MAE over time, Spearman ρ over time).</li>
+    <li>Component-level result pages for each of the three regressions.</li>
+    <li>The reference-value compliance table per segment (the supervisor's first read).</li>
+    <li>The ELBE convergence chart per cohort.</li>
+    <li>The external-benchmarking comparison table.</li>
+    <li>The limitations register / MoC mapping for amber findings.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>LGD metric levels are not directly comparable to PD metric levels</strong>. A Gini of 75% on PD versus a Spearman ρ of 0.55 on LGD are equivalent expressions of "this model discriminates well on a continuous target that is intrinsically noisier than a binary target". Practitioners who report LGD metrics without this comparison framing find their results read as worse than PD; with the framing, the supervisor reads them correctly. The right move is to include in the LGD validation pack a one-paragraph framing of why the metric values should be expected at the levels they are.</p>
+
+  <p>The second lesson is on <strong>the reference-value test as supervisory anchor</strong>. SS4/24 §15.7 gives the supervisor a quantitative floor that every bank in the UK can be compared on. Banks whose downturn LGD compliance is documented per segment in clean tables get green on the first read; banks whose calibration is more elaborate but whose reference-value compliance is buried in technical appendices get challenged. The right reporting discipline is to put the reference-value table on the first page of the calibration pack.</p>
+
+  <p>The third lesson is on <strong>ELBE convergence</strong>. The convergence test is conceptually simple (ELBE should equal realised remaining loss at month MRP - 1) but operationally demanding because ELBE is updated each period and realised remaining loss is observed only at the end. Banks whose ELBE methodology is statically calibrated (ELBE at t = 0 for every t) fail the convergence test; banks whose methodology updates ELBE based on the realised workout-stage features (months since default, cumulative recoveries to date, recovery channel) pass. The lecture-20 LGD2 model's use of post-default features is what enables the convergence; banks who skip the LGD2 / LGD1 distinction find the convergence test catches them.</p>
+
+  <p>The fourth lesson is on <strong>component-level testing</strong>. The temptation is to focus on the composite: it is the regulatory parameter, it is what feeds the K formula, it is what the supervisor needs. The right discipline is to maintain component-level visibility too, because the composite can be passing while one component is failing in a way the aggregation averages out. A weak P(Full | not Zero) component will not show on composite MAE if the other components compensate; it will show in component Gini and in MAE for the partial-payer sub-population. Validators who only check composite metrics miss this.</p>
+
+  <p>The fifth lesson is on <strong>the test pack as the monitoring framework</strong>. The same battery runs quarterly in production. A green scoreboard at development that turns amber three quarters in is a model drifting toward recalibration; an amber that turns red is a trigger for material model change (lecture 32). The discipline of building the test battery once and re-running it forever is what keeps the LGD approval current; modelling teams that treat testing as a development-only exercise lose track of model performance in production.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Why does PD's Gini metric not directly apply to the composite LGD output? Name the continuous-target analogues and explain why each is reported alongside the others.</li>
+    <li>Distinguish MAE from RMSE in the LGD context. Which is more robust, and which is more sensitive to mixture-model failure on extremes?</li>
+    <li>State the typical retail benchmarks for Spearman ρ on the composite, P(Zero) Gini, and P(Full | not Zero) Gini.</li>
+    <li>The composite passes MAE on OOS but the P(Full | not Zero) component Gini is weak. What is the diagnosis, and why does the composite hide it?</li>
+    <li>Write the SS4/24 §15.7 reference-value compliance test formally. What is the supervisor's response to a segment that fails?</li>
+    <li>Explain ELBE convergence as a validation test. Why does it require an LGD2 model rather than just a constant ELBE assumption?</li>
+    <li>The PD test battery had 14 tests. The LGD test battery has 16 (9 in Block A, 7 in Block B). Name the two extra LGD tests and explain their LGD-specific role.</li>
+    <li>Why do LGD calibration segments typically show lower migration rates than PD grades? When would high migration be a concern rather than a positive sign?</li>
+    <li>External benchmarking is more important for LGD than for PD. Why? Name three external benchmark sources and the portfolio segments each serves.</li>
+    <li>A bank's LGD validation pack puts the reference-value compliance table in a technical appendix. What does the senior supervisor's first read look like, and what is the right remediation?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li>The LGD wiki has no dedicated testing file. This lecture is constructed from <a href="15-pd_testing.html">lecture 15</a>'s battery plus LGD-specific regulatory text and best practice.</li>
+      <li>CRR Article 185. Validation of internal estimates.</li>
+      <li>PRA SS4/24, paragraph 17. UK supervisory expectations for LGD validation.</li>
+      <li>EBA/GL/2017/16 paragraphs 215 to 240. The European authority's interpretation.</li>
+      <li>BCBS Working Paper 14, "Studies on the Validation of Internal Rating Systems" (May 2005), sections on LGD validation.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="15-pd_testing.html">PD testing</a> &mdash; the two-block battery this lecture adapts with three structural adjustments.</li>
+      <li><a href="20-lgd_risk_differentiation.html">LGD risk differentiation</a> &mdash; the composite PiT LGD that Block A validates.</li>
+      <li><a href="21-lgd_risk_quantification.html">LGD risk quantification</a> &mdash; the regulatory LGD and ELBE that Block B validates.</li>
+    </ul>
+
+    <p><strong>Forward references inside A-IRB capital:</strong></p>
+    <ul>
+      <li>30-moc (planned) &mdash; amber findings feed MoC category B; data limitations identified earlier feed category A.</li>
+      <li>31-rwa (planned) &mdash; the validated LGD enters the K formula for non-defaulted exposures, and (LGD − ELBE) for defaulted.</li>
+      <li>32-monitoring (planned) &mdash; the same test battery re-runs quarterly to detect drift and trigger material model change.</li>
+    </ul>
+
+    <p><strong>Cross-component:</strong></p>
+    <ul>
+      <li>29-ead_testing (planned) &mdash; the EAD analogue: MAE / RMSE / MAPE on realised EADF, monotonicity across utilisation bands.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>BCBS Working Paper 14, "Studies on the Validation of Internal Rating Systems" (May 2005), sections on LGD validation. The canonical Basel reference.</li>
+      <li>Stein and Jordao, "What is a more powerful model worth?" (2003). The economic-value-of-discrimination perspective.</li>
+      <li>Loterman et al. (2012), "Benchmarking regression algorithms for loss given default modeling". Empirical comparison of LGD model classes including testing metrics.</li>
+      <li>Global Credit Data benchmarking reports. Industry pooled-data references for external benchmarking.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 22 of n &middot; LGD 7 of 7 &mdash; LGD sequence complete.</span>
+  <span><a href="21-lgd_risk_quantification.html">Previous: risk quantification</a> &middot; <a href="23-ead_concept.html">Next: EAD concept</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

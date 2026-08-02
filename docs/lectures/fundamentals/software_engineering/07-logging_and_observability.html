@@ -1,0 +1,412 @@
+﻿<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 7: logging and observability</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Logging and observability</h1>
+  <p class="subtitle">Debugging works when you can run the code. In production, you cannot. Logging is what the code says about itself while it runs; observability is the property that lets you ask new questions about a running system without re-deploying it. This lecture covers Python's logging module, the structured-logging discipline that makes logs queryable, the three pillars (logs, metrics, traces) of the modern observability stack, and the specific application to model-monitoring pipelines.</p>
+  <div class="meta">
+    <span>Lecture 7 of 16</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part II: testing and debugging</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Logging</strong> is the practice of having running code emit a record of what it is doing. A log line is a timestamped event with a level, a message, and (in modern usage) a structured payload of named fields. Logs are written to standard output, to a file, or to a remote aggregator (Loki, Datadog, Splunk, ELK), and they are the primary tool for diagnosing what a program did after the fact. The category is forty years old (syslog dates from 1980; Eric Allman, sendmail); the modern Python tooling around it is well-developed and largely standardised.</p>
+
+  <p><strong>Observability</strong>, in the sense the term has taken on since around 2018, is something more ambitious. The word, borrowed from control theory by Charity Majors and others at Honeycomb, refers to the property of a system that you can ask arbitrary, unplanned questions about it from outside, using only the signals it emits. A system is observable if you can debug a new failure mode without adding new instrumentation. The three signals that practical observability stacks build on are <strong>logs</strong> (discrete events), <strong>metrics</strong> (aggregates over time), and <strong>traces</strong> (the path of a single request through a distributed system). The three together are sometimes called the three pillars.</p>
+
+  <p>The Python toolchain has converged on a working set. The standard library's <code>logging</code> module is the foundation; <strong>structlog</strong> (Hynek Schlawack, 2013) is the structured-logging library that wraps it; <strong>Loguru</strong> (Delgan, 2018) is the simpler alternative for small projects. For metrics and traces, the cross-language standard is <strong>OpenTelemetry</strong> (CNCF, 2019), the merger of the older OpenTracing and OpenCensus projects. Behind the instrumentation sit the backend services that store and query the data: Prometheus and Grafana for metrics; Loki, Datadog, Splunk, or Elasticsearch for logs; Jaeger, Honeycomb, or Datadog APM for traces. The specific choice depends on the team; the discipline of emitting the signals is the same in every case.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A log line is a structured event. A metric is the same kind of event, counted or aggregated before being recorded. A trace is a tree of events tied together by a shared identifier. All three are the same primitive (an event with attributes) wearing different costumes. If you can describe what an event carries and what each pillar does with it, you can have an informed opinion on any "should we log this or expose a metric for it?" question.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The deep cultural shift behind observability, captured in Charity Majors's essays and in the Honeycomb book <em>Observability Engineering</em> (Majors, Fong-Jones, Miranda, 2022), is the move from <em>monitoring</em> to <em>observability</em>. Monitoring assumes you know what to ask: pre-defined dashboards, pre-defined alerts, pre-defined failure modes. Observability accepts that you do not know: high-cardinality events, the ability to slice arbitrarily, the freedom to ask a question that no one has asked before. A modelling pipeline is a poster child for the gap; the failure modes that cost money are usually the ones no one had written a dashboard for.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that production failure is a different problem from test failure. A failing test (Lecture 5) gives you the failing input, the expected output, the actual output, and a stack trace; a production failure gives you what the system wrote about itself before it broke. Anything not in the logs is unrecoverable. The classical observation, attributed to multiple sources but most cleanly to Brian Kernighan, is that the time spent thinking about what to log before deployment is paid back many times over the first time something goes wrong. Teams that log too little spend their incident response reconstructing context; teams that log usefully spend it fixing the problem.</p>
+
+  <p>The second reason, specific to risk modelling, is that model monitoring is observability applied to predictions. A PD model in production emits a score for every loan application; the question "is the model drifting?" is the same kind of question as "is the API latency drifting?", and it is answered by the same kind of instrumentation. Population stability index, feature drift, calibration drift, prediction distribution shift, all of these are metrics computed over time from the same events the inference pipeline already emits. A team that has built the observability layer for its operational systems can extend it to its models almost for free; a team that has not has to build it twice.</p>
+
+  <p>The third reason is the regulatory expectation. The PRA's SS3/24 on model risk management, the EBA's RTS on the IRB process, and the SR 11-7 guidance from the US Federal Reserve all expect ongoing model performance monitoring as a routine activity, not a quarterly review. The infrastructure that makes routine monitoring affordable is the observability stack: events emitted on every inference, metrics aggregated continuously, dashboards updated automatically. The alternative, hand-rolled monthly reports, is expensive, slow, and rarely catches drift until it has been going on for weeks. The investment in observability pays back across both the operational and the regulatory dimensions.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The three pillars</h3>
+
+  <p>The standard taxonomy distinguishes three kinds of signal that a system emits. Each answers a different question and has different cost characteristics; the working observability stack uses all three.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The three pillars of observability">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The three pillars of observability</text>
+
+      <g font-family="Inter" font-size="12">
+        <rect x="40"  y="60" width="220" height="180" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2" rx="6"/>
+        <text x="150" y="90"  text-anchor="middle" font-size="14" font-weight="700" fill="#3D2EB5">Logs</text>
+        <text x="150" y="115" text-anchor="middle" fill="#37352F">Discrete events</text>
+        <text x="150" y="133" text-anchor="middle" fill="#37352F">with full context</text>
+        <text x="150" y="165" text-anchor="middle" font-size="11" fill="#71717a">Question:</text>
+        <text x="150" y="181" text-anchor="middle" font-size="11" fill="#71717a">"What exactly happened?"</text>
+        <text x="150" y="205" text-anchor="middle" font-size="11" fill="#71717a">Storage: $$$ (high volume)</text>
+        <text x="150" y="223" text-anchor="middle" font-size="11" fill="#71717a">Tools: Loki, Datadog, ELK</text>
+
+        <rect x="280" y="60" width="220" height="180" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2" rx="6"/>
+        <text x="390" y="90"  text-anchor="middle" font-size="14" font-weight="700" fill="#1E9D54">Metrics</text>
+        <text x="390" y="115" text-anchor="middle" fill="#37352F">Aggregates over time</text>
+        <text x="390" y="133" text-anchor="middle" fill="#37352F">named, low-cardinality</text>
+        <text x="390" y="165" text-anchor="middle" font-size="11" fill="#71717a">Question:</text>
+        <text x="390" y="181" text-anchor="middle" font-size="11" fill="#71717a">"How is the system trending?"</text>
+        <text x="390" y="205" text-anchor="middle" font-size="11" fill="#71717a">Storage: $ (compact)</text>
+        <text x="390" y="223" text-anchor="middle" font-size="11" fill="#71717a">Tools: Prometheus, Grafana</text>
+
+        <rect x="520" y="60" width="220" height="180" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2" rx="6"/>
+        <text x="630" y="90"  text-anchor="middle" font-size="14" font-weight="700" fill="#C76B2A">Traces</text>
+        <text x="630" y="115" text-anchor="middle" fill="#37352F">Path of one request</text>
+        <text x="630" y="133" text-anchor="middle" fill="#37352F">across services</text>
+        <text x="630" y="165" text-anchor="middle" font-size="11" fill="#71717a">Question:</text>
+        <text x="630" y="181" text-anchor="middle" font-size="11" fill="#71717a">"Where did the time go?"</text>
+        <text x="630" y="205" text-anchor="middle" font-size="11" fill="#71717a">Storage: $$ (sampled)</text>
+        <text x="630" y="223" text-anchor="middle" font-size="11" fill="#71717a">Tools: Jaeger, Honeycomb</text>
+      </g>
+    </svg>
+    <figcaption>Each pillar answers a different question and has different cost characteristics. Logs are detailed but expensive; metrics are cheap but lossy; traces sit between, with sampling as the cost-control lever.</figcaption>
+  </figure>
+
+  <p><strong>Logs</strong> are discrete events with full context. When the inference service rejects a request because the feature vector contains a NaN, a log line records the timestamp, the request ID, the customer ID, the feature that was NaN, the version of the model, and the stack location. A reader investigating the rejection later can reconstruct exactly what happened. The cost is volume: a busy system can emit gigabytes of logs per day, and storage is rarely free.</p>
+
+  <p><strong>Metrics</strong> are aggregates over time. The same NaN rejection, viewed as a metric, becomes a counter (<code>inference_rejections_total{reason="nan_feature"}</code>) incremented every time the event happens. Over a week, the metric tells you how many rejections occurred and how the rate is trending. It does not tell you which customers, which features, or which model version. Metrics are cheap to store (a counter is one number per scrape interval) but they are also lossy: the detail is discarded at the moment of aggregation.</p>
+
+  <p><strong>Traces</strong> are the path of one request through a distributed system. When a scoring API call enters the gateway, calls the feature service, calls the model service, and returns, each step becomes a span; the spans share a trace ID and form a tree. A trace tells you which step was slow and which step failed, in a way that neither logs nor metrics alone can. The cost is again volume; the typical solution is sampling, keeping only a fraction of traces (say 1%) plus a heavier sample for traces that errored.</p>
+
+  <h3>Log levels: the contract with future-you</h3>
+
+  <p>Python's <code>logging</code> module defines five severity levels: <code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>, <code>CRITICAL</code>. The convention is not arbitrary; each level signals a different intent.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Level</th><th>What it means</th><th>Audience</th><th>Typical content</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>DEBUG</code></td><td>Diagnostic detail useful only when investigating</td><td>The author, post-incident</td><td>Variable values, branch taken, intermediate state</td></tr>
+      <tr><td><code>INFO</code></td><td>Normal operation, the system is working</td><td>Operator, audit</td><td>Job started, request processed, model loaded</td></tr>
+      <tr><td><code>WARNING</code></td><td>Something unusual but not failing</td><td>Operator, monitor</td><td>Retry needed, deprecated path, slow response</td></tr>
+      <tr><td><code>ERROR</code></td><td>A failure that the system handled</td><td>Operator, on-call</td><td>Request rejected, fallback used, exception caught</td></tr>
+      <tr><td><code>CRITICAL</code></td><td>The system cannot continue</td><td>On-call, immediately</td><td>Database unreachable, config missing, panic</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The contract works because the production configuration sets a threshold (typically <code>INFO</code>) and discards everything below it. <code>DEBUG</code> logs are written by the application but filtered before they reach storage, so they cost nothing in production. When investigating, you raise the threshold and re-run, or you enable debug logging on a specific module without restarting the service. Logging at the wrong level (logging routine operations at <code>WARNING</code>, or genuine failures at <code>INFO</code>) breaks the contract and makes alerting impossible.</p>
+
+  <h3>Structured logs and the cardinality dilemma</h3>
+
+  <p>A traditional log line is a string. "User 12345 was rejected at 2026-05-18T09:14:22Z because feature credit_score was NaN" is human-readable but machine-hostile: to find every NaN rejection across a million log lines, you have to parse the string. <strong>Structured logging</strong> is the move from string to dictionary. The same event becomes:</p>
+
+  <pre><code class="language-json">{
+  "timestamp": "2026-05-18T09:14:22Z",
+  "level": "WARNING",
+  "event": "inference_rejected",
+  "reason": "nan_feature",
+  "feature_name": "credit_score",
+  "customer_id": "12345",
+  "model_version": "pd_consumer_2026_03_29",
+  "request_id": "req-7a8b9c"
+}
+</code></pre>
+
+  <p>The same event, viewed in a structured-log store like Loki or Datadog, supports queries that the string version does not: count by reason, group by feature, filter by model version, correlate with the request_id from the upstream service's logs. The cost is one decision: pick a schema and stick to it. The cost of <em>not</em> structuring is that you re-invent the schema with every new query, by writing a brittle regex against last week's strings.</p>
+
+  <p>The <strong>cardinality</strong> question is the design tension between the pillars. High-cardinality data (the customer ID, the trace ID, the model version) is what gives observability its power; you can slice by any of them after the fact. But metric systems (Prometheus and its kin) store one time series per unique combination of labels; adding a customer ID label to a counter explodes the number of time series and quickly exhausts memory. The rule of thumb is: low-cardinality fields (status code, region, model name) belong on metrics; high-cardinality fields (customer ID, request ID, feature value) belong on logs or traces. Honeycomb's argument, since 2018, is that this division is a relic of cheap-storage-poor design, and a system built around high-cardinality events from the start is strictly more useful.</p>
+
+  <div class="defcard">
+    <strong>Cardinality.</strong> The number of distinct values a field takes. A <code>status_code</code> field has cardinality of about 60 (the HTTP codes that actually occur); a <code>customer_id</code> field has cardinality of millions. Metrics systems struggle with high-cardinality labels; log and trace systems do not.
+  </div>
+
+  <div class="defcard">
+    <strong>Sampling.</strong> The practice of keeping only a fraction of events to control storage cost. Head sampling decides at request entry whether to keep the trace; tail sampling decides after the request completes, so you can keep all errors and a small fraction of successes. The latter is more useful but more expensive to implement.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The Python logging module</h3>
+
+  <p>The standard library's <code>logging</code> module is the foundation under every Python logging library. The model has four components. A <strong>logger</strong> is a named object that code calls to emit an event; loggers form a hierarchy by dotted name (<code>credit_risk.pd.calibrate</code> is a child of <code>credit_risk.pd</code>, which is a child of <code>credit_risk</code>, which is a child of the root logger). A <strong>handler</strong> takes a record from a logger and writes it somewhere: <code>StreamHandler</code> to stdout, <code>FileHandler</code> to a file, <code>SysLogHandler</code> to syslog, <code>HTTPHandler</code> to a remote service. A <strong>formatter</strong> turns the record into a string (or, with extensions, a JSON blob). A <strong>filter</strong> drops records that fail a predicate.</p>
+
+  <pre><code class="language-python">import logging
+
+# The standard idiom: one logger per module, named after __name__.
+logger = logging.getLogger(__name__)
+
+def calibrate_pd(features, outcomes):
+    logger.info("calibration_started",
+                extra={"n_rows": len(features),
+                       "n_features": features.shape[1]})
+    try:
+        model = fit(features, outcomes)
+    except Exception:
+        logger.exception("calibration_failed")   # includes traceback
+        raise
+    logger.info("calibration_finished",
+                extra={"auc": model.auc, "ks": model.ks})
+    return model
+</code></pre>
+
+  <p>The <code>logging.getLogger(__name__)</code> idiom is the right default: each module owns its logger, and the dotted naming lets you configure log levels per package. The <code>extra</code> parameter attaches structured fields to the record without baking them into the message string, which is the cleanest path to structured output. The <code>logger.exception</code> method (only call inside an <code>except</code> block) records the message plus the full stack trace, automatically.</p>
+
+  <p>The single trap every new Python user falls into is the <strong>root-logger trap</strong>. Calling <code>logging.info(...)</code> (without first getting a named logger) emits a record on the root logger, which by default has no handlers and silently discards everything. The diagnostic, "my logs are not appearing", is almost always: the code used the module-level functions, no handler was configured, the messages went into the void. The fix is to configure logging once at process start, using <code>logging.basicConfig</code> or <code>logging.config.dictConfig</code>, and then use named loggers everywhere else.</p>
+
+  <pre><code class="language-python"># At process start, in your main module:
+import logging
+import logging.config
+
+logging.config.dictConfig({
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
+        },
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "stream": "ext://sys.stdout",
+        },
+    },
+    "loggers": {
+        "credit_risk":          {"level": "INFO",  "handlers": ["stdout"]},
+        "credit_risk.pd":       {"level": "DEBUG", "handlers": ["stdout"], "propagate": False},
+    },
+    "root": {"level": "WARNING", "handlers": ["stdout"]},
+})
+</code></pre>
+
+  <p>The configuration above: emit JSON to stdout, INFO and above from the credit_risk package, DEBUG and above from the PD submodule (a focused investigation), WARNING and above from everything else (including third-party libraries that would otherwise be noisy). In a containerised deployment, stdout is the correct destination; the orchestration layer (Kubernetes, ECS, the cloud platform) collects stdout and ships it to the aggregator. File-based logging is a legacy pattern that creates more problems (rotation, disk space, permissions) than it solves.</p>
+
+  <h3>structlog and Loguru</h3>
+
+  <p>The standard library's <code>logging</code> module is the foundation but not the most ergonomic. Two libraries sit on top of it and improve the experience.</p>
+
+  <p><strong>structlog</strong> (Hynek Schlawack, 2013) treats every log call as a dictionary by construction. The call site is <code>log.info("event_name", key=value, key2=value2)</code>, the output is a fully-structured event with the named keys, and the processing pipeline (timestamping, context binding, formatting) is configurable. structlog is the right answer for production Python services; it adds about 50 lines of one-off configuration and pays back in queryable logs from the first request.</p>
+
+  <pre><code class="language-python">import structlog
+
+log = structlog.get_logger()
+
+def score_application(application_id: str, features: dict) -&gt; float:
+    log_ctx = log.bind(application_id=application_id,
+                       model="pd_consumer_v3")
+    log_ctx.info("scoring_started", n_features=len(features))
+    score = model.predict_proba(features)
+    log_ctx.info("scoring_completed", score=score)
+    return score
+</code></pre>
+
+  <p>The <code>bind</code> pattern attaches the application_id and model name to a contextual logger; every subsequent log call from that context automatically carries those fields. The pattern composes with FastAPI middleware to attach a request_id to every log line emitted while handling that request, which is the lightweight equivalent of distributed tracing.</p>
+
+  <p><strong>Loguru</strong> (Delgan, 2018) is the simpler alternative: one global logger, sensible defaults, colour output in the terminal, automatic structured serialisation if you ask for it. It is the right answer for scripts, notebooks, and small services where the per-module logger pattern is overkill.</p>
+
+  <pre><code class="language-python">from loguru import logger
+
+logger.info("model loaded", model="pd_consumer", version="2026-03-29")
+logger.warning("missing feature, imputed",
+               feature="income", customer_id=12345)
+</code></pre>
+
+  <h3>What to log, what not to log</h3>
+
+  <p>The instinct of someone who has been bitten by an under-instrumented system is to log everything. This is wrong for three reasons. The first is volume: a busy service generating debug-level logs for every operation produces gigabytes per hour, costs real money in storage, and drowns the signal that matters. The second is sensitivity: PII, credentials, and access tokens that end up in logs become security incidents the moment the logs leak. The third is signal-to-noise: an alert based on a log line that fires a hundred times per second is not an alert.</p>
+
+  <p>The discipline that emerges, distilled from the SRE practitioners (Beyer, Jones, Petoff, Murphy, <em>Site Reliability Engineering</em>, O'Reilly 2016) and from the structlog and Honeycomb communities, is roughly:</p>
+
+  <p><strong>Log every state transition.</strong> The system moved from "starting" to "ready"; the model loaded; the request was accepted; the calibration completed. State transitions are the events that an operator wants to know about; they are also the events that diagnose "what was the system doing when the failure happened?".</p>
+
+  <p><strong>Log every external interaction.</strong> An outbound HTTP call, a database query, a message published to a queue. Include the destination, the duration, the status. These are the boundaries at which most failures occur and the points at which most latency is introduced.</p>
+
+  <p><strong>Log every decision that affects an output.</strong> The model version chosen, the feature imputation that was applied, the threshold that the score was compared to. For audit and for model-monitoring purposes, the prediction is not enough; the path the prediction took matters as much as the score.</p>
+
+  <p><strong>Do not log loop bodies.</strong> A function processing a million rows should log the start, the end, and the count; not every row. The exception is when investigating a specific bug, at which point a temporary DEBUG-level log inside the loop is fine because production has DEBUG filtered.</p>
+
+  <p><strong>Do not log secrets, PII, or full feature vectors.</strong> Hash, redact, or omit. A logger configured with a redactor (structlog has one built in) that strips known sensitive keys before serialisation is the belt-and-braces version.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    The single most damaging logging mistake is calling <code>logger.info(f"processed {customer.full_record}")</code> with an f-string. Three problems: the f-string is interpolated even if the log level is filtered (wasted work); the customer record might contain PII that should not appear in logs; the string is unstructured, so you cannot query for "all events from customer X". The right pattern is always <code>logger.info("processed", customer_id=customer.id)</code>: the message is a literal event name, the field is named and selective, and the level filter applies before the field values are computed.
+  </div>
+
+  <h3>Metrics with Prometheus and OpenTelemetry</h3>
+
+  <p>Logs answer "what happened?". Metrics answer "how is it trending?". The Python tooling for metrics has settled on <strong>Prometheus</strong> as the data model (Brian Brazil at SoundCloud, 2012, donated to the CNCF in 2016) and <strong>OpenTelemetry</strong> as the instrumentation API. The client libraries (<code>prometheus_client</code> for Prometheus directly, <code>opentelemetry-api</code> for the vendor-neutral path) expose four metric primitives:</p>
+
+  <p><strong>Counter</strong>: a number that only goes up (or resets to zero on restart). Used for "how many times has X happened?". <code>inference_requests_total</code>, <code>inference_errors_total</code>.</p>
+
+  <p><strong>Gauge</strong>: a number that goes up and down. Used for "what is the current value?". <code>active_connections</code>, <code>queue_depth</code>, <code>model_features_loaded</code>.</p>
+
+  <p><strong>Histogram</strong>: a distribution recorded into pre-defined buckets. Used for "how is X distributed?". <code>inference_latency_seconds</code>, <code>feature_value_distribution</code>.</p>
+
+  <p><strong>Summary</strong>: like a histogram but with pre-computed quantiles (p50, p95, p99). Used where the buckets are not known in advance; mostly superseded by histograms in modern usage.</p>
+
+  <pre><code class="language-python">from prometheus_client import Counter, Histogram
+
+inference_requests = Counter(
+    "inference_requests_total",
+    "Total inference requests",
+    ["model", "outcome"],            # labels (low-cardinality only)
+)
+inference_latency = Histogram(
+    "inference_latency_seconds",
+    "Inference latency",
+    ["model"],
+    buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0),
+)
+
+def score(features, model_name):
+    with inference_latency.labels(model=model_name).time():
+        try:
+            score = predict(features)
+            inference_requests.labels(model=model_name, outcome="ok").inc()
+            return score
+        except Exception:
+            inference_requests.labels(model=model_name, outcome="error").inc()
+            raise
+</code></pre>
+
+  <p>Prometheus then scrapes the application's <code>/metrics</code> endpoint every 15 seconds, stores the time series, and Grafana visualises it. Alerts (Alertmanager, in the same stack) fire when a metric crosses a threshold: error rate above 1%, p95 latency above 200ms, queue depth above 1000. The pattern is decades old; the modern version is well-tooled and standardised.</p>
+
+  <h3>Traces with OpenTelemetry</h3>
+
+  <p>For a single service, logs plus metrics is usually sufficient. For a distributed system (an API gateway calling a feature service calling a model service calling a downstream score-store), the question "where did the time go?" requires <strong>distributed tracing</strong>. Each step in a request's path is a <em>span</em>; spans share a trace ID; the tree of spans reconstructs the request's journey.</p>
+
+  <pre><code class="language-python">from opentelemetry import trace
+
+tracer = trace.get_tracer("credit_risk.pd")
+
+def score_application(application_id: str) -&gt; float:
+    with tracer.start_as_current_span("score_application") as span:
+        span.set_attribute("application_id", application_id)
+
+        with tracer.start_as_current_span("load_features"):
+            features = feature_service.get(application_id)
+
+        with tracer.start_as_current_span("predict"):
+            score = model.predict(features)
+            span.set_attribute("score", score)
+
+        return score
+</code></pre>
+
+  <p>The instrumentation above produces a three-span trace for each application scored. Loaded into Jaeger or Honeycomb, the trace shows the wall-clock time of each step, the attributes attached to each span, and the call relationship between them. For a distributed system, this is the only way to answer "why was this specific request slow?" because the answer might be in any of the services involved.</p>
+
+  <h3>Model monitoring as observability</h3>
+
+  <p>The credit-risk-specific application of all of the above is <strong>model monitoring</strong>. A PD model in production emits one event per scored application; that event becomes a log line with the application_id, model_version, features, score, and timestamp. From the stream of events, the monitoring pipeline computes metrics: the distribution of scores per day, the prediction stability index, the feature drift relative to the calibration sample, the calibration of the score against realised defaults six months later. The metrics dashboards alert when any of them drifts beyond a threshold.</p>
+
+  <p>The point worth emphasising is that none of this requires a separate "monitoring system". The same logs the operations team uses for incident response are the data source for the model monitoring. The same metrics primitives (counters, histograms) record both system metrics and model metrics. The same dashboard tool (Grafana) shows both. The unification is the modern part; the alternative, hand-built monthly model-monitoring reports in Excel, is the artefact of pre-observability tooling and is on its way out wherever the engineering team is competent.</p>
+
+  <h3>Worked example: instrumenting a PD scoring service</h3>
+
+  <div class="worked">
+    <strong>Worked example: full observability for a PD scoring service</strong>
+    <p>The team's PD scoring service is a FastAPI application that accepts a feature vector and returns a default probability. Today it logs almost nothing; the only signal is an HTTP access log from the load balancer. The remediation is to add the three pillars in one sitting.</p>
+    <p>Step 1 (configure structured logging). Add structlog and <code>python-json-logger</code> to the project dependencies. Configure structlog at startup with a JSON renderer, an ISO timestamp processor, and a key redactor that strips any field starting with <code>customer_</code> or <code>income</code>. Replace every existing <code>print()</code> with a <code>log.info(event=..., ...)</code> call.</p>
+    <p>Step 2 (add request middleware). Write a FastAPI middleware that generates a request_id at the entry of every request, binds it to the structlog contextual logger, and adds an <code>X-Request-Id</code> header to the response. Every log line emitted during the request now carries the request_id; the upstream service does the same, so logs can be correlated across services.</p>
+    <p>Step 3 (instrument the model). At each step of the scoring pipeline (feature load, feature preprocessing, prediction, post-processing), emit an INFO log with the duration and the relevant attributes. At the entry of each step, set up an OpenTelemetry span so the same structure appears in traces.</p>
+    <p>Step 4 (add Prometheus metrics). Define four metrics: <code>pd_requests_total</code> (Counter labeled by outcome), <code>pd_latency_seconds</code> (Histogram), <code>pd_score_distribution</code> (Histogram with buckets covering the score range), <code>pd_feature_missing_total</code> (Counter labeled by feature). Expose <code>/metrics</code> via the <code>prometheus_client</code> ASGI integration.</p>
+    <p>Step 5 (dashboard and alerts). In Grafana, build a dashboard with four rows: request rate and error rate (from <code>pd_requests_total</code>), latency p50/p95/p99 (from the histogram), score distribution (from the histogram, rendered as a heatmap over time), missing-feature rate (from the counter). Configure two alerts: error rate above 0.5% for five minutes, p95 latency above 200ms for ten minutes.</p>
+    <p>Step 6 (model monitoring). Add an offline job (runs nightly, via the CI scheduler from Lecture 15) that pulls the last 24 hours of logs, computes the population stability index against the calibration sample, computes per-feature drift, and writes the results to a model-monitoring dashboard alongside the operational metrics. When PSI exceeds 0.1, an issue is opened automatically.</p>
+    <p>The total investment is about three engineer-days. The recurring cost is the discipline of using structured logs everywhere; pre-commit and CI catch <code>print()</code> calls in the same way they catch unused imports. The audit value, the regulatory value, and the incident-response value all compound from day one.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Logging is what code says about itself while it runs; observability is the property that lets you ask new questions of the running system without redeploying. The three pillars (logs, metrics, traces) are the same primitive (an event with attributes) under different aggregation rules; the working observability stack uses all three. The Python toolchain is well-developed: the standard <code>logging</code> module as the foundation, structlog or Loguru for structured emission, OpenTelemetry plus Prometheus for metrics and traces, and any of half a dozen backends (Loki, Datadog, Honeycomb, Splunk) for storage and query. The discipline is to log structured events not strings, to use log levels as the contract with future-you, to keep cardinality on the right pillar, and to instrument every state transition, every external call, and every decision that shapes an output.</p>
+
+  <p>For risk modelling specifically, observability is the infrastructure that turns model monitoring from a quarterly Excel exercise into a continuous activity. The same events the inference service emits are the inputs to the population-stability and drift metrics that the supervisor expects. The next lecture opens Part III by turning from the verification and diagnosis discipline of Part II to the documentation discipline: the prose that surrounds the code, the static-site generators that turn it into a navigable artefact, and the conventions (Diátaxis, docs-as-code) that decide what goes where.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the three pillars of observability. For each, give one question it answers well and one cost characteristic.</li>
+      <li>Define cardinality. Why do high-cardinality fields belong on logs and traces rather than on metrics?</li>
+      <li>Name the five log levels and the audience or use case each serves.</li>
+      <li>What is the "root-logger trap" in Python's <code>logging</code> module? How do you avoid it?</li>
+      <li>Compare structlog and Loguru on three axes: target use case, configuration overhead, output format.</li>
+      <li>You see <code>logger.info(f"processed {customer.full_record}")</code>. Name three things wrong with it and the corrected form.</li>
+      <li>What four metric primitives does Prometheus offer? Match each to one example from a model-scoring service.</li>
+      <li>Sketch how a PD scoring service could turn its existing logs into a model-monitoring pipeline without adding a separate system.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="06-debugging_and_profiling.html">Lecture 6 (debugging and profiling)</a> covered the diagnostic discipline for code you can run; this lecture covers the same discipline for code you cannot reach.</li>
+      <li><strong>Next:</strong> <a href="08-markdown_and_docs.html">Lecture 8 (markdown and the documentation toolchain)</a> opens Part III by turning to the prose that surrounds the code.</li>
+      <li><strong>Cross-link:</strong> <a href="05-testing.html">Lecture 5 (testing)</a> defined the verification discipline that tests apply before deployment; logging applies the same discipline after.</li>
+      <li><strong>Cross-link:</strong> <a href="15-ci_cd.html">Lecture 15 (continuous integration and delivery)</a> covers the automation layer that ships the instrumented service to production.</li>
+      <li><strong>Cross-link:</strong> <a href="11-jupyter_and_reproducibility.html">Lecture 11 (Jupyter notebooks and reproducibility)</a> covered the development-time observability gap (hidden state, execution order); this lecture closes the production-time gap.</li>
+      <li><strong>Outside this course:</strong> Charity Majors, Liz Fong-Jones, and George Miranda, <em>Observability Engineering</em> (O'Reilly, 2022); Beyer, Jones, Petoff, and Murphy, <em>Site Reliability Engineering</em> (O'Reilly, 2016, sre.google/books); structlog documentation (structlog.org); Loguru documentation (loguru.readthedocs.io); OpenTelemetry Python documentation (opentelemetry.io/docs/instrumentation/python); Prometheus documentation (prometheus.io/docs); the Twelve-Factor App, factor XI on logs (12factor.net/logs).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 7 of 16</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EAD testing: discrimination, calibration and stability</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>EAD testing: discrimination, calibration and stability</h1>
+  <p class="subtitle">The closing lecture of the EAD sequence. Back-tests of the composite PiT EADF and the calibrated regulatory EADF, run on OOS and OOT samples and re-run quarterly in production. The two-block battery from PD and LGD transfers with three EAD-specific adjustments: continuous-target metrics throughout, the max-of-paths binding check on the regulatory EADF, and the implicit-limit-change diagnostic.</p>
+  <div class="meta">
+    <span>A-IRB 29 of n &mdash; EAD 7 of 7</span>
+    <span>Reading time, 28 minutes</span>
+    <span>Sources: (wiki gap — files exist as stubs only). Drawn from <a href="15-pd_testing.html">PD testing</a>, <a href="22-lgd_testing.html">LGD testing</a>, CRR Article 185, PRA SS4/24 §17.</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">EAD testing closes the validation cycle for everything the previous six EAD lectures produced. The same two-block architecture as PD and LGD applies. <strong>Block A differentiation tests</strong> validate the composite PiT EADF from lecture 27: accuracy via MAE / RMSE / MPE; discrimination via Spearman rho and R-squared; stability via PSI on the predicted-EADF distribution and CSI per feature; parameter sensitivity via GLM refit on OOS; robustness across utilisation bands, limit bands, MoB and partners; stress via input shocks; benchmarking where external EAD datasets are available. <strong>Block B calibration tests</strong> validate the regulatory EADF from lecture 28: LRA EADF accuracy against realised, downturn EADF adequacy against 2008 to 2009 realised, grade monotonicity (SS4/24 §11.31), concentration (HHI), grade migration, and the EAD-specific <strong>max-of-paths binding check</strong> that confirms which of the two regulatory-EADF paths (LRA + MoC_LRA or Downturn + MoC_DT) binds per grade and whether the binding is stable across cohorts.</p>
+
+  <p>Three structural adjustments versus PD testing matter. First, <strong>continuous-target metrics replace binary metrics</strong> throughout, exactly as in LGD testing: Spearman rho replaces Gini, MAE / RMSE / MPE replace classification accuracy, t-test replaces binomial z-test for grade-level heterogeneity. Second, the <strong>max-of-paths binding check</strong> is unique to EAD: per grade, the bank reports which path binds (typically the downturn + MoC path) and tracks the bound choice's stability over time. Third, the <strong>implicit-limit-change diagnostic</strong> tests whether the model's outputs reflect limit-management actions appropriately even though limit-change features were not included in the regression (lecture 27).</p>
+
+  <p>The legal anchor is CRR Article 185 (validation of internal estimates), the supervisory anchor is PRA SS4/24 §17. The test battery is also the production monitoring battery, run quarterly to detect drift and trigger material model change (lecture 32). Anchored in the small EAD development sample, the test battery has fewer rows but tighter discipline than the equivalent PD battery; the supervisor's standard is the same.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    PD testing asked whether the binary default flag could be predicted; LGD testing asked whether a continuous noisy loss rate matched realised outcomes; EAD testing asks whether a continuous bounded exposure factor matches realised drawdown behaviour. The continuous-target framing is the same as LGD's, so the metrics transfer. The max-of-paths construction is unique to EAD, so the calibration check transfers from neither PD nor LGD; it is the new diagnostic this lecture introduces.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>EAD validation has historically been the lightest of the three IRB parameters, partly because the wiki documentation is thinnest there and partly because the supervisor focuses on PD and LGD where the capital sensitivity is higher. The risk is that an EAD model that under-predicts drawdown can silently inflate the gap between modelled EAD and realised EAD over the cycle, with the realised side rising in stress while the modelled side stays anchored. The max-of-paths regulatory rule from lecture 28 is designed to prevent this; the testing in this lecture is what verifies the rule has worked.</p>
+
+  <p>The implicit-limit-change diagnostic matters because limit-management policy is the single most consequential operational lever for EAD outputs. A bank that switches from proactive credit-line increases to a more conservative limit-down strategy will see EADFs drift downward; if the model does not pick up the drift, the modelled EAD will overpredict on the new policy regime. The diagnostic checks that the model's predicted EADFs on the application portfolio remain close to the realised EADFs from comparable historical cohorts, after controlling for utilisation and limit composition. Where the divergence is material the bank either retrains on more recent data, adds a policy flag, or carries an MoC overlay.</p>
+
+  <p>For F107 candidates the EAD testing material is exam-classic on three counts: the continuous-target metric framing (Spearman rho, MAE versus PD's Gini), the max-of-paths binding check (a quantitative test that combines lecture 28's regulatory construction with lecture 29's diagnostics), and the absence of a SS4/24 §15.7-style reference value (EAD has nothing equivalent, which makes the max-of-paths conservatism do the floor work instead).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The two-block battery from PD lecture 15 and LGD lecture 22 maps onto EAD with the same structural adjustments as LGD (continuous-target metrics) plus the max-of-paths binding check that is unique to EAD.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The EAD testing battery">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The EAD testing battery: differentiation block and calibration block</text>
+
+      <!-- Block A: Differentiation -->
+      <g>
+        <rect x="40" y="50" width="400" height="380" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.3"/>
+        <text x="240" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Block A: Differentiation tests</text>
+        <text x="240" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">validates the composite PiT EADF from lecture 27</text>
+
+        <rect x="60" y="105" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="124" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A1. Composite accuracy</text>
+        <text x="410" y="124" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">MAE, RMSE, MPE on OOS / OOT</text>
+
+        <rect x="60" y="140" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="159" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A2. Composite discrimination</text>
+        <text x="410" y="159" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">Spearman &rho;, R-squared on OOS / OOT</text>
+
+        <rect x="60" y="175" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="194" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A3. Stability (PSI)</text>
+        <text x="410" y="194" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">PSI on predicted EADF distribution</text>
+
+        <rect x="60" y="210" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="229" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A4. Stability (CSI)</text>
+        <text x="410" y="229" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">CSI per GLM feature</text>
+
+        <rect x="60" y="245" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="264" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A5. Parameter sensitivity</text>
+        <text x="410" y="264" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">refit GLM on OOS; check signs</text>
+
+        <rect x="60" y="280" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="299" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A6. Robustness (utilisation, limit, partner)</text>
+        <text x="410" y="299" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">per-sub-population performance</text>
+
+        <rect x="60" y="315" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="334" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A7. Stress (utilisation, limit, drawdown)</text>
+        <text x="410" y="334" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">single / multi-factor &plusmn;10/20%</text>
+
+        <rect x="60" y="350" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="369" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A8. External benchmarking</text>
+        <text x="410" y="369" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">limited; GCD / industry pools where available</text>
+
+        <rect x="60" y="385" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="404" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A9. Implicit-limit-change diagnostic</text>
+        <text x="410" y="404" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">EAD-specific; see section 4</text>
+      </g>
+
+      <!-- Block B: Calibration -->
+      <g>
+        <rect x="460" y="50" width="400" height="380" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="660" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">Block B: Calibration tests</text>
+        <text x="660" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">validates the regulatory EADF from lecture 28</text>
+
+        <rect x="480" y="105" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="124" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B1. LRA EADF accuracy</text>
+        <text x="830" y="124" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">LRA vs realised average per grade</text>
+
+        <rect x="480" y="140" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="159" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B2. Downturn EADF adequacy</text>
+        <text x="830" y="159" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">vs realised in 2008-09 cohorts</text>
+
+        <rect x="480" y="175" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="194" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B3. Grade monotonicity</text>
+        <text x="830" y="194" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">SS4/24 §11.31</text>
+
+        <rect x="480" y="210" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="229" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B4. Concentration (HHI)</text>
+        <text x="830" y="229" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">across grades; CRR 170(3)(b)</text>
+
+        <rect x="480" y="245" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="264" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B5. Grade migration</text>
+        <text x="830" y="264" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">cohort-to-cohort transitions; PiT consistency</text>
+
+        <rect x="480" y="280" width="360" height="28" fill="#fee2e2" stroke="#991b1b"/>
+        <text x="490" y="299" font-family="Inter" font-size="10" font-weight="600" fill="#7f1d1d">B6. Max-of-paths binding check (EAD-specific)</text>
+        <text x="830" y="299" text-anchor="end" font-family="Inter" font-size="9" fill="#7f1d1d">which path binds per grade; stability over time</text>
+
+        <rect x="480" y="315" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="334" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B7. Homogeneity / heterogeneity</text>
+        <text x="830" y="334" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">F-test within / t-test between grades</text>
+      </g>
+    </svg>
+    <figcaption>The EAD test battery. Block A applies continuous-target diagnostics (MAE, Spearman, MPE) plus the LGD-style sub-population battery to the composite PiT EADF, with one EAD-specific addition (A9, the implicit-limit-change diagnostic). Block B applies the standard calibration tests (LRA accuracy, downturn adequacy, monotonicity, concentration, migration, homogeneity / heterogeneity) plus the EAD-specific max-of-paths binding check (B6). Both blocks run quarterly in production as the monitoring framework.</figcaption>
+  </figure>
+
+  <p>Three properties to internalise. First, the <strong>continuous-target metrics</strong> are identical to LGD's: a model that scores Spearman rho 0.6 on EADF is doing the same job as one that scores Gini 80% on PD (a continuous-target Spearman is not directly comparable in level to a binary Gini, as discussed in lecture 22). Second, the <strong>max-of-paths binding check is the EAD-unique diagnostic</strong>: it confirms the bank's regulatory construction is doing the conservatism work the supervisor expects. Third, the <strong>implicit-limit-change diagnostic</strong> closes the loop on the design choice from lecture 27 (limit changes not included as features); the test verifies the model still picks up limit-management effects through the historical training data.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Block A: differentiation testing</h3>
+
+  <h4>A1. Composite accuracy: MAE, RMSE, MPE</h4>
+
+  <p>Same three metrics as LGD testing (<a href="22-lgd_testing.html">lecture 22</a>), applied to predicted EADF versus realised EADF on OOS and OOT samples:</p>
+
+  <pre><code>MAE  = mean over facilities of  | predicted_EADF - realised_EADF |
+RMSE = sqrt( mean over facilities of  ( predicted_EADF - realised_EADF )^2 )
+MPE  = mean over facilities of  ( predicted_EADF - realised_EADF ) / realised_EADF
+</code></pre>
+
+  <p>Typical retail card benchmarks: MAE 5 to 10 pp, RMSE 10 to 15 pp, MPE within ±5% at the portfolio level and ±10% at the segment level. EAD metrics typically come in tighter than LGD because the target is less noisy: realised EADF is largely determined by utilisation at observation (which is observable), whereas realised LGD depends on a 60-month workout track with many sources of variance.</p>
+
+  <h4>A2. Composite discrimination: Spearman rho, R-squared</h4>
+
+  <p>Same continuous-target machinery as LGD. Spearman rho is the rank correlation between predicted and realised EADF; typical retail benchmarks 0.5 to 0.7. R-squared is the coefficient of determination on the GLM fit; typical per-segment values 0.2 to 0.5 (lower than aggregate because within-segment heterogeneity is smaller).</p>
+
+  <h4>A3 and A4. Stability (PSI and CSI)</h4>
+
+  <p>Same machinery as PD and LGD. PSI on the predicted EADF distribution between development sample and OOT / application; CSI on each GLM feature (per segment, since the GLM is segmented). Thresholds: PSI / CSI &lt; 0.10 stable; 0.10 to 0.25 watch; &gt; 0.25 material drift.</p>
+
+  <h4>A5. Parameter sensitivity</h4>
+
+  <p>Each segment's GLM is re-fit on the OOS sample; coefficients compared to development. Same two checks as PD / LGD: sign stability (coefficients should not flip between development and OOS) and significance stability (p-values stay below 0.01 on the refit). For Gaussian + Identity GLMs the standard machinery applies; for Gamma + Log or Beta + Logit alternatives the link-specific diagnostics (dispersion parameter stability) are also reported.</p>
+
+  <h4>A6. Robustness across sub-populations</h4>
+
+  <p>Per-sub-population MAE and Spearman computed across:</p>
+
+  <ul>
+    <li>Utilisation bands at observation (under 30%, 30-70%, over 70%)</li>
+    <li>Credit-limit bands</li>
+    <li>Months on book</li>
+    <li>External score bands</li>
+    <li>Strategic partner or product line</li>
+  </ul>
+
+  <p>Persistent under-performance in any sub-population triggers segment-specific re-modelling, partner-flag interactions, or MoC overlay.</p>
+
+  <h4>A7. Stress tests</h4>
+
+  <p>EAD-specific stress shocks differ from PD or LGD because the inputs are different:</p>
+
+  <ul>
+    <li><strong>Utilisation shocks</strong>: shift at-observation utilisation up by 10 or 20 percentage points across the portfolio; re-derive predicted EADF.</li>
+    <li><strong>Limit shocks</strong>: reduce limits by 10 or 20% (a hypothetical collections-action wave); re-derive.</li>
+    <li><strong>Drawdown-rate shocks</strong>: increase the CCF assumption by 10 or 20%; re-derive.</li>
+    <li><strong>Multi-factor combined shocks</strong>: utilisation up + limit down + drawdown up simultaneously.</li>
+  </ul>
+
+  <p>Each shock produces an EADF response; the responses feed ICAAP stress-testing inputs and the bank's risk-appetite framework.</p>
+
+  <h4>A8. External benchmarking</h4>
+
+  <p>EAD external benchmarking is more limited than PD or LGD. Global Credit Data (GCD) maintains LGD pools but its EAD coverage is thinner; some industry surveys publish EADF distributions by product and region. Banks compare their per-segment regulatory EADF to industry pools where data is available. Material deviation triggers either documented justification (the bank's portfolio differs from the pool composition) or MoC adjustment.</p>
+
+  <h4>A9. The implicit-limit-change diagnostic (EAD-specific)</h4>
+
+  <p>The lecture-27 design excluded limit-change features from the GLM to avoid leakage; this test verifies the model still picks up limit-management effects through the historical training data. The diagnostic:</p>
+
+  <ol>
+    <li>Partition the OOS / application sample into facilities that experienced a limit increase in the 12 months before observation versus those that did not.</li>
+    <li>Compare predicted EADF versus realised EADF separately for the two groups.</li>
+    <li>The model should over-predict (slightly) for the limit-increase group (because the historical training data captured similar facilities at the moment of their limit increase, when realised drawdown was modest) and predict accurately for the no-limit-change group.</li>
+    <li>If the model under-predicts for the limit-increase group materially, the implicit treatment has failed and the model needs a policy flag added.</li>
+  </ol>
+
+  <p>The same diagnostic runs for limit-decrease facilities (collections-action lines). Both diagnostics together confirm the model is robust to the bank's limit-management policy.</p>
+
+  <h3>Block B: calibration testing</h3>
+
+  <h4>B1. LRA EADF accuracy</h4>
+
+  <p>For each grade, the calibrated LRA EADF is compared to the empirical realised EADF over the calibration window. The MPE:</p>
+
+  <pre><code>MPE_LRA(grade)  =  ( LRA_EADF(grade) - realised_avg_EADF(grade) ) / realised_avg_EADF(grade)
+</code></pre>
+
+  <p>By construction this should be close to zero. Non-zero MPE indicates the calibration sample's weighting or MoC application is inconsistent with the pure averaging definition.</p>
+
+  <h4>B2. Downturn EADF adequacy</h4>
+
+  <p>Per grade, the downturn EADF is compared to the realised EADF in cohorts within the identified downturn window (2008-2009). The downturn EADF should match or modestly exceed the realised; under-prediction is a red flag and triggers either downturn-window re-selection or an MoC top-up.</p>
+
+  <h4>B3. Grade monotonicity (PRA SS4/24 §11.31)</h4>
+
+  <p>The regulatory EADF must increase monotonically across grades. Two checks:</p>
+
+  <ul>
+    <li>Plot regulatory EADF against grade. Monotonic by construction in the design but cross-overs can appear after MoC application; cross-overs are flagged for grade-boundary review.</li>
+    <li>Plot realised EADF against grade per cohort. Cross-overs at the same grade boundary across multiple cohorts indicate the boundary needs revisiting.</li>
+  </ul>
+
+  <h4>B4. Concentration (HHI)</h4>
+
+  <p>Same construction as PD: HHI = sum of grade-volume-share squared. Threshold 0.25. Reported as a line chart over time. EAD's smaller grade count (10 to 15 versus PD's 26) makes HHI inherently higher than PD's; the 0.25 threshold still applies but interpretation is contextual.</p>
+
+  <h4>B5. Grade migration</h4>
+
+  <p>Per cohort transition, count the share of facilities that move between grades. Under a PiT philosophy some migration is expected; excessive migration creates RWA volatility. Standard report: migration matrices per cohort plus the share of facilities that stayed put / moved ±1 / moved ±2 or more bands. Most facilities should stay within ±1 band per cohort transition.</p>
+
+  <h4>B6. Max-of-paths binding check (EAD-specific)</h4>
+
+  <p>The unique EAD calibration diagnostic. Per grade, the bank reports which of the two regulatory paths binds:</p>
+
+  <pre><code>Path 1 (LRA + MoC_LRA)         vs    Path 2 (Downturn + MoC_DT)
+
+if Path 1 > Path 2: bind = LRA       (rare, indicates downturn period was mild for this grade)
+else:               bind = downturn   (typical; downturn path is binding for most grades)
+</code></pre>
+
+  <p>The diagnostic reports two metrics per grade:</p>
+
+  <ul>
+    <li><strong>Which path binds</strong>. Typical retail card outcome: downturn binds for 8 of 12 grades; LRA binds for grades at the very low end (where the downturn premium was small in absolute terms).</li>
+    <li><strong>Stability of the binding</strong>. Over multiple cohort-on-cohort re-runs, does the binding stay the same? Material flipping between paths cohort-to-cohort indicates instability in the MoC overlays and triggers MoC review.</li>
+  </ul>
+
+  <h4>B7. Homogeneity and heterogeneity within and between grades</h4>
+
+  <p>Adapted from PD lecture 15 for continuous targets. <strong>Homogeneity within grade</strong>: F-test on within-grade EADF variance across bootstrap sub-samples; null hypothesis is equal variances. <strong>Heterogeneity between adjacent grades</strong>: t-test on the difference in mean realised EADF between adjacent grades. Both tests report fail rates per grade per cohort; overall fail rate should sit below 5%.</p>
+
+  <h3>The reporting pack</h3>
+
+  <p>The standard EAD test report contains the same six artefacts as PD plus the two EAD-specific ones:</p>
+
+  <ol>
+    <li>Summary scoreboard with traffic-light status per test.</li>
+    <li>Per-test detailed pages with tables and visualisations (predicted-vs-realised scatter per grade, MAE over time, PSI over time).</li>
+    <li>Per-segment GLM result pages.</li>
+    <li>The max-of-paths binding table per grade per cohort.</li>
+    <li>The implicit-limit-change diagnostic chart (predicted vs realised by limit-change subgroup).</li>
+    <li>External-benchmarking comparison (where available).</li>
+    <li>Limitations register / MoC mapping for amber findings.</li>
+    <li>Remediation register for red findings.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the max-of-paths binding check is the single most distinctive EAD calibration diagnostic</strong>. PD's analogous diagnostic is the LRA back-test; LGD's is the SS4/24 §15.7 reference value compliance. EAD's binding check tells the supervisor which conservatism mechanism (LRA + MoC or Downturn + MoC) is doing the work per grade. A well-built EAD model has the downturn path binding for most grades, with stable binding over cohorts. A model where the binding flips between cohorts has unstable MoC overlays and is amber-rated.</p>
+
+  <p>The second lesson is on <strong>the implicit-limit-change diagnostic</strong>. The supervisor's pushback on EAD models is often that they may not adequately capture limit-management effects. The diagnostic is the bank's response: show separately that the model predicts well on limit-increase facilities, limit-decrease facilities and no-limit-change facilities. Banks that include the diagnostic in their validation pack pre-empt the supervisor's question; banks that do not get asked at SREP.</p>
+
+  <p>The third lesson is on <strong>the absence of a reference-value test</strong>. LGD has SS4/24 §15.7 (the two-worst-years average) as a quantitative floor on downturn LGD. EAD has nothing equivalent. The max-of-paths construction plays the same conservatism role but is methodology-driven rather than data-driven. The supervisor's instinct on EAD is therefore to probe the MoC quantum more aggressively than for LGD, where the reference value gives them a hard external comparison point. Banks should expect more MoC dialogue on EAD than on LGD as a result.</p>
+
+  <p>The fourth lesson is on <strong>EAD validation in production</strong>. The same test battery runs quarterly in production. A green scoreboard at development that turns amber four quarters into production is a model drifting toward recalibration. For EAD specifically the most common drift signal is on the PSI of predicted EADF distribution: a shift in the application portfolio's utilisation mix (more revolvers, fewer transactors) moves the predicted EADF distribution rightward and shows up as PSI &gt; 0.10 before any of the underlying realised metrics deteriorate. Modellers who treat PSI as an early warning rather than a lagging indicator catch issues 2 to 4 quarters earlier than those who wait for MAE to deteriorate.</p>
+
+  <p>The fifth and structurally most important: <strong>the EAD test battery closes the IRB-parameter modelling track</strong>. Lectures 9 through 29 have produced three calibrated regulatory parameters (PD, LGD, EAD) ready to feed the K formula in lecture 31. The MoC framework in lecture 30 wraps all three with the conservatism overlays that bridge known weaknesses to the regulatory output. The monitoring framework in lecture 32 runs the same test batteries quarterly in production. The IRB capital model is complete at that point; everything else (lecture 31 and beyond) is mechanical or governance.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>State the two-block testing structure for EAD. How does it differ from PD testing (lecture 15) and how does it match LGD testing (lecture 22)?</li>
+    <li>Why are MAE, RMSE and MPE the appropriate accuracy metrics for EAD rather than Gini? Compare to LGD's situation.</li>
+    <li>Typical retail EAD benchmarks: MAE 5-10 pp, Spearman 0.5-0.7. Compare these to the equivalent PD numbers and explain why EAD's MAE typically comes in tighter than LGD's.</li>
+    <li>Define the max-of-paths binding check. Per grade, what two metrics does the diagnostic report and what does material flipping between paths indicate?</li>
+    <li>Describe the implicit-limit-change diagnostic. What design choice in lecture 27 does it close the loop on?</li>
+    <li>The LGD calibration block had a specific reference-value compliance test (SS4/24 §15.7). EAD has nothing equivalent. What mechanism plays the same role, and how does the supervisor's review differ as a result?</li>
+    <li>Why is HHI typically higher for EAD than for PD even when both portfolios are well-segmented? What does this imply for the interpretation of the 0.25 threshold?</li>
+    <li>An EAD model's PSI on predicted EADF distribution rises to 0.12 in the first quarter after deployment. Realised MAE remains flat. Which is the early-warning indicator and what should the monitoring team do?</li>
+    <li>The max-of-paths binding for grade 5 was the LRA path in 2024 Q1 and the downturn path in 2024 Q2. What does this signal and what is the remediation?</li>
+    <li>EAD testing closes the IRB-parameter modelling track. What three regulatory parameters have lectures 9 through 29 now produced, and what is the next step in the A-IRB pipeline?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li>The EAD wiki testing files exist as stubs only. This lecture is constructed from the PD and LGD testing protocols plus EAD-specific regulatory text.</li>
+      <li>CRR Article 185. Validation of internal estimates.</li>
+      <li>PRA SS4/24, paragraph 17. UK supervisory expectations for EAD validation.</li>
+      <li>EBA/GL/2017/16 paragraphs 154 to 188. The European authority's interpretation of EAD modelling and validation.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="15-pd_testing.html">PD testing</a> &mdash; the two-block structure this lecture inherits.</li>
+      <li><a href="22-lgd_testing.html">LGD testing</a> &mdash; the continuous-target metric framing.</li>
+      <li><a href="27-ead_risk_differentiation.html">EAD risk differentiation</a> &mdash; the composite PiT EADF that Block A validates.</li>
+      <li><a href="28-ead_risk_quantification.html">EAD risk quantification</a> &mdash; the regulatory EADF that Block B validates.</li>
+    </ul>
+
+    <p><strong>Forward references inside A-IRB capital:</strong></p>
+    <ul>
+      <li>30-moc (planned) &mdash; amber findings feed MoC category B; data limitations identified earlier feed category A.</li>
+      <li>31-rwa (planned) &mdash; the validated EAD = regulatory_EADF &times; limit_at_observation enters the K formula.</li>
+      <li>32-monitoring (planned) &mdash; the same test battery re-runs quarterly to detect drift.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>BCBS Working Paper 14 (May 2005), "Studies on the Validation of Internal Rating Systems". The canonical Basel reference; EAD validation section is thinner than PD's but principles are the same.</li>
+      <li>EBA/GL/2017/16 paragraphs on EAD validation expectations.</li>
+      <li>Stein and Jordao, "What is a more powerful model worth?" (2003). The economic-value-of-discrimination perspective.</li>
+      <li>Tong, E. (2016), "A comparison of EAD models in the credit card industry". Industry benchmark data points for EAD discrimination metrics.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 29 of n &middot; EAD 7 of 7 &mdash; EAD sequence complete; IRB-parameter modelling track complete.</span>
+  <span><a href="28-ead_risk_quantification.html">Previous: risk quantification</a> &middot; <a href="../index.html">Back to credit risk</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

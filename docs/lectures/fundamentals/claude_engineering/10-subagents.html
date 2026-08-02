@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 10: subagents, fan-out, and worktrees</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Subagents, fan-out, and git worktrees</h1>
+  <p class="subtitle">A subagent is not a way to go faster. It is a way to spend a hundred thousand tokens of reading somewhere other than your own context window and get two hundred words back. Once you hold that, the question of when to delegate answers itself, and so does the question of when not to.</p>
+  <div class="meta">
+    <span>Lecture 10 of 22</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part II: steering the agent</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>subagent</strong> runs in its own context window with its own set of allowed tools, does a bounded piece of work, and returns a condensed result to the parent. Anthropic's figure for that result is a thousand to two thousand tokens. Everything it read to produce those tokens, forty files, a directory tree, a stack of search results, stays in its window and dies with it. That asymmetry is the entire value proposition, and the documentation says so directly: since context is your fundamental constraint, subagents are among the most powerful tools available.</p>
+
+  <p>Which gives a single selection criterion. Delegate work with a high <strong>read-to-conclusion ratio</strong>: tasks that consume a lot of material and produce a short answer. "Find where token refresh is handled and whether we already have OAuth utilities" is a perfect subagent task, because the answer is a paragraph and the search is not. "Write the patch" is usually not, because the output is the point and it has to come back in full anyway.</p>
+
+  <p>The second use is independence rather than economy. A reviewer running in a fresh context sees only the diff and the criteria, not the reasoning that produced the change, so it evaluates the result on its own terms. That is a genuinely different property from asking the same session to check its own work, and it is why the writer-reviewer split is worth the round trip even when context is not tight.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Before delegating, estimate two numbers: how much the task will read, and how long the answer is. If the first is much larger than the second, delegate; you are buying the difference. If they are similar, do it yourself; you are paying a briefing, a spawn, and a summary for nothing. The mistake is thinking about parallelism first, because parallelism is a side effect and context is the product.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Every subagent boundary is a lossy compression step, and lossy compression is not free. The parent receives what the child judged worth reporting, which means the child's judgement about relevance is now load-bearing and unauditable: you cannot see what it decided to omit. This is the same failure surface as any organisational hierarchy, where information degrades at each reporting boundary and the degradation is invisible from above. The engineering consequence is that the tasks safest to delegate are the ones where the summary can be checked against reality cheaply, and the ones most dangerous to delegate are those where the child's omissions would be indistinguishable from an absence of findings.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that unscoped investigation is the documented way to destroy a session. Asking an agent to "look into" something without bounds has it read hundreds of files, all of which land in your window, and the session is impaired for everything that follows. The named remedy is to scope the investigation narrowly or push it into a subagent so the exploration does not consume the main context. That single move is the difference between a session that stays sharp through a long task and one that goes vague around the halfway mark.</p>
+
+  <p>The second reason is that fresh context is a quality mechanism, not just an economy one. A model reviewing code it has just written is biased towards it, having already reasoned its way to why each choice was correct. A reviewer that never saw that reasoning has no such commitment. Getting a second opinion from the same window is close to worthless for the same reason that asking someone to proofread their own writing is.</p>
+
+  <p>The third reason is that delegation has a real cost that is easy to ignore because it is not billed as latency. Every subagent needs briefing, spawns with none of the parent's accumulated understanding, re-derives context the parent already had, and returns a summary that discards what it did not think mattered. On a small task those costs exceed the saving comfortably. Knowing where the crossover sits is most of the skill.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The economics of a delegation</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Read-to-conclusion ratio for delegated and undelegated work">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">What lands in your window, with and without a subagent</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <text x="60" y="66" font-weight="600" fill="#52525b">Inline</text>
+        <rect x="150" y="50" width="480" height="26" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="390" y="68" text-anchor="middle" fill="#C76B2A">40 files read, all of it resident for the rest of the session</text>
+        <text x="648" y="68" font-size="10.5" fill="#C76B2A">~100k</text>
+
+        <text x="60" y="126" font-weight="600" fill="#52525b">Delegated</text>
+        <rect x="150" y="110" width="60" height="26" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="180" y="128" text-anchor="middle" font-size="10.5" fill="#1E9D54">brief</text>
+        <rect x="212" y="110" width="70" height="26" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="247" y="128" text-anchor="middle" font-size="10.5" fill="#1E9D54">report</text>
+        <rect x="284" y="110" width="346" height="26" fill="#fafafa" stroke="#d4d4d8" stroke-dasharray="4,3"/>
+        <text x="457" y="128" text-anchor="middle" font-size="10.5" fill="#a1a1aa">headroom you keep</text>
+        <text x="648" y="128" font-size="10.5" fill="#1E9D54">~2k</text>
+
+        <text x="150" y="172" font-size="11" font-style="italic" fill="#71717a">The 100k is still spent — it is billed, it just is not carried.</text>
+        <text x="150" y="192" font-size="11" font-style="italic" fill="#71717a">You are buying context headroom, not tokens, and certainly not time.</text>
+        <text x="150" y="212" font-size="11" font-style="italic" fill="#71717a">When read and report are the same size, the brief and the spawn are pure loss.</text>
+      </g>
+    </svg>
+    <figcaption>The saving is in occupancy rather than spend. This is why a subagent on a cheap model at low effort is usually the right configuration: it is doing volume reading, and the conclusion is short.</figcaption>
+  </figure>
+
+  <h3>Defining one</h3>
+
+  <p>Custom subagents live in <code>.claude/agents/</code> as markdown files with frontmatter naming the agent, describing when it applies, and restricting its tools and model.</p>
+
+  <pre><code class="language-md">---
+name: security-reviewer
+description: Reviews code for security vulnerabilities
+tools: Read, Grep, Glob, Bash
+model: opus
+---
+You are a senior security engineer. Review code for:
+- Injection vulnerabilities (SQL, XSS, command injection)
+- Authentication and authorisation flaws
+- Secrets or credentials in code
+- Insecure data handling
+
+Provide specific line references and suggested fixes.</code></pre>
+
+  <p>The <code>tools</code> line is doing more than it appears. Restricting a reviewer to read-only tools means it cannot fix what it finds, which sounds like a limitation and is actually the point: a reviewer that edits is no longer a reviewer, and its findings can no longer be assessed independently of its changes. Tool restriction is how you keep the roles separate.</p>
+
+  <h3>What a subagent does and does not inherit</h3>
+
+  <p>A subagent starts with its own context. It does not inherit the parent conversation's accumulated understanding, nor the main conversation's automatic memory. The exception is a <em>fork</em>, which does inherit the parent conversation and system prompt, and which is what the <code>context: fork</code> skill setting from Lecture 8 produces. The practical consequence is that a briefing has to be self-contained: everything the subagent needs must be in the prompt, because it cannot see the forty turns that led here.</p>
+
+  <p>Under auto mode, subagent work is checked at three points: the delegated task description is evaluated before the subagent starts, each of its actions goes through the same classifier as the parent, and its full action history is reviewed when it finishes, with a warning prepended to its results if the return check flags anything. Notably, a <code>permissionMode</code> in a subagent's own frontmatter is ignored while this is in force, which closes the obvious escalation route.</p>
+
+  <div class="defcard">
+    <strong>Read-to-conclusion ratio.</strong> How much a task must read relative to how much it must report. High ratios are the delegation criterion; low ratios mean the briefing costs more than the summary saves.
+  </div>
+
+  <div class="defcard">
+    <strong>Worktree isolation.</strong> Running an agent in its own git worktree so parallel agents editing files do not collide. Costs setup time and disk, so it is warranted only when the parallelism is genuinely mutating, not merely concurrent.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Four patterns that pay</h3>
+
+  <p><strong>Scoped investigation.</strong> The default case. "Use subagents to investigate how authentication handles token refresh, and whether we have existing OAuth utilities I should reuse." High ratio, bounded, and the answer is checkable against the code afterwards.</p>
+
+  <p><strong>Writer and reviewer.</strong> One session or agent implements, a second reviews the diff in a fresh context against stated criteria. The documentation is careful about the failure mode here, and the caution is worth repeating: a reviewer prompted to find gaps will usually report some, even when the work is sound, because that is what it was asked to do. Chasing every finding leads to over-engineering. Tell the reviewer to flag only what affects correctness or the stated requirements, and treat the rest as optional.</p>
+
+  <p><strong>Adversarial verification.</strong> Sharper than review. Give several verifiers the same claim and ask each to <em>refute</em> it, defaulting to refuted when uncertain, then keep the claim only if it survives a majority. Diversity of angle beats redundancy: three verifiers with distinct lenses, correctness, security, does-it-reproduce, catch failure modes that three identical ones cannot.</p>
+
+  <p><strong>Fan-out over a work list.</strong> For migrations and sweeps, generate the list of targets first, then loop a non-interactive invocation over it with scoped permissions. The documented advice is to refine the prompt against the first two or three items before running the full set, which is the difference between a migration and two thousand identically wrong edits.</p>
+
+  <pre><code class="language-bash">for file in $(cat files.txt); do
+  claude -p "Migrate $file from React to Vue. Return OK or FAIL." \
+    --allowedTools "Edit,Bash(git commit *)"
+done</code></pre>
+
+  <h3>Worktrees, and when they are worth it</h3>
+
+  <p>Parallel agents editing the same checkout collide. A git worktree gives each its own directory on its own branch, which removes the collision entirely. The cost is real, a few hundred milliseconds of setup plus disk per agent, so the rule is narrow: use worktrees when agents <em>mutate files in parallel</em>, and not otherwise. Read-only fan-out, which is most fan-out, needs no isolation at all. This is the point at which delegation stops being a context technique and becomes a workspace-management one, and the <a href="../software_engineering/13-git.html">git lecture</a> in the software engineering track covers the underlying mechanism.</p>
+
+  <h3>When delegation loses</h3>
+
+  <p>Three situations where the inline version wins, and all three are common.</p>
+
+  <p><strong>The briefing approaches the task.</strong> If explaining what you want takes as long as doing it, you have not saved anything, and you have added a summarisation step where information can be lost.</p>
+
+  <p><strong>The work is exploratory and iterative.</strong> Delegation assumes a bounded question. Work where each finding changes the next question does not survive the round trip, because the subagent returns after one pass and the second question needs the context it just discarded.</p>
+
+  <p><strong>The nuance is the deliverable.</strong> Anything where the details of what was read matter, and not just the conclusion, is a bad fit, because you receive the conclusion. A subagent that reports "no security issues found" has told you either that there are none or that it did not look properly, and those are indistinguishable from where you are sitting.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Delegating a task and then re-deriving its findings yourself is the most expensive pattern available, and it is a common instinct when the summary feels thin. You have paid the subagent's tokens, the briefing, and the summary, and are now paying the full inline cost as well. If you do not trust a delegation, the fix is upstream: brief it better, or do not delegate that task. Committing to the delegation is part of the decision to make it.
+  </div>
+
+  <h3>Worked example: the instruction conflict in this session</h3>
+
+  <div class="worked">
+    <strong>Worked example: two rules about subagents, in direct contradiction</strong>
+    <p>This session ran under two instructions that cannot both be followed. The machine's global <code>CLAUDE.md</code> mandates delegation: "Every Agent tool call must set <code>model: \"haiku\"</code> by default," and "Three or more file reads should be batched into an Explore subagent with <code>model: \"haiku\"</code>." The session-level instructions state the opposite: "Do not call the AgentTool unless the user requested it." Plan mode's own workflow guidance adds a third voice, instructing that exploration be done with Explore subagents.</p>
+    <p><strong>How it resolved, and why that is worth noticing.</strong> The narrower, later instruction won: no subagents were used, and the exploration was done by reading files directly in the main context. That is defensible as a precedence rule, and it is also exactly the failure Lecture 5 described. Two instruction sources, written at different times for different reasons, disagreed; the model picked one; nothing surfaced the conflict; and the global rule that someone deliberately wrote has been silently inert in every session on this machine that carries the session-level instruction.</p>
+    <p><strong>What the contradiction cost.</strong> Building this course involved reading well over three files: the design specification, a sample lecture, a course landing page, the root index, the stylesheet, the bootstrap script, four instruction files, two skill definitions, and two settings files. Under the global rule that is squarely an Explore subagent task with a high read-to-conclusion ratio, and delegating it would have kept most of that material out of this window. It was instead read inline, and all of it is still resident.</p>
+    <p><strong>Whether the global rule was right anyway.</strong> Partly. The read-to-conclusion ratio for the structural exploration was genuinely high and delegation would have paid. But a subagent returning "the lecture format uses these classes and this section structure" would have given a summary, and what the writing actually needed was the <em>exact markup</em> of a reference lecture, verbatim, to copy conventions from. That is the third losing case above: the nuance was the deliverable, and a summary would have produced plausible-looking markup with invented class names. The right answer was mixed, delegate the survey and read the one reference file directly, which neither instruction expresses.</p>
+    <p><strong>The general lesson, which is about instructions rather than subagents.</strong> A blanket rule of the form "always delegate when N files" encodes a proxy for the read-to-conclusion ratio, and proxies fail at the edges. The rule that survives contact is the criterion itself: delegate when the reading is large and the conclusion is small, read directly when the material itself is what you need. Write the criterion into the instruction file rather than the threshold, and check periodically whether the rule you wrote is one any session is actually still following.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A subagent buys context headroom, not speed and not tokens: it reads in its own window and returns a short report. Delegate on the read-to-conclusion ratio, and use a cheap model at low effort when doing so, because the work is volume reading. Fresh context is independently valuable for review, since a reviewer that never saw the reasoning evaluates the result rather than the argument. Restrict tools to keep roles separate. Reach for worktrees only when parallel agents actually mutate files. And know the three losing cases: when the briefing rivals the task, when the work is iterative, and when the nuance rather than the conclusion is what you need.</p>
+
+  <p>That closes Part II. Between them, instruction files, prompts, plans, skills, hooks, and subagents are the whole steering layer: what the agent is told, what it is asked, what it may do, and where it does it. Every one of them is upstream of the moment that actually decides whether any of this was worth doing, which is when the work comes back and somebody has to determine whether it is correct. Part III is about that moment, and it opens with the technique that makes it cheapest: writing the test before the code, when the code is not being written by you.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What does a subagent actually save, and what does it not save?</li>
+      <li>State the read-to-conclusion criterion. Give a task on each side of it.</li>
+      <li>Why is a reviewer in a fresh context better than asking the same session to check its work?</li>
+      <li>What does restricting a subagent's <code>tools</code> to read-only buy, beyond safety?</li>
+      <li>What does a subagent inherit from the parent, and what is the exception?</li>
+      <li>Name the three cases where delegation loses. Which one applies to "review this module for security issues"?</li>
+      <li>When is a git worktree warranted, and when is it wasted setup?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="09-hooks_and_settings.html">Lecture 9 (hooks and settings)</a> covered enforcement; this lecture covers structure.</li>
+      <li><strong>Next:</strong> Lecture 11 opens Part III with test-driven development when the agent writes the code.</li>
+      <li><strong>Cross-link:</strong> <a href="02-context_engineering.html">Lecture 2 (context engineering)</a> introduced subagent architectures as one of the three long-horizon techniques.</li>
+      <li><strong>Cross-link:</strong> <a href="04-models_and_modes.html">Lecture 4 (models and effort)</a> explains why subagents belong on the cheapest tier.</li>
+      <li><strong>Cross-link:</strong> <a href="08-skills.html">Lecture 8 (skills)</a> covers <code>context: fork</code>, which is a subagent wearing a skill's clothes.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/13-git.html">Software engineering, Lecture 13 (git)</a> covers worktrees as a git mechanism.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "Best practices for Claude Code" and "Subagents", code.claude.com/docs (the fan-out pattern, the writer-reviewer split, and the over-reporting caution); Anthropic, "Effective context engineering for AI agents", anthropic.com/engineering (the thousand-to-two-thousand-token return figure).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 10 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

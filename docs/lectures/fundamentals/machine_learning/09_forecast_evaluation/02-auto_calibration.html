@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 43: auto-calibration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Calibration</a></div>
+  <h1>Auto-calibration</h1>
+  <p class="subtitle">Lecture 42 showed that a portfolio can reconcile in aggregate, the balance property, while still overcharging one price cohort and undercharging another by an exactly offsetting amount. Auto-calibration is the property that rules this out cohort by cohort, and the actual-versus-predicted plot is the diagnostic that tests for it. This is the single most common chart a credit-risk or insurance-pricing validator will ask to see, and it answers a different question from every average-performance metric in the previous sub-module.</p>
+  <div class="meta">
+    <span>Lecture 43 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part VII: calibration and forecast evaluation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A regression function $\mu: \mathcal{X} \to \mathbb{R}$ is <strong>auto-calibrated</strong> for $(Y, X)$ if $\mu(X) = E[Y \mid \mu(X)]$ almost surely: every group of observations that received the identical prediction $\mu(X)$ is, on average, exactly self-financing for the outcomes it actually generated. No price cohort systematically subsidises another. The true regression function is always auto-calibrated, and there are typically infinitely many other auto-calibrated functions besides it, so auto-calibration is a necessary property of a good model, not a sufficient one; a model can be perfectly auto-calibrated and still discriminate terribly (predicting the population mean for everyone is trivially auto-calibrated). The standard diagnostic is the <strong>actual-versus-predicted plot</strong>, known in the statistical literature as a T-reliability diagram: bin the test-set predictions (by decile, typically), plot the bin-average prediction against the bin-average actual outcome, and check whether the points sit on the 45-degree line. Any fitted regression function can be turned into an auto-calibrated one by the <strong>recalibration step</strong> $\mu^{\text{rc}}(X) := E[Y \mid \mu(X)]$, a genuine regression of the response on the model's own predictions, which the next lecture shows how to estimate non-parametrically.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Sort every policyholder or borrower by the price your model quoted them, and split them into ten equal-sized buckets from cheapest-quoted to most-expensive-quoted. Auto-calibration asks: within each bucket, does the average price you actually charged match the average claim or default loss that bucket actually generated? If bucket 3 was charged an average of £400 but generated £480 of average loss, and bucket 8 was charged £1,200 but only generated £1,100, your model is auto-calibrated nowhere near well enough, even if its overall portfolio total balances and even if its Gini score looks respectable, because cheaper risks in bucket 3 are quietly subsidised by more expensive risks in bucket 8.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the sharpened, cohort-level version of lecture 42's portfolio-wide balance property: balance is the special case of auto-calibration with a single "cohort" (the whole book); auto-calibration demands the identity hold separately in every price band. It also sets up the rest of this sub-module: the Gini score, developed two lectures from now, is only a trustworthy model-selection tool once auto-calibration has been checked, because Gini measures ranking quality and says nothing about whether the levels within that ranking are correct.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this is the chart a validator asks for before anything else.</p>
+
+  <p>First, <strong>cross-subsidy between price cohorts is exactly the failure mode a regulator, a competitor, and an actuary all care about for different reasons</strong>. Underpriced segments attract adverse selection (competitors who spot the gap will target exactly those customers), overpriced segments lose good business to better-calibrated competitors, and a solvency regulator wants assurance that a rating-grade-level PD or LGD estimate is not systematically wrong for a specific grade even if the portfolio-wide average is fine. All three concerns are answered, or flagged, by the identical chart.</p>
+
+  <p>Second, <strong>flexible model classes are more prone to this failure than a well-specified GLM, not less</strong>. A GBM or a neural network can achieve excellent average error while having a systematically wrong shape in specific regions of the covariate space, a training artefact that a GLM's constrained functional form is less likely to produce by accident but that a validator cannot assume away just because the model class is "more powerful".</p>
+
+  <p>Third, <strong>auto-calibration is a necessary condition, not the whole validation exercise, and knowing which is which prevents over-claiming</strong>. A model that passes the actual-versus-predicted test still needs its discrimination checked separately (the next-but-one lecture); a model that fails it is definitely not ready, no matter how good its Gini score looks, because Gini is not even a valid selection criterion for a model that fails this check, a point the discrimination lecture develops in full.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A specialty lender's LGD model showed an out-of-sample R-squared that satisfied every internal benchmark. The actual-versus-predicted plot, requested only at the final validation gate, showed the bottom decile of predicted LGD (the lowest-loss cases) under-predicting actual losses by nearly 40 per cent, while the top decile over-predicted by a similar margin in the other direction: the model was compressing its predictions toward the middle, a common artefact of gradient boosting on a moderate-sized dataset with a skewed target, invisible in an aggregate R-squared computed across the whole range. The fix, an isotonic recalibration step (the subject of the next lecture), corrected the shape without requiring the underlying model to be rebuilt.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold two pictures side by side: a bar chart of three price cohorts showing which ones cross-subsidise which, and the standard decile-binned actual-versus-predicted plot that is the practical way this failure is actually detected.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Auto-calibration: cross-subsidy between price cohorts, and the actual-versus-predicted diagnostic">
+      <defs>
+        <marker id="autoArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Cross-subsidy between cohorts, and how the actual-vs-predicted plot catches it</text>
+
+      <g transform="translate(40, 55)">
+        <rect x="0" y="0" width="360" height="290" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="180" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Three price cohorts, one cross-subsidising</text>
+        <line x1="30" y1="240" x2="330" y2="240" stroke="#92400e" stroke-width="1.5"/>
+        <rect x="55" y="120" width="55" height="120" fill="#d97706"/>
+        <text x="82" y="112" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">predicted</text>
+        <rect x="125" y="90" width="55" height="150" fill="#7c2d12"/>
+        <text x="152" y="82" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">actual</text>
+        <text x="82" y="258" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">cohort 1</text>
+        <text x="152" y="258" text-anchor="middle" font-family="Inter" font-size="9" fill="#dc2626">under-priced</text>
+
+        <rect x="195" y="150" width="55" height="90" fill="#d97706"/>
+        <rect x="222" y="150" width="0" height="0"/>
+        <rect x="195" y="150" width="55" height="90" fill="#d97706"/>
+        <rect x="255" y="152" width="55" height="88" fill="#7c2d12"/>
+        <text x="222" y="258" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">cohort 2</text>
+        <text x="255" y="258" text-anchor="middle" font-family="Inter" font-size="9" fill="#166534">roughly fair</text>
+
+        <rect x="55" y="120" width="0" height="0"/>
+        <text x="180" y="270" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#92400e">cohort 1 is cross-financed by cohort 3 (not shown to scale)</text>
+      </g>
+
+      <g transform="translate(440, 55)">
+        <rect x="0" y="0" width="400" height="290" rx="12" fill="#EFF6FF" stroke="#1d4ed8" stroke-width="2"/>
+        <text x="200" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Actual-vs-predicted plot, decile bins</text>
+
+        <line x1="50" y1="240" x2="350" y2="240" stroke="#1d4ed8" stroke-width="1"/>
+        <line x1="50" y1="240" x2="50" y2="50" stroke="#1d4ed8" stroke-width="1"/>
+        <line x1="50" y1="240" x2="340" y2="60" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="345" y="55" font-family="Inter" font-size="9" fill="#64748b">perfect calibration</text>
+
+        <circle cx="70" cy="205" r="5" fill="#1d4ed8"/>
+        <circle cx="110" cy="180" r="5" fill="#1d4ed8"/>
+        <circle cx="150" cy="160" r="5" fill="#1d4ed8"/>
+        <circle cx="190" cy="140" r="5" fill="#1d4ed8"/>
+        <circle cx="230" cy="128" r="5" fill="#1d4ed8"/>
+        <circle cx="270" cy="115" r="5" fill="#1d4ed8"/>
+        <circle cx="310" cy="90" r="5" fill="#1d4ed8"/>
+
+        <text x="200" y="262" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">predicted (decile mean)</text>
+        <text x="20" y="145" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a" transform="rotate(-90 20 145)">actual (decile mean)</text>
+        <text x="200" y="275" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#1e3a8a">low deciles sit above the line: under-priced; high deciles sit below: over-priced</text>
+      </g>
+    </svg>
+    <figcaption>Left: three price cohorts, with cohort 1 charged less than it actually generated in loss and effectively cross-financed by another cohort not shown, exactly the pattern the balance property (lecture 42) cannot detect because it only checks the portfolio-wide total. Right: the actual-versus-predicted plot that surfaces this in practice. Points systematically above the diagonal at low predicted deciles and below it at high deciles is the classic compression signature of a model whose fitted values are pulled toward the centre, a common artefact of gradient boosting and neural networks on moderate-sized samples.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Auto-calibration is balance, done separately for every cohort.</strong> Collapse the actual-versus-predicted plot to a single bin covering the whole portfolio and you recover exactly the balance-property check of lecture 42. <strong>Auto-calibration is necessary, not sufficient.</strong> The global mean, predicting the identical number for every observation, is trivially auto-calibrated (every "cohort" is the whole population, and the mean is unbiased for itself by definition) and has zero discrimination; passing this check tells you the model's levels are not systematically wrong, and tells you nothing about whether it usefully distinguishes risks.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The formal definition, and two facts that follow from it immediately</h3>
+
+  <p>A regression function $\mu: \mathcal{X} \to \mathbb{R}$ is auto-calibrated for $(Y, X)$ if, almost surely,</p>
+
+  $$\mu(X) = E[Y \mid \mu(X)].$$
+
+  <p>Read the right-hand side carefully: it conditions on the <em>value of the prediction itself</em>, not on the full covariate vector $X$. Two consequences follow immediately. First, the <strong>true regression function</strong> $\mu^\star(X) = E[Y \mid X]$ is always auto-calibrated, because $E[Y \mid \mu^\star(X)] = E[E[Y \mid X] \mid \mu^\star(X)] = \mu^\star(X)$ by the tower property, given that $\mu^\star(X)$ is itself a function of $X$; a non-auto-calibrated function therefore cannot be the true regression function, which is the sense in which auto-calibration is a necessary condition for correctness. Second, there are typically <strong>infinitely many</strong> auto-calibrated functions besides the true one, most obviously the constant function equal to the global mean $\mu_0 = E[Y]$, which is trivially auto-calibrated but discriminates not at all. Auto-calibration alone therefore cannot be the whole story, a point section 3's second slogan already made and worth restating precisely here.</p>
+
+  <h3>The recalibration step: turning any fitted function into an auto-calibrated one</h3>
+
+  <p>Given any fitted regression function $\mu$, not necessarily auto-calibrated, define</p>
+
+  $$\mu^{\text{rc}}(X) := E[Y \mid \mu(X)].$$
+
+  <p>This <strong>recalibration step</strong> is itself always auto-calibrated (by the identical tower-property argument as above, applied to $\mu^{\text{rc}}$ instead of $\mu^\star$), regardless of how badly miscalibrated the original $\mu$ was. In words: take whatever score your original model produces, then fit a fresh, one-dimensional regression of the actual response on that score alone, and the result is guaranteed auto-calibrated. This is not merely a theoretical curiosity; it is the operational definition behind every practical recalibration technique, and the next lecture develops two concrete ways to estimate $E[Y \mid \mu(X)]$ from data, local regression and isotonic regression, the second of which additionally guarantees the recalibrated function preserves the original model's ranking.</p>
+
+  <h3>The actual-versus-predicted plot, in practice</h3>
+
+  <p>Testing auto-calibration exactly requires estimating $E[Y \mid \mu(X)]$, a genuine (if one-dimensional) non-parametric regression problem, which the next lecture develops properly. The simple, universally used diagnostic that approximates this is the <strong>actual-versus-predicted plot</strong>, sometimes called a T-reliability diagram in the statistical literature or, in actuarial usage, exactly the same object under that name. The construction:</p>
+
+  <ol>
+    <li>Fit the candidate model $\mu$ on a learning sample $L$.</li>
+    <li>On an independent test sample $T = (Y_t, X_t, v_t)_{t=1}^m$, compute the predictions $\mu(X_t)$ and sort the test-set instances by this value.</li>
+    <li>Partition the sorted instances into bins (deciles are standard; finer bins trade off noise against resolution, discussed in the pitfalls below), typically by exposure-weighted quantiles of $\mu(X_t)$ so each bin carries comparable weight.</li>
+    <li>For each bin, plot the exposure-weighted mean prediction on the horizontal axis against the exposure-weighted mean actual outcome on the vertical axis.</li>
+  </ol>
+
+  <p>If the resulting points sit on the 45-degree line, the model shows no evidence of miscalibration at the resolution the binning allows; systematic departure from the line, especially the "low deciles above the line, high deciles below it" compression pattern in the mental-model figure, is the signature of a model whose predictions have been pulled toward the centre, common in gradient boosting and neural networks fitted on moderate sample sizes with an early-stopping rule that halts before the extremes are well learned.</p>
+
+  <div class="defcard tint-sky">
+    <div class="term">Why this must be computed out-of-sample</div>
+    <div class="def">Computing the actual-versus-predicted plot on the same data the model was fitted to inherits the in-sample optimism the model-evaluation sub-module already warned against: a sufficiently flexible model can fit its own training predictions almost perfectly by construction, which would make every model look auto-calibrated regardless of its true behaviour. The plot is diagnostic only when computed on data the model has not seen, exactly the train-test discipline the earlier sub-module on train-test splitting established as the baseline for any honest evaluation.</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Binning too finely and reading noise as miscalibration</span>
+    Splitting a moderate test set into fifty or a hundred bins to get a "more detailed" picture produces bins with too few observations for the bin-average actual outcome to be a reliable estimate; the resulting scatter around the diagonal is sampling noise, not evidence of miscalibration. Decile binning (or coarser, for small test sets) is the standard resolution precisely because it balances enough bins to see shape against enough observations per bin to trust each point.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Unweighted binning when exposures vary</span>
+    Binning by raw prediction value without weighting by exposure gives disproportionate influence to a few high-exposure rows landing in a single bin, distorting the bin average in a direction that has nothing to do with miscalibration. The exposure weighting used throughout the balance-property lecture applies identically here: bins should be constructed, and averages computed, with the case weight $v$ included.</div>
+
+  <div class="callout warn">
+    <span class="tag">Treating a passed check as proof of good discrimination</span>
+    A model that lands every decile squarely on the diagonal has demonstrated that its levels are not systematically wrong, nothing more. The trivial constant model achieves a perfect actual-versus-predicted plot (one point, on the diagonal, by construction) while distinguishing no risks whatsoever. Auto-calibration must be read alongside a genuine discrimination measure, developed two lectures ahead, before any claim about overall model quality is made.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Computing the plot in-sample</span>
+    As the detail section's boxed note explains, an in-sample actual-versus-predicted plot is close to meaningless for a flexible model class, because the model can fit its own training predictions closely regardless of whether it generalises. Every actual-versus-predicted diagnostic in this sub-module assumes an independent test sample; skipping that discipline produces a chart that looks reassuring for the wrong reason.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Auto-calibration sharpens the balance property from a single portfolio-wide reconciliation to a condition that must hold separately at every price cohort: $\mu(X) = E[Y \mid \mu(X)]$. The true regression function always satisfies it; so does the trivial constant model, which is why the property is necessary but not sufficient, and why it must be read alongside a discrimination measure rather than in isolation. The recalibration step $\mu^{\text{rc}}(X) = E[Y \mid \mu(X)]$ turns any fitted function into an auto-calibrated one in principle, and the standard practical diagnostic, the decile-binned actual-versus-predicted plot computed strictly out-of-sample, is the chart a validator asks to see before anything else.</p>
+
+  <p>The next lecture makes the recalibration step computable, introducing local regression and isotonic regression as two non-parametric tools for estimating $E[Y \mid \mu(X)]$ from data, and shows why isotonic regression, in particular, is the standard choice when the goal is to repair a model's calibration without disturbing its ranking of risks.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the definition of auto-calibration. Why is the true regression function always auto-calibrated?</li>
+      <li>Give an example of a function that is auto-calibrated but discriminates poorly. What does this tell you about how to use the property in a validation report?</li>
+      <li>Describe the recalibration step $\mu^{\text{rc}}(X) = E[Y \mid \mu(X)]$. Why is the result always auto-calibrated regardless of how miscalibrated the original model was?</li>
+      <li>Describe the construction of an actual-versus-predicted plot, including why exposure weighting matters and why it must be computed out-of-sample.</li>
+      <li>You are shown an actual-versus-predicted plot where the bottom three deciles sit above the diagonal and the top three sit below it. What pattern does this indicate, and which model classes are most prone to it?</li>
+      <li>Explain, in one sentence, why auto-calibration is the special case of the balance property extended to every price cohort rather than the whole portfolio.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 42 (<a href="01-statistical_bias_and_balance.html">statistical bias and the balance property</a>) introduced the portfolio-wide version of the reconciliation this lecture applies cohort by cohort.</li>
+      <li><strong>Next:</strong> Lecture 3 (<a href="03-nonparametric_recalibration.html">non-parametric recalibration</a>) develops local regression and isotonic regression as concrete estimators of the recalibration step introduced here.</li>
+      <li><strong>Used by:</strong> Lecture 4 (<a href="04-discrimination_and_gini.html">discrimination and the Gini score</a>), which shows that the Gini score is only a valid model-selection criterion once the candidate models being compared are auto-calibrated.</li>
+      <li><strong>Outside this course:</strong> The actual-versus-predicted plot is the standard chart in A-IRB rating-grade PD calibration testing and in IFRS 9 ECL backtesting by segment; it is frequently the single most-requested exhibit in a model validation pack.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Calibration course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 43 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

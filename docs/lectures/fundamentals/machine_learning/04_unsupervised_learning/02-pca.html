@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 15: principal component analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Unsupervised learning</a></div>
+  <h1>Principal component analysis</h1>
+  <p class="subtitle">The variance-maximising rotation of the feature space. One eigendecomposition of the covariance matrix produces a new basis ordered by how much of the data's spread each direction captures. The first PCA lecture is overview; this one is the maths.</p>
+  <div class="meta">
+    <span>Lecture 15 of 62</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Part III: unsupervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Principal component analysis</strong> rotates the feature matrix into a new orthogonal basis in which the axes are ordered by the variance of the data along them. The first axis points in the direction of maximum variance, the second points in the direction of maximum variance orthogonal to the first, and so on. The recipe is one equation: centre the data, build the sample covariance matrix $\Sigma = \tfrac{1}{n-1} X_c^T X_c$, and take its eigendecomposition. The eigenvectors are the principal directions; the eigenvalues are the variances of the data projected onto those directions. To compress, keep the top $k$ eigenvectors; the share of variance retained is $\sum_{j=1}^{k} \lambda_j / \sum_{j=1}^{p} \lambda_j$. The transformation is linear, unsupervised, and dominated by whichever feature has the largest raw variance, so every feature must be standardised first or the result is a fancy way of pointing at the column with the biggest units. This lecture is the mathematical treatment; the practitioner overview is <a href="../01_feature_engineering/03-dimensionality_reduction.html">feature engineering lecture 3</a>.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine a cloud of points in two dimensions that lies along a diagonal stripe. The cloud is wide in one direction and thin in the perpendicular direction. PCA finds those two directions for you, then offers you a deal: keep just the wide direction and you keep almost all the information; throw away the thin direction and you have compressed two columns to one with almost no loss. In higher dimensions the same thing happens, except the new directions are not visible to the eye. The eigendecomposition is the machinery that finds them, and the eigenvalues tell you how good a deal you are getting in each direction.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Textbooks present PCA as decorrelation plus compression. In production it has a third life: anomaly detection. Fit PCA on clean data, keep $k$ components, then reconstruct each new observation by projecting onto the components and back. Points that reconstruct accurately are typical; points with large reconstruction error live in the directions the model discarded as noise, and are flagged as anomalous. This is how credit card transaction monitoring, network intrusion detection, and several fraud systems actually work in the first stage of triage, before more expensive supervised models are called.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    PCA is the canonical linear unsupervised method. It sits alongside <a href="01-k_means_clustering.html">k-means</a> (clustering) as the two algorithms a student should learn by heart before moving on. PCA is also the bridge from classical feature engineering (<a href="../01_feature_engineering/03-dimensionality_reduction.html">feature engineering lecture 3</a>) to modern representation learning. The autoencoder of <a href="../05_deep_learning/01-neural_networks.html">deep learning lecture 35</a> is, in its simplest linear form, PCA in disguise: minimise reconstruction error with a bottleneck and the optimal bottleneck weights span the same subspace as the top principal components.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three problems push PCA into almost every applied pipeline. First, <strong>the curse of dimensionality.</strong> The volume of a $p$-dimensional unit cube grows as $1^p$, but the volume of the unit ball inscribed inside it shrinks rapidly with $p$, and the distance between any two random points concentrates around a constant. Distance-based methods (k-nearest neighbours, k-means, RBF support vector machines) lose discriminative power in high dimensions because every pair of points is approximately equidistant. PCA pushes the data into a lower-dimensional subspace where pairwise distances actually carry information again.</p>
+
+  <p>Second, <strong>multicollinearity in linear models.</strong> When two or more features are highly correlated, the ordinary least squares solution is unstable: small changes in the training sample produce large swings in the estimated coefficients, and the inverse $(X^T X)^{-1}$ becomes ill-conditioned. PCA's output is exactly orthogonal by construction (eigenvectors of a symmetric matrix are mutually orthogonal), so a regression on principal components has no multicollinearity problem at all. The price is interpretability: a coefficient on PC2 does not correspond to any business quantity, only to a particular linear combination of the original features.</p>
+
+  <p>Third, <strong>visualisation.</strong> No human can read a five-dimensional scatter plot. Projecting onto the first two principal components gives the best linear two-dimensional view of the data in the precise sense that no other two-dimensional projection captures more variance. This is the reason PCA appears on the first page of almost every exploratory data analysis: it is the cheapest way to see whether the data has obvious cluster structure, obvious outliers, or obvious gradients before any modelling begins.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A market risk team applied PCA to a panel of one hundred and twenty interest rate tenors to extract the standard level-slope-curvature factors. The first run produced what looked like a single dominant component explaining ninety-eight per cent of the variance, with the others contributing negligibly. The "factor" was the absolute level of the British pound tenors, whose daily moves were three orders of magnitude larger in basis-point terms than the comparator currencies because of how the input file's units had been merged from two sources. After standardising each tenor to unit variance, the recognisable level-slope-curvature decomposition emerged, with proportions in line with the published literature. PCA without scaling is PCA of the loudest column.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. The data is a cloud of points in $p$ dimensions. PCA rotates the coordinate system so that the new axes line up with the directions of greatest spread, not with the original feature labels. The first new axis is the line through the centre of the cloud along which the projected points are most spread out; the variance of those projections is the first eigenvalue. The second axis is the perpendicular line along which the remaining variance is greatest; its variance is the second eigenvalue. The procedure continues until you have $p$ orthogonal axes, at which point you have rewritten every observation in a new coordinate system that has the same total variance as the old one but has redistributed it so that the early components carry most of it.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two-dimensional scatter plot with the first principal component drawn as the axis of maximum variance, and projections of points onto that axis shown">
+      <defs>
+        <marker id="pcArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#0d9488"/>
+        </marker>
+        <marker id="pcArrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">First principal component as the axis of maximum projected variance</text>
+
+      <!-- Axes -->
+      <line x1="80" y1="320" x2="740" y2="320" stroke="#a1a1aa" stroke-width="1"/>
+      <line x1="80" y1="320" x2="80" y2="60" stroke="#a1a1aa" stroke-width="1"/>
+      <text x="740" y="338" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">feature 1 (centred)</text>
+      <text x="92" y="68" text-anchor="start" font-family="Inter" font-size="10" fill="#71717a">feature 2 (centred)</text>
+
+      <!-- Origin marker -->
+      <circle cx="410" cy="190" r="3" fill="#18181b"/>
+      <text x="416" y="186" font-family="Inter" font-size="9" fill="#71717a">mean</text>
+
+      <!-- Data points along a diagonal stripe -->
+      <g fill="#0d9488" opacity="0.55">
+        <circle cx="200" cy="280" r="3"/>
+        <circle cx="225" cy="268" r="3"/>
+        <circle cx="248" cy="262" r="3"/>
+        <circle cx="262" cy="255" r="3"/>
+        <circle cx="280" cy="245" r="3"/>
+        <circle cx="300" cy="240" r="3"/>
+        <circle cx="318" cy="228" r="3"/>
+        <circle cx="332" cy="222" r="3"/>
+        <circle cx="350" cy="215" r="3"/>
+        <circle cx="368" cy="208" r="3"/>
+        <circle cx="385" cy="200" r="3"/>
+        <circle cx="400" cy="194" r="3"/>
+        <circle cx="418" cy="186" r="3"/>
+        <circle cx="436" cy="180" r="3"/>
+        <circle cx="452" cy="172" r="3"/>
+        <circle cx="468" cy="166" r="3"/>
+        <circle cx="486" cy="158" r="3"/>
+        <circle cx="504" cy="152" r="3"/>
+        <circle cx="520" cy="144" r="3"/>
+        <circle cx="538" cy="136" r="3"/>
+        <circle cx="556" cy="130" r="3"/>
+        <circle cx="572" cy="122" r="3"/>
+        <circle cx="592" cy="114" r="3"/>
+        <circle cx="610" cy="106" r="3"/>
+        <circle cx="628" cy="98" r="3"/>
+        <circle cx="215" cy="258" r="3"/>
+        <circle cx="240" cy="248" r="3"/>
+        <circle cx="270" cy="232" r="3"/>
+        <circle cx="294" cy="220" r="3"/>
+        <circle cx="328" cy="208" r="3"/>
+        <circle cx="356" cy="195" r="3"/>
+        <circle cx="380" cy="180" r="3"/>
+        <circle cx="412" cy="172" r="3"/>
+        <circle cx="440" cy="160" r="3"/>
+        <circle cx="468" cy="148" r="3"/>
+        <circle cx="496" cy="138" r="3"/>
+        <circle cx="528" cy="126" r="3"/>
+        <circle cx="558" cy="112" r="3"/>
+        <circle cx="588" cy="100" r="3"/>
+        <circle cx="618" cy="88" r="3"/>
+      </g>
+
+      <!-- First principal component line through the cloud -->
+      <line x1="160" y1="296" x2="660" y2="84" stroke="#0d9488" stroke-width="2" marker-end="url(#pcArrow)"/>
+      <text x="668" y="78" font-family="Inter" font-size="11" font-weight="700" fill="#0d9488">PC1</text>
+      <text x="668" y="92" font-family="Inter" font-size="9" fill="#0d9488">max variance</text>
+
+      <!-- Second principal component, orthogonal -->
+      <line x1="410" y1="190" x2="320" y2="80" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#pcArrow2)"/>
+      <text x="296" y="74" font-family="Inter" font-size="11" font-weight="700" fill="#7c3aed">PC2</text>
+      <text x="240" y="88" font-family="Inter" font-size="9" fill="#7c3aed">orthogonal residual</text>
+
+      <!-- Projection lines from a couple of points down to PC1 -->
+      <line x1="332" y1="222" x2="266" y2="252" stroke="#b45309" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="486" y1="158" x2="430" y2="180" stroke="#b45309" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="572" y1="122" x2="540" y2="135" stroke="#b45309" stroke-width="1" stroke-dasharray="2 2"/>
+      <text x="270" y="338" font-family="Inter" font-size="9" fill="#b45309">amber dashed lines: projection onto PC1</text>
+
+      <!-- Caption strip -->
+      <line x1="40" y1="356" x2="780" y2="356" stroke="#a1a1aa" stroke-width="0.5"/>
+      <text x="410" y="372" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">eigenvalues = variance of the projected points along each axis; the data's total variance is preserved by the rotation</text>
+    </svg>
+    <figcaption>The cloud has wide spread along the diagonal and narrow spread perpendicular to it. PC1 is the diagonal; the variance of the orange dots projected onto PC1 (along the dashed amber projection lines) is the first eigenvalue. PC2 is orthogonal and captures the residual spread. Keep only PC1 and you have compressed two columns to one with the smallest possible reconstruction error.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The first principal component is not the regression line of feature 2 on feature 1; it is the total-least-squares line that minimises perpendicular distances to the cloud, which is a different geometric object. The second principal component is forced to be orthogonal to the first, which is what makes the resulting features uncorrelated. The eigenvalues are quantities of variance, measured in the same squared units as the centred features; their ratio to the total is the dimensionless explained-variance proportion that drives every model-selection decision downstream.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The geometric problem</h3>
+
+  <p>Start with a centred data matrix $X_c \in \mathbb{R}^{n \times p}$, where $n$ is the number of observations and $p$ is the number of features. Centring means subtracting the column means,</p>
+  $$X_c = X - \bar{X}, \qquad \bar{X}_{ij} = \frac{1}{n} \sum_{k=1}^{n} X_{kj},$$
+  <p>so that each column has mean zero. Geometrically, this moves the centre of mass of the point cloud to the origin. PCA seeks a unit vector $w \in \mathbb{R}^p$ such that the projected coordinates $X_c w \in \mathbb{R}^n$ have maximum variance. Without the unit-norm constraint the problem is unbounded (scale $w$ up and the variance scales with $\|w\|^2$), so $\|w\| = 1$ is required.</p>
+
+  <h3>The optimisation</h3>
+
+  <p>Write the sample covariance matrix as</p>
+  $$\Sigma = \frac{1}{n-1} X_c^T X_c \in \mathbb{R}^{p \times p}.$$
+  <p>The variance of the projection $X_c w$ is</p>
+  $$\operatorname{Var}(X_c w) = \frac{1}{n-1} (X_c w)^T (X_c w) = w^T \Sigma w.$$
+  <p>The PCA objective is therefore</p>
+  $$\max_{w} \; w^T \Sigma w \quad \text{subject to} \quad w^T w = 1.$$
+  <p>Form the Lagrangian, introducing a multiplier $\lambda$ for the unit-norm constraint,</p>
+  $$L(w, \lambda) = w^T \Sigma w - \lambda (w^T w - 1).$$
+  <p>Differentiate with respect to $w$ and set the gradient to zero,</p>
+  $$\nabla_w L = 2 \Sigma w - 2 \lambda w = 0,$$
+  <p>which rearranges to the eigenvalue equation</p>
+  $$\Sigma w = \lambda w.$$
+  <p>The maximisers of the variance are eigenvectors of the covariance matrix, and substituting back gives the variance attained,</p>
+  $$w^T \Sigma w = w^T (\lambda w) = \lambda w^T w = \lambda.$$
+  <p>So the variance along the principal direction equals the corresponding eigenvalue. The eigenvalue is not an arbitrary scalar; it is a quantity of variance, measured in the squared units of the centred features. Sort the eigenvalues in descending order $\lambda_1 \ge \lambda_2 \ge \cdots \ge \lambda_p \ge 0$; the corresponding eigenvectors $w_1, w_2, \ldots, w_p$ are the principal directions, ordered from most to least informative. Because $\Sigma$ is real symmetric, the spectral theorem guarantees that the eigenvectors can be chosen mutually orthogonal, so the new basis is orthonormal.</p>
+
+  <h3>Properties of the rotation</h3>
+
+  <p>Stack the eigenvectors column-wise into an orthogonal matrix $W = [w_1 \mid w_2 \mid \cdots \mid w_p]$ and the eigenvalues into a diagonal matrix $\Lambda = \operatorname{diag}(\lambda_1, \ldots, \lambda_p)$. The eigendecomposition is then</p>
+  $$\Sigma = W \Lambda W^T, \qquad W^T W = W W^T = I.$$
+  <p>The transformed data $Z = X_c W \in \mathbb{R}^{n \times p}$ has covariance matrix $\Lambda$, which is diagonal. The principal components are therefore mutually uncorrelated: $\operatorname{Cov}(Z_j, Z_k) = 0$ for $j \ne k$. This is the property that fixes multicollinearity. The total variance is preserved by the rotation,</p>
+  $$\sum_{j=1}^{p} \operatorname{Var}(X_j) = \operatorname{tr}(\Sigma) = \operatorname{tr}(W \Lambda W^T) = \operatorname{tr}(\Lambda) = \sum_{j=1}^{p} \lambda_j,$$
+  <p>so PCA does not destroy information; it redistributes it. The compression comes from choosing to keep only the first $k$ components and discarding the rest.</p>
+
+  <h3>Choosing the number of components</h3>
+
+  <p>The <strong>explained variance ratio</strong> for the $k$-th component is</p>
+  $$r_k = \frac{\lambda_k}{\sum_{j=1}^{p} \lambda_j},$$
+  <p>and the cumulative explained variance up to $k$ components is $R_k = \sum_{j=1}^{k} r_j$. Two standard procedures pick $k$. The <strong>cumulative-variance threshold</strong> chooses the smallest $k$ such that $R_k$ exceeds a chosen proportion (commonly 0.90, 0.95, or 0.99); the choice is a trade-off between dimensionality reduction and information loss. The <strong>scree plot</strong> plots $r_k$ against $k$ and inspects the curve for an "elbow" where it transitions from steeply declining to nearly flat; components past the elbow are taken to represent noise. The two criteria often disagree on the exact value of $k$ but rarely by more than one or two components, and in practice both are reported.</p>
+
+  <p>A third procedure deserves mention. The <strong>Kaiser criterion</strong> retains all components with eigenvalue greater than one, applicable when the input has been standardised so that each feature has unit variance. The argument is that a component capturing less variance than a single original variable is not worth keeping. It is a useful first pass but tends to over-retain on small samples and under-retain when features are very correlated, so it should be confirmed against a scree plot.</p>
+
+  <h3>Computation: eigendecomposition versus SVD</h3>
+
+  <p>The textbook derivation goes through the covariance matrix and its eigendecomposition, but production implementations use the singular value decomposition of the centred data matrix directly. Write</p>
+  $$X_c = U S V^T,$$
+  <p>where $U \in \mathbb{R}^{n \times n}$ and $V \in \mathbb{R}^{p \times p}$ are orthogonal and $S \in \mathbb{R}^{n \times p}$ is a rectangular diagonal matrix of singular values $s_1 \ge s_2 \ge \cdots \ge 0$. Substituting into the covariance,</p>
+  $$\Sigma = \frac{1}{n-1} X_c^T X_c = \frac{1}{n-1} V S^T U^T U S V^T = V \left(\frac{S^T S}{n-1}\right) V^T,$$
+  <p>so the columns of $V$ are the eigenvectors of $\Sigma$ and the squared singular values divided by $n - 1$ are the eigenvalues, $\lambda_j = s_j^2 / (n - 1)$. The SVD route avoids forming $X_c^T X_c$ explicitly, which doubles the condition number and amplifies numerical error on nearly singular data. Scikit-learn's <code>PCA</code> uses LAPACK's SVD by default; for very large $p$ or very large $n$, <strong>randomised PCA</strong> (Halko, Martinsson and Tropp, 2009) approximates the top $k$ singular vectors in $O(n p k)$ time rather than $O(n p^2)$, with controllable approximation error. The scikit-learn argument <code>svd_solver="randomized"</code> activates it.</p>
+
+  <h3>Scaling is mandatory</h3>
+
+  <p>The covariance matrix is dominated by whichever feature has the largest variance. If income is measured in pounds and age in years, the variance of income is on the order of $10^8$ and the variance of age is on the order of $10^2$; the first eigenvector will point almost exactly along the income axis regardless of any structure in the rest of the data. Standardising each column to mean zero and unit variance before PCA replaces the covariance matrix with the correlation matrix and removes the scale dependence. The numpy idiom on raw data is exactly the bug in the market risk vignette in section 2.</p>
+
+  <p>The order of operations matters in a pipeline. Fit the standardiser on the training fold, transform the training fold, fit PCA on the transformed training fold, then apply both transformations in sequence to validation and test. Re-fitting the standardiser or the PCA on test data is the standard leakage failure and is the same hazard discussed in <a href="../01_feature_engineering/02-feature_transformation.html">feature engineering lecture 2</a> for univariate transformers.</p>
+
+  <h3>Reconstruction and inverse transform</h3>
+
+  <p>To project an observation $x \in \mathbb{R}^p$ onto the first $k$ components, compute $z = W_k^T (x - \bar{x})$ where $W_k$ is the $p \times k$ matrix of the leading eigenvectors. The reconstruction is</p>
+  $$\hat{x} = W_k z + \bar{x} = W_k W_k^T (x - \bar{x}) + \bar{x},$$
+  <p>which lives in the $k$-dimensional subspace spanned by the retained components. The reconstruction error is</p>
+  $$\| x - \hat{x} \|^2 = \sum_{j=k+1}^{p} (w_j^T (x - \bar{x}))^2,$$
+  <p>that is, the squared norm of the components that were discarded. The expected reconstruction error across the training data equals the sum of the discarded eigenvalues, which is one minus the retained variance ratio. Scikit-learn exposes the reconstruction via the <code>inverse_transform</code> method, which is the basis of the anomaly-detection use case: train PCA on clean data, score a new point by its reconstruction error, and flag points with large error as anomalous.</p>
+
+  <h3>Use cases</h3>
+
+  <p>PCA has six common production uses. <strong>Visualisation</strong> projects the data onto the first two or three components for exploratory scatter plots; the proportion of variance shown on the plot axes (often quoted in the axis labels) is the honest summary of how much of the structure has survived the projection. <strong>Denoising</strong> keeps the leading components and discards the trailing ones on the assumption that genuine signal sits in high-variance directions and noise sits in low-variance ones; effective when the signal-to-noise ratio is high enough that the assumption holds. <strong>Multicollinearity remediation</strong> in regression replaces a correlated feature block with its leading principal components, which are exactly orthogonal by construction. <strong>Image compression</strong> reshapes each image into a long vector, fits PCA to a corpus of images, and represents each image by its first $k$ component scores; the JPEG codec's DCT step is a fixed-basis cousin of this idea. <strong>Anomaly detection</strong> uses reconstruction error as a score, as above. <strong>Preprocessing for distance-based learners</strong> compresses the feature matrix before k-nearest neighbours or k-means so that distances are computed in a low-dimensional, decorrelated, scale-aligned space.</p>
+
+  <h3>Implementation in scikit-learn</h3>
+
+  <p>The standard recipe is one pipeline,</p>
+  <pre><code>from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+pipe = Pipeline([
+    ("scale", StandardScaler()),
+    ("pca", PCA(n_components=0.95, svd_solver="full")),
+])
+Z = pipe.fit_transform(X_train)
+Z_test = pipe.transform(X_test)</code></pre>
+
+  <p>Two arguments do most of the work. <code>n_components</code> accepts an integer (keep exactly that many components), a float in $(0, 1)$ (keep the smallest number of components whose cumulative explained variance exceeds the value), or <code>"mle"</code> (Minka's maximum-likelihood selector, useful when neither a fixed count nor a fixed variance threshold is appropriate). <code>svd_solver</code> defaults to <code>"auto"</code> and switches to randomised SVD when both $n$ and $p$ exceed 500 and $k$ is at most 80 per cent of the smaller dimension; force <code>"full"</code> for exact reproducibility, <code>"randomized"</code> for very large matrices, and <code>"arpack"</code> for the sparse case. After fitting, <code>explained_variance_ratio_</code> returns the $r_k$ values, <code>components_</code> returns the eigenvectors as rows, and <code>inverse_transform</code> reverses the projection (modulo the variance lost to the discarded components).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Five failure modes account for almost every PCA misuse seen in practice. Each is invisible if the diagnostic plots are skipped.</p>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting to standardise</span>
+    Running PCA on raw mixed-unit features yields the eigendecomposition of the covariance matrix, which is dominated by whichever feature has the largest raw variance. The first component points along that feature, the explained-variance ratio of PC1 looks impressively high, and the result tells you nothing about the joint structure of the data. Always standardise unless every feature is already in the same physical units and on a comparable scale, and even then prefer standardisation for safety.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Interpreting principal components as latent variables</span>
+    PCA is a rotation, not a causal model. PC1 is the direction of maximum variance, which is sometimes interpretable (level of yield curve, overall size, overall brightness) and sometimes a meaningless mixture. Treating PC1 as if it were a real underlying factor without independent evidence is a common error in finance, where "the market factor" extracted by PCA is often confounded with whatever drove variance in the sample period rather than a stable economic quantity. Factor analysis, which assumes an explicit measurement model with idiosyncratic noise, is the right tool when latent factors are the goal.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using PCA on categorical or binary features</span>
+    The covariance matrix is well-defined for any numeric input, but its eigendecomposition of one-hot encoded dummies is dominated by the rarity of each level rather than by any meaningful structure. Multiple correspondence analysis is the categorical analogue of PCA; for mixed numeric-and-categorical data, use FAMD (factor analysis of mixed data) or fit PCA only on the numeric block.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Leakage through PCA fitting on test data</span>
+    The eigenvectors are learned parameters in exactly the sense that mean and standard deviation are learned parameters in <a href="../01_feature_engineering/02-feature_transformation.html">feature engineering lecture 2</a>. Fitting PCA on a combined train-and-test matrix leaks information from the test set into the training process; the model's apparent test performance is biased upward, and the deployed pipeline behaves differently from the validated one. Fit on the training fold, transform on the test fold, every time.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating PCA as supervised feature selection</span>
+    PCA is unsupervised: it knows nothing about the target. A direction of high variance may carry zero signal for the label, and a direction of low variance may carry all of it. Dropping the last principal components on the assumption that low variance equals low predictive value is sometimes safe but is not guaranteed; running a quick supervised filter (mutual information against the target) on the components, or using linear discriminant analysis if a supervised reduction is what you actually need, will catch the case where the discriminative direction lies along a low-variance axis.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Principal component analysis solves one optimisation problem and uses it to do many things. The problem is to find an orthogonal direction along which the variance of the centred data is maximised; the Lagrangian first-order condition rearranges to the eigenvalue equation $\Sigma w = \lambda w$, so the principal directions are eigenvectors of the covariance matrix and the variances along them are the eigenvalues. Sorting the eigenvalues in descending order gives the principal-component basis; the explained-variance ratio $\lambda_k / \sum_j \lambda_j$ summarises each direction's share of the total spread. Production implementations compute the decomposition through the singular value decomposition of the centred data for numerical stability, and through randomised SVD when the matrix is too large for the exact algorithm to be tractable. Three operational facts close the loop. Standardise first or the result is the eigendecomposition of the loudest feature. Fit the rotation on training data only, exactly like every other learned transformer. Remember that PCA is unsupervised and linear, so it is not a substitute for supervised feature selection (linear discriminant analysis) or for non-linear methods (kernel PCA, t-SNE, autoencoders).</p>
+
+  <p>What this lecture deliberately did not do. It did not derive linear discriminant analysis, which solves a structurally similar generalised eigenvalue problem but with a supervised objective; LDA is the right tool when class separation is the goal and is covered in the practitioner overview at <a href="../01_feature_engineering/03-dimensionality_reduction.html">feature engineering lecture 3</a>. It did not derive kernel PCA, factor analysis, or independent component analysis, all of which are linear-algebra cousins of PCA with different objective functions. It did not derive t-SNE or UMAP, which are non-linear neighbour-preserving embeddings for visualisation only. The autoencoder of <a href="../05_deep_learning/01-neural_networks.html">deep learning lecture 35</a> generalises PCA to non-linear reconstruction by replacing the matrix factorisation with a neural network bottleneck.</p>
+
+  <p>Lecture 21, on hierarchical clustering, returns to the unsupervised theme but from the opposite direction: rather than reducing dimensions, it builds a tree of nested groupings of the observations. The two approaches are complementary and are often run together, with PCA used to visualise the clusters produced by hierarchical or k-means analysis.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Derive the eigenvalue equation $\Sigma w = \lambda w$ from the constrained variance-maximisation problem $\max w^T \Sigma w$ subject to $\|w\| = 1$ via the Lagrangian. State what $\lambda$ represents.</li>
+      <li>A PCA on a $10 \times 5$ standardised data matrix returns eigenvalues $(2.40, 1.30, 0.80, 0.30, 0.20)$. What proportion of variance does the first principal component explain, and how many components are needed to retain at least 90 per cent of the total variance?</li>
+      <li>Explain why scikit-learn's <code>PCA</code> defaults to SVD on the centred data matrix rather than to an eigendecomposition of $X^T X$. Give the relationship between the singular values $s_j$ and the eigenvalues $\lambda_j$.</li>
+      <li>A practitioner runs PCA on a dataset where income is in pounds and age is in years and observes that PC1 explains 99.6 per cent of the variance. Diagnose the problem and state the fix.</li>
+      <li>Define the reconstruction error of an observation $x$ projected onto the first $k$ principal components. Express it in terms of the discarded eigenvalues for a typical training point.</li>
+      <li>Why is PCA unsuitable as a direct method of supervised feature selection? Name the supervised analogue of PCA and one circumstance in which low-variance components might carry high predictive value.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous in this module:</strong> Lecture 14 on <a href="01-k_means_clustering.html">k-means clustering</a> is the other foundational unsupervised algorithm. PCA and k-means are commonly run in sequence: PCA first to reduce dimensions and decorrelate, k-means second to find groups in the resulting low-dimensional space.</li>
+      <li><strong>Overview version:</strong> <a href="../01_feature_engineering/03-dimensionality_reduction.html">Feature engineering lecture 3</a> is the practitioner overview of PCA alongside LDA and t-SNE; this lecture is the deep mathematical treatment of PCA on its own.</li>
+      <li><strong>Pipeline context:</strong> <a href="../01_feature_engineering/01-the_ml_landscape.html">Feature engineering lecture 1</a> places dimensionality reduction in the six-stage machine learning pipeline. PCA assumes the previous stages (scaling, encoding, missing-value handling) have already produced a clean numeric matrix.</li>
+      <li><strong>Non-linear generalisation:</strong> A linear autoencoder with a bottleneck of width $k$ and squared-error loss recovers the same subspace as the top $k$ principal components. The non-linear autoencoder of <a href="../05_deep_learning/01-neural_networks.html">deep learning lecture 35</a> generalises the idea by replacing the linear projection with a multi-layer network.</li>
+      <li><strong>Statistical foundation:</strong> The covariance matrix that PCA decomposes is the multivariate generalisation of the variance defined in <a href="../../statistics/01-descriptive_statistics.html">statistics lecture 1</a>. The eigenvalues are variances; the eigenvectors are the directions in which those variances live.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Unsupervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 15 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

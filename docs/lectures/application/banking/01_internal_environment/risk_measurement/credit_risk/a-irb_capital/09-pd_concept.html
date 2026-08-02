@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PD concept: probability, horizon, philosophy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Probability of default: what it is and how it gets modelled</h1>
+  <p class="subtitle">The opening lecture of the PD sequence. What a PD actually is (a probability, not a rate), the IRB-specific framing around horizon and rating philosophy, the long-run average anchor that defines compliant calibration, and the landscape of modelling approaches a bank can choose between. The next six lectures take a single approach (logistic regression with segmentation) through the full development pipeline.</p>
+  <div class="meta">
+    <span>A-IRB 9 of n &mdash; PD 1 of 7</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Sources: <code>credit_risk/01_models.md</code>, <code>02_probability_of_default.md</code>, <code>05_modelling/pd/01-model_methodology.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A PD is a probability, not a rate. Specifically: the probability that a named obligor or homogeneous segment of obligors crosses the regulatory default boundary (CRR Article 178: 90 DPD or UTP) within a defined forward horizon. For A-IRB the horizon is fixed at 12 months. The probability is conditioned on what the model knows at the snapshot date, which means in practice it is a function of the obligor's behavioural and bureau features, with no macro information.</p>
+
+  <p>Two design choices on top of the definition shape every later step in the pipeline. The first is the <strong>rating philosophy</strong>: through-the-cycle (TTC) ratings are stable through the credit cycle by construction; point-in-time (PiT) ratings move as obligor risk drivers change; dynamic PiT adds a recalibration overlay to track the cycle exactly. CRR Article 180(2)(a) requires that the PD assigned to each rating grade be consistent with the long-run average (LRA) of observed default rates for that grade across a full cycle. Most modern UK and EU banks choose PiT (without dynamic recalibration) because pure TTC is non-compliant with the relevant-information requirement, and dynamic PiT generates capital procyclicality.</p>
+
+  <p>The second is the <strong>modelling approach</strong>. The academic landscape is wide: statistical (linear, logistic, probit, panel, Cox survival), machine learning (neural networks, gradient-boosted trees), structural (Merton, KMV), reduced-form (Jarrow-Turnbull). In practice almost every retail A-IRB PD model in operation today is a logistic regression with feature segmentation, because it is interpretable, supervisor-approved, computationally cheap and statistically well-behaved on binary targets. The rest of this PD sequence assumes that choice; alternative approaches are discussed in this lecture and then set aside.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The most common error in informal discussion is to talk about "the PD of the portfolio" as if it were a number. There is no such object. The PD is a probability assigned to a specific obligor (or homogeneous segment) over a specific forward horizon, conditioned on what the model knows on the snapshot date. The portfolio has a distribution of PDs across its obligors, and that distribution has an expected value, but that expected value is not "the portfolio PD" in any operational sense. Confusing the two is what makes capital calculations go wrong: capital is a function of the distribution, not of the mean.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>PD is the most material input to risk-weighted assets. The K formula is sub-linear in LGD and EAD but is roughly proportional to a non-linear function of PD through the WCDR. A 10 bp shift in average portfolio PD typically moves RWA by 5 to 8% for an unsecured retail book; the same shift in average LGD moves it by 2 to 3%. The supervisor knows this, which is why PD models attract the most validation attention, the most stress-testing scrutiny, and the most input floors. Basel 3.1 introduced explicit floors on PD inputs (0.05% for corporate, 0.03% for retail) precisely to bound how much capital relief a PD model is allowed to deliver.</p>
+
+  <p>The framing in this lecture also fixes a recurring confusion. <strong>Default rate</strong> is an empirical observation: a count of defaults divided by an at-risk population in a specific historical window. <strong>PD</strong> is a model output: a forward-looking probability conditioned on currently observable features. A PD is calibrated against historical default rates (specifically against the LRA), but it is not the same object. A bank that confuses the two will at best produce models that are statistically valid but operationally wrong, and at worst will fail the use test in its first supervisory review.</p>
+
+  <p>For F107 the conceptual material in this lecture is the substrate for several exam-classic questions: what is a PD, what is the difference between PiT and TTC, what is the LRA, what model approach do banks use and why. The answers should come out cleanly if the definitions in section 4 below are clear.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Three rating philosophies define how a PD moves through the credit cycle. The diagram below shows them side by side. The same underlying obligor risk is plotted three times; what differs is how the rating system reads that risk and converts it into a PD.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three rating philosophies through the cycle">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three rating philosophies: how each handles the credit cycle</text>
+
+      <!-- TTC panel -->
+      <g>
+        <rect x="40" y="50" width="260" height="280" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="170" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Through-the-cycle (TTC)</text>
+        <!-- axes -->
+        <line x1="65" y1="285" x2="280" y2="285" stroke="#475569" stroke-width="1"/>
+        <line x1="65" y1="285" x2="65" y2="105" stroke="#475569" stroke-width="1"/>
+        <text x="170" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">time (cycle)</text>
+        <text x="55" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569" transform="rotate(-90 55 200)">PD</text>
+        <!-- ODR (cycle) -->
+        <path d="M 70 230 Q 110 170 150 175 Q 190 180 230 230 Q 260 260 275 240" fill="none" stroke="#991b1b" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="240" y="225" font-family="Inter" font-size="8" fill="#991b1b">observed default rate</text>
+        <!-- TTC line (flat) -->
+        <line x1="70" y1="200" x2="275" y2="200" stroke="#1e3a8a" stroke-width="2"/>
+        <text x="80" y="195" font-family="Inter" font-size="9" font-weight="600" fill="#1e3a8a">PD (flat)</text>
+        <!-- annotations -->
+        <text x="80" y="320" font-family="Inter" font-size="8" fill="#1e3a8a">stable; non-compliant with CRR</text>
+        <text x="80" y="332" font-family="Inter" font-size="8" fill="#1e3a8a">180(2)(a) relevant-info clause</text>
+      </g>
+
+      <!-- PiT panel -->
+      <g>
+        <rect x="320" y="50" width="260" height="280" fill="#DDF1E5" stroke="#0f766e"/>
+        <text x="450" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">Point-in-time (PiT)</text>
+        <line x1="345" y1="285" x2="560" y2="285" stroke="#475569" stroke-width="1"/>
+        <line x1="345" y1="285" x2="345" y2="105" stroke="#475569" stroke-width="1"/>
+        <text x="450" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">time (cycle)</text>
+        <text x="335" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569" transform="rotate(-90 335 200)">PD</text>
+        <!-- ODR -->
+        <path d="M 350 230 Q 390 170 430 175 Q 470 180 510 230 Q 540 260 555 240" fill="none" stroke="#991b1b" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="475" y="220" font-family="Inter" font-size="8" fill="#991b1b">observed default rate</text>
+        <!-- PiT line (semi-cyclical) -->
+        <path d="M 350 215 Q 390 175 430 180 Q 470 190 510 225 Q 540 245 555 230" fill="none" stroke="#0f766e" stroke-width="2"/>
+        <text x="360" y="200" font-family="Inter" font-size="9" font-weight="600" fill="#134e4a">PD (semi-cyclical)</text>
+        <text x="350" y="320" font-family="Inter" font-size="8" fill="#134e4a">moves with obligor drivers;</text>
+        <text x="350" y="332" font-family="Inter" font-size="8" fill="#134e4a">CRR-compliant; the IRB default</text>
+      </g>
+
+      <!-- Dynamic PiT panel -->
+      <g>
+        <rect x="600" y="50" width="260" height="280" fill="#fef9c3" stroke="#92400e"/>
+        <text x="730" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Dynamic PiT</text>
+        <line x1="625" y1="285" x2="840" y2="285" stroke="#475569" stroke-width="1"/>
+        <line x1="625" y1="285" x2="625" y2="105" stroke="#475569" stroke-width="1"/>
+        <text x="730" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">time (cycle)</text>
+        <text x="615" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569" transform="rotate(-90 615 200)">PD</text>
+        <!-- ODR + PD overlap -->
+        <path d="M 630 230 Q 670 170 710 175 Q 750 180 790 230 Q 820 260 835 240" fill="none" stroke="#991b1b" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <path d="M 630 230 Q 670 170 710 175 Q 750 180 790 230 Q 820 260 835 240" fill="none" stroke="#92400e" stroke-width="2"/>
+        <text x="640" y="195" font-family="Inter" font-size="9" font-weight="600" fill="#92400e">PD = ODR (recalibrated)</text>
+        <text x="630" y="320" font-family="Inter" font-size="8" fill="#92400e">tightest fit; operationally heavy;</text>
+        <text x="630" y="332" font-family="Inter" font-size="8" fill="#92400e">procyclical RWA</text>
+      </g>
+
+      <!-- Bottom legend -->
+      <text x="450" y="380" text-anchor="middle" font-family="Inter" font-size="10" fill="#475569">The IRB workhorse is PiT (centre panel) without dynamic recalibration: relevant to current risk, CRR-compliant, capital-stable.</text>
+    </svg>
+    <figcaption>Three rating philosophies through the credit cycle. The dashed red curve is the observed default rate, the same in each panel. The solid line is the PD the rating system assigns under each philosophy. TTC ignores the cycle (flat); PiT tracks it semi-cyclically through obligor risk drivers; dynamic PiT recalibrates to fit the cycle exactly. Most UK and EU A-IRB banks operate the middle one.</figcaption>
+  </figure>
+
+  <p>Three properties of the diagram repay attention. First, <strong>only dynamic PiT delivers a PD that matches the observed default rate</strong> at every point; the others differ by design. Second, <strong>the LRA anchor is a horizontal line through the dashed curve</strong> (not shown): it is the time-average of observed default rates over a full cycle. The TTC PD coincides with the LRA by construction; the PiT PD coincides with the LRA on average through the cycle; the dynamic-PiT PD does not coincide at all and gets reconciled to the LRA at recalibration. Third, <strong>the choice of philosophy determines the rest of the model build</strong>: a PiT model needs behavioural risk drivers (utilisation, arrears, time-on-book); a TTC model needs static obligor characteristics. The lectures that follow build a PiT model.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>What a PD actually is</h3>
+
+  <p>Formally, the IRB PD for obligor <em>i</em> at observation time <em>t</em> over the regulatory 12-month horizon is</p>
+
+  <pre><code>PD_i,t  =  Prob( default occurs in (t, t+12m]  |  features known at t )
+</code></pre>
+
+  <p>Three components of this definition do work. <strong>Default</strong> is the CRR Article 178 event (90 DPD or one of the UTP triggers; see <a href="03-definitions.html">lecture 03</a>). The <strong>horizon</strong> is fixed at 12 months for IRB; the IFRS 9 framework also uses 12-month and lifetime horizons, but the operational mechanics differ and are covered in the IFRS 9 track. The <strong>conditioning set</strong> is the obligor's behavioural and bureau features at snapshot date <em>t</em>; under IRB the model is supposed to capture the intrinsic credit quality of the counterparty and not the macroeconomic environment, which is the reverse of the IFRS 9 conditioning set.</p>
+
+  <p>The output of a PD model is a number in [0, 1]. After regulatory flooring (0.03% for retail under Basel 3.1) and MoC overlays, the model output becomes the <em>regulatory PD</em> that goes into the K formula. The pre-floor, pre-MoC output is the <em>LRA PD</em>, which is the natural object for back-testing against observed default rates and is also the natural input to the IFRS 9 PiT layer (the IFRS 9 track picks this up).</p>
+
+  <h3>Time horizon</h3>
+
+  <p>For IRB the horizon is 12 months. Three reasons. First, the LRA is constructed from 12-month observed default rates; mismatching the horizon between LRA and model would invalidate calibration. Second, the K formula assumes a one-year capital cycle; longer-horizon PDs would feed an incompatible engine. Third, recovery periods in retail typically exceed 12 months, so a 12-month horizon cleanly separates the PD (probability of the default event) from the LGD (loss given the event).</p>
+
+  <p>IFRS 9 also uses a 12-month horizon (for Stage 1) but additionally requires lifetime PDs for Stage 2 exposures and through the lifetime PD term structure for Stage 3. The construction of lifetime PDs (migration matrices, Vasicek-based forward extension, scenario-weighted aggregation) is IFRS-9-specific and not covered in this IRB sequence.</p>
+
+  <div class="callout">
+    <strong>Forward pointer.</strong> The IFRS 9 track will pick up: forward-in-time (FIT) PDs that condition on forward-looking macroeconomic information, lifetime PD term structures, the migration-matrix extension method, monthly recalibration cadence (versus the IRB annual cadence), and the no-floor convention that distinguishes ECL calibration from IRB capital calibration. None of this is in scope for the next six lectures.
+  </div>
+
+  <h3>Rating philosophy in detail</h3>
+
+  <p>The three philosophies in the diagram above translate into three concrete operating models. Each has a regulatory anchor.</p>
+
+  <table>
+    <thead>
+      <tr><th>Philosophy</th><th>Operating model</th><th>Pros</th><th>Cons</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Through-the-cycle (TTC)</strong></td>
+        <td>Risk grades based only on static obligor characteristics; no rating migration through the cycle; observed default rate per grade varies with the cycle</td>
+        <td>Simple operations; minimal maintenance; no forecast assumptions</td>
+        <td>Fails to reflect current risk; non-compliant with CRR Article 180(2)(a) relevant-information clause; weak in business use</td>
+      </tr>
+      <tr>
+        <td><strong>Point-in-time (PiT)</strong></td>
+        <td>Ratings driven by segmentation plus a scorecard that reads current behavioural and bureau features; ratings migrate as features change; ODR per grade is approximately stable through the cycle</td>
+        <td>Compliant with CRR; reflects current portfolio composition; supports use-test; modest maintenance</td>
+        <td>Some PD volatility within obligor (less than dynamic PiT); needs continuous representativeness monitoring</td>
+      </tr>
+      <tr>
+        <td><strong>Dynamic PiT</strong></td>
+        <td>PiT scorecard with periodic recalibration to track the cycle precisely; ODR per grade is flat by construction; PD movement comes from rating migrations</td>
+        <td>Strongest theoretical alignment to "true" PiT; accurate short-term capital reflection</td>
+        <td>Frequent recalibration; backward-looking calibration factors; RWA procyclicality; operational risk</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>The UK and EU IRB landscape has settled overwhelmingly on PiT without dynamic recalibration. PRA SS4/24 §10.10 explicitly allows any of the three philosophies, and PS9/24 §3.129 permits dynamic recalibration with a buffer, but most banks reject TTC (non-compliant) and dynamic PiT (capital procyclicality), leaving PiT as the workhorse.</p>
+
+  <h3>The LRA anchor</h3>
+
+  <p>CRR Article 180(2)(a) requires that the PD assigned to each rating grade is consistent with the long-run average of one-year default rates for that grade. The LRA is computed by taking the historical 12-month ODR series for each grade and averaging it across a representative period that covers at least one full credit cycle (a minimum of 5 years for retail; 7 years for corporate / sovereign / bank under CRR Article 180(1)(h)).</p>
+
+  <p>The LRA does several jobs. It is the empirical benchmark the PD model is calibrated to. It is the back-test the model has to pass at every monitoring cycle. It is the natural object the supervisor compares between banks for like-for-like portfolios. And it is the LRA, not the PiT output, that becomes the pre-MoC regulatory PD before flooring. The construction of the LRA is the central deliverable of lecture 14 (PD risk quantification).</p>
+
+  <h3>The modelling-approach landscape</h3>
+
+  <p>The academic literature on credit-risk modelling is wide. Five families are worth knowing for completeness even though only one (statistical / logistic) is operationally dominant.</p>
+
+  <ol>
+    <li>
+      <strong>Statistical models</strong>. Regression-based: linear regression for continuous targets, logistic regression for binary, probit as a normal-distribution alternative to logistic. Plus survival models (Cox proportional hazards) and discriminant analysis (the Altman Z-score is the classic). Logistic regression dominates retail A-IRB because: the target is binary, the output is bounded in [0,1], the coefficients are interpretable, the maximum-likelihood machinery is standard, and supervisors have decades of comfort with it.
+    </li>
+    <li>
+      <strong>Machine learning</strong>. Neural networks, gradient-boosted trees, random forests. Typically deliver 1 to 3 Gini points of additional discrimination over logistic regression on the same features, but face three obstacles for regulatory use: the "black box" issue (interpretability for supervisors), heavier data requirements, and challenges getting independent validation comfortable. Active research area but not yet the operational standard for A-IRB capital. The frontier is in market risk and pricing, not capital.
+    </li>
+    <li>
+      <strong>Structural models</strong>. Merton (1974) and the KMV variant. Treat equity as a call option on firm assets; default occurs when asset value falls below liabilities. Distance-to-default (DD) is the key intermediate quantity. Best suited to wholesale exposures where firm-level financials are available; not a retail approach because retail obligors have no market-value-of-equity series.
+    </li>
+    <li>
+      <strong>Reduced-form models</strong>. Jarrow-Turnbull (1995) and successors. Model the default hazard rate directly as a stochastic process, without invoking economic principles. Used in academic literature and in some bond-pricing contexts; rarely seen in retail A-IRB.
+    </li>
+    <li>
+      <strong>Portfolio models</strong>. CreditMetrics (JP Morgan), CreditRisk+ (Credit Suisse), copula-based aggregation. Estimate the loss distribution of a portfolio, not the PD of an individual obligor. Out of scope for PD modelling; the relevant portfolio aggregation for IRB is the Basel one-factor Vasicek model that produces the WCDR (covered in lecture 31 on RWA).
+    </li>
+  </ol>
+
+  <p>The other axis worth knowing is <strong>top-down versus bottom-up</strong>. A top-down approach starts with portfolio-level default rates and decomposes to subgroups; common in retail where individual obligor data is limited and segments behave homogeneously. A bottom-up approach starts with individual obligor data and aggregates; common in wholesale where each obligor has its own financial statements. Retail A-IRB is essentially a top-down approach implemented through segmentation; the next lecture (12-pd_feature_engineering) and the modelling lecture (13-pd_risk_differentiation) operationalise this.</p>
+
+  <h3>What the rest of this sequence assumes</h3>
+
+  <p>The remaining six lectures in this PD sequence assume:</p>
+
+  <ul>
+    <li>The target is the 12-month default flag under CRR Article 178 (binary).</li>
+    <li>The philosophy is PiT without dynamic recalibration.</li>
+    <li>The model class is logistic regression with feature segmentation. ML and structural alternatives are referenced but not built.</li>
+    <li>The development perimeter is a retail portfolio (the Kaggle Home Credit reference dataset is the worked example, but the approach generalises).</li>
+    <li>The horizon is 12 months and the target population is the non-defaulted opening book at each snapshot.</li>
+    <li>The output is calibrated against the LRA, MoC-uplifted, then floored at 0.03% to become the regulatory PD.</li>
+  </ul>
+
+  <p>Anything not in this list (FIT PDs, lifetime extension, SICR, ECL, IFRS 9 specifics) is deferred to the IFRS 9 track.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>PD is not a property of a customer; it is a property of a model's information set</strong>. The same customer assigned to two different scoring frameworks (say an application scorecard and a behavioural scorecard) will have two different PDs, and both can be correct simultaneously. The application scorecard knows what the obligor looked like at origination; the behavioural scorecard knows their current account activity, repayment history and bureau movement. The two information sets produce two probabilities, and the model that knows more will (other things equal) produce the more accurate one. Banks operate both layers in parallel and use them at different decision points.</p>
+
+  <p>The second lesson is that the <strong>dominance of logistic regression is not an accident of regulatory conservatism</strong>; it reflects three deep properties of the target. The binary nature of default forces a [0,1] output, which logistic delivers naturally through its CDF. The relatively rare-event nature of default (typical retail ODR is 1 to 3% per year) makes the log-odds linearity assumption better-behaved than a probit normal-tail assumption. And the interpretability of logistic coefficients makes credit-officer review possible, which feeds the use test. A neural network may discriminate slightly better, but the resulting black box fails the use test by construction. The choice is not "which model has the highest Gini" but "which model can be defended in front of a credit committee, a validator and a supervisor".</p>
+
+  <p>The third lesson is on the <strong>discipline of separating estimation from calibration</strong>. The PiT model estimates relative risk: who is more likely to default than whom. Calibration to LRA converts those relative risks into absolute probabilities. These are two different steps with different tooling and different validation. A team that bundles them ("just train the model and use its predicted probabilities") will get the discrimination right and the absolute level wrong by a factor of 2 or 3, which is enough to invalidate the capital number even if the rank-ordering is excellent. The two-phase architecture in lecture 13 (risk differentiation) and lecture 14 (risk quantification) is the answer to this.</p>
+
+  <p>The fourth lesson, and the hardest to internalise, is on <strong>the gap between probability and rate</strong>. A 2% PD does not mean 2% of customers will default. It means each customer carries a 2% probability of default, and the empirical default rate in any one year may be 1%, 2% or 5% depending on the cycle. The PD calibration target is the LRA, which is the time-average of the empirical rate; the realised rate in any given year is a draw from a distribution around that average. A PD model that produces a stable 2% prediction in a year when the realised rate was 5% is not necessarily miscalibrated; it may be that the year was a 2-sigma adverse draw. Distinguishing genuine miscalibration from a tail draw is the core of back-testing and is treated in lecture 15.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Define the IRB 12-month PD formally, naming each of the three components of the definition.</li>
+    <li>Distinguish PD from default rate. Why is the distinction operationally important?</li>
+    <li>Compare the three rating philosophies (TTC, PiT, Dynamic PiT) on three axes: regulatory compliance, capital stability, and operational burden.</li>
+    <li>What does CRR Article 180(2)(a) require, and how is the LRA constructed to meet it?</li>
+    <li>Why has logistic regression won as the operational standard for retail A-IRB PD models? Name three specific reasons.</li>
+    <li>What is the difference between a top-down and a bottom-up approach to PD modelling? Which is standard for retail and why?</li>
+    <li>Why is dynamic PiT operationally undesirable for capital purposes despite its theoretical appeal?</li>
+    <li>Distinguish estimation (risk differentiation) from calibration (risk quantification). What goes wrong if a team bundles them?</li>
+    <li>A retail portfolio shows a 5% realised default rate in a year when the LRA is 2%. Is the PD model necessarily miscalibrated?</li>
+    <li>List three model classes (other than logistic regression) that have been proposed for PD modelling. For each, give one reason it has not become operationally dominant for A-IRB.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../credit_risk/01_models.md</code> &mdash; the modelling-approach landscape (statistical, ML, structural, reduced-form, portfolio).</li>
+      <li><code>docs/wiki/.../credit_risk/02_probability_of_default.md</code> &mdash; the PiT / TTC / Dynamic PiT framing. IRB sections used here; FIT, lifetime PD and SICR sections deferred to the IFRS 9 track.</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/pd/01-model_methodology.md</code> &mdash; the rating-philosophy choice with regulatory anchors (CRR Art 180(2)(a), SS4/24 §10.10, PS9/24 §3.129).</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="../01-notation.html">Notation</a> &mdash; the PD family symbols (PiT, TTC, conditional, cumulative, lifetime, SysPiT, WCDR) are defined there.</li>
+      <li><a href="03-definitions.html">Definitions</a> &mdash; the CRR Article 178 default trigger that the PD models.</li>
+      <li><a href="02-credit_losses.html">Credit losses</a> &mdash; the loss-distribution context in which PD does its work.</li>
+    </ul>
+
+    <p><strong>Forward references inside the PD sequence:</strong></p>
+    <ul>
+      <li>10-pd_target_and_data (planned) &mdash; the 12-month default flag and the data history requirement.</li>
+      <li>11-pd_sampling_and_representativeness (planned) &mdash; how to build a fit-for-purpose development sample.</li>
+      <li>12-pd_feature_engineering (planned) &mdash; the 5-step reduction and transformation pipeline.</li>
+      <li>13-pd_risk_differentiation (planned) &mdash; the logistic-regression PiT model build.</li>
+      <li>14-pd_risk_quantification (planned) &mdash; grade construction and LRA calibration.</li>
+      <li>15-pd_testing (planned) &mdash; discrimination, stability, calibration back-testing.</li>
+    </ul>
+
+    <p><strong>Cross-track and forward to IFRS 9:</strong></p>
+    <ul>
+      <li>The same PiT scorecard is the input to the IFRS 9 PiT layer (after stripping LRA, MoC and downturn overlays). The IFRS 9 track will pick this up.</li>
+      <li>Lifetime PDs, FIT PDs, SICR, monthly recalibration and no-floor calibration are IFRS-9-specific and not covered here.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Article 180(2)(a) &mdash; the LRA requirement.</li>
+      <li>PRA SS4/24, paragraph 10.10 &mdash; rating philosophy options.</li>
+      <li>PRA PS9/24, paragraph 3.129 &mdash; dynamic recalibration with buffer.</li>
+      <li>BCBS "An Explanatory Note on the Basel II IRB Risk Weight Functions" (July 2005). The PD-to-WCDR mapping that motivates the 12-month horizon and TTC anchor.</li>
+      <li>Merton (1974), "On the pricing of corporate debt". The structural-model anchor for completeness.</li>
+      <li>Altman (1968), Z-score paper. The discriminant-analysis anchor.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 9 of n &middot; PD 1 of 7.</span>
+  <span><a href="08-portfolio_description.html">Previous: portfolio description</a> &middot; <a href="10-pd_target_and_data.html">Next: target and data</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 7: k-nearest neighbours</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Supervised learning</a></div>
+  <h1>K-nearest neighbours</h1>
+  <p class="subtitle">The simplest supervised algorithm: no model, no parameters, just memory of the training set. The lecture is short because the method is, but every later algorithm can be read as a refinement of what KNN does naively.</p>
+  <div class="meta">
+    <span>Lecture 7 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part II: supervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>K-nearest neighbours</strong> classifies a query point by looking up its $k$ closest training points and taking a majority vote of their labels; for regression it returns the mean (or distance-weighted mean) of their targets. There is no training in the usual sense. <code>fit</code> simply stores the training matrix; all the work happens at prediction time, when distances are computed between the query and every stored point. The algorithm has only two real decisions: how to measure distance (Euclidean by default, Manhattan or Mahalanobis where appropriate) and how many neighbours to consult. The first decision makes feature scaling non-optional, because a distance is dominated by whichever feature carries the largest raw units. The second decision is the bias-variance dial: $k = 1$ memorises the training set and overfits, $k = n$ collapses to a single global prediction and underfits, and the sweet spot is found by cross-validation. KNN is the cleanest illustration of the bias-variance trade-off in supervised learning, and the easiest method to break by skipping the scaling step.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You have a spreadsheet of customers, each with a row of features and a known label (default or no default). A new customer arrives. To guess their label you find the five customers in your spreadsheet whose feature rows are most similar to the new one, look at how many of those five defaulted, and predict the majority. That is the whole algorithm. The only craft is in deciding what "similar" means (which distance, on which scaled features) and how many neighbours to consult.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    KNN almost never appears in production credit risk or fraud systems, not because it predicts badly but because it scales poorly: every prediction requires a scan over the full training set, the model object is the training set, and there is no compact summary an auditor can examine. It survives as a teaching algorithm and as a strong baseline. If a model six times more complicated cannot beat KNN by a meaningful margin, the extra complexity is not earning its keep.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    The first concrete supervised algorithm in the course. It assumes the matrix arrives already transformed (lectures 2 onward in sub-module 01) and that train and test were split properly through a pipeline (<a href="../02_train_test_split/02-pipelines.html">lecture 6</a>). The next algorithm, <a href="02-decision_trees.html">decision trees</a>, is the conceptual opposite of KNN: a global, axis-aligned, rule-based partition rather than a local, distance-based lookup. Reading them as a contrasting pair makes both sharper.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons KNN earns its place at the start of supervised learning. First, <strong>it is the cleanest non-parametric baseline.</strong> A non-parametric method does not fix the functional form of the relationship between $X$ and $Y$ in advance; the complexity of the resulting decision boundary grows with the data. KNN does this in the most literal way possible. There is no functional form at all, only a lookup in the training set. If a more sophisticated model cannot beat well-tuned KNN by a clear margin, the sophistication is not buying signal, it is buying complexity.</p>
+
+  <p>Second, <strong>KNN exposes the bias-variance trade-off in its rawest form.</strong> A single parameter, $k$, controls where the model sits on the axis. At $k = 1$ every prediction echoes the nearest training point, including its noise; variance is high, bias is low, and the decision boundary is jagged. At $k = n$ every prediction returns the majority class of the whole training set; bias is high, variance is zero, and the decision boundary disappears. The whole spectrum from overfitting to underfitting is traversed by a single integer. Every subsequent algorithm reproduces this dial under a different name (tree depth, number of estimators, regularisation strength, neural network width); KNN is where it can be seen in isolation.</p>
+
+  <p>Third, <strong>KNN forces the scaling discussion to be settled.</strong> A model that compares two customers by Euclidean distance is computing $\sqrt{\sum_j (x_{ij} - x_{qj})^2}$. If income is in pounds and age in years, the income term dominates the sum by six orders of magnitude and age may as well not be in the feature matrix. The connection to <a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a> is not optional here: the choice of distance metric is the choice of how feature scales interact, and standardisation or min-max scaling becomes a prerequisite, not a stylistic preference. Tree-based methods are scale-invariant and forgive a careless pipeline; KNN does not.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A junior analyst built a churn model with KNN on a customer feature matrix that included monthly spend in pounds, tenure in months, and a satisfaction score on a 1-to-10 scale. Out-of-sample accuracy was suspiciously close to the base rate. The problem was traced in five minutes: monthly spend had a range of about 4,000, so the Euclidean distance between any two customers was effectively the difference in their spend; tenure and satisfaction contributed nothing. After z-scoring every column the accuracy rose by twelve percentage points. The lesson is structural, not arithmetic. A distance-based model with unscaled features is a univariate model dressed up as a multivariate one.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. The training set is a cloud of labelled points in feature space. A query point arrives somewhere in that cloud. Draw a circle around the query and grow it outward until it encloses exactly $k$ training points. Take the majority label of those $k$ points (classification) or average their targets (regression). That is the prediction. Changing $k$ changes how far the circle grows; changing the distance metric changes the shape of the circle (a true circle for Euclidean, a diamond for Manhattan, an ellipse aligned to the covariance for Mahalanobis).</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KNN decision changes as k grows around a query point">
+      <defs>
+        <marker id="knnArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same query point, three values of k, three predictions</text>
+
+      <!-- Axes box -->
+      <rect x="40" y="50" width="740" height="280" rx="6" fill="#FAFAF7" stroke="#d4d4d8" stroke-width="1"/>
+
+      <!-- Class A points (teal circles) -->
+      <g fill="#0d9488" stroke="#115e59" stroke-width="0.8">
+        <circle cx="120" cy="200" r="5"/>
+        <circle cx="150" cy="160" r="5"/>
+        <circle cx="180" cy="210" r="5"/>
+        <circle cx="200" cy="140" r="5"/>
+        <circle cx="220" cy="180" r="5"/>
+        <circle cx="170" cy="120" r="5"/>
+        <circle cx="240" cy="220" r="5"/>
+        <circle cx="135" cy="240" r="5"/>
+        <circle cx="195" cy="270" r="5"/>
+        <circle cx="260" cy="155" r="5"/>
+        <circle cx="100" cy="170" r="5"/>
+        <circle cx="280" cy="195" r="5"/>
+        <circle cx="320" cy="170" r="5"/>
+        <circle cx="350" cy="220" r="5"/>
+        <circle cx="380" cy="160" r="5"/>
+      </g>
+
+      <!-- Class B points (purple squares) -->
+      <g fill="#7c3aed" stroke="#5b21b6" stroke-width="0.8">
+        <rect x="455" y="115" width="9" height="9"/>
+        <rect x="490" y="140" width="9" height="9"/>
+        <rect x="520" y="105" width="9" height="9"/>
+        <rect x="550" y="160" width="9" height="9"/>
+        <rect x="580" y="130" width="9" height="9"/>
+        <rect x="500" y="190" width="9" height="9"/>
+        <rect x="610" y="170" width="9" height="9"/>
+        <rect x="540" y="220" width="9" height="9"/>
+        <rect x="600" y="240" width="9" height="9"/>
+        <rect x="640" y="125" width="9" height="9"/>
+        <rect x="670" y="180" width="9" height="9"/>
+        <rect x="700" y="210" width="9" height="9"/>
+        <rect x="475" y="245" width="9" height="9"/>
+        <rect x="630" y="270" width="9" height="9"/>
+        <rect x="565" y="280" width="9" height="9"/>
+      </g>
+
+      <!-- A few class-A points sitting near the query, to make k=1 vote teal -->
+      <g fill="#0d9488" stroke="#115e59" stroke-width="0.8">
+        <circle cx="430" cy="185" r="5"/>
+        <circle cx="445" cy="205" r="5"/>
+        <circle cx="415" cy="170" r="5"/>
+      </g>
+
+      <!-- Query point (large amber star-ish) -->
+      <g>
+        <circle cx="440" cy="190" r="7" fill="#fbbf24" stroke="#b45309" stroke-width="1.5"/>
+        <text x="440" y="178" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">query</text>
+      </g>
+
+      <!-- k=1 circle, small, encloses only one teal -->
+      <circle cx="440" cy="190" r="14" fill="none" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <!-- k=5 circle, mid, mix slightly teal-leaning -->
+      <circle cx="440" cy="190" r="40" fill="none" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <!-- k=15 circle, wide, dominated by purple cluster -->
+      <circle cx="440" cy="190" r="95" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5 4"/>
+
+      <!-- Labels for the three circles, off to the side -->
+      <text x="440" y="220" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">k=1: teal</text>
+      <text x="495" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#6b21a8">k=5: teal/purple tie-break</text>
+      <text x="555" y="295" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">k=15: purple</text>
+
+      <!-- Legend bottom -->
+      <g transform="translate(60, 350)">
+        <circle cx="6" cy="0" r="5" fill="#0d9488" stroke="#115e59" stroke-width="0.8"/>
+        <text x="18" y="3" font-family="Inter" font-size="10" fill="#18181b">class A (teal)</text>
+        <rect x="120" y="-4" width="9" height="9" fill="#7c3aed" stroke="#5b21b6" stroke-width="0.8"/>
+        <text x="138" y="3" font-family="Inter" font-size="10" fill="#18181b">class B (purple)</text>
+        <circle cx="246" cy="0" r="6" fill="#fbbf24" stroke="#b45309" stroke-width="1.2"/>
+        <text x="258" y="3" font-family="Inter" font-size="10" fill="#18181b">query point</text>
+      </g>
+    </svg>
+    <figcaption>The query sits in a small pocket of class A points that are themselves close to a larger class B cluster. At $k = 1$ the prediction is teal (the single nearest neighbour). At $k = 5$ teal still narrowly wins (most of the closest five are the pocket). At $k = 15$ the circle has expanded into the surrounding purple cluster and the prediction flips. The same point can be labelled either class depending only on the value of $k$.</figcaption>
+  </figure>
+
+  <p>Three things to read off the picture. The decision is local, not global; only the points near the query matter, the rest of the training set is invisible to this prediction. The decision is unstable in the small-$k$ regime; flipping one nearby point's label can flip the answer. The decision is over-smoothed in the large-$k$ regime; a small minority pocket gets absorbed into the surrounding majority. Choosing $k$ is choosing where on that spectrum the model lives.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Distance metrics</h3>
+
+  <p>A <strong>distance metric</strong> is the function $d(\mathbf{x}, \mathbf{q})$ that ranks training points by similarity to the query. Four matter in practice. The <strong>Euclidean distance</strong> is the straight-line distance in feature space and the default in almost every implementation,</p>
+  $$d_2(\mathbf{x}, \mathbf{q}) = \sqrt{\sum_{j=1}^{p} (x_j - q_j)^2}.$$
+  <p>Geometrically, the set of points at fixed Euclidean distance from the query is a circle in two dimensions, a sphere in three, a hypersphere in $p$. The <strong>Manhattan distance</strong> (also called taxicab or L1) sums absolute coordinate differences,</p>
+  $$d_1(\mathbf{x}, \mathbf{q}) = \sum_{j=1}^{p} |x_j - q_j|.$$
+  <p>Its iso-distance contour is a diamond (a square rotated 45 degrees) in two dimensions. Manhattan is less sensitive to extreme values in a single coordinate than Euclidean, because squaring inflates large differences more than the absolute value does. It is the natural choice when features are independent grid-like axes (street-grid travel, count vectors) rather than continuous positions in space.</p>
+
+  <p>The <strong>Minkowski distance</strong> generalises both into a single one-parameter family,</p>
+  $$d_p(\mathbf{x}, \mathbf{q}) = \left(\sum_{j=1}^{p} |x_j - q_j|^{p}\right)^{1/p}.$$
+  <p>At $p = 1$ it reduces to Manhattan, at $p = 2$ to Euclidean, and as $p \to \infty$ it approaches the Chebyshev (maximum coordinate difference) distance. scikit-learn's <code>KNeighborsClassifier</code> takes a <code>p</code> argument that selects within this family.</p>
+
+  <p>The <strong>Mahalanobis distance</strong> respects feature correlation by rescaling along the principal axes of the data,</p>
+  $$d_M(\mathbf{x}, \mathbf{q}) = \sqrt{(\mathbf{x} - \mathbf{q})^{\top} \Sigma^{-1} (\mathbf{x} - \mathbf{q})},$$
+  <p>where $\Sigma$ is the sample covariance matrix of the features. When $\Sigma$ is the identity, Mahalanobis collapses to Euclidean. When features are correlated, Mahalanobis effectively de-correlates them first; two features that always move together are not double-counted. It is the right choice when features are heterogeneous but the geometry of correlation is informative.</p>
+
+  <p>The single fact that ties this whole subsection to <a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a>: Euclidean and Manhattan distances are not scale-invariant. Multiplying one feature by a hundred multiplies its contribution to the distance by a hundred (Manhattan) or ten thousand (Euclidean squared) before the square root. The fix is to standardise (z-score) or min-max scale every numeric feature before fitting. Mahalanobis distance is the exception: it scales by the inverse covariance, so it absorbs unit changes automatically. In practice almost everyone uses Euclidean with z-scored features, because Mahalanobis requires estimating and inverting a $p \times p$ matrix and the saving is rarely worth the complexity.</p>
+
+  <h3>Choosing k</h3>
+
+  <p>The neighbour count $k$ controls the bias-variance position of the model. Small $k$ produces low bias (the prediction follows the local structure closely) and high variance (the prediction is sensitive to which specific points happened to land near the query). $k = 1$ achieves zero training error trivially, because every training point is its own nearest neighbour, but generalisation suffers because the model has memorised noise. Large $k$ produces high bias (the prediction is smoothed over a wide neighbourhood that may cross class boundaries) and low variance (the prediction is stable). $k = n$ predicts the global majority class for every query and ignores the features entirely.</p>
+
+  <p>The standard way to choose $k$ is grid search with cross-validation. Sweep $k$ across a range (commonly 1 to 50 or 1 to $\sqrt{n}$), evaluate out-of-fold accuracy (or RMSE for regression) at each value, and pick the $k$ at which the validation curve plateaus. The resulting accuracy-versus-$k$ plot is the classic U-shape inverted: poor at $k = 1$ from variance, climbing as $k$ rises, peaking in a broad plateau, then falling again as $k$ becomes large enough to underfit. One practical rule of thumb when computation is tight: $k \approx \sqrt{n}$ is rarely far from optimal for a moderately-sized dataset, although cross-validation should always refine it.</p>
+
+  <p>Two conventions help. Use an odd $k$ for binary classification to avoid ties (an even $k$ can split 50-50 between classes, forcing an arbitrary tie-break). For multi-class problems ties are still possible and scikit-learn resolves them by class label order; if that matters for the application, increment $k$ by one until the tie disappears.</p>
+
+  <h3>Classification versus regression</h3>
+
+  <p>Both variants use the same lookup of $k$ nearest neighbours. They differ only in how the neighbours' labels are aggregated. For <strong>classification</strong>, the prediction is the modal class among the $k$ neighbours,</p>
+  $$\hat{y}_q = \operatorname{argmax}_{c} \sum_{i \in \mathcal{N}_k(q)} \mathbb{1}\{y_i = c\}.$$
+  <p>For <strong>regression</strong>, the prediction is the mean of the $k$ neighbours' targets,</p>
+  $$\hat{y}_q = \frac{1}{k} \sum_{i \in \mathcal{N}_k(q)} y_i.$$
+  <p>A <strong>distance-weighted</strong> aggregation refines both. Each neighbour contributes proportionally to the inverse of its distance from the query, so very close neighbours dominate and far neighbours fade,</p>
+  $$\hat{y}_q = \frac{\sum_{i \in \mathcal{N}_k(q)} w_i \cdot y_i}{\sum_{i \in \mathcal{N}_k(q)} w_i}, \qquad w_i = \frac{1}{d(\mathbf{x}_i, \mathbf{q}) + \varepsilon}.$$
+  <p>The small $\varepsilon$ prevents division by zero when a training point coincides with the query. Weighted KNN is preferable when neighbour density varies across the feature space, because uniform averaging treats a neighbour at the edge of the local cloud the same as one almost touching the query.</p>
+
+  <h3>The curse of dimensionality</h3>
+
+  <p>The <strong>curse of dimensionality</strong> is the observation that distances lose their discriminating power as the number of features rises. Concretely, the ratio of the maximum to the minimum distance between a query and a set of random points in $p$-dimensional space tends toward one as $p$ grows. In high dimensions every training point is roughly the same distance from the query, "nearest" is barely nearer than "farthest", and the algorithm degenerates. The effect bites earlier than most practitioners expect; with a few dozen uncorrelated features it is already material.</p>
+
+  <p>Three responses help. Reduce dimensionality before fitting (PCA, feature selection, or domain pruning). Switch to a method that does not rely on global distances (tree-based methods cut the feature space along one axis at a time and are immune). Use Mahalanobis or a learned distance metric that effectively weights features by their informativeness. The general advice is unambiguous: KNN works well in low-to-moderate dimensions ($p$ in the single digits to low tens) and degrades steadily above that. If the feature matrix is very wide, KNN is the wrong tool.</p>
+
+  <h3>KNN in scikit-learn</h3>
+
+  <p>The two relevant classes are <code>KNeighborsClassifier</code> and <code>KNeighborsRegressor</code>, both in <code>sklearn.neighbors</code>. The minimal classification call is:</p>
+
+  <pre><code>from sklearn.neighbors import KNeighborsClassifier
+
+knn = KNeighborsClassifier(n_neighbors=5, weights="uniform", metric="minkowski", p=2)
+knn.fit(X_train, y_train)
+y_pred = knn.predict(X_test)</code></pre>
+
+  <p>The four parameters that matter are <code>n_neighbors</code> (the integer $k$), <code>weights</code> (<code>"uniform"</code> or <code>"distance"</code>), <code>metric</code> (<code>"minkowski"</code>, <code>"euclidean"</code>, <code>"manhattan"</code>, <code>"chebyshev"</code>, <code>"mahalanobis"</code>, or a callable), and <code>p</code> (the Minkowski exponent when <code>metric="minkowski"</code>; $p = 2$ gives Euclidean, $p = 1$ Manhattan). The regressor signature is identical, swapping in <code>KNeighborsRegressor</code>.</p>
+
+  <p>Two implementation details are worth knowing. scikit-learn computes neighbours by default with a <strong>ball tree</strong> or <strong>k-d tree</strong> rather than brute force; both are spatial indexing structures that reduce average prediction time from $O(n)$ per query to $O(\log n)$ in low dimensions. In high dimensions the trees degenerate and brute force is automatically used; this is one symptom of the curse of dimensionality showing up in the runtime as well as the accuracy. The second detail is that KNN respects scikit-learn's <code>Pipeline</code> contract: wrapping it with a <code>StandardScaler</code> in the same pipeline (see <a href="../02_train_test_split/02-pipelines.html">lecture 6</a>) ensures the scaler is fit on training data only, fixing the most common KNN bug in one line.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every KNN problem in practice. Each is easy to introduce and easy to miss without explicit checks.</p>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting to scale</span>
+    Fitting KNN on a feature matrix with mixed units (pounds, years, ratios) without scaling makes the largest-unit feature the only feature the algorithm sees. The model still trains, still predicts, and still reports an accuracy number; that number is just badly worse than it should be. The fix is to wrap the model in a pipeline with <code>StandardScaler</code> (or <code>MinMaxScaler</code>) as the first step. Always. There is no defensible KNN model without explicit scaling and there is no scenario where leaving it out improves performance.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Scaling the test set on its own statistics</span>
+    Computing the scaler's mean and standard deviation on the test set, or on the full dataset before splitting, leaks information and inflates test accuracy. The fix is the same pipeline pattern from <a href="../02_train_test_split/02-pipelines.html">lecture 6</a>: the scaler is fit on the training fold inside a pipeline, and the same fitted scaler is then applied to the test fold without re-fitting. This is the canonical leakage failure for any distance-based method and it is invisible at validation time.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing k by training accuracy</span>
+    Training accuracy is monotonic in small-to-moderate $k$: it is one at $k = 1$ (perfect by construction) and falls smoothly as $k$ rises. Picking the $k$ that maximises training accuracy always picks $k = 1$, which is the worst choice. The fix is to evaluate $k$ on a held-out fold via cross-validation. Plot the validation accuracy against $k$ and pick the broad plateau, not the spike.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Running KNN on a wide feature matrix</span>
+    With dozens or hundreds of features, the curse of dimensionality drains the distance metric of meaning and KNN converges toward random performance regardless of $k$. The model still produces predictions; they just stop reflecting the structure of the data. The fix is either to reduce dimensionality first (PCA, feature selection, domain pruning) or to switch to a method that does not depend on global distances. If a tree-based baseline crushes KNN on the same matrix, dimensionality is almost certainly the cause.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>KNN is the algorithm with the smallest gap between intuition and implementation. Store the training set. For a new point, find the $k$ closest training points under some distance metric, vote (for classification) or average (for regression). Two decisions matter: the distance metric (Euclidean by default, with scaling mandatory; Mahalanobis when correlation between features is informative) and $k$ (chosen by cross-validation, not by training accuracy, with odd values preferred for binary classification). Two structural weaknesses constrain it: prediction time grows with the training set, and the curse of dimensionality dissolves the meaning of distance once feature count rises into the dozens.</p>
+
+  <p>What this lecture deliberately did not do. It did not introduce kernel methods (kernel regression, kernel density estimation, support vector machines with RBF kernels), which can be read as KNN with a smooth weighting function instead of a hard cutoff at $k$ neighbours; that line continues into later lectures. It did not derive any decision boundary explicitly, because KNN has no closed-form boundary, only an implicit Voronoi tessellation around the training points. It did not benchmark against another classifier; that comparison is the job of <a href="../07_model_evaluation/03-classification_metrics.html">model evaluation</a>.</p>
+
+  <p>Lecture 8, <a href="02-decision_trees.html">decision trees</a>, swaps every assumption KNN makes. Where KNN is local, decision trees are global. Where KNN is distance-based and demands scaling, decision trees are axis-aligned and scale-invariant. Where KNN's complexity dial is an integer $k$, the tree's is depth and the minimum-samples-per-leaf threshold. Reading the two methods as complementary opposites is the cleanest way to internalise both. Every algorithm later in the course is a refinement somewhere on the axis they bracket.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the Euclidean and Manhattan distance formulas in $p$ dimensions, and explain in one sentence why a KNN classifier requires feature scaling whereas a decision tree does not.</li>
+      <li>Consider three training points with $(x_1, x_2, y)$ values $(2, 3, A)$, $(5, 4, B)$, $(1, 1, A)$, $(4, 7, B)$, $(6, 5, B)$. A query point arrives at $(3, 3)$. Compute the Euclidean distance from the query to each training point, identify the $k = 3$ nearest neighbours, and state the majority-vote prediction.</li>
+      <li>Sketch the validation accuracy versus $k$ curve for a typical KNN classifier. Label the regions where bias dominates and where variance dominates, and explain why the curve has a maximum rather than monotonic behaviour.</li>
+      <li>Describe the curse of dimensionality in one sentence. State two practical responses an analyst can take if KNN must be used on a wide feature matrix.</li>
+      <li>You are predicting house prices with KNN regression. Explain when distance-weighted averaging (<code>weights="distance"</code>) is preferable to uniform averaging (<code>weights="uniform"</code>) and what failure mode the small $\varepsilon$ in the weight expression prevents.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 8 (<a href="02-decision_trees.html">decision trees</a>) is the structural opposite of KNN: global, axis-aligned, rule-based, and scale-invariant. Reading the two as a contrasting pair sharpens both.</li>
+      <li><strong>Prerequisite:</strong> Lecture 2 (<a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a>) covers the scaling step that KNN requires. Without standardisation or min-max scaling, the distance metric is dominated by whichever feature carries the largest raw units.</li>
+      <li><strong>Prerequisite:</strong> Lecture 1 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the machine learning landscape</a>) introduced the bias-variance trade-off as the axis along which every supervised algorithm sits. KNN's parameter $k$ is the cleanest instance of that axis in the course.</li>
+      <li><strong>Forward link:</strong> Lecture 36 (<a href="../07_model_evaluation/03-classification_metrics.html">classification metrics</a>) provides the language for choosing $k$ properly: accuracy is rarely the right scoring rule under class imbalance, and KNN's neighbour vote is exactly the kind of model where calibrated probabilities, AUC, and confusion-matrix-derived metrics matter more than raw accuracy.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Supervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 7 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

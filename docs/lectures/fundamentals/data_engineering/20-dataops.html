@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 20: DataOps and delivery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>DataOps and delivery</h1>
+  <p class="subtitle">Software engineering learned how to ship changes safely and repeatedly, and data work spent two decades not adopting any of it. DataOps is the adoption, plus the one genuine complication: software is code and can be recreated anywhere, while a data platform is code plus state, and the state is confidential, enormous, and impossible to copy into a development environment.</p>
+  <div class="meta">
+    <span>Lecture 20 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part V: the undercurrents</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>DataOps</strong> applies the delivery practices of software engineering to data platforms: everything in version control, automated tests on every change, continuous integration that builds and verifies before merge, environment promotion rather than editing production, infrastructure defined as code, and monitoring wired in from the start rather than added after the first incident.</p>
+
+  <p>Almost all of it transfers unchanged from the <a href="../software_engineering/index.html">software engineering track</a>, which this lecture will not repeat. Three things are genuinely different and are what this lecture is about. <strong>Environments cannot be identical</strong>, because you cannot copy the production data, so the discipline is about what you substitute and how you keep the substitute representative. <strong>Deployments change state as well as behaviour</strong>, so a release may need to rebuild tables, and rolling back a bad release means rolling back data, which is where Lecture 14's time travel earns its keep. And <strong>cost is a first-class engineering property</strong>, because a query is a purchase and an inefficient pipeline shows up on an invoice rather than merely feeling slow.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A workshop where each craftsman keeps their own jigs and works from memory produces good pieces and cannot produce the same piece twice, and when one craftsman leaves their pieces become unmaintainable. A factory writes the process down, tests the first article against a specification, changes the line through a controlled procedure, and can tell you exactly which batch a defect came from. Neither is more skilled. The factory is repeatable, and repeatability is what lets a bank rely on the output. The complication is that this particular factory's raw material cannot leave the building, so the test line has to run on a substitute.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">The maturity trap</span>
+    Every item in this lecture is worth doing, and doing them in the wrong order wastes months. The order that works: version control first, because nothing else is possible without it; then automated tests on the transformation logic, because they are what make change safe; then continuous integration to run those tests before merge; then environment promotion; then infrastructure as code; then cost engineering. A team that builds sophisticated infrastructure automation before it has tests has automated the deployment of unverified logic, which is faster delivery of the same defects.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Deployment is the riskiest moment in a platform's life, and in data work it is usually the least controlled.</strong> The characteristic incident is a change made directly in production because that is where the data is: a column added by hand, a query edited in a console, a job's schedule adjusted and forgotten. Each is unreviewed, unrecorded, and irreproducible, and collectively they mean the deployed state of the platform is not described by any repository. When a supervisor asks what changed and when, the answer must come from a version history or it does not exist.</p>
+
+  <p><strong>Reproducibility is a regulatory requirement, not an engineering aesthetic.</strong> Model risk standards expect a model, including its data preparation, to be reproducible by an independent party. That requires the code in version control, the environment pinned, the parameters explicit, and the input data version identifiable, which is the intersection of this lecture with Lectures 14 and 15. A pipeline that runs correctly but cannot be re-run to produce an identical result is a validation finding.</p>
+
+  <p><strong>Cost surprises are an engineering failure with a finance signature.</strong> A missing partition filter turns a daily query into a full-history scan; a poorly clustered table multiplies data scanned by twenty; small files multiply overhead; an idle cluster left running costs the same as a busy one. None of these show up as errors, and all of them show up on the monthly invoice, usually attributed to nobody. Treating cost as a monitored metric with owners is what stops a platform's cost growing faster than its usefulness.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The environment problem, and the three substitutes</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Environments and data substitution">
+      <defs>
+        <marker id="ar-do" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Code promotes unchanged; data does not promote at all</text>
+
+      <!-- environments -->
+      <rect x="30" y="40" width="200" height="110" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="130" y="62" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">DEVELOPMENT</text>
+      <text x="46" y="82" font-family="Inter" font-size="8.5" fill="#0d9488">one schema per engineer</text>
+      <text x="46" y="96" font-family="Inter" font-size="8.5" fill="#0d9488">data: synthetic or tokenised</text>
+      <text x="46" y="110" font-family="Inter" font-size="8.5" fill="#0d9488">volume: small sample</text>
+      <text x="46" y="124" font-family="Inter" font-size="8.5" fill="#0d9488">runs: on demand, seconds</text>
+      <text x="46" y="140" font-family="Inter" font-size="8.5" font-weight="600" fill="#115e59">optimised for iteration speed</text>
+
+      <rect x="280" y="40" width="200" height="110" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="380" y="62" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#92400e">CI / STAGING</text>
+      <text x="296" y="82" font-family="Inter" font-size="8.5" fill="#b45309">ephemeral schema per PR</text>
+      <text x="296" y="96" font-family="Inter" font-size="8.5" fill="#b45309">data: masked subset</text>
+      <text x="296" y="110" font-family="Inter" font-size="8.5" fill="#b45309">volume: one partition</text>
+      <text x="296" y="124" font-family="Inter" font-size="8.5" fill="#b45309">runs: on every push</text>
+      <text x="296" y="140" font-family="Inter" font-size="8.5" font-weight="600" fill="#92400e">optimised for evidence</text>
+
+      <rect x="530" y="40" width="200" height="110" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="630" y="62" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#5b21b6">PRODUCTION</text>
+      <text x="546" y="82" font-family="Inter" font-size="8.5" fill="#7c3aed">the only real data</text>
+      <text x="546" y="96" font-family="Inter" font-size="8.5" fill="#7c3aed">data: real, governed</text>
+      <text x="546" y="110" font-family="Inter" font-size="8.5" fill="#7c3aed">volume: full history</text>
+      <text x="546" y="124" font-family="Inter" font-size="8.5" fill="#7c3aed">runs: scheduled, monitored</text>
+      <text x="546" y="140" font-family="Inter" font-size="8.5" font-weight="600" fill="#5b21b6">optimised for reliability</text>
+
+      <g stroke="#71717a" stroke-width="1.5" fill="none">
+        <line x1="233" y1="95" x2="276" y2="95" marker-end="url(#ar-do)"/>
+        <line x1="483" y1="95" x2="526" y2="95" marker-end="url(#ar-do)"/>
+      </g>
+      <text x="255" y="86" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">code</text>
+      <text x="505" y="86" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">code</text>
+
+      <!-- the blocked arrow -->
+      <line x1="526" y1="130" x2="240" y2="130" stroke="#DC2855" stroke-width="2" stroke-dasharray="5 4"/>
+      <line x1="378" y1="120" x2="392" y2="140" stroke="#DC2855" stroke-width="2.5"/>
+      <line x1="392" y1="120" x2="378" y2="140" stroke="#DC2855" stroke-width="2.5"/>
+      <text x="380" y="160" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="700" fill="#991b1b">production data must not flow left (Lecture 19)</text>
+
+      <!-- substitutes -->
+      <rect x="30" y="180" width="700" height="146" rx="10" fill="#F4F4F5" stroke="#52525b" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="380" y="202" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#27272a">SO WHAT DO THE LOWER ENVIRONMENTS RUN ON?</text>
+      <g font-family="Inter" font-size="9">
+        <text x="50" y="226" font-weight="700" fill="#115e59">Synthetic</text>
+        <text x="150" y="226" fill="#3f3f46">Generated to match the schema, the distributions, and specifically the edge cases.</text>
+        <text x="150" y="239" fill="#3f3f46">Best for unit tests and for cases production rarely contains. Never realistic enough alone.</text>
+
+        <text x="50" y="263" font-weight="700" fill="#92400e">Tokenised subset</text>
+        <text x="180" y="263" fill="#3f3f46">Real shapes, real volumes and skew, real join behaviour; identifiers replaced by tokens</text>
+        <text x="180" y="276" fill="#3f3f46">and personal fields masked. Best for integration testing and performance work.</text>
+
+        <text x="50" y="300" font-weight="700" fill="#5b21b6">Production, read-only</text>
+        <text x="200" y="300" fill="#3f3f46">A CI job builds the changed models into an ephemeral schema against real inputs,</text>
+        <text x="200" y="313" fill="#3f3f46">under production access controls, and destroys them. Best evidence; strictest controls.</text>
+      </g>
+    </svg>
+    <figcaption>Code promotes left to right; data does not promote right to left. The three substitutes are complementary rather than competing: synthetic data for unit tests and edge cases, a tokenised subset for integration and performance, and a controlled read-only build against production inputs when you need real evidence before merging.</figcaption>
+  </figure>
+
+  <h3>What continuous integration checks on a data change</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Stage</th><th>Checks</th><th>Fails on</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Pre-commit</strong></td><td>Formatting, SQL linting, no secrets, no large files</td><td>Anything that should never reach a reviewer</td></tr>
+      <tr><td><strong>Static</strong></td><td>Transformation code compiles; references resolve; no cycles; type checks on Python</td><td>A model referencing something that does not exist</td></tr>
+      <tr><td><strong>Unit</strong></td><td>Transformation logic against fixed inputs; the cell cleaners; the schema definitions</td><td>Logic that does not do what the author claims</td></tr>
+      <tr><td><strong>Build</strong></td><td>Changed models and their dependants built into an ephemeral schema</td><td>SQL that is valid but does not execute against the real schema</td></tr>
+      <tr><td><strong>Data tests</strong></td><td>Grain uniqueness, keys, ranges, referential integrity on the built output</td><td>Output that violates a stated expectation</td></tr>
+      <tr><td><strong>Contract</strong></td><td>Any dataset with a contract still satisfies its schema and semantics</td><td>A change that would break a named consumer</td></tr>
+      <tr><td><strong>Impact</strong></td><td>Row counts and key aggregates compared with production, posted to the pull request</td><td>Nothing automatically; a human reads it and decides</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The last row is the one people skip and the one reviewers value most. A pull request that says "this change moves the March default rate from 1.42 to 1.51 per cent and adds 214 accounts to the default population" is reviewable. One that says "modified int_default_flag.sql" is not, and the reviewer either approves it on trust or reproduces the analysis themselves.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>What lives in the repository</h3>
+
+  <pre><code>risk-platform/
+├── ingestion/            # extract and load code, parameterised by partition
+├── transform/            # dbt project: models, tests, snapshots, macros
+├── contracts/            # one YAML per published dataset (Lecture 18)
+├── quality/              # pandera schemas and validation suites (Lecture 16)
+├── orchestration/        # DAG or asset definitions: thin, no business logic
+├── infra/                # Terraform: storage, catalogue, compute, IAM, secrets refs
+├── tests/                # unit tests mirroring the source layout
+├── .github/workflows/    # CI pipeline definitions
+├── .pre-commit-config.yaml
+└── pyproject.toml        # pinned dependencies, lint and type configuration</code></pre>
+
+  <p>Two properties matter more than the exact layout. Everything needed to recreate the platform is here, so a new environment is a Terraform apply and a deployment rather than an archaeology exercise. And nothing here is a secret: credentials are referenced by name and resolved at runtime from the secret manager of Lecture 19, with a pre-commit hook and a CI scan to catch the accident.</p>
+
+  <h3>Pinned environments, because reproducibility depends on them</h3>
+
+  <pre><code># pinned, resolved, committed: the same versions everywhere, including in three years
+[project]
+requires-python = "==3.12.*"
+dependencies = [
+  "dbt-core==1.9.2",
+  "duckdb==1.1.3",
+  "pandera[pandas]==0.22.1",
+  "pyspark==3.5.4",
+]</code></pre>
+
+  <p>Unpinned dependencies are the most common reason a pipeline that ran in March cannot be re-run in September: a library changed a default, a date parser became stricter, an aggregation changed its null handling. Pin exact versions, commit the lock file, and rebuild the container image deliberately rather than implicitly. Containerising the runtime with Docker takes this further by pinning the interpreter and the system libraries too, which is what makes "reproduce this model build" a defensible claim rather than an optimistic one.</p>
+
+  <h3>Deployment strategies when the deliverable is a table</h3>
+
+  <p>Three patterns, in increasing safety.</p>
+
+  <p><em>In-place rebuild.</em> The new code runs and overwrites the table. Simple, and the table is briefly wrong or absent if the run fails partway, unless the table format's atomic commit protects you, which is one more reason for Lecture 14.</p>
+
+  <p><em>Blue-green tables.</em> Build the new version alongside the old under a different name, verify it, then atomically swap a view or a catalogue pointer so consumers move in one step. Rollback is swapping the pointer back. This is the right pattern for a table feeding a regulatory submission, because the verification happens before anyone can read the new version.</p>
+
+  <p><em>Time-travel rollback.</em> With a table format, a bad deployment can be reverted by restoring the table to its prior version, which is faster than rebuilding and works even when the cause of the badness is not yet understood. It is not a substitute for the previous pattern, because it operates after consumers may already have read the bad data, but it is the fastest available remedy and it should be a documented, practised procedure rather than something improvised during an incident.</p>
+
+  <p>Whichever pattern, the deployment of a <em>definition change</em> needs the decision from Lecture 15: does history rebuild under the new definition, or does the change apply only prospectively? Both are legitimate, the choice has reporting consequences, and it must be recorded in the change record rather than emerging from whichever command someone happened to run.</p>
+
+  <h3>Infrastructure as code, briefly</h3>
+
+  <p>Storage buckets, catalogue objects, compute resources, service identities, access grants, and secret references all belong in Terraform or an equivalent. The argument is the same as for the rest of the repository: a change to a permission is then a reviewed commit rather than a console click, environments are consistent by construction, and the current state of the platform is described by a file somebody can read. For access grants specifically this closes the loop with Lecture 19: the quarterly entitlement review becomes a review of a file with a change history, not an export from a console that nobody can compare with last quarter's.</p>
+
+  <h3>Cost engineering</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Lever</th><th>Typical waste it removes</th><th>Where it was introduced</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Partition pruning</strong></td><td>Queries scanning full history because a filter is on a derived column or missing</td><td>Lectures 02, 09</td></tr>
+      <tr><td><strong>Clustering and sort order</strong></td><td>File skipping ineffective, so ten times the data is read</td><td>Lectures 02, 14</td></tr>
+      <tr><td><strong>Compaction</strong></td><td>Per-file overhead dominating on small files</td><td>Lectures 02, 14</td></tr>
+      <tr><td><strong>Right-sized compute</strong></td><td>A cluster for work a single node does faster; idle clusters left running</td><td>Lectures 09, 13</td></tr>
+      <tr><td><strong>Incremental instead of full rebuild</strong></td><td>Reprocessing ten years nightly to add one month</td><td>Lecture 15</td></tr>
+      <tr><td><strong>Storage tiering and retention</strong></td><td>Ten years of intermediate data nobody reads, on the fastest tier</td><td>Lecture 19</td></tr>
+      <tr><td><strong>Cost attribution</strong></td><td>Nobody owning the invoice, so nobody optimising</td><td>This lecture</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The last lever is the one that makes the others happen. Tag every job and query with a team and a pipeline, report cost by owner monthly, and the conversations follow: the team that discovers its nightly job costs more than the rest of the platform combined will fix it without being asked. Cost attribution is a monitoring problem, and it belongs alongside the monitors of Lecture 18 rather than in a finance spreadsheet.</p>
+
+  <div class="callout insight">
+    <span class="tag">The four-eyes principle, applied to data</span>
+    In a bank, changes to production risk figures generally require a second person's approval, and the natural implementation is the pull request: no direct commits to the main branch, no direct changes in production, every merge reviewed and recorded, and deployment automated from the main branch so that what is deployed is what was reviewed. This is not extra process bolted on for compliance; it is the ordinary practice from the <a href="../software_engineering/14-code_review_and_prs.html">code review lecture</a>, which happens also to satisfy a control requirement. When an auditor asks how you prevent unreviewed changes to regulatory calculations, the branch protection rule is the answer, and it is a better answer than a policy document.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: the delivery pipeline for the risk platform, and a cost review</strong>
+    <p>Bring the whole course together on one change: adding a forbearance flag to the default definition, the same change as in Lecture 15, and following it from a developer's laptop to a published regulatory figure.</p>
+    <p><em>1. Local.</em> The engineer works in their own schema against a tokenised subset of one month. The transformation runs in seconds on DuckDB, unit tests cover the new edge cases with synthetic rows, and the pandera schema is updated if the output shape changed. Nothing here touches real personal data, and nothing here needs a cluster.</p>
+    <p><em>2. Pre-commit.</em> Formatting, SQL linting, secret scanning, and type checks run before the commit is created. These take two seconds and prevent the class of review comment that wastes a reviewer's attention on whitespace instead of logic.</p>
+    <p><em>3. Continuous integration on the pull request.</em> The changed models and their dependants build into an ephemeral schema against real inputs, read-only, under production access controls. Data tests run on the output: grain unique, keys resolve, ranges hold. The contract test confirms the published dataset still satisfies its schema and documented semantics. The impact job posts to the pull request: 214 accounts newly in default, exposure of £31.2 million, March default rate moving from 1.42 to 1.51 per cent, no change to row counts.</p>
+    <p><em>4. Review.</em> Two reviewers, one engineer and one credit risk modeller. The diff is one file plus tests. The impact figures are in the pull request. The reviewer's job is to judge whether the definition is right, which is the only question a machine cannot answer, and everything mechanical has already been verified. This is the four-eyes control and the code review practice being the same act.</p>
+    <p><em>5. Merge and deploy.</em> Merge to main triggers deployment. The definition change requires history to rebuild, which is a conscious decision recorded in the change record, so the deployment runs a full refresh of the affected models across all partitions, with concurrency capped, each partition reconciled, and the previous table versions retained. Blue-green for the table feeding the regulatory submission: build alongside, verify the reconciliation, swap the pointer.</p>
+    <p><em>6. Verify and communicate.</em> Monitors confirm freshness and that the distributional shift matches the predicted impact rather than exceeding it, which is the check that the deployment did what the analysis said it would. Consumers named in the contract are notified with the new version number and the restated figures. The lineage graph and the commit history now record what changed, when, why, and who approved it, which is the audit trail the whole exercise exists to produce.</p>
+    <p><em>Then the cost review, three months later.</em> Cost attribution reports show the platform's spend has grown forty per cent while volumes grew five. Three findings, each traceable to a lecture in this course. First, the payments aggregation rebuilds ten years nightly to add one day, because it was written as a full refresh: making it incremental removes most of the growth. Second, a dashboard query filters on a derived month column rather than the partition column, so it scans the full history every refresh, and moving the filter onto the partition column fixes it. Third, the streaming sink writes a file every thirty seconds and compaction was never scheduled, so a table of modest size consists of four hundred thousand files and every query pays per-file overhead. None of the three was an error, none raised an alert, and all three were visible the moment somebody was shown the invoice broken down by pipeline.</p>
+    <p><em>The closing observation.</em> Notice that this single change exercised nearly every lecture in the course: the file formats and pruning of Part I, the SQL and modelling of Part II, the ingestion and restatement window of Part III, the engine, table format, and transformation layer of Part IV, and every undercurrent in Part V. That is the argument for treating the lifecycle as one subject rather than a collection of tools. The tools will all be replaced. The lifecycle, and the question of whether anyone should believe the number at the end of it, will not.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>DataOps is the software engineering discipline applied to data, with three genuine differences: environments cannot share data so the substitutes must be chosen deliberately, deployments change state as well as behaviour so rollback means rolling back tables, and cost is an engineering property that only gets managed once it is attributed. Build the practices in order, version control before tests before continuous integration before infrastructure automation, and let the pull request be both the engineering practice and the four-eyes control. The measure of the whole apparatus is a single question: can an independent party reproduce this number, and can you show what changed since the last time it was produced?</p>
+
+  <div class="callout insight">
+    <span class="tag">Closing the course</span>
+    Twenty lectures, and one claim running through them. Data engineering is the supply chain that delivers usable data to models and people, and the difference between a pipeline that runs and a platform anyone should rely on is entirely in the undercurrents: definitions with one home, quality checked at the boundary, lineage derived from code, history that can be reproduced, and access that can be proven. For a credit risk modeller specifically, the leverage is unusually clear. The data engineering stage of an A-IRB or IFRS 9 model build is this course applied to one portfolio, and the findings that sink model approvals are almost never about the model form. They are about whether the arrears count meant what you thought, whether the observation window was censored correctly, whether the March figure can be reproduced, and whether anyone can say where the number came from. Those are the questions this course was built to answer.
+  </div>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Give the three ways a data platform's delivery differs from an ordinary software project.</li>
+      <li>State the order in which DataOps practices should be adopted, and what goes wrong if infrastructure automation comes first.</li>
+      <li>Name the three data substitutes for lower environments and what each is best for.</li>
+      <li>Which continuous integration stage do teams most often omit, and why do reviewers value it most?</li>
+      <li>Why are unpinned dependencies a reproducibility failure rather than a convenience?</li>
+      <li>Contrast in-place rebuild, blue-green tables, and time-travel rollback, and say which suits a regulatory submission.</li>
+      <li>Give four cost levers and the lecture that introduced each, plus the one lever that makes the others happen.</li>
+      <li>How does a branch protection rule satisfy the four-eyes principle, and why is it a better answer than a policy document?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="19-governance_and_privacy.html">Lecture 19</a> supplied the access model and secret handling this pipeline enforces; <a href="18-observability_and_contracts.html">Lecture 18</a> supplied the contract test and the monitors.</li>
+      <li><strong>The course:</strong> return to the <a href="index.html">course landing page</a> for the full sequence, or to <a href="01-introduction.html">Lecture 01</a> for the lifecycle this lecture has just traversed end to end.</li>
+      <li><strong>Outside this course:</strong> the <a href="../software_engineering/index.html">software engineering</a> track is the parent discipline, particularly <a href="../software_engineering/12-project_setup.html">project setup</a>, <a href="../software_engineering/13-git.html">git</a>, <a href="../software_engineering/14-code_review_and_prs.html">code review</a>, and <a href="../software_engineering/15-ci_cd.html">CI/CD</a>, none of whose arguments are repeated here.</li>
+      <li><strong>Downstream:</strong> the <a href="../data_analysis/index.html">data analysis</a> and <a href="../machine_learning/index.html">machine learning</a> tracks consume what this platform produces; the <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">credit risk</a> track is this course applied to one portfolio under supervision.</li>
+      <li><strong>Further reading:</strong> Forsgren, Humble, and Kim's <em>Accelerate</em> (2018) for the delivery evidence base; Reis and Housley for the lifecycle framing this course has followed throughout.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 20 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

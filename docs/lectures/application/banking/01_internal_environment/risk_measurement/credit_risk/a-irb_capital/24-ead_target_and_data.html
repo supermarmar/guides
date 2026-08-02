@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EAD target and data: EADF at the 12-month horizon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>EAD target and data: EADF at the 12-month horizon</h1>
+  <p class="subtitle">The data foundation of the EAD build. The EADF target at the 12-month forward horizon, the row-construction rules that produce one observation per defaulted facility, the three feature families the model is allowed to use (at-observation, pre-default trend, macro), and the data-history requirement that runs lighter than LGD because there is no MRP compounding.</p>
+  <div class="meta">
+    <span>A-IRB 24 of n &mdash; EAD 2 of 7</span>
+    <span>Reading time, 25 minutes</span>
+    <span>Source: <code>04_feature_engineering/ead/02-data_requirements.md</code>; supplemented from CRR Article 182, PRA SS4/24 §17, EBA/GL/2017/16.</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The EAD target is the realised EADF for facilities that default within the 12-month forward window: <code>EADF_i,t = EAD_at_default / Limit_at_observation_t</code>. Each row of the development sample is a (facility, snapshot) pair where the facility was performing at the snapshot and defaulted within the next 12 months. The target value per row is the EADF realised at the default event. The continuous nature of the target (in [0, 1+], with most mass between current utilisation and 1) makes the rest of the pipeline a regression problem rather than a classification problem.</p>
+
+  <p>The independent variables split into three families. <strong>At-observation features</strong> describe the facility at the snapshot date: utilisation, balance, limit, age on book, product type, recent payment behaviour, days past due. <strong>Pre-default trend features</strong> describe the drawdown trajectory over the 12 months before observation: balance trend, utilisation trend, limit-change events, payment-pattern shifts. <strong>Macroeconomic features</strong> describe the economic environment that customers respond to: unemployment rate, credit-card industry usage, consumer-confidence index. Unlike PD where macro is typically excluded from the conditioning set, EAD typically does include macro because the recovery-market analogy from LGD applies: customer drawing behaviour in stress is fundamentally a macro phenomenon.</p>
+
+  <p>The data history requirement is 5 years for retail and 7 years for corporate / sovereign / bank exposures (CRR Article 182(3)). Importantly, there is no MRP compounding: EAD is captured at the moment of default, not at the end of a 60-month workout, so a 5-year history supports 5 cohorts of defaulted facilities directly. This makes EAD sampling lighter on data history than LGD sampling, though heavier than PD sampling because the population is still restricted to defaulted facilities.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The PD target asked "did this facility default in the next 12 months?" (binary). The LGD target asked "given default, what fraction of EAD was lost over the next 60 months?" (continuous, requires full workout track). The EAD target sits between them: "given default, what fraction of the limit was drawn at the moment of default?" (continuous, captured at a single event). The single-event nature is what makes EAD data work easier than LGD data work: no MRP, no resolution wait, no 60-month tracking. The continuous nature is what makes it different from PD: GLM instead of logistic, MAE instead of Gini.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The 12-month fixed-horizon construction is the structural difference between EAD sampling and PD sampling. PD uses overlapping cohorts (each obligor contributes one row per snapshot) and de-duplicates to one row per facility before fitting. EAD uses non-overlapping cohorts (each facility contributes one row per default event, not per snapshot), so de-duplication is automatic and the sample geometry is cleaner. This matters operationally: EAD development samples are typically 50,000 to 200,000 rows (one per defaulted facility plus some additional snapshots of the same facility at different observation dates if monthly cohorts are used) versus PD's millions. The smaller sample inherits LGD-style sample-size discipline (tighter VIF, no aggressive downsampling).</p>
+
+  <p>The target's continuous nature creates a data-leakage challenge unique to EAD. The strongest predictor of EADF at default is utilisation at observation (a customer at 90% utilisation will end up at high EADF almost regardless of what happens in the 12 months). But "utilisation at observation" is a snapshot-date variable, computed from balance and limit. If the snapshot-date balance is computed using forward-looking smoothing (a 3-month average centred on the snapshot, for example), the variable contains information from the outcome window and is a leakage. The discipline is to compute utilisation features using only data observed at or before the snapshot date, never centred or forward-windowed.</p>
+
+  <p>For F107 the exam-classic question is on the fixed-horizon construction: why is EAD sampling different from PD sampling, and what role does the absence of MRP play? Candidates who articulate both differences cleanly score well; candidates who treat all three IRB parameters as having identical data-engineering pipelines miss the structural distinctions.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The EAD row is a hybrid of the PD row and the LGD row. Like PD, it is indexed by (facility, snapshot) and looks 12 months forward to detect default. Like LGD, it only enters the development sample if a default occurs. Unlike LGD, the data captured at the default event is a single number (EAD), not a 60-month track. The diagram below shows the construction.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The EAD row construction">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The temporal structure of an EAD training row</text>
+
+      <!-- Timeline -->
+      <line x1="40" y1="160" x2="860" y2="160" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="860,160 852,156 852,164" fill="#475569"/>
+      <text x="868" y="164" font-family="Inter" font-size="10" fill="#64748b">time</text>
+
+      <!-- Pre-default trend window -->
+      <rect x="60" y="170" width="180" height="50" fill="#eff6ff" stroke="#1e3a8a"/>
+      <text x="150" y="190" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Pre-observation window</text>
+      <text x="150" y="206" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">trend features over 12m</text>
+
+      <!-- Observation event marker -->
+      <line x1="240" y1="140" x2="240" y2="160" stroke="#0f766e" stroke-width="2"/>
+      <circle cx="240" cy="160" r="5" fill="#0f766e"/>
+      <text x="240" y="135" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">observation t</text>
+      <text x="240" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">facility performing</text>
+
+      <!-- At-observation features -->
+      <rect x="220" y="80" width="40" height="50" fill="#fef9c3" stroke="#92400e"/>
+      <text x="240" y="100" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#92400e">at-obs</text>
+      <text x="240" y="113" text-anchor="middle" font-family="Inter" font-size="8" fill="#92400e">snapshot</text>
+
+      <!-- 12-month outcome window -->
+      <rect x="240" y="170" width="500" height="50" fill="#fee2e2" stroke="#991b1b" stroke-width="1.2"/>
+      <text x="490" y="190" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">12-month forward outcome window</text>
+      <text x="490" y="206" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">does the facility default in (t, t+12m] ?</text>
+
+      <!-- Default event marker -->
+      <line x1="600" y1="140" x2="600" y2="160" stroke="#7f1d1d" stroke-width="2"/>
+      <circle cx="600" cy="160" r="5" fill="#7f1d1d"/>
+      <text x="600" y="135" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">default event tD</text>
+      <text x="600" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">EAD captured here</text>
+
+      <!-- 12m end -->
+      <line x1="740" y1="155" x2="740" y2="170" stroke="#475569" stroke-width="1"/>
+      <text x="740" y="245" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">t + 12m</text>
+
+      <!-- Outcome -->
+      <rect x="40" y="260" width="820" height="50" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+      <text x="450" y="280" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#134e4a">If default in window: target = EADF_i,t = EAD_at_default / Limit_at_observation</text>
+      <text x="450" y="296" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">If no default in window: row excluded from development (model only fits on defaulted facilities)</text>
+
+      <text x="450" y="340" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">One row per (facility, snapshot) where the facility defaults within 12m. Snapshots cycled monthly or quarterly for the same facility.</text>
+    </svg>
+    <figcaption>The temporal structure of one EAD row. Trend features are observed in the 12 months before the observation snapshot; at-observation features are the snapshot itself. The 12-month forward window captures whether the facility defaults; if so, the EAD is observed at the default event and the EADF target is computed as EAD divided by the limit at observation. Non-defaulting facilities do not contribute rows (this is the LGD-style restriction to defaulted facilities only).</figcaption>
+  </figure>
+
+  <p>Three properties of the structure matter. First, <strong>the limit in the denominator is at observation, not at default</strong>. This is the standard convention from CRR Article 182(1)(b): EADF is expressed relative to the limit the bank had committed at the snapshot date, not the limit that may have changed between snapshot and default. A facility whose limit was reduced from £5,000 to £3,000 in the 12-month window can still have EADF &gt; 1 if the EAD at default exceeds £5,000 (rare but operationally valid in cases with late post-observation drawdowns). Second, <strong>multiple snapshots of the same facility can contribute rows</strong>: a facility observed at January 2018, July 2018 and January 2019, defaulting in March 2019, contributes three rows (one from each snapshot), all sharing the same EAD-at-default but different limits at observation. Third, <strong>the row enters the sample only on default</strong>: the model fits on a sample of defaulted facilities, which is why the EAD development sample is smaller than the PD sample (only defaults contribute) but does not need the MRP waiting period of LGD.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The EADF target</h3>
+
+  <p>Per CRR Article 182(1)(f) and (g):</p>
+
+  <pre><code>EADF_i,t  =  EAD_at_default_i  /  Limit_at_observation_i,t
+
+       where  the snapshot date t precedes the default event by some s in (0, 12] months
+              EAD_at_default = customer balance at the default event,
+                                including all principal, interest and fees
+              Limit_at_observation = the contractual credit limit at snapshot date t
+</code></pre>
+
+  <p>The same outstanding-amount rules from <a href="17-lgd_target_and_data.html">lecture 17</a> apply to EAD-at-default: for defaulted facilities, customer balance with no further adjustment for SCRA, late fees not capitalised excluded, interest not capitalised excluded (SS4/24 §13.5, §13.9, §13.10). The result is that the EAD denominator in the LGD calculation and the EAD numerator in the EADF calculation are the same quantity, which the bank computes once and uses twice.</p>
+
+  <h3>Row construction</h3>
+
+  <p>Operational construction is a join between the MRD's monthly snapshots and the default-event table:</p>
+
+  <pre><code># Pseudo-SQL: build the EAD development sample
+SELECT
+    facility_id,
+    snapshot_month,
+    limit_at_snapshot,
+    drawn_balance_at_snapshot,
+    EAD_at_default,
+    EAD_at_default / limit_at_snapshot AS target_eadf,
+    ... -- features
+FROM
+    monthly_snapshots s
+INNER JOIN
+    default_events d
+    ON s.facility_id = d.facility_id
+WHERE
+    d.default_date BETWEEN s.snapshot_month
+                       AND DATE_ADD(s.snapshot_month, INTERVAL 12 MONTH)
+    AND s.facility_status = 'PERFORMING'   -- not already in default at snapshot
+    AND s.limit_at_snapshot > 0           -- EADF undefined for zero-limit facilities
+    AND s.snapshot_month <= max_snapshot_date - INTERVAL 12 MONTH   -- avoid censoring
+</code></pre>
+
+  <p>The four filters at the bottom are the standard EAD population-construction rules. The performing-at-snapshot filter mirrors the PD population rule (already-defaulted facilities have an EADF of 1 by construction and add no information). The zero-limit filter is EAD-specific (the target is undefined). The 12-month censoring filter mirrors the PD rule.</p>
+
+  <h3>The three feature families</h3>
+
+  <table>
+    <thead>
+      <tr><th>Family</th><th>Examples</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>At-observation</strong></td>
+        <td>Utilisation_t, drawn balance_t, limit_t, days-past-due_t, transactor/revolver flag_t, age on book at t, segment / product type, channel of origination</td>
+        <td>The strongest features; utilisation_t alone explains 40 to 60% of EADF variance in retail unsecured</td>
+      </tr>
+      <tr>
+        <td><strong>Pre-observation trend</strong></td>
+        <td>Balance trend over t-12 to t, utilisation trend, count of limit changes in last 12m, payment regularity, recent draw / repay volatility</td>
+        <td>Adds incremental signal on top of at-observation features; computed strictly with data prior to t (no centring, no forward look-ahead)</td>
+      </tr>
+      <tr>
+        <td><strong>Macroeconomic</strong></td>
+        <td>Unemployment rate, credit-card industry utilisation, consumer-confidence index, regional house-price index (less relevant for unsecured)</td>
+        <td>Unlike PD where macro is typically excluded from the conditioning set, EAD typically includes macro because drawdown behaviour in stress is a macro phenomenon. Banks that exclude macro absorb the cycle effect through LRA / downturn calibration; banks that include it capture the cycle in PiT EADF directly</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>The bureau feature family used in PD and LGD is less consequential for EAD: bureau scores predict default and recovery, not drawdown intensity. Some banks include bureau utilisation (the obligor's utilisation on other lenders' lines) as a proxy for general financial stress; this is the most useful bureau-derived EAD feature.</p>
+
+  <h3>Look-back-only discipline for at-observation features</h3>
+
+  <p>The standard data-leakage check from PD applies, with one EAD-specific subtlety. At-observation features must reflect data available at t, not at t plus any look-ahead. Three traps:</p>
+
+  <ul>
+    <li><strong>Balance smoothing</strong>. A 3-month centred moving-average balance includes one month before t and one month after; the after-t month is in the outcome window and is a leakage. Smoothing must be one-sided (trailing).</li>
+    <li><strong>Limit changes</strong>. The "current limit" at snapshot t should be the limit on that calendar date; some systems backfill limit changes to the effective date weeks later, which creates a small look-ahead. The data engineering has to use as-of-t snapshots, not corrected versions.</li>
+    <li><strong>Bureau pull dates</strong>. Bureau data is sometimes refreshed monthly with a 1 to 2 week lag. The "bureau score at t" used in the model must be the score available on the snapshot date in production, not the score available with the benefit of hindsight.</li>
+  </ul>
+
+  <h3>Data history</h3>
+
+  <p>CRR Article 182(3) requires:</p>
+
+  <ul>
+    <li><strong>Retail</strong>: minimum 5 years; the window must include a downturn period or be supplemented by conservative assumptions.</li>
+    <li><strong>Corporate, sovereign, bank</strong>: minimum 7 years.</li>
+  </ul>
+
+  <p>Unlike LGD, there is no MRP compounding: each default event provides a single EAD observation captured at the default date. So a 5-year history supports 5 years of defaulted-facility rows directly. Most banks operate with 7 to 10 years of EAD history to ensure cycle coverage; the GFC vintage (2008 to 2009) is typically included to anchor downturn calibration.</p>
+
+  <h3>Population construction nuances</h3>
+
+  <ul>
+    <li><strong>Limit increases between observation and default</strong>: the limit in EADF is at observation, not at default, per CRR Article 182(1)(b). A facility whose limit was increased by the bank in the 12-month window can therefore have EADF &gt; 1 if EAD at default exceeds the observation limit. The model accommodates this (the GLM in lecture 27 handles values above 1 if the link function permits).</li>
+    <li><strong>Limit decreases</strong>: the bank's collections-action limit reduction shortly before default compresses available headroom and artificially lowers EADF. Standard practice is to flag limit decreases within the 12-month window and either exclude affected rows or include them with a "limit reduced" indicator.</li>
+    <li><strong>Closed facilities at default</strong>: a facility closed by the bank (limit set to zero) with a non-zero balance at default is still in scope; the EAD is the closing balance, and the EADF is computed against the limit at observation (not at default, which is zero and would explode).</li>
+    <li><strong>Related facilities</strong> (SS4/24 §13.8): if a facility is restructured to a new account number between observation and default, the data engineering links the two and treats them as a single facility for EAD purposes.</li>
+  </ul>
+
+  <h3>Data sources</h3>
+
+  <p>Internal sources dominate; external sources play a smaller role than for PD.</p>
+
+  <ul>
+    <li><strong>Month-end snapshots</strong>. The MRD's monthly tables from <a href="06-data_engineering.html">lecture 06</a>. Provides at-observation utilisation, balance, limit, and behavioural features.</li>
+    <li><strong>Transaction records</strong>. Daily payment, drawing and fee transactions; aggregated to produce pre-observation trend features.</li>
+    <li><strong>Limit-change records</strong>. Operational system event log; tracks proactive credit-line increases and decreases. Important for the limit-change diagnostics described above.</li>
+    <li><strong>Default-event table</strong>. From the same MRD pipeline; provides the EAD at default and the default date.</li>
+    <li><strong>Credit bureau</strong>. Bureau utilisation as a proxy for general financial stress; less central for EAD than for PD or LGD.</li>
+    <li><strong>Macroeconomic data series</strong>. Same UR, CPI, GDP, HPI, CCI series used in the PD and LGD LRA / downturn work.</li>
+  </ul>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the choice of limit at observation as the denominator is the single most consequential design decision in EAD modelling</strong>. The alternative is limit at default. Using limit at observation freezes the denominator at a known quantity (and lets the model focus on predicting the numerator); using limit at default contaminates the denominator with future limit changes that the bank cannot forecast. CRR Article 182(1)(b) settles the question: use limit at observation. Modellers who try to use limit at default for theoretical purity end up with EADF distributions that move with limit-management actions rather than with customer behaviour.</p>
+
+  <p>The second lesson is on <strong>the trend-feature look-ahead discipline</strong>. Pre-observation trend features (balance trend over the previous 12 months, utilisation trend, etc.) are powerful predictors but require careful construction. The most common error is including the snapshot month itself in the trend window, which is fine in principle but creates a hidden dependency: the trend value at snapshot t includes data from t itself, and a feature engineering pipeline that subsequently does any data manipulation at t can leak forward. The safe convention is to compute trend features over t-12 to t-1 (exclusive of t) and to compute the at-observation feature as the value at t.</p>
+
+  <p>The third lesson is on <strong>including macro in the EAD conditioning set</strong>. PD's instinct is to exclude macro to avoid procyclicality; LGD's instinct is to include macro for secured exposures because collateral value is a macro phenomenon; EAD sits in between. The right answer for EAD is to include macro because customer drawing behaviour in stress is fundamentally a macro phenomenon (when unemployment rises, customers under stress draw down available credit at higher rates), and excluding macro produces a PiT EADF that systematically under-predicts in downturns. The cycle effect is then captured in PiT directly; the LRA / downturn calibration in lecture 28 picks up any residual.</p>
+
+  <p>The fourth lesson, operational: <strong>EAD data engineering is easier than LGD data engineering but harder than PD data engineering</strong>. Easier than LGD because there is no MRP waiting period and no 60-month workout track. Harder than PD because the target is continuous and the population is restricted to defaulted facilities. The right resource allocation is somewhere in the middle; teams that staff EAD data work at PD intensity over-deliver, teams that staff it at LGD intensity under-deliver.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Write the EADF formula. State why the limit in the denominator is taken at observation rather than at default.</li>
+    <li>Why does the EAD development sample contain only defaulted facilities? How does this affect the sample-size comparison with PD?</li>
+    <li>The MRP compounded the LGD data-history requirement. Why does it not compound the EAD data-history requirement?</li>
+    <li>Name the three feature families used by EAD models. Which one is the strongest single predictor of EADF, and what fraction of variance does it typically explain in retail unsecured?</li>
+    <li>State three data-leakage traps specific to EAD feature engineering. For each, explain the mechanism.</li>
+    <li>A facility's limit was increased from £5,000 to £8,000 in the 12-month window. EAD at default is £6,500. Compute the EADF using the standard convention. What does the value tell you?</li>
+    <li>A facility was closed by the bank (limit reduced to zero) 6 months before default, but the customer still owed £2,000 at default. What is the EADF? How is the limit handled?</li>
+    <li>Why does the EAD pipeline typically include macroeconomic features in the conditioning set, whereas PD typically excludes them?</li>
+    <li>Explain the look-back-only discipline for at-observation features. What error does a centred moving-average balance introduce?</li>
+    <li>What is the relationship between the EAD numerator in the EADF formula and the EAD denominator in the LGD formula?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/ead/02-data_requirements.md</code> &mdash; the target and features metadata table.</li>
+      <li>Supplementary: CRR Article 182(1)(b), (f), (g) and (3); PRA SS4/24 §13.5 to §13.11 and §17; EBA/GL/2017/16 paragraphs 154 to 188.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="03-definitions.html">Definitions</a> &mdash; CRR Article 178 default trigger and the obligor / facility distinction.</li>
+      <li><a href="06-data_engineering.html">Data engineering</a> &mdash; the MRD this lecture's target and features derive from.</li>
+      <li><a href="10-pd_target_and_data.html">PD target and data</a> &mdash; the 12-month forward window and data-leakage discipline transfer.</li>
+      <li><a href="17-lgd_target_and_data.html">LGD target and data</a> &mdash; the outstanding-amount definition shared with EAD (the EAD numerator is the LGD denominator).</li>
+      <li><a href="23-ead_concept.html">EAD concept</a> &mdash; the EADF target selection and PiT / LRA / DT architecture.</li>
+    </ul>
+
+    <p><strong>Forward references inside the EAD sequence:</strong></p>
+    <ul>
+      <li>25-ead_sampling_and_representativeness (next) &mdash; fixed-horizon sampling design, OOS / OOT split, representativeness diagnostics.</li>
+      <li>26-ead_feature_engineering (planned) &mdash; reducing and transforming the candidate features defined here.</li>
+      <li>27-ead_risk_differentiation (planned) &mdash; GLM model fit on the EADF target.</li>
+      <li>28-ead_risk_quantification (planned) &mdash; LRA and downturn calibration.</li>
+    </ul>
+
+    <p><strong>Cross-track:</strong></p>
+    <ul>
+      <li>IFRS 9 EAD (planned) &mdash; same EADF target with forward-looking macro overlays; no downturn add-on.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Article 182(1)(b), (f), (g), (3). The legislative anchors.</li>
+      <li>PRA SS4/24, paragraphs 13.5 to 13.11 and 17.1 to 17.5. UK supervisory expectations.</li>
+      <li>EBA/GL/2017/16, paragraphs 154 to 188. The European authority's interpretation of EAD modelling.</li>
+      <li>Tong, E. (2016), "A comparison of EAD models in the credit card industry". Empirical comparison of direct EAD versus CCF estimation.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 24 of n &middot; EAD 2 of 7.</span>
+  <span><a href="23-ead_concept.html">Previous: EAD concept</a> &middot; <a href="25-ead_sampling_and_representativeness.html">Next: sampling and representativeness</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

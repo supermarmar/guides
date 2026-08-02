@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PD risk differentiation: segmentation and the logistic regression</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Risk differentiation: segmentation and the logistic regression</h1>
+  <p class="subtitle">The PiT model build. Segment the portfolio into homogeneous risk groups, fit a binary logistic regression in each segment, and iterate variable selection against five regulatory criteria until the model rank-orders obligors well, generalises across sub-populations, and is defensible to a credit officer. Calibration to absolute PD levels happens in the next lecture.</p>
+  <div class="meta">
+    <span>A-IRB 13 of n &mdash; PD 5 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Sources: <code>05_modelling/pd/02-model_design.md</code>, <code>03-risk-differentiation.md</code>, <code>06-pit-model.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Risk differentiation is the rank-ordering stage of the PD build. The development team segments the portfolio into roughly 8 to 12 homogeneous groups, fits a binary logistic regression in each segment using the features that survived feature engineering, and tests every coefficient against five criteria: statistical significance (p &lt; 1%), low collinearity (VIF &lt; 3), intuitive sign, meaningful incremental discrimination (incremental Gini &ge; 0.25%), and coverage across data sources (at least five predictors per segment drawn from both internal and external sources). The output is a PiT PD per obligor that ranks risk; it is not yet a calibrated probability in the absolute sense.</p>
+
+  <p>Three architectural choices shape the lecture. First, <strong>segmentation</strong>: rather than fit a single model over the whole book, the portfolio is split into segments that share underlying risk drivers (delinquency state, age on book, activity status, recent-history cleanliness, utilisation level). A decision-tree analysis over historical default rates produces the initial splits; the splits are then rounded and rationalised to avoid over-fitting. Second, <strong>the logistic regression itself</strong>: binary outcome, logit link, maximum-likelihood estimation via iteratively reweighted least squares (IRLS). Alternatives (multinomial logistic, nested logistic, decision trees, random forests) are considered and rejected for reasons covered below. Third, the <strong>dual-model approach</strong>: a full-sample model and a post-COVID-only model are fit in parallel; the final variable set is the intersection of variables that score well in both, which produces a model robust to the structural break in 2020 to 2022.</p>
+
+  <p>This lecture is one half of the IRB modelling phase. Risk differentiation produces a ranking; risk quantification (lecture 14) converts the ranking into calibrated, regulator-grade PDs anchored to the LRA. Both are required for compliant capital. A team that bundles them produces a model with reasonable Gini and a misaligned absolute level, which is the most common technical failure mode at supervisory validation.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The job in this lecture is to answer "who in the portfolio is more likely to default than whom". The job in the next lecture is to answer "what is the actual probability of default for each person". The two questions sound similar; they are not. The first is a discrimination question, solved by fitting a model that maximises a metric like Gini. The second is a calibration question, solved by anchoring the model's outputs to the long-run average of observed default rates. A team that confuses the two will get the discrimination right and the absolute level wrong by a factor of two or three.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Segmentation is the first design choice that propagates everywhere. A portfolio modelled as a single homogeneous group with one regression has all its risk drivers averaged across segments: the same coefficient on "utilisation" applies to the customer who is in early arrears and the customer who is performing cleanly. Both are real customers, but the relationship between utilisation and default is very different in the two segments (steep in early arrears, modest in clean performing). Averaging is statistically valid but operationally weak; the resulting scorecard ranks obligors less effectively than a segmented model, and the supervisor will ask why segmentation was not attempted.</p>
+
+  <p>The choice of logistic regression also matters. The dominant alternative is a tree-based ML approach (random forest, gradient-boosted trees). On the same features, ML approaches typically deliver 1 to 3 Gini points of additional discrimination. The reasons banks still choose logistic regression are governance-related rather than statistical: every coefficient is interpretable, the regression is easy to explain to a credit committee, the validation methodology is mature and well-trodden, and the supervisor has decades of comfort with the approach. The Gini advantage of an ML model is not large enough to overcome the governance disadvantage; almost every retail A-IRB scorecard in production today is a logistic regression.</p>
+
+  <p>The dual-model approach (full sample plus post-COVID) is the modern modelling team's answer to the structural break problem. A model fit only on the full sample averages the pre-COVID and post-COVID relationships and may include variables that were predictive pre-COVID but are no longer informative post-COVID. A model fit only on post-COVID data has a small sample and weak cycle coverage. The intersection of variables that score well in both fits is the robust set that the production model uses. This pattern repeats whenever a major regime change has occurred in the development window.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Risk differentiation is the first phase of a two-phase build. The diagram below puts the whole modelling pipeline in one view: feature engineering on the left (lecture 12, done), risk differentiation in the middle (this lecture), risk quantification on the right (lecture 14, next). Each phase has a distinct output and a distinct regulatory anchor.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The two-phase IRB modelling architecture">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The two-phase IRB modelling architecture</text>
+
+      <!-- Phase 1: Risk Differentiation -->
+      <g>
+        <rect x="40" y="50" width="380" height="280" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.5"/>
+        <text x="230" y="76" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Phase 1: Risk Differentiation</text>
+        <text x="230" y="92" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">(this lecture)</text>
+
+        <rect x="60" y="110" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="130" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A. Segmentation</text>
+        <text x="230" y="146" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">decision-tree-derived; ~10 segments</text>
+
+        <rect x="60" y="170" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="190" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">B. Logistic regression per segment</text>
+        <text x="230" y="206" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">MLE via IRLS; dual-model approach (full + post-COVID)</text>
+
+        <rect x="60" y="230" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="250" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">C. Iterative refinement (5 criteria)</text>
+        <text x="230" y="266" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">p&lt;1%, VIF&lt;3, sign, &Delta;Gini&ge;0.25%, &ge;5 predictors</text>
+
+        <text x="230" y="305" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">Output: PiT PD per obligor (uncalibrated)</text>
+        <text x="230" y="320" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#1e3a8a">a ranking, not an absolute probability</text>
+      </g>
+
+      <!-- Arrow -->
+      <path d="M 420 190 L 480 190" fill="none" stroke="#475569" stroke-width="2"/>
+      <polygon points="480,190 472,186 472,194" fill="#475569"/>
+
+      <!-- Phase 2: Risk Quantification -->
+      <g>
+        <rect x="480" y="50" width="380" height="280" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.5"/>
+        <text x="670" y="76" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">Phase 2: Risk Quantification</text>
+        <text x="670" y="92" text-anchor="middle" font-family="Inter" font-size="10" fill="#134e4a">(next lecture, 14)</text>
+
+        <rect x="500" y="110" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="670" y="130" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">D. Grade construction</text>
+        <text x="670" y="146" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">PiT PDs binned into ~26 risk grades</text>
+
+        <rect x="500" y="170" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="670" y="190" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">E. LRA calibration</text>
+        <text x="670" y="206" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">per-grade LRA from cycle-covering window</text>
+
+        <rect x="500" y="230" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="670" y="250" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">F. MoC overlay + floor</text>
+        <text x="670" y="266" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">final PD = calibrated + MoC, then 0.03% floor</text>
+
+        <text x="670" y="305" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">Output: Regulatory PD per grade</text>
+        <text x="670" y="320" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#134e4a">discrete, calibrated, MoC-uplifted, floored</text>
+      </g>
+
+      <!-- Bottom legend -->
+      <text x="450" y="365" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">CRR Article 174 / 179 / 180; PRA SS4/24 paragraphs 10 to 14.</text>
+    </svg>
+    <figcaption>The two-phase architecture. Phase 1 produces a PiT PD per obligor that rank-orders risk but is not yet calibrated to absolute levels. Phase 2 takes the PiT outputs, bins them into grades, calibrates each grade's PD to the long-run average, applies an MoC uplift, and applies the regulatory floor. The supervisor reviews both phases as a single regulatory PD model.</figcaption>
+  </figure>
+
+  <p>Three properties of the architecture to internalise. First, the two phases are <strong>separately validated</strong>: the validator runs discrimination tests on the Phase 1 output (Gini, AUC, KS) and calibration tests on the Phase 2 output (binomial, chi-square, MPE). Conflating them produces a model that passes one test and fails the other. Second, the segmentation in Phase 1 <strong>defines the perimeter for everything downstream</strong>: grades are built per segment, the LRA is calculated per segment, MoC is applied per segment. A late change to segmentation forces a rebuild of every later step. Third, the dual-model approach <strong>is not a hedge against being wrong; it is a tool for identifying which variables are robust</strong>. The final model is not the average of the two fits; it is a single model whose variable set is the intersection of variables that both fits found important.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Logistic regression: the model class</h3>
+
+  <p>The binary logistic regression maps a linear combination of features to a probability in [0, 1] via the logit link. With features x_1 ... x_n and coefficients beta_0 ... beta_n:</p>
+
+  <pre><code>logit( p ) = log( p / (1 - p) ) = beta_0 + beta_1 * x_1 + ... + beta_n * x_n
+
+p = exp(y) / (1 + exp(y))   where  y = beta_0 + beta_1 * x_1 + ...
+</code></pre>
+
+  <p>An increase of one unit in feature x_j shifts the log-odds of default by beta_j units; equivalently, it multiplies the odds of default by exp(beta_j). The coefficients are estimated by <strong>Maximum Likelihood Estimation (MLE)</strong>. There is no closed-form solution for the logistic likelihood maximiser; the standard numerical algorithm is <strong>Iteratively Reweighted Least Squares (IRLS)</strong>, which converges in a small number of iterations for well-conditioned problems and produces coefficient estimates plus standard errors plus a covariance matrix (used for VIF and significance testing).</p>
+
+  <h3>Alternative model classes considered and rejected</h3>
+
+  <p>The wiki lists four alternatives that are considered and discarded in standard IRB builds:</p>
+
+  <table>
+    <thead>
+      <tr><th>Alternative</th><th>What it offers</th><th>Why rejected for IRB</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Multinomial logistic regression</td><td>Models more than two outcome classes simultaneously</td><td>Imposes the Independence of Irrelevant Alternatives assumption, which is unrealistic when credit outcomes are correlated. Also unnecessary for a binary default / non-default target.</td></tr>
+      <tr><td>Nested (sequential) logistic regression</td><td>Relaxes the IIA assumption via sequential decision modelling</td><td>Mathematically sound but adds complexity without commensurate benefit on a binary target; the dual-model approach addresses the same concerns within standard logistic.</td></tr>
+      <tr><td>Decision trees</td><td>Handle non-linearity natively, naturally interpretable as if-then rules</td><td>Prone to overfitting; coefficients (or splits) less stable than logistic; harder to back-test under stress; less mature validation methodology.</td></tr>
+      <tr><td>Random forests / gradient boosting</td><td>Often deliver 1 to 3 Gini points of additional discrimination on the same features</td><td>Black-box characterisation; validation team and supervisor comfort is weaker; coefficient interpretation is replaced by feature-importance ranking which is less precise; harder to defend at SREP.</td></tr>
+    </tbody>
+  </table>
+
+  <p>The choice of binary logistic regression is therefore not a statement that logistic is the best discriminator; it is a statement that the trade-off between interpretability, governance maturity and discrimination favours logistic in the regulatory context.</p>
+
+  <h3>Segmentation: the first design choice</h3>
+
+  <p>Segmentation produces a small number of homogeneous risk pools within which a single set of regression coefficients applies. The aims are:</p>
+
+  <ol>
+    <li>Each segment shares underlying risk drivers with a similar relationship to default.</li>
+    <li>Each segment has sufficient volume for statistically stable coefficient estimation.</li>
+    <li>Each segment is stable over time, so the same segment definitions can be used across the development window.</li>
+  </ol>
+
+  <p>The standard approach uses <strong>decision-tree analysis</strong> over historical default rates, taking multiple <strong>stacked snapshots</strong> from across the development window (typically four to six snapshots, spanning benign and stressed periods to mitigate seasonal and cyclical biases). The tree's splits are then rounded (cut-points moved to neat values like 40% and 80% rather than 41.1% and 81.8%) to avoid over-fitting to the development sample. The reference build in the wiki produces ten segments via the following hierarchical splits:</p>
+
+  <ol>
+    <li><strong>Delinquency status at observation</strong>: in-order vs early delinquency (1 cycle past due) vs late delinquency (2 to 3 cycles past due).</li>
+    <li>For in-order accounts: <strong>Seasoned vs Early Month on Book (EMOB)</strong>; EMOB = MOB &le; 3. EMOB obligors have limited behavioural data so their risk drivers are mostly application and bureau features.</li>
+    <li>For seasoned accounts: <strong>active vs inactive</strong>. Inactive accounts often have proactive credit-limit decreases and a distinct risk pattern.</li>
+    <li>For active accounts: <strong>clean vs dirty history</strong> based on whether any delinquency occurred in the past 12 months.</li>
+    <li>For clean active accounts: <strong>internal utilisation bands</strong> (low / medium / high; rounded cut-offs at 40% and 80%).</li>
+    <li>For the low-utilisation segment: further split by <strong>maximum bureau utilisation</strong> in the last 6 months (cut at 60%).</li>
+    <li>For low-internal-and-bureau utilisation: further split by <strong>revolver vs non-revolver</strong> flag.</li>
+  </ol>
+
+  <p>The result is a population breakdown roughly as follows (the volumes are dataset-specific but the structural pattern is generalisable):</p>
+
+  <pre><code>Segment                                                          Volume %    Default rate
+1. Late delinquency                                              0.67%       75%
+2. Early delinquency                                             1.30%       30%
+3. Early MOB                                                     3.93%       3%
+4. Inactive                                                      26.36%      0.45%
+5. Seasoned clean low internal & bureau utilisation, non-revolver 19.75%      0.29%
+6. Seasoned clean low internal & bureau utilisation, revolver    7.72%       0.59%
+7. Seasoned clean low internal & high bureau utilisation         11.10%      1.43%
+8. Seasoned clean mid internal utilisation                       8.23%       7.66%
+9. Seasoned clean high internal utilisation                      8.01%       7.40%
+10. Dirty                                                        12.93%      3.22%
+</code></pre>
+
+  <p>The default rates span more than two orders of magnitude across segments. A single regression over all ten segments would average these differences out; the segmented approach lets each one have its own coefficient set.</p>
+
+  <h3>The dual-model approach (full sample plus post-COVID)</h3>
+
+  <p>Within each segment, two logistic regressions are fit in parallel:</p>
+
+  <ol>
+    <li><strong>Full development sample</strong>: all snapshots in the development window, all transformed variables.</li>
+    <li><strong>Post-COVID subset</strong>: only snapshots from after the COVID exclusion window, all transformed variables.</li>
+  </ol>
+
+  <p>From each model, the top 25 variables by marginal lift are identified. Variables that rank highly in <strong>both</strong> the full-sample and post-COVID fits are prioritised for the final model. This intersection step is the dual-model approach's value: it identifies variables whose predictive relationship survived the regime change, which is the property that matters for production use.</p>
+
+  <h3>Iterative refinement: the five criteria</h3>
+
+  <p>Once the candidate variable set is identified, each surviving variable is tested against five criteria. Variables that fail any criterion are dropped, the regression is re-fit, and the process iterates until all retained variables pass all criteria simultaneously.</p>
+
+  <table>
+    <thead>
+      <tr><th>Criterion</th><th>Threshold</th><th>Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Statistical significance</td><td>p-value &lt; 1%</td><td>Confirms each variable contributes meaningfully; tighter than the conventional 5% to compensate for multiple testing in a large feature set</td></tr>
+      <tr><td>Collinearity</td><td>VIF &lt; 3</td><td>Stricter than the conventional VIF &lt; 10; reflects supervisory preference for highly stable coefficients</td></tr>
+      <tr><td>Intuitive sign and shape</td><td>Consistent with business logic in log-odds space</td><td>The coefficient direction must match the credit-officer's intuition (utilisation positive, payment-amount negative, etc.); otherwise the variable is dropped or transformed</td></tr>
+      <tr><td>Marginal discrimination</td><td>Incremental Gini &ge; 0.25%</td><td>Each retained variable must provide measurable lift after the others; below this threshold the variable is not contributing</td></tr>
+      <tr><td>Coverage across data sources</td><td>&ge; 5 predictors per segment, mix of internal and external, across multiple risk categories</td><td>Improves model balance and resilience; prevents over-reliance on any single data feed</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Sign conventions: the directionality table</h3>
+
+  <p>The "intuitive sign" criterion is operationalised through a directionality table. Each variable category has an expected sign in log-odds space; coefficients with the wrong sign are flagged for investigation before the model is accepted. The wiki reference table for retail credit cards:</p>
+
+  <table>
+    <thead>
+      <tr><th>Category</th><th>Expected sign</th><th>Examples</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Balance</td><td>+</td><td>Outstanding balance, recent balance trend</td></tr>
+      <tr><td>Utilisation</td><td>+</td><td>Internal utilisation, bureau utilisation, max-utilisation in window</td></tr>
+      <tr><td>Cash advance</td><td>+</td><td>Cash-advance volume and frequency</td></tr>
+      <tr><td>Financial charge</td><td>+</td><td>Interest and fee burden</td></tr>
+      <tr><td>Revolver flag</td><td>+</td><td>Customer revolves rather than transacts</td></tr>
+      <tr><td>Delinquency</td><td>+</td><td>Days past due, months in arrears, prior delinquency count</td></tr>
+      <tr><td>Late fee</td><td>+</td><td>Late-fee occurrence and amount</td></tr>
+      <tr><td>Inquiry</td><td>+</td><td>Bureau enquiries in the recent past</td></tr>
+      <tr><td>Payment</td><td>&minus;</td><td>Payment amount, payment regularity</td></tr>
+      <tr><td>Number of accounts</td><td>&minus;</td><td>Total credit relationships</td></tr>
+      <tr><td>Credit history length</td><td>&minus;</td><td>Age of oldest account</td></tr>
+      <tr><td>Credit limit</td><td>&minus;</td><td>Granted limit (signals underwriting confidence)</td></tr>
+      <tr><td>Open to buy</td><td>&minus;</td><td>Limit minus balance, available headroom</td></tr>
+      <tr><td>Months on book</td><td>&minus;</td><td>Tenure</td></tr>
+    </tbody>
+  </table>
+
+  <p>Coefficients with a sign opposite to the expected one usually indicate a multicollinearity artefact (Step 5 of reduction missed something), an interaction with a segment-specific feature, or a transformation that needs adjusting. The standard remediation is to investigate, refit, and either retain the variable with a documented sign-flip justification or drop it.</p>
+
+  <h3>Sub-population testing</h3>
+
+  <p>Once a segment's logistic regression has converged and passed the five criteria, it is tested across key sub-populations to confirm performance is consistent. Standard sub-populations:</p>
+
+  <ul>
+    <li>External score (e.g. FICO) bands: under 600, 600 to 699, 700 and above.</li>
+    <li>Credit-limit bands: low, medium, high.</li>
+    <li>Utilisation bands: under 30%, 30 to 70%, over 70%.</li>
+    <li>Strategic partners or product lines.</li>
+  </ul>
+
+  <p>For each sub-population, the Gini, average ODR, average predicted PD and relative-prediction-error are computed. Sub-populations with materially weaker Gini or higher prediction error are investigated. Where the issue is a portfolio-specific risk pattern (a new product, a run-off book, a higher mortality-driven default rate), a <strong>partner flag</strong> or <strong>interaction variable</strong> is added to the model to capture the differential.</p>
+
+  <h3>Overall model performance</h3>
+
+  <p>The ten segment models are combined into a single portfolio-level PiT PD model. The combined model is evaluated on:</p>
+
+  <ul>
+    <li><strong>Development sample</strong>: typically 75 to 80% overall Gini for a well-built retail card model.</li>
+    <li><strong>Out-of-time (OOT) sample</strong>: the most recent reserved snapshot. Gini should hold within a few percentage points of development.</li>
+    <li><strong>Sub-populations</strong>: Gini, ODR, predicted PD and relative error reported per band per segment.</li>
+  </ul>
+
+  <p>The deliverables are an accuracy curve (predicted PD vs realised ODR per decile), a Lorenz curve (cumulative bad-rate vs cumulative population, ordered by predicted PD; the area between this curve and the diagonal is the Gini), and a comparative Gini chart across segments and sub-populations.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The most important lesson in risk differentiation is that <strong>segmentation is the design choice with the highest leverage</strong>. A poorly segmented model with the best possible features will always under-perform a well-segmented model with average features. The diagnostic is the spread of default rates across segments: a portfolio that defaults at 0.3% in one segment and 75% in another has been segmented effectively, because a single regression cannot describe both populations with one coefficient set. A portfolio whose segments all default at 1 to 5% has either been segmented along the wrong dimensions or genuinely is homogeneous, and the modelling team should investigate which it is before proceeding.</p>
+
+  <p>The second lesson is on <strong>the trade-off between Gini and interpretability</strong>. An ML model on the same features will typically deliver 1 to 3 Gini points more. The temptation to use it is real, especially when modelling teams have ML expertise on hand. The right answer for IRB capital is to stick with logistic regression and capture the marginal lift in two other places: better segmentation (the trees-as-segmenter approach gets the ML's non-linear handling at the segment-definition stage) and better feature engineering (Tukey transformations, splines, interactions captured in the regression). Practitioners who push hardest for ML are often the ones who have under-invested in segmentation and transformation; both have higher governance return per unit of Gini lift.</p>
+
+  <p>The third lesson is on the <strong>dual-model approach</strong>. The temptation is to skip it ("we have enough post-COVID data now"); the discipline is to keep running both regressions every recalibration cycle until the variable sets converge stably. The intersection step is what makes the model robust to the next regime change, which we can be confident will happen and cannot predict the timing of. The cost is two fits per segment per recalibration, which is trivial on modern infrastructure.</p>
+
+  <p>The fourth lesson is operational: <strong>the iterative refinement process is where most junior modellers underestimate the time required</strong>. Each iteration is a fit, a coefficient inspection, a sign check, a Gini test, a sub-population test, a discussion with the model owner. Each iteration can take half a day to a day. A segment typically needs five to ten iterations to converge. A ten-segment portfolio with five to ten iterations per segment is fifty to a hundred iterations, which is two to three months of disciplined work. Modellers who try to compress this into a sprint produce models that fail at validation, which costs much more than the compressed schedule saved.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Distinguish risk differentiation from risk quantification. What is the output of each phase, and what regulatory test does each pass?</li>
+    <li>Write the logistic regression equation in log-odds form. What is the interpretation of beta_j?</li>
+    <li>State three reasons why logistic regression is preferred over random forests for IRB capital despite the typical 1 to 3 Gini-point disadvantage.</li>
+    <li>Why is segmentation undertaken before model estimation rather than as a feature in the regression? What aim does it serve?</li>
+    <li>Name five of the seven hierarchical splits used in the reference 10-segment scheme. What is the default-rate range across the resulting segments?</li>
+    <li>Explain the dual-model approach. Why is the final variable set the intersection of the two fits rather than the union?</li>
+    <li>List the five criteria for variable retention in iterative refinement, including the threshold for each.</li>
+    <li>The expected sign of "credit limit" in the directionality table is negative. Explain why higher limit is associated with lower default risk in log-odds space.</li>
+    <li>A coefficient comes out with the opposite sign to the directionality table. What are the three most common diagnoses and the standard remediation?</li>
+    <li>What is the Lorenz curve in the context of a PD scorecard, and how is it related to Gini?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/pd/02-model_design.md</code> &mdash; the two-phase architecture and regulatory anchors (CRR Art 174, 179, 180; SS4/24 §11.20).</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/pd/03-risk-differentiation.md</code> &mdash; logistic regression formulation, alternatives considered, segmentation strategy, and the 10-segment scheme.</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/pd/06-pit-model.md</code> &mdash; dual-model approach, iterative refinement criteria, directionality table, sub-population testing.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="09-pd_concept.html">PD concept</a> &mdash; the rating-philosophy choice that this lecture's PiT model implements.</li>
+      <li><a href="10-pd_target_and_data.html">Target and data</a> &mdash; the 12-month default flag the regression is fitted against.</li>
+      <li><a href="11-pd_sampling_and_representativeness.html">Sampling and representativeness</a> &mdash; the development sample the model is trained on, and the OOS / OOT samples the model is tested on.</li>
+      <li><a href="12-pd_feature_engineering.html">Feature engineering</a> &mdash; the reduced and transformed feature set this regression consumes.</li>
+    </ul>
+
+    <p><strong>Forward references inside the PD sequence:</strong></p>
+    <ul>
+      <li>14-pd_risk_quantification (planned) &mdash; Phase 2: grade construction, LRA calibration, MoC overlay.</li>
+      <li>15-pd_testing (planned) &mdash; discrimination, calibration and stability back-tests.</li>
+    </ul>
+
+    <p><strong>Cross-component:</strong></p>
+    <ul>
+      <li>EAD risk differentiation (planned, lecture 27) &mdash; the same architecture with a GLM (Gaussian, Identity link) for continuous EADF.</li>
+      <li>LGD risk differentiation (planned, lecture 20) &mdash; mixture model architecture (logistic for zero-payer and full-payer, Gamma / Beta for partial recovery).</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Articles 174, 179, 180. Segmentation, representativeness and calibration anchors.</li>
+      <li>PRA SS4/24, paragraphs 10 to 14. UK supervisory expectations for modelling.</li>
+      <li>Hosmer, Lemeshow and Sturdivant (2013), <em>Applied Logistic Regression</em>, chapters 3 and 5. The standard reference for logistic regression with binary outcomes.</li>
+      <li>McCullagh and Nelder (1989), <em>Generalized Linear Models</em>. The classical reference for IRLS and likelihood-based GLM fitting.</li>
+      <li>Anderson, R. (2007), <em>The Credit Scoring Toolkit</em>, chapters 11 and 12. The standard reference for retail scorecard segmentation and stepwise variable selection.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 13 of n &middot; PD 5 of 7.</span>
+  <span><a href="12-pd_feature_engineering.html">Previous: feature engineering</a> &middot; <a href="14-pd_risk_quantification.html">Next: risk quantification</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

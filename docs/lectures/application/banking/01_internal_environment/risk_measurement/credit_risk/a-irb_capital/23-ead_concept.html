@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EAD concept: targets, conversion factors and the 12-month horizon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Exposure at default: targets, conversion factors and the 12-month horizon</h1>
+  <p class="subtitle">The opening lecture of the EAD sequence. What EAD is, why it has to be modelled for revolving products, the five candidate target variables (EAD, LEQ, EADF, CCF, UCF) with their strengths and weaknesses, why EADF is the operational standard, and the regulatory machinery (outstanding amount, PiT / LRA / downturn EADF) that shapes the rest of the EAD pipeline.</p>
+  <div class="meta">
+    <span>A-IRB 23 of n &mdash; EAD 1 of 7</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Sources: <code>04_feature_engineering/ead/01-target-variables.md</code>, <code>05_modelling/ead/01-model_methodology.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Exposure at default is the bank's expected exposure to an obligor at the moment they default. For a term loan with a fixed balance schedule the answer is trivial (the next 12 months of the schedule). For a revolving facility (credit card, overdraft, committed undrawn line) the answer is non-trivial: a customer approaching default tends to draw down their available credit, so EAD at default exceeds the current drawn balance. The standard expression captures this:</p>
+
+  <pre><code>EAD  =  Drawn balance at observation  +  CCF  *  Undrawn balance at observation
+</code></pre>
+
+  <p>where CCF (credit conversion factor) is the modelled fraction of the undrawn balance that the obligor will draw between observation and default. The bank models CCF or one of its close relatives. Five candidate targets exist: raw EAD (dollars), LEQ (EAD over balance), EADF (EAD over limit), CCF (incremental drawing over available credit), and UCF (incremental drawing over limit). The retail A-IRB standard is <strong>EADF</strong>: target = EAD over limit at observation. EADF is stable across cycles, intuitive for business users, defined for every facility (unlike CCF, which is undefined when balance equals limit), and aligned with PRA SS4/24 §17.2's recognition that limit-factor estimation is an acceptable approach.</p>
+
+  <p>The architecture mirrors PD's two-phase design (lecture 13 to 14) and LGD's mixture-then-calibration design (lecture 20 to 21): a PiT EADF model that ranks risk, followed by calibration to LRA EADF, downturn EADF, and a final regulatory EADF with MoC. The K formula then uses EAD = regulatory_EADF × limit_at_observation. The continuous nature of EADF means the modelling approach in lecture 27 is a GLM (Gaussian or Beta) rather than logistic regression; the data engineering and feature selection adjust accordingly.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    PD asked whether a customer will default; LGD asked how much the bank will lose if they do; EAD asks how much the customer will owe the bank when they default. For most products the answer to the third question is simply the current balance. For revolving products it is a forecast: the customer can draw up to their limit, and customers under stress tend to do so. The EAD model is the bank's forecast of how much that drawdown will be over the 12 months leading up to default. The forecast is a continuous quantity bounded between zero and the limit, so the modelling tooling is regression rather than classification.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>EAD's material impact on capital is product-dependent. For an instalment mortgage with no undrawn portion, EAD equals the current balance and the model adds little value. For a credit card with a £5,000 limit and a £500 current balance, EAD can range from £500 (no drawdown) to £5,000 (full drawdown); the modelling choice between 20% CCF and 80% CCF moves EAD by £2,000, which moves RWA proportionally. Banks with large revolving books therefore care about EAD modelling almost as much as they care about LGD modelling; banks with predominantly secured term-loan books treat EAD as a near-mechanical step.</p>
+
+  <p>The off-balance-sheet question makes EAD more consequential globally. CRR Article 166D recognises that off-BS commitments (undrawn portions of committed credit lines, letters of credit, guarantees) have to be brought on-balance-sheet for capital purposes via the CCF. The CCF is therefore the bridge between the bank's off-BS commitment book and its capital calculation. Aggregated across all banks, undrawn commitments globally are measured in the trillions; the CCF is the lever that determines how much of that becomes RWA.</p>
+
+  <p>Counterparty credit risk (CCR) is excluded from this lecture. Derivatives, repos and securities financing transactions have an exposure profile that fluctuates with market prices, not with customer drawing behaviour; their EAD calculation uses the SA-CCR or IMM methods and is covered in a separate track (counterparty credit risk). The EAD lecture sequence here covers only the credit-risk-driven EAD for loans and committed facilities.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>EAD has two structural pictures worth holding. The first is the <strong>balance-plus-drawdown decomposition</strong>: EAD splits into the part the customer has already drawn (which is observable) and the part the customer might draw before default (which has to be modelled). The second is the <strong>target-variable choice</strong>: five candidate quantities, each with a different stability profile, definition domain and business interpretation. The diagram below puts both in one view.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EAD: balance-plus-drawdown decomposition and target alternatives">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">EAD architecture: decomposition and target choice</text>
+
+      <!-- Top: balance + drawdown decomposition -->
+      <text x="450" y="50" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">Balance-plus-drawdown decomposition</text>
+
+      <!-- Bar at t=0 -->
+      <rect x="60" y="70" width="350" height="40" fill="#fee2e2" stroke="#991b1b" stroke-width="1.2"/>
+      <text x="100" y="92" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">Drawn t0</text>
+      <rect x="170" y="70" width="240" height="40" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.2"/>
+      <text x="210" y="92" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">Undrawn t0</text>
+      <text x="60" y="128" font-family="Inter" font-size="9" fill="#475569">at observation (t = 0)</text>
+      <text x="410" y="128" text-anchor="end" font-family="Inter" font-size="9" fill="#475569">Limit at t0</text>
+
+      <!-- Bar at t=default -->
+      <rect x="60" y="140" width="350" height="40" fill="#fee2e2" stroke="#991b1b" stroke-width="1.2"/>
+      <text x="100" y="162" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">Drawn tD = EAD</text>
+      <rect x="312" y="140" width="98" height="40" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.2"/>
+      <text x="345" y="162" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">Remaining</text>
+      <text x="60" y="198" font-family="Inter" font-size="9" fill="#475569">at default (t = D)</text>
+
+      <!-- Arrow showing the conversion -->
+      <line x1="240" y1="115" x2="240" y2="138" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="240,138 237,132 243,132" fill="#475569"/>
+      <text x="430" y="115" font-family="Inter" font-size="9" fill="#475569">12 months</text>
+
+      <text x="450" y="218" text-anchor="middle" font-family="Inter" font-size="10" fill="#475569">EAD = Drawn_t0 + CCF &times; Undrawn_t0</text>
+
+      <!-- Bottom: five target alternatives -->
+      <text x="450" y="248" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">Five candidate target variables</text>
+
+      <g font-family="Inter" font-size="9">
+        <rect x="60" y="265" width="160" height="80" fill="#f3f4f6" stroke="#475569"/>
+        <text x="140" y="285" text-anchor="middle" font-weight="700" fill="#1f2937">EAD (dollars)</text>
+        <text x="140" y="302" text-anchor="middle" fill="#1f2937">EAD_tD</text>
+        <text x="140" y="320" text-anchor="middle" fill="#475569">simple</text>
+        <text x="140" y="334" text-anchor="middle" fill="#475569">scale-sensitive</text>
+
+        <rect x="230" y="265" width="160" height="80" fill="#f3f4f6" stroke="#475569"/>
+        <text x="310" y="285" text-anchor="middle" font-weight="700" fill="#1f2937">LEQ</text>
+        <text x="310" y="302" text-anchor="middle" fill="#1f2937">EAD / Balance_t0</text>
+        <text x="310" y="320" text-anchor="middle" fill="#475569">good for high-util</text>
+        <text x="310" y="334" text-anchor="middle" fill="#475569">undefined at balance=0</text>
+
+        <rect x="400" y="265" width="160" height="80" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.5"/>
+        <text x="480" y="285" text-anchor="middle" font-weight="700" fill="#134e4a">EADF (chosen)</text>
+        <text x="480" y="302" text-anchor="middle" fill="#134e4a">EAD / Limit_t0</text>
+        <text x="480" y="320" text-anchor="middle" fill="#134e4a">stable across cycles</text>
+        <text x="480" y="334" text-anchor="middle" fill="#134e4a">defined for every facility</text>
+
+        <rect x="570" y="265" width="160" height="80" fill="#f3f4f6" stroke="#475569"/>
+        <text x="650" y="285" text-anchor="middle" font-weight="700" fill="#1f2937">CCF</text>
+        <text x="650" y="302" text-anchor="middle" fill="#1f2937">(EAD - Bal) / AvailCr</text>
+        <text x="650" y="320" text-anchor="middle" fill="#475569">precise on undrawn</text>
+        <text x="650" y="334" text-anchor="middle" fill="#475569">undefined when bal=limit</text>
+
+        <rect x="740" y="265" width="120" height="80" fill="#f3f4f6" stroke="#475569"/>
+        <text x="800" y="285" text-anchor="middle" font-weight="700" fill="#1f2937">UCF</text>
+        <text x="800" y="302" text-anchor="middle" fill="#1f2937">(EAD - Bal) / Limit</text>
+        <text x="800" y="320" text-anchor="middle" fill="#475569">normalised undrawn</text>
+        <text x="800" y="334" text-anchor="middle" fill="#475569">ignores drawn portion</text>
+      </g>
+
+      <!-- Selection criteria -->
+      <rect x="60" y="370" width="800" height="50" fill="#fef9c3" stroke="#92400e"/>
+      <text x="460" y="392" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">Selection criteria: stability (low variance across cycle), defined for every facility, business intuition, regulatory alignment</text>
+      <text x="460" y="408" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">EADF wins on all four; CCF wins on precision but loses on stability and definition domain</text>
+    </svg>
+    <figcaption>EAD architecture in one view. The top shows the balance-plus-drawdown decomposition: at observation the facility has a drawn portion and an undrawn portion; over 12 months the customer can draw additional credit; at default the drawn portion equals EAD. The bottom lists the five candidate target variables; EADF (highlighted) is the operational standard for retail A-IRB because it wins on stability, definition domain, business intuition and regulatory alignment.</figcaption>
+  </figure>
+
+  <p>Three properties of the picture matter. First, <strong>EAD is bounded above by the limit at default</strong>: a customer cannot draw more than the contractual limit, so for revolving facilities EAD &le; Limit and consequently EADF &le; 1 in most cases. Limit increases between observation and default (some banks proactively raise limits for performing customers) can push EADF above 1; this is operationally valid and the modelling team accommodates it. Second, <strong>the choice of target propagates into the model class</strong>: EADF is bounded in [0, 1] (mostly), continuous and right-skewed, which suits a GLM with logit or Gaussian-identity link rather than logistic regression. Third, the <strong>12-month horizon matches PD</strong>: the same forward window is used (CRR Article 182(1)(a)).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Formal definition</h3>
+
+  <p>EAD is the bank's exposure to an obligor at the moment of default, measured 12 months forward from the observation date for IRB capital purposes (CRR Article 166A, 182). For facilities where the future exposure is uncertain (revolving lines, committed undrawn facilities), EAD is modelled. For facilities where the future exposure is deterministic (instalment loans on a fixed amortisation schedule), EAD is computed mechanically from the contract.</p>
+
+  <p>The standard form, applicable to revolving facilities:</p>
+
+  <pre><code>EAD  =  Drawn_t0  +  CCF * Undrawn_t0
+
+      where  Undrawn_t0  =  Limit_t0  -  Drawn_t0
+             CCF         =  modelled credit conversion factor in [0, 1+]
+</code></pre>
+
+  <p>An equivalent re-expression using EADF (EAD as a fraction of the limit):</p>
+
+  <pre><code>EAD  =  EADF * Limit_t0
+
+      where  EADF  =  (Drawn_t0 + CCF * Undrawn_t0) / Limit_t0
+             EADF  =  Drawn_t0/Limit_t0 + CCF * (Limit_t0 - Drawn_t0)/Limit_t0
+             EADF  =  utilisation_t0 + CCF * (1 - utilisation_t0)
+</code></pre>
+
+  <p>The last line makes the relationship explicit: EADF is a weighted average of current utilisation and 100%, with the CCF as the weight applied to the available headroom. Customers at zero utilisation have EADF = CCF; customers at 100% utilisation have EADF = 1 regardless of CCF.</p>
+
+  <h3>The five candidate target variables</h3>
+
+  <p>PRA SS4/24 §17.1 allows banks to estimate EAD directly in place of the CCF (where Article 166D(3) of the CRR otherwise requires the CCF). SS4/24 §17.2 explicitly recognises "estimating EAD as a percentage of total limit (Limit Factor estimation)" as an acceptable approach. The full menu of candidate targets:</p>
+
+  <table>
+    <thead>
+      <tr><th>Target</th><th>Formula</th><th>Range</th><th>Strengths</th><th>Weaknesses</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>EAD</strong></td><td>EAD_tD (raw dollars)</td><td>&ge; 0</td><td>Simplest; aligns with intuition</td><td>Scale-sensitive; hard to model across different balance ranges; ignores limit information</td></tr>
+      <tr><td><strong>LEQ</strong></td><td>EAD_tD / Balance_t0</td><td>0 to 2 (often &gt; 1)</td><td>Good for high-utilisation closed accounts</td><td>Unstable at low balance; undefined when balance is zero</td></tr>
+      <tr><td><strong>EADF</strong></td><td>EAD_tD / Limit_t0</td><td>Typically 0 to 1, can exceed 1 if limit decreases before default</td><td>Stable; combines drawn and undrawn naturally; intuitive; defined for every facility with a limit; regulatory-accepted</td><td>Omits current balance from the denominator (treated as a feature instead); can crowd out other drivers</td></tr>
+      <tr><td><strong>CCF</strong></td><td>(EAD_tD - Balance_t0) / AvailableCredit_t0</td><td>-&infin; to &infin; (often &gt; 0)</td><td>Precise tracking of the undrawn drawdown</td><td>Undefined when available credit is zero (balance = limit); explodes at high utilisation; volatile</td></tr>
+      <tr><td><strong>UCF</strong></td><td>(EAD_tD - Balance_t0) / Limit_t0</td><td>0 to 1+</td><td>Normalised undrawn; defined for every facility</td><td>Ignores the drawn portion entirely; less interpretable</td></tr>
+    </tbody>
+  </table>
+
+  <p>The <strong>EADF</strong> choice has emerged as the retail A-IRB standard for four reasons:</p>
+
+  <ol>
+    <li>It is <strong>stable across credit cycles</strong>. Empirical analysis shows EADF distributions move only mildly through the cycle, whereas CCF distributions widen dramatically in stress (when balance approaches limit, available credit collapses, CCF explodes).</li>
+    <li>It is <strong>defined for every facility with a limit</strong>. CCF is undefined for facilities at 100% utilisation; LEQ is undefined for zero-balance facilities. Both create operational headaches that EADF avoids.</li>
+    <li>It is <strong>intuitive for business users and regulators</strong>. "What fraction of the limit will be drawn at default" is a question a credit officer or a supervisor can answer; "what is the CCF on this account" requires familiarity with the formula.</li>
+    <li>It is <strong>regulatory-aligned</strong>. SS4/24 §17.2 explicitly endorses limit-factor estimation; SS4/24 §17.1 permits direct EAD estimation in place of CCF.</li>
+  </ol>
+
+  <p>Banks may still choose EAD or LEQ where business decisions require absolute amounts (capital planning at the loan-level) or where the portfolio's balance volatility is low (term loans). The choice is documented and tested against the others during model design.</p>
+
+  <h3>The outstanding-amount definition</h3>
+
+  <p>Before the bank can compute EAD for any facility, it has to define the outstanding amount precisely. CRR Article 166A(2) sets the legal anchor: outstanding amount is the <strong>accounting value gross of Specific Credit Risk Adjustments (SCRA)</strong>. SS4/24 §13.1 adds operational specificity.</p>
+
+  <p>For <strong>performing facilities</strong>:</p>
+  <ul>
+    <li>Outstanding amount = customer balance at observation, including all principal, interest and fees.</li>
+    <li>No further adjustment for SCRA (impairment liabilities are held separately).</li>
+    <li>Additional drawings between observation and default are reflected in the CCF, not in the outstanding amount adjustment (CRR Article 182(1)(ca)(i), SS4/24 §13.11).</li>
+  </ul>
+
+  <p>For <strong>defaulted facilities</strong> (relevant for the LGD denominator from <a href="17-lgd_target_and_data.html">lecture 17</a>):</p>
+  <ul>
+    <li>Add back previous partial write-offs (SS4/24 §13.5).</li>
+    <li>Late fees not capitalised excluded (CRR Article 181(1)(i), SS4/24 §13.9).</li>
+    <li>Interest not capitalised excluded (SS4/24 §13.10).</li>
+    <li>Result: customer balance at default, with no further adjustments.</li>
+  </ul>
+
+  <p>For <strong>acquired portfolios</strong> initially measured at fair value: the technical outstanding amount would be the fair value at day zero, but the operational standard is to set outstanding amount to the customer balance per CRR Article 3, on the principle that EAD should be agnostic to accounting policy.</p>
+
+  <h3>Related facilities</h3>
+
+  <p>When an account is restructured to a new facility number or transferred to a fixed-term loan to clear debt, the two facilities are <strong>related</strong> (SS4/24 §13.8). For unbiased estimation, firms must look through restructures and account-number changes to connect post-default drawings and cash flows with the at-observation facility. The data engineering for EAD modelling has to identify related facilities and consolidate them; the lecture-18-equivalent EAD sampling work (lecture 25) covers the operational mechanics.</p>
+
+  <h3>On-balance-sheet versus off-balance-sheet</h3>
+
+  <p>The EAD calculation works for both, but the treatment differs:</p>
+
+  <ul>
+    <li><strong>On-BS exposures</strong>: the drawn balance is already on the balance sheet. EAD is the modelled outstanding at default.</li>
+    <li><strong>Off-BS exposures</strong>: committed undrawn lines, letters of credit, guarantees. These do not appear on the balance sheet until drawn. The CCF (or EADF) converts the off-BS notional to an on-BS-equivalent for capital purposes. Article 166D of the CRR sets the supervisory CCFs for standardised approach (40% for revocable commitments, 75% for irrevocable, 100% for direct credit substitutes) and permits IRB banks to estimate their own.</li>
+  </ul>
+
+  <h3>The 12-month fixed-horizon nature</h3>
+
+  <p>EAD modelling under IRB uses a <strong>fixed 12-month horizon</strong>: every observation snapshot looks 12 months forward to default. The sampling approach in lecture 25 is correspondingly different from PD's overlapping-cohort design (lecture 11): EAD sampling uses fixed monthly cohorts from a development period, with the 12-month outcome window observed for each. This simplifies the sample geometry and reduces the autocorrelation problem that motivated PD's de-duplication rule.</p>
+
+  <h3>Counterparty credit risk excluded</h3>
+
+  <p>The EAD methodology in this sequence applies to credit-risk-driven exposures: loans, committed credit lines, off-BS commitments. Derivatives, repurchase agreements and securities financing transactions have an exposure profile driven by market prices (interest rates, FX, equity values); their EAD calculation uses the <strong>Standardised Approach for Counterparty Credit Risk (SA-CCR)</strong> or the <strong>Internal Model Method (IMM)</strong>. CCR is a separate methodology covered in its own track and is referenced in <a href="../01-notation.html">notation</a> but not modelled here.</p>
+
+  <h3>The PiT / LRA / Downturn / Regulatory EADF architecture</h3>
+
+  <p>The modelling architecture parallels PD's two-phase design and LGD's risk-differentiation-then-quantification design. Under CRR Articles 182(1)(a) and 182(1)(b), the bank produces four EADF measures:</p>
+
+  <ul>
+    <li><strong>PiT EADF</strong>: the cycle-sensitive estimate from the lecture-27 GLM model; used to feed IFRS 9 ECL.</li>
+    <li><strong>LRA EADF</strong>: the long-run average over the cycle-covering calibration window.</li>
+    <li><strong>Downturn EADF</strong>: the average EADF over the identified downturn period (typically 2008 to 2009, the GFC).</li>
+    <li><strong>Regulatory EADF</strong>: max(LRA EADF + MoC_LRA, Downturn EADF + MoC_DT), then applied to the limit at observation to produce EAD for the K formula.</li>
+  </ul>
+
+  <p>The downstream consumption: regulatory EADF × limit_at_observation is the EAD input to the K formula in lecture 31. The PiT EADF (without MoC and downturn add-on) feeds the IFRS 9 pipeline.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the choice of EADF as the target is not arbitrary; it falls out of the data shape</strong>. When the empirical EADF distribution is plotted, it has a thick mass around current utilisation (most customers do not change their balance much between observation and default) plus a tail running toward 1 (customers under stress do draw down). The Beta or Gaussian distribution captures both regions reasonably well. CCF, on the other hand, has a very long right tail (because of the limit-balance denominator) and an undefined region (when balance equals limit); no standard distribution fits it cleanly. The data shape recommends EADF; the regulator's text endorses it; the bank's choice is to use it.</p>
+
+  <p>The second lesson is on <strong>the trade-off between EAD and CCF</strong>. The CCF asks "of the undrawn balance, what fraction will be drawn"; the EADF asks "of the total limit, what fraction will be the EAD". The two are mathematically related (the equation in section 4 above) but answer slightly different business questions. CCF is what regulators historically asked for (it appears in standardised-approach rules); EADF is what banks have moved toward for stability. The supervisory texts now allow either, and the operational answer in retail A-IRB is EADF.</p>
+
+  <p>The third lesson is on <strong>off-balance-sheet exposures</strong>. Globally, undrawn commitments dwarf the on-BS exposures of most banks (a credit-card book has 5 to 10x more limit than balance; corporate revolvers are similar). The CCF / EADF is therefore the lever that determines how much of that off-BS world becomes RWA. A bank that uses the standardised CCFs (40% / 75% / 100%) is conservative; a bank with strong IRB CCF / EADF modelling can usually justify lower values that materially reduce off-BS RWA. The capital savings from EAD modelling are second only to PD modelling for revolving portfolios.</p>
+
+  <p>The fourth lesson is on <strong>limit increases and decreases</strong>. The denominator in EADF is the limit at observation; the numerator is the EAD at default 12 months later. If the bank increases the customer's limit between observation and default (proactive credit-line management), the EAD can exceed the observation limit, so EADF exceeds 1. If the bank decreases the limit (collections action), EADF can be artificially compressed. The modelling team has to decide whether limit changes are part of the conditional event (use limit_at_default in EADF construction) or part of the bank's policy (use limit_at_observation and accept EADF &gt; 1). The standard is to use limit at observation per CRR Article 182(1)(b); limit increases get captured in the LRA / downturn calibration averages naturally.</p>
+
+  <p>The fifth lesson is structural: <strong>the EAD sequence has a tighter shape than the PD or LGD sequence</strong>. The wiki content is well-developed (14 files covering the full pipeline), but the substance is more mechanical: a single continuous target rather than a mixture, GLM rather than logistic, fixed-horizon sampling rather than overlapping cohorts. The EAD lecture sequence is therefore less conceptually rich than PD or LGD, but the operational discipline is identical. Practitioners who treat EAD as "the easy one" sometimes under-invest in the data engineering and feature engineering work; the regulatory expectations are the same.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Write the EAD formula in terms of drawn balance, undrawn balance and CCF. State an equivalent expression using EADF and explain how the two relate.</li>
+    <li>Name the five candidate EAD target variables. For each, give one strength and one weakness.</li>
+    <li>State four reasons EADF has emerged as the retail A-IRB standard for the EAD target.</li>
+    <li>EADF can exceed 1. When does this happen, and how is it accommodated in the model?</li>
+    <li>Define the outstanding amount per CRR Article 166A(2) and SS4/24 §13.1. How does it differ between performing and defaulted facilities?</li>
+    <li>What are related facilities under SS4/24 §13.8? What operational requirement do they impose on the EAD data engineering?</li>
+    <li>Distinguish on-BS and off-BS treatment for EAD. What role does the CCF play in the off-BS case?</li>
+    <li>Why is counterparty credit risk excluded from the EAD methodology in this lecture? What methodology applies to CCR exposures?</li>
+    <li>State the four EADF measures required under CRR Articles 182(1)(a) and (b). What is the formula for the regulatory EADF?</li>
+    <li>A customer has a balance of £1,000 and a limit of £5,000 at observation. The bank's CCF model predicts 30%. Compute the EAD and the EADF.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/ead/01-target-variables.md</code> &mdash; the five candidate targets, the EADF selection, the outstanding-amount definition.</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/ead/01-model_methodology.md</code> &mdash; the PiT / LRA / DT / Regulatory EADF architecture, end-to-end design.</li>
+      <li>Supplementary regulatory references: CRR Articles 3, 166A, 166D, 182(1)(a) and (b); PRA SS4/24 §13 and §17.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="../01-notation.html">Notation</a> &mdash; the EAD-family symbols (EAD, EADF, CCF, drawn / undrawn balance, limit) are defined there.</li>
+      <li><a href="02-credit_losses.html">Credit losses</a> &mdash; EAD as the third leg of EL = PD &times; LGD &times; EAD.</li>
+      <li><a href="03-definitions.html">Definitions</a> &mdash; CRR Article 178 default trigger and the obligor / facility distinction.</li>
+      <li><a href="17-lgd_target_and_data.html">LGD target and data</a> &mdash; the outstanding-amount definition shared with EAD (LGD denominator).</li>
+      <li>The PD and LGD sequences (lectures 9 to 22) &mdash; the pipeline pattern this EAD sequence mirrors.</li>
+    </ul>
+
+    <p><strong>Forward references inside the EAD sequence:</strong></p>
+    <ul>
+      <li>24-ead_target_and_data (next) &mdash; the EADF target construction, 12-month horizon sample, data history.</li>
+      <li>25-ead_sampling_and_representativeness (planned) &mdash; fixed-horizon sampling rather than overlapping cohorts.</li>
+      <li>26-ead_feature_engineering (planned) &mdash; R-squared and Lift instead of IV / Gini for univariate screening.</li>
+      <li>27-ead_risk_differentiation (planned) &mdash; GLM (Gaussian + Identity, or Beta + logit) rather than logistic.</li>
+      <li>28-ead_risk_quantification (planned) &mdash; LRA EADF, downturn EADF, regulatory EADF.</li>
+      <li>29-ead_testing (planned) &mdash; MAE / RMSE / MAPE on realised EADF.</li>
+    </ul>
+
+    <p><strong>Forward to RWA and IFRS 9:</strong></p>
+    <ul>
+      <li>31-rwa (planned) &mdash; the K formula consumes EAD = regulatory_EADF &times; limit_at_observation.</li>
+      <li>IFRS 9 EAD (planned) &mdash; the same EADF machinery but with macro overlays for forward-looking ECL and no downturn add-on.</li>
+    </ul>
+
+    <p><strong>Adjacent track:</strong></p>
+    <ul>
+      <li>Counterparty credit risk (planned) &mdash; SA-CCR and IMM methodologies for derivatives, repos and SFTs. Excluded from this EAD sequence.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Articles 166A, 166D, 182. The legislative anchors for EAD.</li>
+      <li>PRA SS4/24, paragraphs 13.1 (outstanding amount), 13.5 to 13.11 (defaulted-facility adjustments), 17.1 and 17.2 (direct EAD vs CCF estimation). UK supervisory expectations.</li>
+      <li>EBA/GL/2017/16, paragraphs 154 to 188. The European authority's interpretation of EAD modelling.</li>
+      <li>Tong, E. (2016), "A comparison of EAD models in the credit card industry". Reference paper on direct EAD versus CCF estimation, cited in <a href="13-pd_risk_differentiation.html">lecture 13</a>'s segmentation discussion.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 23 of n &middot; EAD 1 of 7.</span>
+  <span><a href="22-lgd_testing.html">Previous: LGD testing</a> &middot; <a href="24-ead_target_and_data.html">Next: target and data</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

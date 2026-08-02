@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 34: genetic algorithms</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Hyperparameter tuning</a></div>
+  <h1>Genetic algorithms</h1>
+  <p class="subtitle">Borrow the metaphor from natural selection: a population of candidate configurations, fitness-weighted breeding, occasional mutations. The result is a global search method that excels where Bayesian optimisation struggles: pipeline structure, architectures, combinatorial spaces.</p>
+  <div class="meta">
+    <span>Lecture 34 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>genetic algorithm</strong> (GA) treats the hyperparameter search as a problem of evolution. A <strong>population</strong> of candidate configurations is maintained, each one encoded as a <strong>chromosome</strong> (a vector of hyperparameter values). Every individual is evaluated against a <strong>fitness</strong> function (typically validation performance), the fittest are selected as parents, pairs are <strong>crossed</strong> to produce offspring that mix the parents' values, and offspring are perturbed by <strong>mutation</strong> to keep the gene pool diverse. The population is replaced by its offspring (often with a few elite individuals carried over unchanged) and the loop runs for a fixed number of <strong>generations</strong>. The result is a global, gradient-free, derivative-free search that can navigate spaces where Bayesian optimisation's smoothness assumptions fail: pipeline structure (which preprocessor with which model), neural architectures, feature subsets, mixed continuous-discrete configurations, and multi-objective problems where Pareto fronts matter more than a single best point.</p>
+
+  <div class="callout insight">
+    <span class="tag">Beyond the source</span>
+    The wiki source for this topic is a 22-line stub. This lecture is a gap-fill written because genetic algorithms remain the practical choice for combinatorial search spaces (pipeline selection, feature subset selection, neural-architecture search) where Bayesian optimisation struggles. The detail below draws on TPOT, DEAP, and Optuna's NSGA-II implementations rather than the wiki, which has not yet been built out.
+  </div>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Picture a population of model configurations as a colony of organisms. Each one has a chromosome encoding its hyperparameters: learning rate, depth, number of estimators, choice of preprocessor. Each one is scored on how well it predicts. The best-scoring organisms get to breed, mixing their chromosomes to make children that inherit traits from both parents. Occasionally a random mutation occurs (a learning rate jumps by a small amount, a categorical choice flips). The next generation is mostly children of the fittest, with a small infusion of randomness, and the cycle continues. After twenty or thirty generations, the population is concentrated around configurations that perform well, and the best individual ever seen is the answer.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the course</span>
+    Sub-module 06 covers four tuning methods in increasing order of sophistication: <a href="02-grid_search.html">grid search</a> (exhaustive, cheap to think about, expensive to run), <a href="03-random_search.html">random search</a> (sample uniformly from the space, surprisingly competitive), <a href="04-bayesian_optimisation.html">Bayesian optimisation</a> (build a surrogate, choose points by expected improvement), and genetic algorithms (this lecture). Genetic algorithms are not strictly better or worse than Bayesian optimisation; they are matched to a different shape of problem. The discussion of when each wins is the central content of <a href="01-tuning_principles.html">lecture 30 on tuning principles</a>.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons genetic algorithms deserve a place in the tuning toolkit alongside Bayesian optimisation. First, <strong>they handle combinatorial structure that surrogate models cannot</strong>. Bayesian optimisation fits a Gaussian process (or tree-based surrogate) over the hyperparameter space, which works beautifully when the space is a low-dimensional product of continuous and ordinal axes. It struggles when the space is itself structural: which preprocessor goes before which feature selector goes before which model, with each choice unlocking or closing different sub-parameter spaces. Selecting a tree model means the depth parameter exists; selecting a linear model means it does not. Genetic algorithms encode the whole structure as a chromosome and recombine structures wholesale.</p>
+
+  <p>Second, <strong>they extend cleanly to multi-objective optimisation</strong>. Real model selection is often a trade-off: predictive performance against inference latency, accuracy against fairness disparity, AUC against the number of features retained. Bayesian optimisation requires scalarising the objectives into a weighted sum or using more elaborate multi-output surrogates. Genetic algorithms operate on populations and naturally produce a <strong>Pareto front</strong> of non-dominated solutions through algorithms such as <strong>NSGA-II</strong>. A model owner can then choose a point on the front rather than committing to a weighting in advance.</p>
+
+  <p>Third, <strong>they parallelise embarrassingly</strong>. Every individual in a generation can be evaluated independently. A population of 100 with 30 generations is 3,000 evaluations, but each generation's 100 evaluations are independent and can be sharded across 100 workers. Bayesian optimisation is inherently sequential (each new point depends on the surrogate fitted to all previous points) and parallelises only with elaborate batch acquisition strategies that introduce their own approximations. When compute is abundant and evaluations are moderately fast, GA's parallel throughput beats BO's sample efficiency.</p>
+
+  <div class="callout warn">
+    <span class="tag">When not to reach for a GA</span>
+    Genetic algorithms are not the right tool for smooth, low-dimensional, expensive-to-evaluate spaces. Tuning learning rate, weight decay, and momentum for a single deep network where each training run takes six hours is the textbook case for Bayesian optimisation: the surrogate model uses the smoothness of the response to extrapolate between evaluations, so 30 well-chosen points beat 3,000 random ones. A GA's strength (population-level diversity, recombination across distant points) becomes a weakness here because the population is wasting evaluations on points the surrogate would have ruled out. The decision rule from lecture 30 still applies: structural and combinatorial spaces favour GA; smooth low-dimensional spaces with expensive evaluations favour BO.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. A generation is a slice of time; a population is a column of individuals in that slice; an individual is a chromosome (a configuration); fitness is the score that decides who reproduces. The four operators (encoding, selection, crossover, mutation) define how one generation produces the next. The hyperparameters of the algorithm itself (population size, mutation rate, crossover rate, number of generations, elitism count) trade exploration against exploitation.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Generation-by-generation evolution of a population with the four genetic operators">
+      <defs>
+        <marker id="gaArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Generation-by-generation evolution of a population</text>
+
+      <!-- Generation 0 -->
+      <g>
+        <text x="100" y="60" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">Generation 0</text>
+        <text x="100" y="74" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">random initialisation</text>
+        <rect x="40" y="86" width="120" height="22" rx="4" fill="#FEE2E2" stroke="#dc2626" stroke-width="1"/>
+        <text x="100" y="101" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#7f1d1d">lr=0.31, d=2, f=0.58</text>
+        <rect x="40" y="112" width="120" height="22" rx="4" fill="#FEF3C7" stroke="#d97706" stroke-width="1"/>
+        <text x="100" y="127" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#92400e">lr=0.05, d=7, f=0.69</text>
+        <rect x="40" y="138" width="120" height="22" rx="4" fill="#FEF3C7" stroke="#d97706" stroke-width="1"/>
+        <text x="100" y="153" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#92400e">lr=0.18, d=4, f=0.71</text>
+        <rect x="40" y="164" width="120" height="22" rx="4" fill="#FEE2E2" stroke="#dc2626" stroke-width="1"/>
+        <text x="100" y="179" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#7f1d1d">lr=0.42, d=1, f=0.55</text>
+        <rect x="40" y="190" width="120" height="22" rx="4" fill="#DCFCE7" stroke="#16a34a" stroke-width="1"/>
+        <text x="100" y="205" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#14532d">lr=0.09, d=6, f=0.78</text>
+      </g>
+
+      <!-- Operators column -->
+      <g>
+        <rect x="220" y="86" width="180" height="30" rx="6" fill="#EEF2FF" stroke="#4338ca" stroke-width="1"/>
+        <text x="310" y="98" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#312e81">1. Encoding</text>
+        <text x="310" y="110" text-anchor="middle" font-family="Inter" font-size="8" fill="#4338ca">chromosome = vector</text>
+
+        <rect x="220" y="124" width="180" height="30" rx="6" fill="#EEF2FF" stroke="#4338ca" stroke-width="1"/>
+        <text x="310" y="136" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#312e81">2. Selection</text>
+        <text x="310" y="148" text-anchor="middle" font-family="Inter" font-size="8" fill="#4338ca">tournament, roulette, rank</text>
+
+        <rect x="220" y="162" width="180" height="30" rx="6" fill="#EEF2FF" stroke="#4338ca" stroke-width="1"/>
+        <text x="310" y="174" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#312e81">3. Crossover</text>
+        <text x="310" y="186" text-anchor="middle" font-family="Inter" font-size="8" fill="#4338ca">single-point, uniform, BLX-a</text>
+
+        <rect x="220" y="200" width="180" height="30" rx="6" fill="#EEF2FF" stroke="#4338ca" stroke-width="1"/>
+        <text x="310" y="212" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#312e81">4. Mutation</text>
+        <text x="310" y="224" text-anchor="middle" font-family="Inter" font-size="8" fill="#4338ca">Gaussian, bit-flip, reset</text>
+      </g>
+
+      <line x1="165" y1="150" x2="218" y2="150" stroke="#71717a" stroke-width="1.5" marker-end="url(#gaArrow)"/>
+
+      <!-- Generation N -->
+      <g>
+        <text x="510" y="60" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">Generation N</text>
+        <text x="510" y="74" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">after evolution</text>
+        <rect x="450" y="86" width="120" height="22" rx="4" fill="#DCFCE7" stroke="#16a34a" stroke-width="1"/>
+        <text x="510" y="101" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#14532d">lr=0.08, d=6, f=0.81</text>
+        <rect x="450" y="112" width="120" height="22" rx="4" fill="#DCFCE7" stroke="#16a34a" stroke-width="1"/>
+        <text x="510" y="127" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#14532d">lr=0.10, d=5, f=0.80</text>
+        <rect x="450" y="138" width="120" height="22" rx="4" fill="#DCFCE7" stroke="#16a34a" stroke-width="1"/>
+        <text x="510" y="153" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#14532d">lr=0.07, d=6, f=0.83</text>
+        <rect x="450" y="164" width="120" height="22" rx="4" fill="#FEF3C7" stroke="#d97706" stroke-width="1"/>
+        <text x="510" y="179" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#92400e">lr=0.11, d=5, f=0.76</text>
+        <rect x="450" y="190" width="120" height="22" rx="4" fill="#DCFCE7" stroke="#16a34a" stroke-width="1"/>
+        <text x="510" y="205" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#14532d">lr=0.08, d=7, f=0.85</text>
+      </g>
+
+      <line x1="405" y1="150" x2="448" y2="150" stroke="#71717a" stroke-width="1.5" marker-end="url(#gaArrow)"/>
+
+      <!-- Fitness scale -->
+      <g>
+        <rect x="620" y="86" width="160" height="126" rx="6" fill="#FFFFFF" stroke="#37352F" stroke-width="1"/>
+        <text x="700" y="104" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#18181b">Fitness colour key</text>
+        <rect x="638" y="118" width="14" height="12" fill="#DCFCE7" stroke="#16a34a"/>
+        <text x="660" y="128" font-family="Inter" font-size="9" fill="#14532d">high (top quartile)</text>
+        <rect x="638" y="138" width="14" height="12" fill="#FEF3C7" stroke="#d97706"/>
+        <text x="660" y="148" font-family="Inter" font-size="9" fill="#92400e">middle (mid quartiles)</text>
+        <rect x="638" y="158" width="14" height="12" fill="#FEE2E2" stroke="#dc2626"/>
+        <text x="660" y="168" font-family="Inter" font-size="9" fill="#7f1d1d">low (bottom quartile)</text>
+        <text x="700" y="188" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">chromosome shown as</text>
+        <text x="700" y="200" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#71717a">(learning rate, depth,</text>
+        <text x="700" y="210" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#71717a">fitness score)</text>
+      </g>
+
+      <!-- Loop arrow -->
+      <path d="M 510 230 Q 510 280 410 280 Q 310 280 310 240" fill="none" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#gaArrow)"/>
+      <text x="410" y="298" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">repeat for N generations, with elitism preserving the best individuals unchanged</text>
+
+      <!-- Hyperparameters of the search -->
+      <line x1="40" y1="330" x2="780" y2="330" stroke="#37352F" stroke-width="1"/>
+      <text x="410" y="350" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b">Hyperparameters of the search itself</text>
+      <text x="130" y="372" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#18181b">population size</text>
+      <text x="130" y="386" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">50 to 200 typical</text>
+      <text x="290" y="372" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#18181b">mutation rate</text>
+      <text x="290" y="386" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">0.05 to 0.2 per gene</text>
+      <text x="450" y="372" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#18181b">crossover rate</text>
+      <text x="450" y="386" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">0.5 to 0.9 per pair</text>
+      <text x="610" y="372" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#18181b">generations</text>
+      <text x="610" y="386" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">20 to 100 typical</text>
+      <text x="730" y="372" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#18181b">elitism</text>
+      <text x="730" y="386" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">top 1 to 5 preserved</text>
+
+      <text x="410" y="420" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">the trade-off: high mutation explores, low mutation exploits; large populations parallelise, small populations converge faster</text>
+    </svg>
+    <figcaption>The four operators (encoding, selection, crossover, mutation) define how one generation produces the next. Elitism preserves the top performers across generations to prevent regression. Population size and mutation rate are the dominant levers: large and diverse explores; small and concentrated exploits. The colour-coded population at the right has converged on configurations clustered around small learning rates with moderate depth, with mean fitness rising from generation 0 to generation N.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The operators apply once per generation in a fixed order, and the cycle repeats until a generation budget is exhausted. The population at generation N is qualitatively different from generation 0: less diverse, concentrated in the high-fitness region, with the best individual carried through unchanged by elitism. The hyperparameters of the search itself (the lower band) are not just nuisance parameters; they determine whether the search explores broadly or collapses prematurely onto a local optimum.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Encoding: chromosome as configuration</h3>
+
+  <p>The chromosome is the data structure on which the operators act. For a tuning problem with three continuous hyperparameters (learning rate, regularisation strength, dropout rate) the chromosome is a real-valued vector of length three. For a mixed problem (continuous learning rate, integer tree depth, categorical kernel choice) the chromosome is a heterogeneous tuple, and each gene carries a type tag so operators know how to act on it. For a pipeline-selection problem (which preprocessor, then which feature selector, then which model, each with its own sub-parameters) the chromosome is a tree or a typed expression, and operators must respect the structural constraints (you cannot put a feature selector before its inputs exist).</p>
+
+  <p>The encoding choice has consequences. A <strong>binary encoding</strong>, in which every hyperparameter is discretised to a fixed-length bit string, is the classical formulation from Holland's original work in the 1970s and is convenient for theoretical analysis (the schema theorem applies cleanly to bit strings) but wasteful for continuous parameters and awkward for categoricals with non-power-of-two cardinality. A <strong>real-valued encoding</strong> represents continuous hyperparameters directly as floating-point numbers and uses operators (BLX-alpha crossover, Gaussian mutation) designed for that domain. Modern toolkits (DEAP, TPOT, Optuna) default to mixed real-valued encodings with type-aware operators.</p>
+
+  <h3>Selection: who gets to breed</h3>
+
+  <p>Selection chooses parents based on fitness. Three schemes dominate. <strong>Tournament selection</strong> samples $k$ individuals at random (typically $k = 2$ to $5$) and picks the fittest among them as a parent. It is parameter-light, robust to outliers in the fitness distribution, and the tournament size $k$ trades selection pressure against diversity: small $k$ keeps weaker individuals in play, large $k$ concentrates breeding on the elite. <strong>Roulette wheel</strong> selection (also called fitness-proportionate) selects each parent with probability proportional to its fitness,</p>
+  $$P(\text{select } i) = \frac{f_i}{\sum_{j=1}^{N} f_j}.$$
+  <p>It is intuitive but fragile: if one individual's fitness dominates the rest, the wheel collapses and the population converges on that individual prematurely; if fitness values are all similar, selection becomes effectively random. <strong>Rank-based selection</strong> sidesteps the scaling problem by using fitness rank rather than fitness value,</p>
+  $$P(\text{select } i) = \frac{2 \cdot \operatorname{rank}(i)}{N (N + 1)},$$
+  <p>with rank 1 the worst and rank $N$ the best. The selection pressure is constant regardless of how peaked or flat the fitness distribution is, which makes rank-based selection a sensible default when fitness values vary by orders of magnitude across the population (a common situation in early generations).</p>
+
+  <h3>Crossover: combining two parents</h3>
+
+  <p>Crossover takes two parents and produces one or two children whose chromosomes mix the parents' genes. For binary or discrete chromosomes, <strong>single-point crossover</strong> picks a random cut-point and swaps everything to its right between the parents. <strong>Uniform crossover</strong> goes gene by gene, taking each gene independently from either parent with equal probability. Uniform is more disruptive of co-adapted gene groups but explores more thoroughly; single-point preserves local structure.</p>
+
+  <p>For real-valued chromosomes, the natural analogue is <strong>BLX-alpha</strong> crossover. Given two parent values $p_1 < p_2$ for a continuous gene, define the range $d = p_2 - p_1$ and sample the child uniformly from the interval $[p_1 - \alpha d,\; p_2 + \alpha d]$. With $\alpha = 0.5$ (a common default) the child can land slightly outside the parents' interval, which prevents the population's spread on that gene from shrinking irreversibly. <strong>Simulated binary crossover</strong> (SBX) is a more sophisticated alternative that mimics the offspring distribution of single-point binary crossover and is the default in NSGA-II for real-valued problems.</p>
+
+  <p>The <strong>crossover rate</strong> $p_c$ governs how often crossover is applied: with probability $p_c$ a pair of selected parents produces children via crossover, otherwise the children are direct copies of the parents (which still get a chance to mutate). Typical values are $0.5$ to $0.9$. High crossover rates favour recombination of good gene blocks; low rates rely more on mutation and parent preservation for variation.</p>
+
+  <h3>Mutation: maintaining diversity</h3>
+
+  <p>Mutation perturbs a child's chromosome after crossover, with the dual purpose of injecting variation absent from both parents and escaping local optima the population has settled into. For binary chromosomes, <strong>bit-flip mutation</strong> flips each bit independently with a small probability $p_m$ (commonly $1 / L$ where $L$ is chromosome length, so on average one bit per child mutates). For real-valued chromosomes, <strong>Gaussian mutation</strong> adds a normal perturbation,</p>
+  $$x'_i = x_i + \mathcal{N}(0, \sigma^2),$$
+  <p>with $\sigma$ either fixed or adaptive (decreasing across generations as the population concentrates). For categorical genes, <strong>random reset</strong> mutation replaces the gene's value with a fresh random draw from its categorical domain. For integer genes, a small random walk (add $\pm 1$ or $\pm 2$) often works better than a full reset because it preserves local proximity in the integer space.</p>
+
+  <p>The <strong>mutation rate</strong> is the second key lever (after population size) governing the exploration-exploitation trade-off. High mutation rates explore widely but destroy good chromosomes faster than selection can preserve them, slowing convergence. Low mutation rates exploit known good regions but allow the population to collapse onto a local optimum with no escape. The classical advice is to keep mutation low and rely on a large population and crossover for diversity; in practice, an adaptive schedule (higher mutation early, lower mutation late) often outperforms either extreme.</p>
+
+  <h3>The algorithm loop</h3>
+
+  <p>The standard generational GA loop is short to write and runs as follows. Initialise a population of size $N$ with random chromosomes. Evaluate every individual's fitness. For each subsequent generation, select $N$ parents (with replacement, so the fittest can be parents to many children), pair them up, apply crossover with probability $p_c$ to each pair, apply mutation with probability $p_m$ to each gene of each child, evaluate the new individuals' fitness, and replace the old population with the new one. If elitism is enabled, carry over the top $k$ individuals from the previous generation unchanged, replacing the $k$ weakest of the new generation. Stop after a fixed number of generations or when the best fitness has not improved for a stagnation patience window.</p>
+
+  <p>The hyperparameters of this loop (population size, generation budget, crossover rate, mutation rate, tournament size or selection pressure, elitism count) are the GA's own knobs. A practical default for hyperparameter tuning on a single model: population size 50, 30 generations, tournament size 3, crossover rate 0.7, per-gene mutation rate 0.1, elitism 1 to 3. These are starting points; the right values depend on chromosome length, fitness landscape, and the compute budget for evaluations.</p>
+
+  <h3>Tools: TPOT, DEAP, Optuna NSGA-II</h3>
+
+  <p>Three Python libraries cover the territory. <strong>TPOT</strong> is the highest-level: a genetic search over scikit-learn pipelines, with chromosomes that are tree-structured expressions of preprocessing steps, feature selectors, and final estimators. The user supplies a dataset and a time budget; TPOT returns the best pipeline it has found and exports the corresponding Python code. <strong>DEAP</strong> is a general-purpose evolutionary computation library that exposes every operator and lets the user assemble the loop themselves; it is the right choice when the search space does not fit into a scikit-learn pipeline (custom encodings, problem-specific operators, constraint handling). <strong>Optuna's NSGA-II sampler</strong> is multi-objective by design and integrates with Optuna's pruning and parallelism machinery; use it when you have two or more competing objectives and want a Pareto front rather than a single best configuration.</p>
+
+  <pre><code class="language-python">from tpot import TPOTClassifier
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
+
+X, y = load_breast_cancer(return_X_y=True)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Population of 50 pipelines evolved over 20 generations.
+# Each chromosome is a sklearn pipeline (preprocessor + selector + model).
+tpot = TPOTClassifier(
+    generations=20,
+    population_size=50,
+    offspring_size=50,
+    mutation_rate=0.9,
+    crossover_rate=0.1,
+    scoring="roc_auc",
+    cv=5,
+    n_jobs=-1,
+    random_state=42,
+    verbosity=2,
+)
+
+tpot.fit(X_train, y_train)
+print("Test AUC:", tpot.score(X_test, y_test))
+
+# Export the best pipeline as a runnable Python file.
+tpot.export("best_pipeline.py")
+</code></pre>
+
+  <p>TPOT's defaults are aggressive: the mutation rate is set high (0.9) and the crossover rate low (0.1) because the chromosomes are pipeline structures and mutation in TPOT means "swap one pipeline component for another", which is a coarser operation than mutation on a vector of floats. The exported pipeline is plain scikit-learn code: a reproducible artefact that can be retrained, audited, and deployed without the GA machinery as a runtime dependency.</p>
+
+  <h3>Multi-objective optimisation and NSGA-II</h3>
+
+  <p>When two or more objectives matter (predictive performance against inference latency, AUC against feature count, accuracy against fairness metric), there is no single best solution: any candidate may be better on one objective and worse on another. <strong>NSGA-II</strong> (Non-dominated Sorting Genetic Algorithm II) handles this case by sorting the population into <strong>Pareto fronts</strong>. The first front consists of all individuals not dominated by any other (no other individual is at least as good on every objective and strictly better on at least one). The second front is the non-dominated set after removing the first front, and so on. Selection then prefers individuals from lower-numbered fronts, with ties broken by <strong>crowding distance</strong> (a measure of how isolated an individual is on the front, favouring spread-out solutions that cover the front uniformly).</p>
+
+  <p>The output of an NSGA-II run is not a single best configuration but the population's final first front: a set of non-dominated trade-offs from which the model owner picks the operating point. A typical use case is a fraud detection model where the chromosomes encode (threshold, feature subset, model type); the front exposes the trade-off between precision and recall at different feature counts, and the team chooses based on the operational cost of false positives against the cost of missed fraud.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for most of the disappointments practitioners report with genetic algorithms. Each is easy to fall into and survivable once recognised.</p>
+
+  <div class="callout warn">
+    <span class="tag">Premature convergence</span>
+    A population of 30 with a low mutation rate and roulette-wheel selection often collapses onto a single chromosome within five or six generations. From that point onward, crossover produces near-identical children and only mutation can introduce variation, which it does slowly. The algorithm has effectively become a local search around a single point. The fixes are structural: use a larger population (100 plus for non-trivial search spaces), use rank-based or tournament selection to keep weaker individuals in play, enforce a minimum mutation rate, and consider niching strategies (fitness sharing, crowding) that explicitly penalise individuals too similar to others.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Confusing GA hyperparameters with model hyperparameters</span>
+    A GA tuning a random forest has two layers of hyperparameters: the GA's own (population size, mutation rate, generations) and the random forest's (n_estimators, max_depth, min_samples_leaf). It is tempting to grid-search the GA's hyperparameters too, which doubles the meta-search cost. The practical advice is to use literature defaults for the GA layer (population 50 to 100, mutation rate 0.05 to 0.1, crossover rate 0.7, generations 20 to 50) and only retune them if the GA visibly fails (premature convergence or no improvement across generations). Resist the urge to optimise the optimiser.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating fitness as deterministic when it is noisy</span>
+    Fitness in tuning is a cross-validation score, which has variance: re-running the same configuration on a different CV split gives a different score. A GA that treats fitness as deterministic will sometimes select a lucky individual over a genuinely better one, propagate its chromosome, and converge on the wrong region. Fixes include using a larger number of CV folds (variance falls as $1/k$), re-evaluating elite individuals at the start of each generation so noise in their fitness gets averaged across generations, and reporting confidence intervals on the final best score rather than a point estimate. This is the same hidden-noise problem that affects random search and grid search, but GAs are particularly vulnerable because selection amplifies any chromosome whose fitness was overestimated.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting the same train-test discipline applies</span>
+    A GA evaluates thousands of configurations during a search. Every one is a chance to overfit to the validation fold if the same fold is reused for every evaluation. The configuration the GA reports as best has been selected from a vast space against that validation fold, so its validation score is optimistically biased by selection. The fix is the same as for any tuning method, only more important here because the search is larger: split the data into train, validation (used for the GA's fitness function across all generations), and a held-out test set that is only touched once at the end to report unbiased performance. The discussion in <a href="../07_model_evaluation/01-relative_performance.html">lecture 35 on relative performance</a> develops this further.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Genetic algorithms are a population-based, gradient-free global search method inspired by evolutionary biology. Candidate configurations are encoded as chromosomes, fitness-weighted selection picks parents, crossover combines parents into offspring, and mutation perturbs offspring to preserve diversity. The loop runs for a fixed number of generations with optional elitism. Population size and mutation rate are the dominant levers governing exploration against exploitation. GAs are the right tool for combinatorial and structural search spaces (pipelines, architectures, feature subsets), constrained problems, and multi-objective problems through NSGA-II's Pareto-front machinery. They are not the right tool for smooth low-dimensional spaces with expensive evaluations, where Bayesian optimisation's sample efficiency dominates.</p>
+
+  <p>What this lecture deliberately did not do. It did not develop the theoretical underpinnings (Holland's schema theorem, building-block hypothesis, no-free-lunch theorems for evolutionary search); the practical interpretation is what matters for tuning use. It did not cover evolution strategies (CMA-ES is closer to a Gaussian-process-free Bayesian method than to a classical GA) or genetic programming (chromosomes are programs rather than configurations). It did not develop the multi-objective machinery beyond a sketch of NSGA-II; the full algorithm with crowding distance computation belongs in a dedicated treatment.</p>
+
+  <p>Lecture 35, <a href="../07_model_evaluation/01-relative_performance.html">relative performance</a>, opens sub-module 07 by asking a question the tuning lectures have postponed: once two configurations have been compared on a validation fold, when is the difference real and when is it noise? The held-out test set that protects the final answer from the selection bias of a multi-thousand-configuration GA is the same instrument that lets us put confidence intervals on the comparison between two models. The discipline of tuning ends where the discipline of evaluation begins.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the four operators of a genetic algorithm in the order they act on a generation, and give one common implementation choice for each.</li>
+      <li>Explain why roulette-wheel selection can collapse a population prematurely, and name two selection schemes that are more robust to extreme fitness distributions.</li>
+      <li>A GA tuning a deep network sets population size to 8 and generation count to 200. Why is this configuration likely to underperform a configuration with population 50 and generations 30, even though both use the same total number of evaluations?</li>
+      <li>You have a single objective (validation AUC), a smooth two-dimensional continuous search space, and each evaluation takes one hour. State which tuning method you would choose and why.</li>
+      <li>Define a Pareto front in the context of a multi-objective tuning problem with objectives (AUC, feature count), and explain what NSGA-II produces as output that single-objective GA does not.</li>
+      <li>A TPOT run reports a validation AUC of 0.92 for its best pipeline. A team plans to deploy this pipeline directly. What additional step is required before deployment, and why is it more important after a GA search than after a five-point grid search?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 35 (<a href="../07_model_evaluation/01-relative_performance.html">relative performance</a>) opens sub-module 07 by asking when a difference in validation scores between two tuned configurations is real and when it is noise, the question that protects a GA's reported best from being a selection-biased artefact.</li>
+      <li><strong>Previous:</strong> Lecture 33 (<a href="04-bayesian_optimisation.html">Bayesian optimisation</a>) is the sample-efficient counterpoint for smooth low-dimensional spaces; the choice between BO and GA is the central question of <a href="01-tuning_principles.html">lecture 30 on tuning principles</a>.</li>
+      <li><strong>Prerequisite:</strong> Lecture 30 (<a href="01-tuning_principles.html">tuning principles</a>) frames every tuning method in terms of the train-validation-test split and the exploration-exploitation trade-off, which this lecture builds on with a specific algorithmic family.</li>
+      <li><strong>Outside this course:</strong> TPOT's pipeline-level genetic search is the AutoML technique closest in spirit to this lecture. For neural-architecture search specifically, the same operators apply to architectures encoded as directed acyclic graphs of layers, with crossover swapping subgraphs and mutation adding or removing layers; the literature (NAS, NAS-Bench) is a natural next reading for anyone working on deep learning.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Hyperparameter tuning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 34 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

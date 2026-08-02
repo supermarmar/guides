@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 25: word embeddings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Deep learning</a></div>
+  <h1>Word embeddings</h1>
+  <p class="subtitle">Entity embedding, the previous lecture's subject, needs a supervised target to learn against. Most text has no such target: nobody labelled the words in a claims-narrative free-text field with a "correct" numeric meaning. Word embeddings solve this by inventing a target from the text itself, predicting a word from the words around it, and the resulting geometry is rich enough that "king minus man plus woman" lands near "queen". This lecture is the unsupervised half of the representation story that makes a transformer's input possible.</p>
+  <div class="meta">
+    <span>Lecture 25 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part IV: deep learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>word embedding</strong> is an entity embedding (previous lecture) for the tokens of a natural-language vocabulary, learned <strong>unsupervised</strong>: instead of a labelled target, the training signal comes from a word's own context, the words that tend to appear near it. <strong>Word2vec</strong> (Mikolov et al.) offers two symmetric formulations of this idea: the <strong>skip-gram</strong> model predicts the surrounding context words from a fixed centre word, and <strong>continuous bag-of-words</strong> (CBOW) predicts the centre word from an average of its context. Both reduce to a softmax over the entire vocabulary at every training step, which is computationally prohibitive for a vocabulary of any realistic size; <strong>negative sampling</strong> converts the problem into a cheap binary classification between real (centre, context) pairs drawn from the corpus and fake pairs constructed by random permutation, making the whole procedure tractable. <strong>GloVe</strong> takes a different route to the identical kind of output, factorising a word-by-word co-occurrence count matrix directly rather than fitting a predictive log-likelihood. Both methods produce a dense vector per word such that words used in similar contexts end up with similar vectors, a property that supports both simple similarity search (cosine similarity between vectors) and the well-known analogy arithmetic. Large, publicly available pre-trained embeddings exist and are a strong starting point, with one persistent caveat: a word's meaning in a general internet corpus and its meaning inside a specific insurance claims-text domain are not guaranteed to match.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You can tell a lot about a word's meaning from the company it keeps: "car" and "vehicle" show up next to almost the identical set of other words ("drove", "insurance", "accident", "the"), while "car" and "carbon" almost never do, despite starting with the same three letters. Word embeddings are built entirely on this observation. Train a small prediction task, guess the neighbouring words from a given word or vice versa, on a huge amount of ordinary text, and the numbers the model is forced to assign to each word, purely to make that prediction task work, end up encoding meaning as a side effect, with no human ever telling the model what any word means.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the unsupervised counterpart to the previous lecture's supervised entity embedding, and it is the direct prerequisite for the transformer architecture two lectures ahead, which takes a sequence of embedded tokens as its input tensor. It also connects backward to the unsupervised-learning sub-module's clustering material: word2vec's contextual similarity is, in essence, an implicit clustering of the vocabulary by usage pattern.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons word embeddings matter beyond their role as a stepping stone to transformers.</p>
+
+  <p>First, <strong>free-text fields are common in insurance and credit data and are otherwise wasted</strong>: claims narratives, underwriting notes, customer complaint transcripts all carry information a structured feature set cannot capture, and word embeddings are the standard first step in turning that text into something a predictive model can use at all.</p>
+
+  <p>Second, <strong>pre-trained embeddings are a genuine, low-cost starting point, not a research luxury</strong>. A specialty insurer with a modest claims-text corpus, too small to train a good embedding from scratch, can start from a large publicly available embedding (trained on billions of words of general text) and fine-tune or simply use it directly, a transfer-learning move that is standard practice and dramatically lowers the data requirement for a usable text feature.</p>
+
+  <p>Third, <strong>domain mismatch is a real, recurring failure mode that a modeller needs to actively check for, not assume away</strong>: a word can carry a completely different meaning inside a specific corpus than in general usage, and a pre-trained embedding, however impressive its analogy demos, is only as useful as its match to the domain it will actually be applied in.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    An insurer building a claims-text severity model used a large, publicly available pre-trained word embedding to featurise free-text claim descriptions for a book covering public-sector institutions. The word "Lincoln" appeared repeatedly across the claims corpus and, via the pre-trained embedding, clustered near "president", "memorial", and "car" (the pre-trained embedding's dominant senses of the word, learned from general internet text: the US president, the memorials named after him, and the car brand). In the actual claims corpus, every occurrence of "Lincoln" referred to a specific insured school of that name. The severity model, using the pre-trained embedding uncorrected, effectively treated every claim mentioning the school as thematically related to car-brand claims elsewhere in the corpus, a spurious association invisible until someone actually read a sample of the flagged claims. The fix was targeted fine-tuning of the embedding on the insurer's own corpus, letting domain-specific usage override the general-purpose sense.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: skip-gram slides a fixed-width context window across a sentence, and at every position asks the model to predict the words on either side of the centre word.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The skip-gram context window sliding across a sentence">
+      <defs>
+        <marker id="wordArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Skip-gram: predict the context from the centre word, window size c = 2</text>
+
+      <g font-family="JetBrains Mono" font-size="13" fill="#27272a">
+        <text x="80" y="90">the</text>
+        <text x="160" y="90">car</text>
+        <rect x="215" y="65" width="70" height="35" rx="6" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="250" y="90" text-anchor="middle" fill="#5b21b6" font-weight="700">skidded</text>
+        <text x="360" y="90">on</text>
+        <text x="420" y="90">the</text>
+        <text x="480" y="90">icy</text>
+        <text x="540" y="90">road</text>
+      </g>
+
+      <rect x="140" y="55" width="380" height="55" rx="8" fill="none" stroke="#0d9488" stroke-width="2" stroke-dasharray="5 3"/>
+      <text x="330" y="45" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">context window, c = 2 words each side</text>
+
+      <line x1="250" y1="115" x2="80" y2="160" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#wordArrow)"/>
+      <line x1="250" y1="115" x2="160" y2="160" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#wordArrow)"/>
+      <line x1="250" y1="115" x2="360" y2="160" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#wordArrow)"/>
+      <line x1="250" y1="115" x2="420" y2="160" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#wordArrow)"/>
+
+      <g font-family="Inter" font-size="11" fill="#5b21b6">
+        <text x="80" y="185" text-anchor="middle">p(the | skidded)</text>
+        <text x="160" y="185" text-anchor="middle">p(car | skidded)</text>
+        <text x="360" y="185" text-anchor="middle">p(on | skidded)</text>
+        <text x="420" y="185" text-anchor="middle">p(the | skidded)</text>
+      </g>
+
+      <text x="440" y="230" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#71717a">the window then slides one position right, and the training signal repeats for the next centre word</text>
+      <text x="440" y="255" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#71717a">CBOW reverses the arrows: predict the centre word from the (averaged) context</text>
+    </svg>
+    <figcaption>Skip-gram slides a window of half-width $c$ across every sentence in the training corpus and, at each centre word, tries to predict every word within the window. No label was ever assigned by a human; the "correct answers" are simply the words that happen to sit nearby in real text, which is why this is an unsupervised (or, more precisely, self-supervised) procedure.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Context is the only supervision signal.</strong> No human labels a single word; the entire training signal is derived automatically from which words happen to sit near which other words in a large corpus. <strong>Negative sampling turns an impossible softmax into an easy classifier.</strong> Predicting the exact context word out of a vocabulary of hundreds of thousands is a huge multiclass problem; distinguishing a real (centre, context) pair from a randomly faked one is an easy binary problem that provably learns the identical embedding geometry with far less computation.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Tokenisation and the vocabulary</h3>
+
+  <p>Before any embedding can be learned, text must be broken into discrete units, or <strong>tokens</strong>: words, subwords, or characters, each assigned an integer index from a fixed <strong>vocabulary</strong> $\mathcal{W} = \{1, \ldots, W\}$, with an additional token $0$ reserved for padding short sequences to a common length. A sentence of length $T$ is then a sequence of tokens $\text{text} = (w_1, \ldots, w_T) \in \mathcal{W}_0^T$. This lecture, following convention, presents the theory at the word level, but nothing about the machinery restricts it to whole words; sub-word tokenisation (splitting rare or compound words into smaller reusable pieces) is standard in modern large-scale systems and is covered where relevant in the large-language-model material later in this course.</p>
+
+  <h3>Word2vec: skip-gram</h3>
+
+  <p>For a fixed context (window) size $c \in \mathbb{N}$, the <strong>skip-gram</strong> objective tries to predict the context words surrounding a centre word $w_t$, assuming conditional independence between the context positions given the centre word for tractability:</p>
+  $$\mathcal{L} = \sum_{i=1}^n \sum_{t} \sum_{-c \le j \le c,\, j \ne 0} \log p\big(w_{i,t+j} \mid w_{i,t}\big).$$
+  <p>Two separate embedding mappings are learned, one for a word's role as a centre word and one for its role as a context word, $e^{(1)}, e^{(2)}: \mathcal{W}_0 \to \mathbb{R}^b$, and the conditional probability is modelled by a softmax over the dot product of the two:</p>
+  $$p(w_s \mid w_t) = \frac{\exp\langle e^{(1)}(w_t), e^{(2)}(w_s)\rangle}{\sum_{w=1}^{W} \exp\langle e^{(1)}(w_t), e^{(2)}(w)\rangle}.$$
+  <p>Maximising this log-likelihood over the entire training corpus, by stochastic gradient descent exactly as in any other network, yields the two word embeddings; in practice, $e^{(1)}$ (the centre-word embedding) is the one retained and reported as "the" word embedding.</p>
+
+  <h3>Word2vec: continuous bag-of-words</h3>
+
+  <p><strong>Continuous bag-of-words</strong> (CBOW) reverses the prediction direction: predict the centre word from an average of its context words' embeddings,</p>
+  $$\bar{e}^{(2)}_{i,t} = \frac{1}{2c}\sum_{-c \le j \le c,\, j\ne0} e^{(2)}(w_{i,t+j}), \qquad p(w_t \mid \bar{e}^{(2)}_{i,t}) = \frac{\exp\langle e^{(1)}(w_t), \bar{e}^{(2)}_{i,t}\rangle}{\sum_{w=1}^W \exp\langle e^{(1)}(w), \bar{e}^{(2)}_{i,t}\rangle}.$$
+  <p>CBOW is generally faster to train than skip-gram (averaging the context collapses several predictions into one), while skip-gram tends to perform better on rare words, because it generates one training example per context position rather than one per centre word, giving rare words proportionally more training signal.</p>
+
+  <h3>Negative sampling: making the softmax tractable</h3>
+
+  <p>Both formulations above require a softmax normalised over the entire vocabulary $W$, computationally prohibitive when $W$ runs into the hundreds of thousands, as it does for any realistic corpus. <strong>Negative sampling</strong> reframes the problem as binary classification. Extract every real (centre, context) pair $(w, w')$ observed in the corpus and label it $Y = 1$; for each real pair, generate one or more fake pairs by randomly replacing the context word with a word drawn from the vocabulary's overall frequency distribution, and label these $Y = 0$. Fitting a logistic regression on this constructed binary dataset,</p>
+  $$\mathcal{L} = \sum_{i=1}^n \log\frac{1}{1+\exp(-\langle e^{(1)}(w_i), e^{(2)}(w_i')\rangle)} + \sum_{k} \log\frac{1}{1+\exp(\langle e^{(1)}(w_k), e^{(2)}(w_k')\rangle)},$$
+  <p>with the first sum over real pairs and the second over the randomly permuted fake pairs, requires only as many probability evaluations as there are real-plus-fake pairs, independent of the vocabulary size $W$, and provably learns embeddings with the same qualitative geometric properties as the full softmax version, at a small fraction of the computational cost. This is the standard implementation detail that makes word2vec practical at internet scale, and the identical idea, replace an expensive full-vocabulary softmax with a cheap binary discrimination task, recurs throughout modern large-scale representation learning.</p>
+
+  <h3>GloVe: factorising co-occurrence directly</h3>
+
+  <p><strong>GloVe</strong> (global vectors; Pennington, Socher, and Manning) takes a different route to a similar destination. Rather than a predictive log-likelihood, GloVe starts from the empirical <strong>co-occurrence matrix</strong> $C \in \mathbb{N}_0^{W \times W}$, where $C(w, w')$ counts how often word $w'$ appears within a fixed window of word $w$ across the corpus, and fits embeddings so that the log co-occurrence count is approximated by a bilinear form,</p>
+  $$\log C(w, w') \approx \langle e^{(1)}(w), e^{(2)}(w')\rangle + \beta_w + \beta_{w'},$$
+  <p>with word-specific intercepts $\beta_w, \beta_{w'}$ and a weighting function that down-weights very rare and very frequent co-occurrences in the fitting objective. GloVe is more of an engineering construction than word2vec's clean maximum-likelihood story, but the resulting embeddings are broadly comparable in quality, and both are, in practice, most often used via a large, publicly available, pre-trained version rather than trained from scratch by an individual modeller.</p>
+
+  <h3>Pre-trained embeddings and the domain-mismatch trap</h3>
+
+  <p>Word2vec and GloVe embeddings trained on a large general corpus (web text, news, Wikipedia) are freely available at various scales and embedding dimensions (typically 50 to 300), and downloading one is, for most applications, a far cheaper starting point than training an embedding from scratch on a smaller, domain-specific corpus. The caveat, illustrated in this lecture's vignette, is that a pre-trained embedding encodes the dominant senses of a word <em>in the corpus it was trained on</em>, which need not match the dominant sense of that word in a specific, narrower domain corpus; the standard remedy, where the target domain has enough text to support it, is to fine-tune the pre-trained embedding on the domain-specific corpus (continue training from the pre-trained starting point rather than from a random initialisation) while fitting the rest of the downstream predictive model, letting domain usage nudge the embedding away from its general-purpose defaults exactly where the two disagree.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Using a pre-trained embedding without checking domain fit</span>
+    The vignette's "Lincoln" failure is not an edge case; any word with a dominant general-usage sense that differs from its dominant domain-specific sense (product names, place names, company names, industry jargon) is a candidate for this failure. A quick, cheap check, nearest neighbours of a handful of domain-critical terms in the pre-trained embedding space, compared against what a domain expert expects, catches most instances before they reach production.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Conflating word similarity with word substitutability</span>
+    Two words with similar embeddings are words that appear in similar <em>contexts</em>, which is not the same as words that mean the same thing or can be freely substituted; antonyms ("hot" and "cold") frequently end up with similar embeddings because they appear in near-identical contexts ("the water was very ___"). Downstream applications that assume embedding similarity implies semantic interchangeability, rather than merely distributional similarity, can be led astray by exactly this pattern.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Ignoring word order by defaulting to bag-of-words-style pooling</span>
+    Averaging a sentence's word embeddings (a common, cheap way to get a single vector for a short text) discards word order entirely, inheriting the identical weakness the previous lecture's bag-of-words representation had; "the claim was not paid" and "the claim was paid" can average to near-identical sentence vectors despite opposite meaning. Where order matters, the sequence models developed in the next two lectures, not simple pooling, are the appropriate tool.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Training a from-scratch embedding on too small a corpus</span>
+    Word2vec and GloVe both need a large volume of text to learn a stable, generalisable geometry; a specialty insurer's few thousand claims narratives are rarely enough to train a good embedding unsupervised from nothing. Starting from a pre-trained embedding and fine-tuning, rather than training from a random initialisation on a small domain corpus, is almost always the better-conditioned choice in this regime.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A word embedding is an entity embedding for a natural-language vocabulary, learned without a labelled target by turning surrounding context into the training signal. Skip-gram predicts context from a centre word, CBOW predicts the centre word from its context, and negative sampling replaces the intractable full-vocabulary softmax both need with a cheap binary discrimination task between real and randomly faked (centre, context) pairs. GloVe reaches a similar destination by directly factorising a co-occurrence count matrix. Pre-trained embeddings, at scale, are a strong and cheap starting point, but they encode the dominant senses of the corpus they were trained on, and verifying domain fit before deployment is not optional due diligence, it is the difference between a useful text feature and a silently misleading one.</p>
+
+  <p>The next two lectures leave text representation behind and turn to the architectures that process a sequence of embedded tokens, or a spatial grid of pixels, once the raw input has been converted into the tensor form this and the previous lecture developed: convolutional networks first, for grid-structured data, then recurrent networks, the classical (and now largely superseded) architecture for sequential data.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the skip-gram and CBOW objectives and explain the direction of prediction each one reverses relative to the other.</li>
+      <li>Explain why the full softmax in both skip-gram and CBOW is computationally prohibitive at realistic vocabulary sizes, and describe how negative sampling avoids the problem.</li>
+      <li>Describe GloVe's approach to learning word embeddings, and contrast it with word2vec's maximum-likelihood framing.</li>
+      <li>A colleague proposes using a general-purpose pre-trained word embedding directly on a specialty claims-text corpus with no further checks. What would you ask them to verify first, and why?</li>
+      <li>Explain why averaging a sentence's word embeddings loses information that a sequence model would retain.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 4 (<a href="04-tensors_and_embeddings.html">tensors and entity embedding</a>) introduced the supervised, categorical-level version of the dense-vector idea this lecture extends to unsupervised text.</li>
+      <li><strong>Next:</strong> Lecture 6 (<a href="06-convolutional_networks.html">convolutional networks</a>) turns to grid-structured (image) data; lecture 7 (<a href="07-recurrent_networks.html">recurrent networks</a>) returns to sequential data with an architecture built specifically for it.</li>
+      <li><strong>Used by:</strong> Lecture 8 (<a href="08-transformers.html">transformers</a>) takes a sequence of embedded tokens, built exactly as this lecture describes, as its standard input format.</li>
+      <li><strong>Outside this course:</strong> The large-language-model material later in this course builds directly on the tokenisation and embedding vocabulary introduced here, extended to sub-word tokenisation and to embeddings learned jointly with a much larger downstream architecture rather than pre-trained separately.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Deep learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 25 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

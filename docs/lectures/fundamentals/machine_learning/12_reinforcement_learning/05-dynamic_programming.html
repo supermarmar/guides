@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 60: dynamic programming</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Reinforcement learning</a></div>
+  <h1>Dynamic programming</h1>
+  <p class="subtitle">The Bellman equation is a system of equations, one per state, and when the environment's transition dynamics are fully known in advance, it can be solved directly by iterative computation, with no need to interact with the environment or estimate anything from sampled experience at all. This lecture develops the two classical algorithms, policy iteration and value iteration, that do exactly this, and is deliberately the special, easier case: the next lecture drops the assumption that the dynamics are known and develops what changes as a result.</p>
+  <div class="meta">
+    <span>Lecture 60 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part IX: reinforcement learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Dynamic programming (DP)</strong> in the reinforcement-learning sense solves an MDP's Bellman equation exactly, given complete, explicit knowledge of the transition dynamics $p(s',r\mid s,a)$, using two component procedures. <strong>Policy evaluation</strong> computes $v_\pi(s)$ for a fixed, given policy $\pi$ by treating the Bellman equation as an update rule and iterating it repeatedly across every state until the values stop changing, converging to the unique fixed point that solves the equation exactly. <strong>Policy improvement</strong> then takes a policy's evaluated value function and constructs a new, strictly better (or equally good) policy by acting greedily with respect to it, choosing in each state whichever action's one-step lookahead value is highest. <strong>Policy iteration</strong> alternates these two steps, evaluate fully, improve, evaluate the new policy fully, improve again, and is guaranteed to converge to the optimal policy in a finite number of iterations for a finite MDP. <strong>Value iteration</strong> is a computationally cheaper variant that interleaves the two steps at a much finer grain, improving after only a single sweep of evaluation rather than a fully converged one, trading some elegance for materially less computation per iteration while still converging to the same optimal answer.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine a board-game strategist who has been handed the complete rulebook, every possible move, every consequence of every move, with total certainty, no fog of war at all. There is no need to actually play a single game to work out the best strategy; the strategist can, in principle, simply reason forward from the rules themselves, working out how good every position is under a candidate strategy, then adjusting the strategy wherever a better move is available, repeating until no further improvement is possible. Dynamic programming is exactly this: given the complete rulebook (the transition dynamics), solve for the best strategy by pure computation, with no need to actually run a single simulated game.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the "easy" branch of solving the Bellman equation from the previous lecture, easy in the specific sense of assuming the environment's dynamics are fully known, an assumption that rarely holds in genuine applications but that makes the underlying logic of solving a Bellman equation cleanest to see for the first time. The next lecture develops the considerably more widely applicable case where the dynamics must instead be learned from sampled experience, reusing this lecture's policy-improvement logic almost unchanged.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons dynamic programming earns a full lecture despite its restrictive known-dynamics assumption rarely holding in genuine practice.</p>
+
+  <p>First, <strong>a handful of genuine actuarial and insurance problems do have fully known, or reasonably approximated, transition dynamics</strong>, and DP is the exact, correct tool for them: an actuarial control-cycle problem defined over a small number of clearly specified states with contractually or actuarially specified transition probabilities (a with-profits bonus-declaration policy modelled as an MDP over a small number of funding-level states, for instance) can be solved exactly by DP, with no need for the considerably more data-hungry methods of the next lecture at all.</p>
+
+  <p>Second, <strong>policy iteration and value iteration are the conceptual scaffolding every later method in this sub-module reuses</strong>: the alternation between evaluating a policy and improving it greedily with respect to that evaluation, called <strong>generalised policy iteration</strong>, is the shared structural skeleton of essentially every reinforcement-learning algorithm, including the Monte Carlo and temporal-difference methods of the next lecture and the deep RL methods of the lecture after that; learning it here, in the cleanest possible setting with no sampling noise at all, is what makes the later, noisier variants recognisable as instances of the same idea rather than unrelated new algorithms.</p>
+
+  <p>Third, <strong>DP is the natural benchmark against which every approximate, sampling-based method in the rest of this sub-module should be judged</strong>: knowing what the exact answer looks like when the dynamics are known is the standard against which a Monte Carlo or TD method's approximate answer, learned without that knowledge, can meaningfully be compared.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    An actuarial team modelling a small internal capital-allocation decision across a handful of business-unit funding states, with transition probabilities between funding states directly specified by the finance function's own stress-testing assumptions, initially reached for a sampling-based reinforcement-learning method, reasoning that "reinforcement learning" implied learning from simulated experience by default. Considerable computational effort went into building a simulator to generate sampled transitions before anyone questioned whether sampling was needed at all, given that the transition probabilities between funding states were already fully specified, explicit numbers directly available from the finance function's own model. Recasting the problem as a direct dynamic-programming exercise, solving the Bellman equation exactly via value iteration over the known transition matrix, produced the exact optimal allocation policy in a fraction of the simulator-based approach's development time and compute, a direct lesson that dynamic programming, not sampling-based learning, is the right tool whenever the dynamics are already known rather than needing to be discovered.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: policy iteration as two alternating phases, a full evaluation sweep bringing every state's value estimate all the way to convergence for the current policy, followed by a single improvement step that updates the policy everywhere at once, repeating until the policy stops changing at all.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Policy iteration alternating full evaluation and greedy improvement until convergence">
+      <defs>
+        <marker id="dpArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Policy iteration: alternating evaluation and improvement</text>
+
+      <rect x="60" y="70" width="220" height="110" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="170" y="100" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">Policy evaluation</text>
+      <text x="170" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">iterate the Bellman</text>
+      <text x="170" y="140" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">equation over all states</text>
+      <text x="170" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">until $v_\pi$ converges exactly</text>
+
+      <path d="M 282 125 Q 340 125 340 125" stroke="#71717a" stroke-width="2" marker-end="url(#dpArrow)"/>
+
+      <rect x="345" y="70" width="220" height="110" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="455" y="100" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">Policy improvement</text>
+      <text x="455" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">act greedily with respect</text>
+      <text x="455" y="140" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">to $v_\pi$ in every state</text>
+      <text x="455" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">at once, all together</text>
+
+      <path d="M 455 182 Q 455 230 170 230 Q 60 230 60 182" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#dpArrow)"/>
+      <text x="260" y="250" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">repeat with the new, improved policy</text>
+
+      <rect x="620" y="90" width="200" height="70" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="720" y="115" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">Value iteration:</text>
+      <text x="720" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">one sweep of evaluation,</text>
+      <text x="720" y="148" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">then improve, repeat</text>
+    </svg>
+    <figcaption>Policy iteration alternates a full, fully-converged evaluation of the current policy with a single, whole-state-space improvement step, repeating until the policy stops changing. Value iteration (right) is a cheaper variant that interleaves the two at a much finer grain, improving after only one sweep of evaluation rather than a fully converged one, converging to the identical optimal answer with less computation per iteration.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Evaluate exactly, then improve greedily, and repeat.</strong> This alternation, generalised policy iteration, is the shared skeleton of essentially every algorithm in the rest of this sub-module. <strong>Known dynamics mean no sampling is needed at all.</strong> The vignette's capital-allocation team's initial instinct to simulate was solving a harder problem than the one actually posed, since the transition probabilities were already fully specified numbers, not something that needed to be discovered from data.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Policy evaluation</h3>
+
+  <p>Given a fixed policy $\pi$, the Bellman equation from the previous lecture, $v_\pi(s) = \sum_a \pi(a\mid s)\sum_{s',r} p(s',r\mid s,a)[r + \gamma v_\pi(s')]$, is a system of $|\mathcal{S}|$ linear equations in $|\mathcal{S}|$ unknowns (the values of every state), which could in principle be solved directly by linear algebra for small enough state spaces. <strong>Iterative policy evaluation</strong> instead treats the right-hand side as an update rule, starting from an arbitrary initial guess $v_0$ and repeatedly applying $v_{k+1}(s) \leftarrow \sum_a \pi(a\mid s)\sum_{s',r} p(s',r\mid s,a)[r + \gamma v_k(s')]$ for every state simultaneously, a computation guaranteed to converge to the unique true $v_\pi$ as $k \to \infty$ (and, in practice, run until successive iterations change by less than a small tolerance), because this update is a contraction mapping under standard conditions on $\gamma$ and the reward structure.</p>
+
+  <h3>Policy improvement</h3>
+
+  <p>Given the evaluated $v_\pi$, the <strong>policy improvement theorem</strong> states that constructing a new policy $\pi'$ by acting greedily, $\pi'(s) = \arg\max_a \sum_{s',r} p(s',r\mid s,a)[r + \gamma v_\pi(s')]$, produces a policy that is guaranteed to be at least as good as $\pi$ in every state, and strictly better in at least one state unless $\pi$ was already optimal. This is the exact multi-state generalisation of the bandit lecture's greedy action selection, now applied not to a single-step action-value but to the full, discounted one-step lookahead the Bellman equation supplies.</p>
+
+  <h3>Policy iteration</h3>
+
+  <p><strong>Policy iteration</strong> alternates the two procedures: fully evaluate the current policy (iterate policy evaluation to convergence), then fully improve it (apply policy improvement in every state), then re-evaluate the new policy from scratch, repeating until the policy no longer changes between successive improvement steps. Because there are only finitely many distinct deterministic policies for a finite MDP, and each improvement step is guaranteed not to make things worse, this procedure is guaranteed to terminate at the optimal policy $\pi_*$ in a finite number of iterations.</p>
+
+  <h3>Value iteration</h3>
+
+  <p>Fully evaluating a policy to convergence before every single improvement step is often more computation than is actually needed, since early, partially-converged value estimates already contain enough information to identify a better policy. <strong>Value iteration</strong> collapses evaluation and improvement into a single combined update, $v_{k+1}(s) \leftarrow \max_a \sum_{s',r} p(s',r\mid s,a)[r + \gamma v_k(s')]$, performing only one sweep of (approximate) evaluation before immediately taking the greedy maximum, then repeating. This still converges to the same optimal value function $v_*$ (and hence the same optimal policy), typically with considerably less total computation than full policy iteration, at the cost of the cleaner conceptual separation between the two steps that policy iteration preserves.</p>
+
+  <h3>Generalised policy iteration</h3>
+
+  <p>Policy iteration and value iteration are the two ends of a spectrum: full evaluation before each improvement step versus a single sweep of evaluation before each improvement step, with many intermediate variants (a fixed small number of evaluation sweeps between improvements, for instance) equally valid. <strong>Generalised policy iteration (GPI)</strong> is the name for this entire family, alternating evaluation (making the value function consistent with the current policy) and improvement (making the policy greedy with respect to the current value function) at whatever relative grain is computationally convenient, and it is this general pattern, not the specific full-versus-single-sweep choice, that recurs throughout the rest of this sub-module.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Reaching for a sampling-based method when the dynamics are already known</span>
+    Developed directly in the vignette: building a simulator to generate sampled transitions when the transition probabilities are already fully specified numbers is solving a harder problem than the one actually posed; checking whether $p(s',r\mid s,a)$ is genuinely known before choosing a solution method is a cheap, worthwhile first question.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming dynamic programming scales to large or continuous state spaces</span>
+    Both policy evaluation and value iteration require an explicit sweep over every state at every iteration, which is computationally infeasible once the state space is large or continuous; this is the same tabular-scaling limitation flagged at the end of the previous lecture, and it is exactly why lecture 7 develops function-approximation methods for when a full state sweep is not possible.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Confusing policy iteration's guaranteed finite convergence with value iteration's typically-faster practical convergence</span>
+    Policy iteration is guaranteed to terminate in a finite number of iterations because there are finitely many deterministic policies, a clean theoretical guarantee; value iteration's convergence is asymptotic (it approaches $v_*$ in the limit, with a practical stopping tolerance applied), a distinction worth keeping straight when comparing the two methods' behaviour.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating dynamic programming as a general-purpose RL solution</span>
+    Restated because it bears repeating: DP's core assumption, that $p(s',r\mid s,a)$ is fully and explicitly known, fails for the large majority of genuine reinforcement-learning applications, where the environment's dynamics must instead be discovered from experience; DP is the correct benchmark and the correct tool for the narrower class of problems where the dynamics genuinely are known, not a general substitute for the next lecture's methods.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Dynamic programming solves the Bellman equation exactly whenever the transition dynamics $p(s',r\mid s,a)$ are fully known, via two component procedures: policy evaluation, iterating the Bellman equation to convergence for a fixed policy, and policy improvement, acting greedily with respect to the evaluated values to produce a strictly better policy. Policy iteration alternates full evaluation and improvement to guaranteed, finite convergence at the optimal policy; value iteration collapses the two into a single combined update per state, converging to the same optimal answer with typically less computation. Generalised policy iteration, the alternation between evaluation and improvement at any relative grain, is the shared structural pattern every remaining method in this sub-module reuses.</p>
+
+  <p>The next lecture drops the assumption that the transition dynamics are known, developing Monte Carlo and temporal-difference methods that estimate value functions directly from sampled experience, reusing this lecture's policy-improvement logic essentially unchanged while replacing exact policy evaluation with sample-based estimation, the considerably more broadly applicable setting most genuine reinforcement-learning problems actually sit in.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the update rule for iterative policy evaluation, and explain what it converges to and why.</li>
+      <li>State the policy improvement theorem, and explain how the resulting greedy policy is guaranteed to compare with the original.</li>
+      <li>Distinguish policy iteration from value iteration, in terms of how much evaluation happens between successive improvement steps.</li>
+      <li>Define generalised policy iteration, and explain why it is described as the shared skeleton of the rest of this sub-module.</li>
+      <li>Explain why dynamic programming's assumption of fully known transition dynamics is restrictive, and name the setting the next lecture develops for when it does not hold.</li>
+      <li>In the capital-allocation vignette, explain why building a simulator was unnecessary computational effort given what was already known about the problem.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 4 (<a href="04-markov_decision_processes.html">Markov decision processes</a>) introduced the Bellman equation this lecture solves exactly.</li>
+      <li><strong>Next:</strong> Lecture 6 (<a href="06-monte_carlo_and_td_control.html">Monte Carlo and TD control</a>) solves the identical equation when the dynamics are not known in advance.</li>
+      <li><strong>Forward:</strong> Lecture 7 (<a href="07-deep_rl.html">deep reinforcement learning</a>) develops function approximation for when a full state sweep, as DP requires, is not computationally feasible.</li>
+      <li><strong>Outside this course:</strong> The actuarial-applications sub-module's premium-control problem, when transition dynamics can be reasonably approximated from a well-understood book of business, is a genuine candidate for the dynamic-programming approach developed here rather than the sampling-based methods of the next lecture.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Reinforcement learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 60 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

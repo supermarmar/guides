@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 9: DuckDB</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>DuckDB: the in-process analytical engine</h1>
+  <p class="subtitle">A server database is a restaurant kitchen: you write an order, a waiter carries it away, something happens out of sight, and a plate comes back. DuckDB is a kitchen in your own house. There is no waiter, no queue, and no van bringing ingredients from a depot, because the ingredients are already on your counter. Removing the journey turns out to be worth more than most of the cleverness it replaced.</p>
+  <div class="meta">
+    <span>Lecture 9 of 20</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part II: SQL and data modelling</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>DuckDB</strong> is an in-process analytical database. In-process means it runs inside your Python session as a library rather than as a separate server you connect to, exactly as SQLite does for transactional work, which is why it is often described as SQLite for analytics. It came out of CWI Amsterdam and is free and open source.</p>
+
+  <p>Three properties make it the right default for analytical work below the scale where a cluster is genuinely needed. It is <strong>columnar and vectorised</strong>, so it processes batches of values through tight loops and delivers the scan performance of a warehouse. It <strong>reads files directly</strong>, so a Parquet dataset, a CSV, a JSON file, a pandas or Polars dataframe, or an Arrow table can be queried in place with no load step. And it speaks <strong>full SQL</strong>, including window functions, common table expressions, and the <code>QUALIFY</code> clause from Lecture 05, so everything in Part II runs unchanged.</p>
+
+  <p>What it is not is a transactional multi-user database. One process writes at a time, there is no network protocol for a hundred concurrent clients, and it is not where a bank's ledger belongs. It is where an analyst's queries, a modeller's dataset construction, and a pipeline's local development all belong.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Two cooks make the same omelette. The first phones a depot, waits for a van, signs for the eggs, cooks, then packs the result into another van to send back. The second takes the eggs off the counter. If the recipe is complicated enough, the depot's industrial equipment eventually wins. For an omelette, the second cook has finished before the first van arrives. Most analytical questions are omelettes, and for years we sent them all to the depot because that was the only kitchen anyone had built.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Why "it does not fit in memory" stopped being the argument</span>
+    Two things changed after 2015. Machines grew: a laptop with 32 or 64 GB of RAM is now ordinary, and a single cloud instance can have a terabyte. And engines got much better at not reading what they do not need, so a 200 GB Parquet dataset queried for three columns of one month's partition may only touch a few hundred megabytes. The consequence is that the dataset size that genuinely requires distribution moved up by more than an order of magnitude, and a large share of the Spark clusters running today are solving a problem their data no longer has. DuckDB also spills to disk when a query exceeds memory, so exceeding RAM slows a query rather than failing it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>The journey is often the whole cost.</strong> Running a query against a remote warehouse from a notebook costs a network round trip, serialisation of the result into some wire format, deserialisation into a dataframe, and often a queue wait behind other users. For a query returning ten million rows, that overhead can exceed the computation. In-process execution removes all of it, and Arrow integration removes the serialisation too, so handing a result to pandas or Polars is close to free rather than a copy.</p>
+
+  <p><strong>It removes the excuse not to use SQL.</strong> The historical reason analysts did dataframe gymnastics instead of writing SQL was that SQL required a database, and a database required someone to provision it, grant access, and load data into it. DuckDB requires <code>pip install duckdb</code>. The set-based operations of Lecture 05, which are declarative, parallelised by the engine, and far easier to review than a chain of dataframe mutations, become available with no infrastructure conversation.</p>
+
+  <p><strong>It makes pipeline development local and cheap.</strong> A transformation developed against a local DuckDB instance over sample Parquet files can be tested in seconds, in a unit test, with no cluster and no cloud credentials. Because the SQL is largely portable, the same logic can then run in the production warehouse or in Spark. That is a much shorter feedback loop than the alternative, and a shorter feedback loop is the main determinant of how carefully anybody tests anything.</p>
+
+  <div class="callout warn">
+    <span class="tag">Where DuckDB is the wrong choice</span>
+    Concurrent writes from several processes: one writer at a time is a hard constraint, and a shared file on a network drive is not a substitute for a server. High-frequency single-row transactions: that is OLTP and belongs in PostgreSQL or the core system. Datasets whose working set genuinely exceeds one machine even after pruning, or joins between two very large tables that need distributed shuffling: that is Lecture 13. And anything requiring a governed multi-tenant permission model, which is a catalogue and warehouse concern from Lecture 19. Reach for it as the default, not as the answer to everything.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Client-server architecture compared with in-process">
+      <defs>
+        <marker id="ar-dd" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same query, two architectures</text>
+
+      <!-- client server -->
+      <text x="190" y="52" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">CLIENT-SERVER</text>
+      <rect x="40" y="62" width="120" height="50" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="100" y="84" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">your process</text>
+      <text x="100" y="99" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">notebook, pandas</text>
+
+      <rect x="220" y="62" width="120" height="50" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="280" y="84" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">db server</text>
+      <text x="280" y="99" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">separate machine</text>
+
+      <line x1="163" y1="78" x2="216" y2="78" stroke="#71717a" stroke-width="1.5" marker-end="url(#ar-dd)"/>
+      <line x1="216" y1="98" x2="163" y2="98" stroke="#71717a" stroke-width="1.5" marker-end="url(#ar-dd)"/>
+      <text x="190" y="132" text-anchor="middle" font-family="Inter" font-size="9" fill="#DC2855">serialise, network,</text>
+      <text x="190" y="144" text-anchor="middle" font-family="Inter" font-size="9" fill="#DC2855">deserialise, queue wait</text>
+
+      <!-- in process -->
+      <text x="570" y="52" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">IN-PROCESS</text>
+      <rect x="450" y="62" width="240" height="82" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="570" y="84" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">your process</text>
+      <rect x="470" y="94" width="90" height="34" rx="6" fill="#ffffff" stroke="#0d9488"/>
+      <text x="515" y="115" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">pandas / Polars</text>
+      <rect x="580" y="94" width="90" height="34" rx="6" fill="#ffffff" stroke="#0d9488"/>
+      <text x="625" y="115" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">DuckDB engine</text>
+      <line x1="562" y1="111" x2="577" y2="111" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="570" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#1E9D54">shared memory via Arrow: no copy</text>
+
+      <!-- storage -->
+      <rect x="240" y="200" width="280" height="52" rx="8" fill="#F4F4F5" stroke="#52525b" stroke-width="2"/>
+      <text x="380" y="222" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#27272a">Parquet files on disk or object storage</text>
+      <text x="380" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#3f3f46">partitioned by reporting_date, with footer statistics</text>
+
+      <line x1="280" y1="115" x2="330" y2="196" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar-dd)"/>
+      <text x="250" y="180" font-family="Inter" font-size="8.5" fill="#b45309">loaded in advance</text>
+      <line x1="625" y1="132" x2="470" y2="196" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar-dd)"/>
+      <text x="520" y="180" font-family="Inter" font-size="8.5" fill="#0d9488">queried in place</text>
+
+      <rect x="40" y="278" width="680" height="52" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="380" y="300" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#5b21b6">THE TWO SAVINGS</text>
+      <text x="380" y="318" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">No data movement between processes, and no load step before querying files. Both are removed, not optimised.</text>
+    </svg>
+    <figcaption>The architectural difference. The dashed lines matter as much as the solid ones: in the client-server case the data must be loaded into the server in advance, whereas DuckDB reads the Parquet dataset where it already lives, applying the projection and predicate pushdown of Lecture 02.</figcaption>
+  </figure>
+
+  <h3>How it compares to the three things it is usually weighed against</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th></th><th>versus pandas</th><th>versus PostgreSQL</th><th>versus Spark</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Setup</strong></td><td>Comparable: one import</td><td>Far simpler: no server, no user, no grant</td><td>Far simpler: no cluster, no driver, no executors</td></tr>
+      <tr><td><strong>Scale limit</strong></td><td>Higher: spills to disk rather than failing at RAM</td><td>Similar single-machine ceiling, much faster on scans</td><td>Lower: one machine, however large</td></tr>
+      <tr><td><strong>Speed profile</strong></td><td>Faster on joins, aggregations, and wide scans; parallel by default</td><td>Much faster analytically; slower for single-row lookups</td><td>Faster below the distribution threshold; loses above it</td></tr>
+      <tr><td><strong>Interface</strong></td><td>SQL rather than method chaining, and both interoperate freely</td><td>Nearly the same SQL, minus the transactional surface</td><td>SQL rather than DataFrame API, without the cluster tax</td></tr>
+      <tr><td><strong>Concurrency</strong></td><td>Not a factor</td><td>Weaker: one writer, no multi-tenant serving</td><td>Weaker: no shared cluster for many users</td></tr>
+      <tr><td><strong>Right when</strong></td><td>The operation is relational: joins, groups, windows</td><td>The workload is analytical, not transactional</td><td>The data genuinely does not fit, or the job is a large shuffle</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The pandas comparison deserves a nuance the table cannot carry. This is not a competition, because they share memory. The idiomatic modern pattern is to use DuckDB for the relational heavy lifting, joins across several tables, aggregations over many rows, window functions, and pandas or Polars for the row-wise and modelling work that follows, passing data between them at no cost because both speak Arrow. Choosing between them is usually the wrong question; the right one is which tool each step belongs in.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Connecting</h3>
+
+  <pre><code>import duckdb
+
+# in-memory: everything vanishes at the end of the session
+con = duckdb.connect(":memory:")
+
+# persistent: a single file holding tables, views, and metadata
+con = duckdb.connect("risk.db")
+
+# and when finished
+con.close()</code></pre>
+
+  <p>The choice is not about size, since both spill to disk as needed. It is about whether you want the tables to survive. Use in-memory for ad hoc analysis over files that are themselves the source of truth, and a file when you are building a small warehouse whose tables are the artefact.</p>
+
+  <h3>Querying files with no load step</h3>
+
+  <pre><code>-- a single Parquet file
+SELECT * FROM 'extracts/loans_2026_03.parquet' LIMIT 5;
+
+-- a glob across many files
+SELECT COUNT(*) FROM 'extracts/loans_*.parquet';
+
+-- a Hive-partitioned dataset: the partition column becomes a real column,
+-- and a filter on it prunes whole directories before reading anything
+SELECT reporting_date, COUNT(*) AS accounts
+FROM   read_parquet('lake/loans/**/*.parquet', hive_partitioning = true)
+WHERE  reporting_date &gt;= DATE '2025-01-31'
+GROUP BY reporting_date
+ORDER BY reporting_date;
+
+-- CSV, with the schema declared rather than guessed
+SELECT * FROM read_csv('extracts/loans.csv',
+                       header = true,
+                       delim  = ',',
+                       columns = {'account_id': 'VARCHAR',
+                                  'reporting_date': 'DATE',
+                                  'balance': 'DECIMAL(18,2)',
+                                  'arrears_months': 'INTEGER'});
+
+-- newline-delimited JSON
+SELECT * FROM read_json_auto('events/applications_2026_03.jsonl');</code></pre>
+
+  <p>Declaring the CSV schema explicitly rather than relying on inference is the direct application of Lecture 02's defect table. Inference is convenient for exploration and a liability in a pipeline, because the inferred type depends on the sample the reader happened to see, so a column that is integer this month becomes text next month when one value arrives with a stray space.</p>
+
+  <h3>Replacement scans: querying dataframes by name</h3>
+
+  <pre><code>import pandas as pd, duckdb
+
+loans = pd.read_parquet("extracts/loans_2026_03.parquet")
+segments = pd.read_csv("reference/segments.csv")
+
+# the dataframe names are visible to SQL directly, with no registration
+result = duckdb.sql("""
+    SELECT s.segment,
+           COUNT(*)                                   AS accounts,
+           SUM(l.balance)                             AS exposure,
+           SUM(CASE WHEN l.arrears_months &gt;= 3 THEN l.balance ELSE 0 END) AS defaulted_exposure
+    FROM   loans l
+    JOIN   segments s USING (customer_id)
+    GROUP BY s.segment
+    ORDER BY exposure DESC
+""").df()</code></pre>
+
+  <p>This is the feature that changes daily habits. Any pandas, Polars, or Arrow object in scope can be referenced as if it were a table, and the result comes back as whichever of the three you ask for. A join between two dataframes, which in pandas requires attention to index alignment, suffixes, and merge semantics, becomes the SQL you already know, and it runs in parallel.</p>
+
+  <h3>Creating tables, and exporting</h3>
+
+  <pre><code>-- create a table from a query, the usual way to materialise a step
+CREATE OR REPLACE TABLE fact_account_month AS
+SELECT * FROM read_parquet('lake/silver/loans/**/*.parquet', hive_partitioning = true);
+
+-- write results back out, partitioned, in one statement
+COPY (SELECT * FROM fact_account_month)
+TO 'lake/gold/fact_account_month'
+(FORMAT PARQUET, PARTITION_BY (reporting_date), COMPRESSION ZSTD, OVERWRITE_OR_IGNORE);
+
+-- or a single file for a colleague
+COPY (SELECT * FROM v_defaulted_accounts) TO 'out/defaults.csv' (HEADER, DELIMITER ',');</code></pre>
+
+  <p>The <code>COPY ... PARTITION_BY</code> form is worth noting: it writes a Hive-partitioned Parquet dataset with the layout Lecture 02 recommended, in one statement, which makes the round trip from files to files complete without any other tooling.</p>
+
+  <h3>Extensions, and reaching other systems</h3>
+
+  <pre><code>INSTALL httpfs;  LOAD httpfs;      -- read S3, Azure, GCS, and plain HTTPS
+SELECT * FROM 's3://bucket/lake/loans/reporting_date=2026-03-31/*.parquet';
+
+INSTALL postgres; LOAD postgres;    -- query a live PostgreSQL database
+ATTACH 'host=... dbname=core user=...' AS core (TYPE POSTGRES, READ_ONLY);
+SELECT * FROM core.public.accounts LIMIT 10;
+
+INSTALL sqlite; LOAD sqlite;        -- and SQLite files
+INSTALL iceberg; LOAD iceberg;      -- and Iceberg tables (Lecture 14)</code></pre>
+
+  <p>The PostgreSQL attachment is more useful than it first appears: it lets one query join a table in the analytical store to a small reference table still living in an operational database, without an export step. Note the <code>READ_ONLY</code> flag, which is the right default when pointing anything at a system you do not own, and remember Lecture 03's warning about scanning a production transactional database at all.</p>
+
+  <h3>Settings worth knowing</h3>
+
+  <pre><code>SET threads TO 8;                 -- defaults to the core count
+SET memory_limit = '24GB';        -- above this, the engine spills to disk
+SET temp_directory = '/fast/ssd/tmp';   -- where it spills; put it on fast storage
+SET preserve_insertion_order = false;   -- allows more parallelism on large writes
+
+PRAGMA database_size;             -- how big the file has become
+EXPLAIN ANALYZE SELECT ...;       -- the plan and the actual timings</code></pre>
+
+  <p>The pairing of <code>memory_limit</code> and <code>temp_directory</code> is what makes larger-than-memory work behave predictably: the engine will use up to the limit and then spill hash tables and sort runs to the temporary directory, so a query that exceeds RAM becomes slower rather than failing, provided the temporary directory has space and is not a slow network mount.</p>
+
+  <div class="worked">
+    <strong>Worked example: a default rate time series over sixty monthly snapshots, without loading anything</strong>
+    <p>The setup: <code>lake/silver/loans/</code> holds sixty Hive-partitioned monthly snapshots of a mortgage book, roughly two million accounts each, 140 columns. The task: produce a monthly default rate series, by product, with a twelve-month moving average, and hand the result to matplotlib. No cluster, no warehouse, no load step.</p>
+    <pre><code>import duckdb
+
+con = duckdb.connect(":memory:")
+con.execute("SET memory_limit = '24GB'")
+
+series = con.sql("""
+    WITH book AS (
+        SELECT reporting_date,
+               product,
+               balance,
+               arrears_months,
+               unlikely_to_pay
+        FROM   read_parquet('lake/silver/loans/**/*.parquet',
+                            hive_partitioning = true)
+        WHERE  reporting_date &gt;= DATE '2021-06-30'
+    ),
+    monthly AS (
+        SELECT reporting_date,
+               product,
+               COUNT(*)                                            AS accounts,
+               SUM(balance)                                         AS exposure,
+               COUNT_IF(arrears_months &gt;= 3 OR unlikely_to_pay)     AS defaults,
+               SUM(CASE WHEN arrears_months &gt;= 3 OR unlikely_to_pay
+                        THEN balance ELSE 0 END)                    AS defaulted_exposure
+        FROM   book
+        GROUP BY reporting_date, product
+    )
+    SELECT reporting_date,
+           product,
+           accounts,
+           defaults,
+           -- sum numerator and denominator, then divide once: never average rates
+           defaults::DOUBLE / accounts                       AS default_rate,
+           defaulted_exposure / NULLIF(exposure, 0)          AS default_rate_by_value,
+           AVG(defaults::DOUBLE / accounts) OVER (
+               PARTITION BY product ORDER BY reporting_date
+               ROWS BETWEEN 11 PRECEDING AND CURRENT ROW)    AS rate_ma_12m
+    FROM   monthly
+    ORDER BY product, reporting_date
+""").df()</code></pre>
+    <p><em>What the engine did, and did not do.</em> The <code>WHERE</code> on the partition column eliminated the partitions before 2021 without opening them. Of the 140 columns, five were read, because Parquet stores columns separately and the footer says where each one is. The five columns of sixty partitions were scanned in parallel across cores, aggregated to a few hundred rows, and the window function ran on that small result. The data never left the process, and the final <code>.df()</code> handed the few hundred rows to pandas through Arrow with no serialisation. Nothing was loaded, copied, or staged.</p>
+    <p><em>Two correctness points embedded in the query.</em> The default rate is computed by summing defaults and accounts separately and dividing once, not by averaging monthly rates, per the non-additivity discussion in Lecture 08. Both a count-based and a value-weighted rate are produced, because they answer different questions and diverge when defaults concentrate in large exposures, which is exactly when someone will ask.</p>
+    <p><em>How to know whether it was fast for the right reason.</em> Run it under <code>EXPLAIN ANALYZE</code>. Confirm that the reported number of files or row groups read is far smaller than the total, which proves pruning happened, and that the time is dominated by the scan rather than by a spill to the temporary directory. If a spill dominates, the fix is usually the <code>memory_limit</code> and <code>temp_directory</code> settings above, not a cluster.</p>
+    <p><em>When this stops working.</em> Two signals. If the same query needs a join between two multi-billion-row tables rather than an aggregation, the shuffle may exceed what one machine can do comfortably. If several people need to run heavy queries against the same store concurrently, you want a served engine with a scheduler rather than everyone's laptop reading object storage. Until one of those is true, this is the whole architecture, and Lecture 13 explains what changes when it is not.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>DuckDB removes two costs rather than optimising them: the journey between your process and a database server, and the load step before files can be queried. What remains is a columnar, vectorised, parallel SQL engine that reads Parquet, CSV, JSON, and dataframes in place and shares memory with the rest of the Python stack. It is the right default for analytical work on a single machine, the right tool for developing and testing transformations that will later run at scale, and the wrong tool for concurrent writers, transactional workloads, and genuinely distributed joins. Part II closes here: you can now declare a schema, query it, write to it safely, design it, and run all of it locally.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What does in-process mean, and which two costs does it remove compared with a client-server database?</li>
+      <li>Give three workloads for which DuckDB is the wrong choice, with the reason in each case.</li>
+      <li>Why has "the data does not fit in memory" become a weaker argument for distribution than it was in 2015?</li>
+      <li>What is a replacement scan, and why does it make the pandas-against-DuckDB framing the wrong question?</li>
+      <li>Why declare a CSV schema explicitly instead of relying on inference in a pipeline?</li>
+      <li>What does <code>hive_partitioning = true</code> buy you, and which Lecture 02 mechanism does it exploit?</li>
+      <li>In the worked example, why is the default rate computed by dividing summed counts rather than averaging monthly rates?</li>
+      <li>You run a query and it is slow. Name the two things to check in <code>EXPLAIN ANALYZE</code> before concluding you need a cluster.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="08-dimensional_modelling.html">Lecture 08</a> designed the tables; this lecture is the engine that builds and queries them locally.</li>
+      <li><strong>Next:</strong> <a href="10-batch_ingestion.html">Lecture 10 (batch ingestion)</a> opens Part III with the patterns that get data into these files in the first place: incremental loads, change data capture, watermarks, and backfills.</li>
+      <li><strong>Cross-link:</strong> <a href="02-data_and_file_formats.html">Lecture 02</a> explains the pushdown that makes the worked example fast; <a href="13-spark.html">Lecture 13</a> is what to use when this is genuinely not enough; <a href="14-lakehouse_table_formats.html">Lecture 14</a> adds transactions to the files queried here.</li>
+      <li><strong>Outside this course:</strong> the <a href="../data_analysis/03-polars.html">Polars lecture</a> in the data analysis track covers the dataframe engine that pairs most naturally with this one, and both rest on Arrow.</li>
+      <li><strong>Further reading:</strong> the DuckDB documentation is unusually good and short, particularly the pages on Parquet reading and on configuration; Raasveldt and Mühleisen's 2019 paper introduces the design.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 9 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

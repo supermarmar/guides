@@ -1,0 +1,345 @@
+﻿<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 13: version control with git</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Version control with git</h1>
+  <p class="subtitle">Git is a content-addressed file system with a version-control interface bolted on top. Learning the commands without the data model gives you a tool that works most of the time and terrifies you the rest. This lecture builds the model first (objects, refs, the DAG of commits), then derives the everyday commands and the branching workflows from it.</p>
+  <div class="meta">
+    <span>Lecture 13 of 16</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part IV: project and collaboration</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Git</strong> (Linus Torvalds, 2005) is the distributed version-control system that every modern software-engineering team uses. The interface is famously prickly: more than 150 subcommands, an internal vocabulary borrowed from no one else's tool, and error messages that improve nothing. The remedy is to stop learning git as a command list and start learning it as a data model. The data model has three pieces. First, every file you have ever committed is stored as a <strong>blob</strong>, addressed by the SHA-1 hash of its contents. Second, every snapshot of the project is a <strong>tree</strong> of named blobs, and every snapshot in history is a <strong>commit</strong> that points to a tree and to one or more parent commits. Third, a <strong>branch</strong> is just a label that points at a commit, and the history of the project is the directed acyclic graph (DAG) of commits reachable from those labels.</p>
+
+  <p>Once that model is in place, the commands fall out of it. <code>git add</code> writes blobs and stages them; <code>git commit</code> creates a new commit pointing at a new tree and at the current branch's commit as parent, and then moves the branch label forward by one. <code>git branch foo</code> creates a new label; <code>git checkout foo</code> moves <code>HEAD</code> to point at it; <code>git merge bar</code> creates a commit with two parents, the current branch and the named one. The phrases that frighten new users, "rebase", "cherry-pick", "force-push", "rewriting history", are all small operations on the DAG that become obvious once you can see the DAG.</p>
+
+  <p>The everyday workflow on a team is the same shape on every git host (GitHub, GitLab, Bitbucket, Azure DevOps). Clone the repository, create a branch for the change, commit work to that branch, push the branch to the remote, open a pull request (or merge request, depending on the host), accept review feedback, merge. The variant that matters at the team level is the branching model (trunk-based, GitHub Flow, Git Flow), which decides how many branches are alive at once and how long they live for. The empirical answer, in the 2023 Accelerate State of DevOps report, is that trunk-based with short-lived feature branches correlates with high performance; long-lived branch models correlate with low performance.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A git repository is a database of immutable objects, plus a small set of mutable pointers. The objects are blobs (file contents), trees (folder structure), and commits (snapshots with parents). The pointers are <em>refs</em>: branch names, tags, <code>HEAD</code>. Every git operation either adds an object to the database, moves a ref, or both. If you can hold that distinction, you can predict what every git command will do before you run it.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Git's data model is so cleanly content-addressed that it has been repurposed as a general-purpose object store: GitHub deploys static sites from it, Hugging Face stores models in it, Nix uses the same hashing idea for package identity. The deep insight is that <em>content-addressed storage</em>, where the name of a thing is the hash of its contents, gives you deduplication, integrity checking, and distributed consistency for free. The reason <code>git push</code> can synchronise two repositories quickly is that both sides agree on the names of every object they have ever seen.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that git is the universal medium of collaboration in software. Every modern developer survey (Stack Overflow, GitHub State of the Octoverse, JetBrains State of Developer Ecosystem) puts git's usage above 90% among professional developers, and there is no second-place tool in sight. Mercurial, Bazaar, Perforce, Subversion, Fossil all exist and have their adherents, but a candidate at a modern engineering team is expected to know git the way they are expected to know how to use a keyboard. The minimum competence bar has been raised to a position the bar did not occupy ten years ago.</p>
+
+  <p>The second reason is that fluency with git is what makes the rest of the engineering workflow comfortable. A team that can move work between branches confidently, that can rebase a series of commits before review, that can <code>git bisect</code> to find the commit that introduced a regression, can build a workflow in which mistakes are recoverable. A team that fears git, that commits everything to <code>main</code> because branching is "complicated", forfeits all of those affordances. The fear-driven workflow is the source of most of the merge conflicts, lost work, and force-pushed history that teams complain about; the engineering work is to make the workflow boring.</p>
+
+  <p>The third reason is that git literacy is the prerequisite for the next three lectures. Code review (Lecture 13) is a workflow on top of git branches. Continuous integration (Lecture 14) is automation triggered by git events. Auto-generated documentation (Lecture 15) is keyed on git tags. None of those work if the team's git practice is "we usually push directly to main and hope". The investment in this lecture is the investment that makes the rest of the part-IV curriculum possible.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Objects: blob, tree, commit</h3>
+
+  <p>The git object database lives in <code>.git/objects</code>. It stores three kinds of objects, each addressed by the SHA-1 (or, increasingly, SHA-256) hash of its content.</p>
+
+  <p>A <strong>blob</strong> is the contents of a single file at a point in time. Two files with identical contents share one blob; renaming a file in a commit does not change the blob, only the tree that references it. A <strong>tree</strong> is a list of (mode, name, hash) entries: it is git's representation of a folder. A tree is recursive: each entry in a tree either points to a blob (a file in this directory) or to another tree (a subdirectory). A <strong>commit</strong> is a small text record that names a tree (the snapshot at this commit), one or more parent commits, the author and committer (name, email, timestamp), and a message.</p>
+
+  <pre><code class="language-text">commit a8b7c6d...
+    tree    1f2e3d4...    # the folder structure at this commit
+    parent  9876543...    # the previous commit
+    author  Mario Ervedosa &lt;mario@example.com&gt; 1715000000 +0100
+    committer Mario Ervedosa ...
+
+    Add A-IRB capital formula to lecture 7
+</code></pre>
+
+  <p>The commit is the unit of history. Following the parent pointers backwards traverses the history of the project; following them forwards is not possible directly, which is why git logs walk backwards from the current commit. A commit can have zero parents (the first commit in a repository, known as the <strong>root commit</strong>), one parent (a normal commit), or two or more parents (a <strong>merge commit</strong>). The history of the project is therefore a directed acyclic graph: directed because parent pointers have direction, acyclic because each commit is created with parents already in place, never the reverse.</p>
+
+  <h3>Refs: branches, tags, HEAD</h3>
+
+  <p>The object database is immutable: once a commit is created, its contents and hash do not change. The <em>mutable</em> part of git is the set of <strong>refs</strong> in <code>.git/refs</code>. A ref is a small file containing a hash; the file's name is how the ref is referred to. A <strong>branch</strong> is a ref under <code>refs/heads/</code>: <code>main</code> is the file <code>refs/heads/main</code>, containing the hash of the latest commit on that branch. A <strong>tag</strong> is a ref under <code>refs/tags/</code>: <code>v1.0.0</code> is the file <code>refs/tags/v1.0.0</code>, conventionally pointing at a specific release commit. A <strong>remote-tracking branch</strong> is a ref under <code>refs/remotes/origin/</code>, recording what your local copy knows about the remote's branches.</p>
+
+  <p><strong>HEAD</strong> is the special ref that names the current branch. Usually <code>HEAD</code> contains the literal text <code>ref: refs/heads/main</code> (a symbolic reference); a commit operation reads the branch <code>HEAD</code> points to, creates a new commit with that branch's tip as parent, and updates the branch to point at the new commit. A "detached HEAD", which scares new users, simply means <code>HEAD</code> contains a commit hash directly rather than a branch name; you can commit in that state, but your commits are not on any branch and will be garbage-collected if you switch away without naming them.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The commit DAG">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A small commit DAG: main, feature branch, and a merge</text>
+
+      <g font-family="Inter" font-size="12">
+        <!-- main line -->
+        <circle cx="80"  cy="120" r="20" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="80"  y="124" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#3D2EB5">C1</text>
+        <circle cx="180" cy="120" r="20" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="180" y="124" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#3D2EB5">C2</text>
+        <circle cx="280" cy="120" r="20" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="280" y="124" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#3D2EB5">C3</text>
+        <circle cx="520" cy="120" r="20" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="520" y="124" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#3D2EB5">M</text>
+        <circle cx="620" cy="120" r="22" fill="#DDF1E5" stroke="#1E9D54" stroke-width="3"/>
+        <text x="620" y="124" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#1E9D54">C6</text>
+
+        <line x1="100" y1="120" x2="160" y2="120" stroke="#71717a" stroke-width="1.5" marker-end="url(#a)"/>
+        <line x1="200" y1="120" x2="260" y2="120" stroke="#71717a" stroke-width="1.5" marker-end="url(#a)"/>
+        <line x1="300" y1="120" x2="500" y2="120" stroke="#71717a" stroke-width="1.5" marker-end="url(#a)" stroke-dasharray="3,3"/>
+        <line x1="540" y1="120" x2="600" y2="120" stroke="#71717a" stroke-width="1.5" marker-end="url(#a)"/>
+
+        <!-- feature line -->
+        <circle cx="380" cy="200" r="20" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="380" y="204" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#C76B2A">C4</text>
+        <circle cx="450" cy="200" r="20" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="450" y="204" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#C76B2A">C5</text>
+
+        <line x1="295" y1="135" x2="365" y2="190" stroke="#71717a" stroke-width="1.5" marker-end="url(#a)"/>
+        <line x1="400" y1="200" x2="430" y2="200" stroke="#71717a" stroke-width="1.5" marker-end="url(#a)"/>
+        <line x1="465" y1="190" x2="510" y2="135" stroke="#71717a" stroke-width="1.5" marker-end="url(#a)"/>
+
+        <!-- labels -->
+        <text x="640" y="100" font-family="Inter" font-size="11" font-weight="600" fill="#1E9D54">main / HEAD</text>
+        <text x="380" y="245" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#C76B2A">feature branch (merged)</text>
+      </g>
+
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>The arrows point in the direction history is read (newer to older). The branch label <code>main</code> currently sits on commit <code>C6</code>; the merge commit <code>M</code> has two parents, <code>C3</code> on main and <code>C5</code> on the feature branch.</figcaption>
+  </figure>
+
+  <h3>The three-tier working area</h3>
+
+  <p>Git's interface presents three places a file can live, between the database and the editor. The <strong>working tree</strong> is the files on disk that you edit. The <strong>index</strong> (also called the staging area) is a binary file at <code>.git/index</code> that records what the next commit's tree will look like; it sits between the working tree and the repository. The <strong>repository</strong> is the object database itself. The commands move content between these tiers: <code>git add</code> moves working-tree changes into the index; <code>git commit</code> moves index contents into a new commit in the repository; <code>git checkout</code> moves repository contents (a commit's tree) into the working tree and the index.</p>
+
+  <div class="defcard">
+    <strong>Index.</strong> The proposed contents of the next commit. <code>git add</code> writes to it; <code>git commit</code> reads from it. The index lets you stage some hunks for commit while leaving others out, which is the entire purpose of having an explicit staging step.
+  </div>
+
+  <div class="defcard">
+    <strong>Fast-forward.</strong> A merge that does not need a merge commit: if the target branch's tip is an ancestor of the source branch's tip, the target's pointer can simply be moved forward along the existing chain. Fast-forward merges keep history linear; non-fast-forward merges produce a diamond shape.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The daily commands</h3>
+
+  <p>Most days, a working developer uses a small subset of git's surface. The list below covers about 90% of the activity on a normal week.</p>
+
+  <pre><code class="language-bash"># Set-up
+git clone git@github.com:org/repo.git
+cd repo
+
+# Branching and switching
+git switch -c feature/calibrate-pd        # new branch from current HEAD
+git switch main                            # back to main
+git branch -d feature/calibrate-pd         # delete a merged branch
+
+# Inspecting state
+git status                                 # what is staged, what is not
+git diff                                   # unstaged changes
+git diff --staged                          # staged but uncommitted
+git log --oneline --graph --decorate -20   # recent history
+
+# Recording changes
+git add path/to/file
+git add -p                                 # interactive hunk staging
+git commit -m "feat: add PD calibration"
+git commit --amend                         # rewrite the last commit
+                                           #   (only before push)
+
+# Remote synchronisation
+git fetch                                  # download remote refs
+git pull --rebase                          # fetch + rebase local on top
+git push -u origin feature/calibrate-pd    # push and track
+
+# Recovering
+git restore --staged path/to/file          # unstage
+git restore path/to/file                   # discard working-tree change
+git reset --hard HEAD~1                    # destructive: discard last commit
+</code></pre>
+
+  <p>Two patterns are worth special attention. The interactive add (<code>git add -p</code>) walks through every change hunk by hunk and lets you stage some and not others; it is the difference between committing exactly the change you want and committing whatever happens to be in the file. The <code>git pull --rebase</code> form, rather than the default merge, keeps history linear when you pull in upstream changes; the team's setting <code>git config --global pull.rebase true</code> makes it the default.</p>
+
+  <h3>Merging versus rebasing</h3>
+
+  <p>The branch in the diagram above was integrated with main via a merge commit <code>M</code>, which has two parents. The alternative is a <strong>rebase</strong>: replay the commits from the feature branch on top of the current tip of main, producing new commit objects with new hashes but the same diffs. The history that results is linear, as though the feature work had always been done after the current state of main.</p>
+
+  <pre><code class="language-bash"># merge: keep history accurate, accept a diamond shape
+git switch main
+git merge feature/calibrate-pd
+
+# rebase: keep history linear, rewrite the feature branch
+git switch feature/calibrate-pd
+git rebase main
+git switch main
+git merge feature/calibrate-pd      # this merge is now fast-forward
+</code></pre>
+
+  <p>The choice between them is the longest-running argument in version-control culture. The two camps agree on one rule: <strong>never rebase commits that have been shared</strong>, because rebasing produces new hashes and anyone who has pulled the old hashes will be confused when they reappear under new names. Within that rule, the typical modern workflow is: rebase your own feature branch before opening the pull request (clean history, no merge bubbles), and use a merge (or squash-merge) for the final integration into main. The "Squash and merge" button on GitHub does exactly this: it collapses the feature branch's commits into one and fast-forwards main onto it, producing a one-commit-per-feature history on the trunk.</p>
+
+  <h3>Branching strategies</h3>
+
+  <p>Three branching models account for most teams.</p>
+
+  <p><strong>Trunk-based development</strong> (paulhammant.com/trunkbaseddevelopment): all developers commit to main, with feature branches that live no more than a day or two. CI runs on every push; the trunk is always releasable. Feature flags are used to hide unfinished work in production. The DORA studies (Forsgren, Humble, Kim, Accelerate, 2018) found this model is the strongest predictor of high engineering performance.</p>
+
+  <p><strong>GitHub Flow</strong> (Scott Chacon, 2011): a long-lived <code>main</code>, plus short-lived feature branches that exist for the duration of one pull request. The branch is merged and deleted when the PR lands. This is the default on GitHub and the right starting point for most teams.</p>
+
+  <p><strong>Git Flow</strong> (Vincent Driessen, 2010, nvie.com/posts/a-successful-git-branching-model): a long-lived <code>main</code> for production, a long-lived <code>develop</code> for integration, plus <code>feature/</code>, <code>release/</code>, and <code>hotfix/</code> branches. Designed for products with scheduled releases. Heavyweight for fast-moving teams; Driessen himself published an addendum in 2020 noting that "if your team is doing continuous delivery of software, I would suggest to adopt a much simpler workflow".</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Model</th><th>Long-lived branches</th><th>Feature branch life</th><th>When to choose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Trunk-based</td><td>main only</td><td>&lt; 1 day</td><td>High-performing teams with feature flags and strong CI</td></tr>
+      <tr><td>GitHub Flow</td><td>main only</td><td>1 to 5 days</td><td>Default for most teams; balances speed and review</td></tr>
+      <tr><td>Git Flow</td><td>main + develop</td><td>days to weeks</td><td>Scheduled-release products, e.g. desktop apps</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Useful rescue operations</h3>
+
+  <p>The most frightening git operations are also the ones that recover the situation when something has gone wrong.</p>
+
+  <p><strong><code>git reflog</code></strong> is the answer to "I rebased and lost my commits". The reflog records every place <code>HEAD</code> has been for the last 90 days, including hashes of commits that are no longer reachable from any branch. <code>git reset --hard &lt;hash&gt;</code> on a reflog entry puts you back where you were.</p>
+
+  <p><strong><code>git bisect</code></strong> is the answer to "which commit introduced this bug?". You tell git a known-good commit and a known-bad commit; git checks out the midpoint and asks you to test it; you mark it good or bad; git checks out the next midpoint. In ten steps you have searched a thousand-commit history.</p>
+
+  <pre><code class="language-bash">git bisect start
+git bisect bad                # current commit is broken
+git bisect good v1.2.0        # this old release worked
+# git checks out the midpoint; run your test
+git bisect good   # or bad, depending on result
+# ... repeats until the culprit is found
+git bisect reset
+</code></pre>
+
+  <p><strong><code>git cherry-pick</code></strong> is the answer to "I need this one commit on another branch". It takes a commit by hash, computes the diff, and applies it on top of the current branch. Useful for backporting a bug fix from main to a release branch.</p>
+
+  <p><strong><code>git stash</code></strong> is the answer to "I have uncommitted changes but need to switch branches". It pushes the working-tree changes onto a stack and reverts the working tree to clean; <code>git stash pop</code> reapplies them later. The modern workaround is to use worktrees (<code>git worktree add ../other-checkout other-branch</code>), which lets two branches be checked out at once in different folders.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    The single most destructive git command is <code>git push --force</code> against a shared branch. It rewrites the remote's history to match yours and silently invalidates the local copies of every other team member working on that branch. The safer variant is <code>git push --force-with-lease</code>, which refuses to overwrite if someone else has pushed in the meantime. Better still, configure the remote (GitHub, GitLab) to disallow force pushes to <code>main</code>. The team rule should be: force pushes on your own short-lived feature branch are fine; on any shared or long-lived branch, they are forbidden.
+  </div>
+
+  <h3>The .gitignore and .gitattributes files</h3>
+
+  <p>Two configuration files shape what git tracks and how. <code>.gitignore</code> lists patterns of files that git should never offer to stage: <code>__pycache__/</code>, <code>*.pyc</code>, <code>.venv/</code>, <code>node_modules/</code>, generated build artefacts, and any local-only configuration. <code>.gitattributes</code> declares per-pattern handling: which files are text and need line-ending normalisation, which files are binary and should not be diffed, which files use a custom merge driver. The pair are committed to git like any other source file.</p>
+
+  <pre><code class="language-text"># .gitignore
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.coverage
+data/raw/
+.DS_Store
+.env
+
+# .gitattributes
+*.py        text eol=lf
+*.md        text eol=lf
+*.png       binary
+*.parquet   binary
+*.ipynb     filter=nbstripout      # see Lecture 10
+</code></pre>
+
+  <h3>Worked example: salvaging a tangled feature branch</h3>
+
+  <div class="worked">
+    <strong>Worked example: rescuing a feature branch with a bad commit</strong>
+    <p>You have been working on <code>feature/lgd-recalibration</code> for three days, with six commits. The fifth commit accidentally added the entire <code>data/raw/</code> folder (2GB of parquet files), which is too big to push. The sixth commit, on top of it, contains the actual fix you want to keep. The remote has the first four commits but rejected commits five and six because of the size.</p>
+    <p>Step 1 (find the offending commit). <code>git log --oneline --stat -10</code> shows the six commits and the files each changed. The fifth has 18 parquet files in its diff. The hash is <code>e3b0c44</code>.</p>
+    <p>Step 2 (rebase interactively). <code>git rebase -i HEAD~6</code> opens an editor showing the six commits. Change the line for commit <code>e3b0c44</code> from <code>pick</code> to <code>edit</code>. Save and close.</p>
+    <p>Step 3 (fix the bad commit). git pauses at the bad commit. Remove the files: <code>git rm -r --cached data/raw/</code>. Add the path to <code>.gitignore</code> in this same commit. Amend: <code>git commit --amend --no-edit</code>. Continue the rebase: <code>git rebase --continue</code>.</p>
+    <p>Step 4 (verify). <code>git log --oneline --stat -6</code> confirms the parquet files no longer appear. <code>du -sh .git</code> confirms the repo is back to a reasonable size. <code>git status</code> is clean.</p>
+    <p>Step 5 (force-with-lease push). Because the rebase rewrote local commits and the remote already has different versions of commit five, you need to overwrite. <code>git push --force-with-lease origin feature/lgd-recalibration</code>. The lease ensures you only overwrite if no one else has pushed in the meantime.</p>
+    <p>The branch is now pushable, the bad commit is gone, the fix is preserved, and the team's pull-request review can proceed. The whole rescue is six minutes once you know the shape of it; without the mental model, it is a panicked half-hour search through Stack Overflow.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Git is a content-addressed object database (blobs, trees, commits) with mutable refs (branches, tags, <code>HEAD</code>) pointing into it. The everyday commands move content between the working tree, the index, and the repository, and update the refs as they go. Branching and merging produce a DAG; rebasing rewrites parts of it; the team's branching model (trunk-based, GitHub Flow, Git Flow) decides how busy the DAG becomes. The frightening commands (reflog, bisect, cherry-pick, stash, force-with-lease) are the recovery toolkit; they are scary until you have used them once with the mental model in mind, and obvious afterwards.</p>
+
+  <p>The wider point is that version control is the team's memory. Every change carries the author, the timestamp, and (if the commit message is decent) the reasoning. <code>git blame</code> on a confusing line of code retrieves not just who wrote it but why. The team's commit-message discipline (Conventional Commits, or a similar convention) is therefore not bureaucracy; it is the layer that makes the team's memory useful five years later. The next lecture moves from the mechanics of git to the social practice that runs on top of it: code review and the pull-request workflow.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the three kinds of object in git's database. What does each contain?</li>
+      <li>What is the difference between a branch and a tag? Where do they live on disk?</li>
+      <li>Describe the three-tier model (working tree, index, repository) and the command that moves content between each pair of tiers.</li>
+      <li>What is the difference between a merge and a rebase? Which one rewrites history? When is each appropriate?</li>
+      <li>Compare trunk-based development, GitHub Flow, and Git Flow on branch life span and target audience.</li>
+      <li>Your colleague says "I've lost my commits after a bad rebase". Name the command you would reach for and describe the steps.</li>
+      <li>What does <code>git push --force-with-lease</code> add over <code>git push --force</code>? When would you still refuse to run it?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="12-project_setup.html">Lecture 12 (project setup)</a> defined the four-file contract that git now tracks across every commit.</li>
+      <li><strong>Next:</strong> <a href="14-code_review_and_prs.html">Lecture 14 (code review and pull requests)</a> covers the social workflow built on top of git branches.</li>
+      <li><strong>Cross-link:</strong> <a href="05-testing.html">Lecture 5 (testing)</a> and <a href="15-ci_cd.html">Lecture 15 (CI/CD)</a> describe the automation that runs on every git push.</li>
+      <li><strong>Cross-link:</strong> <a href="06-debugging_and_profiling.html">Lecture 6 (debugging and profiling)</a> introduced <code>git bisect</code> as a binary-search tool for regressions.</li>
+      <li><strong>Outside this course:</strong> Scott Chacon and Ben Straub, <em>Pro Git</em>, 2nd edition (Apress 2014; git-scm.com/book); Linus Torvalds, "Tech Talk: Linus Torvalds on git" (Google, 2007); Forsgren, Humble, and Kim, <em>Accelerate: The Science of Lean Software and DevOps</em> (IT Revolution Press, 2018); Conventional Commits specification (conventionalcommits.org); Vincent Driessen, "A successful Git branching model" (nvie.com, 2010, with 2020 addendum).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 13 of 16</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LGD concept: components, methods and downturn</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Loss given default: components, methods and downturn</h1>
+  <p class="subtitle">The opening lecture of the LGD sequence. What an LGD actually is (1 minus discounted recoveries over EAD), why it is naturally a three-component mixture rather than a single regression, the four estimation methods banks can choose between (market, workout, implied market, implied historical), and the IRB-specific downturn-LGD and ELBE constructs that turn the modelled estimate into a regulatory parameter.</p>
+  <div class="meta">
+    <span>A-IRB 16 of n &mdash; LGD 1 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Sources: <code>04_feature_engineering/lgd/01-target_variable.md</code>, <code>05_modelling/lgd/01-model_methodology.md</code>, <code>07-risk_quantification.md</code>; cross-reference <code>03-definitions.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Loss given default is the proportion of exposure the bank loses when a defaulted obligor's workout completes. Formally, LGD = 1 − PV(recoveries) / EAD, where recoveries include all post-default cash collections net of costs, discounted to the default date. Unlike PD, LGD is a continuous variable bounded in [0, 1] and attached to the facility rather than the obligor: the same customer with a secured mortgage and an unsecured credit card has two different LGDs because the loss given default depends on what the bank can recover from the asset, not on who the customer is.</p>
+
+  <p>The dominant retail estimation approach is <strong>workout LGD</strong>: the bank tracks every defaulted facility through its workout, records every cash flow, discounts them to the default date and computes the realised LGD. The resulting empirical distribution is heavily bimodal (most defaulted facilities either recover almost nothing or recover almost everything) which makes a single regression a poor fit. The standard architecture is therefore a <strong>three-component mixture</strong>: a probability of zero payment, a probability of full payment given non-zero, and a partial-recovery-rate model conditional on the obligor being neither a zero-payer nor a full-payer. Each component is modelled separately; the overall LGD is built up from them via a closed-form expression.</p>
+
+  <p>Two regulatory constructs sit on top of the modelled LGD. <strong>Downturn LGD</strong> (CRR Article 181(1)(b), PRA SS4/24 §15) reflects what LGD looks like in adverse economic conditions and is the parameter that enters the K formula for non-defaulted exposures. <strong>ELBE</strong> (the Expected Loss Best Estimate, CRR Article 181(1)(h)) is the analogous parameter for facilities that are already in default; the K formula for defaulted exposures is K = max(0, LGD_downturn − ELBE) × EAD. The LGD work splits into <strong>LGD1</strong> (the model applied to performing exposures) and <strong>LGD2</strong> (the model applied to defaulted exposures, which feeds ELBE). Both are covered in this sequence; the cure / no-cure logic from <a href="03-definitions.html">lecture 03</a> is what bridges them.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The instinct is to model LGD with a single regression on workout-period features. The data refuses to cooperate: the LGD distribution has a spike at 0 (full recovery), a spike at 1 (zero recovery), and a continuous mass in between. A single regression averages the two spikes and the middle into a flat line that fits no part of the distribution well. The three-component mixture is what the data shape demands: model the spikes as separate probabilities, and model the middle as a continuous regression on the conditional partial-recovery population. The same problem with the same solution recurs in every retail portfolio.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>LGD is the second most material parameter in the K formula. For a typical unsecured retail book, RWA is roughly linear in LGD: a 10 percentage-point shift in LGD shifts RWA by close to 10%. For secured books the sensitivity is larger because the collateral value flows through to LGD directly. The supervisor knows this and runs the LGD validation pack alongside the PD pack at every SREP; the typical UK and EU finding is that LGD models are less mature and more bank-variable than PD models, which means they get more attention rather than less.</p>
+
+  <p>The principles-based nature of LGD regulation is the second reason this lecture matters. CRR is precise about PD: TTC philosophy, LRA calibration, 0.03% floor. CRR is less prescriptive about LGD: downturn LGD is "no lower than the LRA LGD" but the precise downturn-identification methodology is left to the bank. PRA SS4/24 §15 fills in some operational expectations, but compared to PD's CRR Articles 178, 180, 170(3), the LGD legislation is thinner. This gives banks more design space and means more bank-to-bank variability, and that variability is what supervisors probe.</p>
+
+  <p>For F107 the LGD section is examiner-favoured because it lets candidates distinguish themselves on conceptual understanding: the candidate who can articulate why LGD is a mixture, why downturn LGD is principles-based, why ELBE differs from LGD, and how cure / no-cure feeds the LGD1 / LGD2 split is one who understands the credit-risk machinery rather than just naming components.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>LGD has two structural splits worth holding simultaneously. The first is the <strong>three-component mixture decomposition</strong> of an individual obligor's loss outcome (zero / full / partial). The second is the <strong>cure / no-cure split</strong> that determines which sub-model applies (LGD1 if performing at the snapshot; LGD2 if defaulted at the snapshot). The diagram below puts both in one view.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LGD architecture: mixture and cure splits">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">LGD architecture: three-component mixture and cure / no-cure split</text>
+
+      <!-- Top-level box: defaulted facility -->
+      <rect x="380" y="50" width="180" height="40" fill="#fee2e2" stroke="#991b1b"/>
+      <text x="470" y="68" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">Defaulted facility</text>
+      <text x="470" y="82" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">snapshot at default date</text>
+
+      <!-- Three-way split -->
+      <line x1="470" y1="90" x2="200" y2="130" stroke="#475569" stroke-width="1"/>
+      <line x1="470" y1="90" x2="470" y2="130" stroke="#475569" stroke-width="1"/>
+      <line x1="470" y1="90" x2="740" y2="130" stroke="#475569" stroke-width="1"/>
+
+      <!-- Zero payer -->
+      <rect x="100" y="130" width="200" height="60" fill="#eff6ff" stroke="#1e3a8a"/>
+      <text x="200" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Zero payer</text>
+      <text x="200" y="166" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">P(Zero)</text>
+      <text x="200" y="180" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">no recoveries in 24m</text>
+
+      <!-- Full payer -->
+      <rect x="370" y="130" width="200" height="60" fill="#eff6ff" stroke="#1e3a8a"/>
+      <text x="470" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Full payer</text>
+      <text x="470" y="166" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">(1 - P(Zero)) &times; P(Full)</text>
+      <text x="470" y="180" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">100% recoveries in 24m</text>
+
+      <!-- Partial payer -->
+      <rect x="640" y="130" width="200" height="60" fill="#eff6ff" stroke="#1e3a8a"/>
+      <text x="740" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Partial payer</text>
+      <text x="740" y="166" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">(1 - P(Zero)) &times; (1 - P(Full))</text>
+      <text x="740" y="180" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">continuous recovery rate in 60m</text>
+
+      <!-- Recovery rate boxes -->
+      <rect x="100" y="210" width="200" height="36" fill="#fff" stroke="#1e3a8a"/>
+      <text x="200" y="232" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">E[r(Zero)] = 0%</text>
+
+      <rect x="370" y="210" width="200" height="36" fill="#fff" stroke="#1e3a8a"/>
+      <text x="470" y="232" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">E[r(Full)] = ~100% (discounted)</text>
+
+      <rect x="640" y="210" width="200" height="36" fill="#fff" stroke="#1e3a8a"/>
+      <text x="740" y="232" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">E[r(Partial)] = GLM regression</text>
+
+      <!-- Aggregation -->
+      <rect x="250" y="280" width="440" height="50" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+      <text x="470" y="300" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#134e4a">Composite LGD = 1 - (R_Zero + R_Full + R_Partial + Debt Sale - CoR)</text>
+      <text x="470" y="318" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">R_i = P(component) &times; E[r(component)]</text>
+
+      <!-- Arrows -->
+      <line x1="200" y1="190" x2="200" y2="210" stroke="#475569"/>
+      <line x1="470" y1="190" x2="470" y2="210" stroke="#475569"/>
+      <line x1="740" y1="190" x2="740" y2="210" stroke="#475569"/>
+      <line x1="200" y1="246" x2="200" y2="280" stroke="#475569"/>
+      <line x1="470" y1="246" x2="470" y2="280" stroke="#475569"/>
+      <line x1="740" y1="246" x2="740" y2="280" stroke="#475569"/>
+
+      <!-- Bottom: regulatory constructs -->
+      <rect x="100" y="370" width="340" height="50" fill="#fef9c3" stroke="#92400e"/>
+      <text x="270" y="390" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">LGD1 (performing): &rarr; downturn LGD</text>
+      <text x="270" y="406" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">enters K formula for non-defaulted exposures</text>
+
+      <rect x="500" y="370" width="340" height="50" fill="#fef9c3" stroke="#92400e"/>
+      <text x="670" y="390" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">LGD2 (defaulted): &rarr; ELBE</text>
+      <text x="670" y="406" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">K = max(0, LGD_DT - ELBE) &times; EAD</text>
+
+      <line x1="350" y1="330" x2="270" y2="370" stroke="#475569"/>
+      <line x1="590" y1="330" x2="670" y2="370" stroke="#475569"/>
+    </svg>
+    <figcaption>The LGD architecture in one view. The three-component mixture (top) decomposes a defaulted facility's loss outcome into zero / full / partial payer probabilities, each with its own conditional recovery rate. The composite LGD is the closed-form aggregation. The bottom row shows the LGD1 / LGD2 split: the same mixture machinery is calibrated separately for performing facilities (LGD1, feeds the downturn LGD that enters the K formula) and for defaulted facilities (LGD2, feeds ELBE).</figcaption>
+  </figure>
+
+  <p>Three properties of the architecture matter. First, the <strong>order of conditioning matters</strong>: in the diagram above the model is "zero-first, then full given not-zero". The reverse ordering (full-first, then zero given not-full) is also defensible and used by some banks; the choice is empirical and is benchmarked during model design. Second, the <strong>recovery rates for zero and full payers are non-modelled</strong>: 0% for zero-payers by construction, near-100% for full-payers (adjusted downward for discounting). Only the partial-payer recovery rate is regressed. Third, the <strong>debt-sale and cost-of-recovery components are added in</strong> at the aggregation step: a third-party debt sale produces a small recovery long after the workout has notionally ended, and the cost of recovery is the bank's own collection cost, both of which are observed and included in the realised LGD calculation.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The definition</h3>
+
+  <p>The realised LGD for a defaulted facility i is:</p>
+
+  <pre><code>LGD_i  =  1  -  PV( recoveries_i + collateral_i + debt_sale_i - costs_i )  /  EAD_i
+</code></pre>
+
+  <p>Three operational notes. Recoveries are <strong>discounted to the default date</strong> at a regulator-approved rate (SS4/24 §13.16 to 13.18 for the discount-rate convention; this lecture's calculation assumes the discount has already been applied). Costs include both <strong>direct collection expenses</strong> (debt-collector fees, legal costs) and <strong>indirect overheads</strong> (allocated cost of in-house collections staff); CRR includes indirect costs in the regulatory LGD whereas IFRS 9 does not. The realised LGD is <strong>floored at zero</strong> per SS4/24 §14.14: a recovery that exceeds the defaulted balance (because of penalty interest, fees, or unrealised collateral gain) produces a negative loss that is treated as a zero loss for modelling purposes.</p>
+
+  <h3>Why LGD is facility-level, not obligor-level</h3>
+
+  <p>An obligor's PD is a property of the customer: how likely are they to default. The same obligor with a credit card, a mortgage and a car loan has the same PD across all three. An obligor's LGD is a property of the facility: how much of <em>each individual exposure</em> is lost on default. The mortgage will have a low LGD (high collateral value), the car loan a medium LGD (depreciating collateral), the credit card a high LGD (unsecured). This is why CRR Article 178 default events are recognised at obligor level for non-retail but at facility level for retail: the LGD calculation only makes sense at facility level for retail, and the regulator chose to align the default event with the LGD modelling unit.</p>
+
+  <h3>The three-component mixture</h3>
+
+  <p>The wiki specification:</p>
+
+  <pre><code>P(Zero)               P( zero discounted recoveries in 24m | default )
+P(Full | not Zero)    P( 100% undiscounted recoveries in 24m | recoveries > 0, default )
+E[r(Partial)]         expected discounted recovery rate over 60m
+                         given account is neither zero nor full payer
+</code></pre>
+
+  <p>The composite LGD is then:</p>
+
+  <pre><code>R_Zero    = P(Zero) * 0
+R_Full    = (1 - P(Zero)) * P(Full) * E[r(Full)]
+R_Partial = (1 - P(Zero)) * (1 - P(Full)) * E[r(Partial)]
+
+LGD = 1 - ( R_Zero + R_Full + R_Partial + E[r(Debt Sale)] - CoR )
+</code></pre>
+
+  <p>The two binary components (P(Zero) and P(Full | not zero)) are modelled with logistic regression analogous to lecture 13. The continuous component (E[r(Partial)]) is modelled with a generalised linear model (GLM): typically a Beta-distributed response with a logit link (because the recovery rate is naturally bounded in [0, 1]) or a Gamma-distributed loss-rate with a log link. The choice between Beta and Gamma is empirical and documented per portfolio.</p>
+
+  <h3>Outcome periods: 24 months and 60 months</h3>
+
+  <p>The 24-month outcome period for the binary components and the 60-month outcome period for the partial-recovery component are not arbitrary. The 60-month figure aligns with the Maximum Recovery Period (MRP) defined in lecture 03 (CRR Article 181, SS4/24 §14.8): empirical analysis on retail unsecured portfolios consistently shows that 90 to 95% of cumulative recoveries arrive within 60 months of default, and the marginal information from extending the window further does not justify the year of data lag it costs. The 24-month period for the zero / full classification reflects the speed at which the workout's outcome category becomes clear: by month 24 an account has either repaid in full, settled at zero, or moved into the slow grinding partial-recovery regime.</p>
+
+  <h3>The cure / no-cure split feeds the LGD1 / LGD2 distinction</h3>
+
+  <p>From <a href="03-definitions.html">lecture 03</a>: an obligor that has defaulted may eventually cure (12-month probation period; 9-month additional independence period for LGD modelling per SS4/24 §12.2). The cure / no-cure distinction shapes the LGD architecture:</p>
+
+  <ul>
+    <li><strong>LGD1</strong> applies to <strong>performing exposures</strong> (snapshot is non-defaulted). The model predicts the LGD that would be realised <em>if</em> the obligor were to default. LGD1 feeds the downturn LGD that enters the K formula for non-defaulted exposures.</li>
+    <li><strong>LGD2</strong> applies to <strong>defaulted exposures</strong> (snapshot is already defaulted). The model predicts the remaining loss given that the workout is partway through. LGD2 feeds ELBE, which enters the K formula for defaulted exposures.</li>
+  </ul>
+
+  <p>Both LGD1 and LGD2 use the same three-component mixture architecture; they differ in the data window (LGD1 is fitted on completed workouts; LGD2 is fitted on currently-defaulted facilities) and in the regulatory wrapper.</p>
+
+  <h3>The four estimation methods</h3>
+
+  <table>
+    <thead>
+      <tr><th>Method</th><th>What it does</th><th>When it applies</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Market LGD</strong></td>
+        <td>Observe the market price of defaulted bonds shortly after default; the residual market value indicates the recovered value</td>
+        <td>Liquid secondary market in defaulted instruments. Large corporate bonds, leveraged loans, sovereign bonds. Not applicable to retail.</td>
+      </tr>
+      <tr>
+        <td><strong>Workout LGD</strong></td>
+        <td>Track every cash flow during the workout, discount to default date, compute realised LGD per resolved facility</td>
+        <td>Bank-loan portfolios with sufficient historical resolved-workout data: mortgages, retail unsecured, corporate loans. The standard for A-IRB retail.</td>
+      </tr>
+      <tr>
+        <td><strong>Implied market LGD</strong></td>
+        <td>Derive LGD from credit spreads of high-risk but non-defaulted bonds, given a known or estimated PD</td>
+        <td>Investment-grade corporates with low default count but liquid bond market. Forward-looking. Less reliable because it bundles risk premium into the LGD estimate.</td>
+      </tr>
+      <tr>
+        <td><strong>Implied historical LGD</strong></td>
+        <td>Use long-term historical average losses for similar asset types as the LGD assumption</td>
+        <td>Retail portfolios where individual recovery tracking is operationally hard but pooled historical experience is available. Basel allows this only in a retail context.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Workout LGD is the standard for retail A-IRB. The remaining lectures in this LGD sequence build a workout LGD model end-to-end. The other three methods are referenced and rejected as not applicable to the reference portfolio.</p>
+
+  <h3>Downturn LGD</h3>
+
+  <p>CRR Article 181(1)(b) requires that the LGD used for capital purposes "reflect economic downturn conditions where necessary to capture the relevant risks". The Article does <em>not</em> specify how a downturn is identified, what discount rate applies, or how the downturn LGD is calibrated. PRA SS4/24 §15 fills some of this gap with operational expectations. The result is a principles-based regime: each bank's downturn LGD methodology can differ from the next, provided each can be defended on its own evidence base.</p>
+
+  <p>Three operational features hold across most banks:</p>
+
+  <ul>
+    <li>The <strong>discount rate</strong> applied to recoveries when computing the downturn LGD is floored at max(SOFR or SONIA + 5%, 9%) per SS4/24 §13.17. The 9% floor is what makes downturn LGD materially higher than LRA LGD; the floor exists because in a downturn the bank's own funding cost rises.</li>
+    <li>The <strong>downturn period identification</strong> mirrors the LRA work in PD lecture 14: typically an MEV-driven PCA approach identifies the stressed period (often the GFC in 2008 to 2009), and the realised LGDs in that period are averaged to give the downturn LGD.</li>
+    <li>An <strong>LGD reference value</strong> (SS4/24 §15.7) is computed: the simple average of the realised LGDs in the two years with the highest total economic loss divided by total outstanding amount. The bank's downturn LGD must equal or exceed this reference value at the calibration-segment level.</li>
+  </ul>
+
+  <h3>ELBE</h3>
+
+  <p>For defaulted exposures, the K formula switches to:</p>
+
+  <pre><code>K_defaulted  =  max(0,  LGD_downturn  -  ELBE)  *  EAD
+</code></pre>
+
+  <p>ELBE is the bank's best estimate of expected loss for that defaulted exposure: <em>given that the obligor has defaulted</em>, what fraction of EAD does the bank actually expect to lose? Naturally ELBE &le; LGD_downturn (downturn LGD includes a stress margin that the bank's actual expectation does not), so the K formula above is mathematically the residual loss above what the bank already provides for in its IFRS 9 / accounting expected-loss number. CRR Article 181(1)(h) and SS4/24 §16 are the regulatory anchors; the operational construction of ELBE is the subject of lecture 21 (LGD risk quantification).</p>
+
+  <h3>Two further measures</h3>
+
+  <p><strong>Observed Average LGD</strong> (SS4/24 §14.6). The arithmetic (default-weighted) average of realised LGDs across resolved facilities in the calibration window. The natural back-test target for the modelled LGD: the modelled average should approximate the observed average within tolerance.</p>
+
+  <p><strong>LGD Reference Value</strong> (SS4/24 §15.7). The two-worst-years average defined above. The downturn LGD must equal or exceed this reference value at the calibration-segment level.</p>
+
+  <h3>Data requirements</h3>
+
+  <p>CRR Article 181(1)(j) sets the minimum data history for LGD models:</p>
+
+  <ul>
+    <li><strong>Retail</strong>: minimum 5 years; the window must include a downturn period or be supplemented with conservative assumptions.</li>
+    <li><strong>Corporate, sovereign, bank</strong>: minimum 7 years.</li>
+  </ul>
+
+  <p>The data requirement compounds the Maximum Recovery Period: a workout that takes 5 years to complete needs 5 years of post-default observation, so a 5-year minimum history barely supports one cohort of resolved-workout data. Most banks operate with 10+ years of LGD history where available, and the limitations register from <a href="07-governance_and_limitations.html">lecture 07</a> records any shortfall.</p>
+
+  <h3>Collateral and haircuts</h3>
+
+  <p>For secured portfolios, collateral is the dominant LGD driver. The realised recovery includes the proceeds of collateral sale (residential property auction, vehicle resale, securities liquidation). Banks apply a <strong>haircut</strong> to recognise that collateral value at sale is below collateral value at the snapshot date: typically 20 to 40% for residential property, 30 to 50% for commercial property, 50 to 70% for vehicles. The haircut is one of the LGD model's risk drivers, captured at the facility level (loan-to-value at default, time since the latest valuation, regional house-price index).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the three-component mixture is not just a statistical convenience; it reflects the operational reality of workouts</strong>. A workout team's first triage decision is whether the obligor will pay anything at all. Their second decision, for those who will pay something, is whether the obligor is settling in full or only partially. Their third decision, for partial payers, is how much will eventually be recovered. The model architecture mirrors the triage. Banks that try to fit a single regression often find that the model's "average" predictions are wrong for every segment because no single regression can capture the spike-spike-continuous shape of the empirical distribution.</p>
+
+  <p>The second lesson is on the <strong>asymmetry of regulatory prescription between PD and LGD</strong>. CRR Article 180 is prescriptive on PD calibration (LRA, 0.03% floor, 5-year history); CRR Article 181 is much lighter on LGD calibration (downturn LGD must be no lower than the LRA LGD, but how downturn is identified is left to the bank). The asymmetry exists because PD is the more material parameter and the regulator wants comparability across banks; LGD is bank-specific because the collateral, the recovery infrastructure, and the workout operations differ from bank to bank in ways the regulator cannot prescribe. The practical implication: LGD models are more bank-variable, more bank-specific, and more supervisory-discretion-driven than PD models. F107 candidates who understand this asymmetry will outperform those who treat the two parameters as symmetric.</p>
+
+  <p>The third lesson is on <strong>ELBE</strong>. The construct is exam-classic but operationally subtle. ELBE is the bank's expectation of remaining loss on a defaulted exposure, before any further stress overlay. The K formula for defaulted exposures (max(0, LGD_downturn − ELBE) × EAD) is therefore the regulatory residual: the supervisor wants to hold capital against the stress margin only, because the bank should already be provisioning against the expected portion via IFRS 9. The supervisor's test is whether ELBE plus IFRS 9 provisions plus K_defaulted equals the full downturn LGD; the three together should not double-count, but should also cover the stress.</p>
+
+  <p>The fourth lesson is on <strong>cure</strong>. A cured account is one that defaulted, completed the 12-month probation, then completed a further 9-month independence period without re-defaulting. The LGD of a cured account is the loss the bank realised between default and cure (the discounted shortfall of payments during the workout, plus any costs); typically far smaller than the LGD of a no-cure account (where the workout ends with a write-off and most of EAD is lost). The cure / no-cure mixture is therefore a second factorisation of the LGD distribution (cure outcomes mostly small, no-cure outcomes mostly large), which interacts with the zero / full / partial mixture in operationally important ways. The LGD risk-differentiation lecture (20) will unpack the interaction.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Write the realised LGD formula. Why is LGD a facility-level quantity rather than an obligor-level one?</li>
+    <li>The empirical LGD distribution is bimodal with spikes near 0 and 1 and a continuous mass in between. Explain why this rules out a single regression and motivates the three-component mixture.</li>
+    <li>Write the composite LGD formula in terms of P(Zero), P(Full | not zero) and E[r(Partial)]. What are R_Zero, R_Full and R_Partial?</li>
+    <li>Why are the recovery rates for zero-payers and full-payers non-modelled, while the partial-payer recovery rate is modelled?</li>
+    <li>Name the four LGD estimation methods. For each, name one portfolio type for which it is appropriate and one for which it is not.</li>
+    <li>Why is the LGD regulation principles-based whereas the PD regulation is prescriptive? What is the practical implication?</li>
+    <li>Distinguish LGD1 from LGD2. Which feeds the K formula for non-defaulted exposures, and which feeds ELBE?</li>
+    <li>The K formula for defaulted exposures is K = max(0, LGD_downturn − ELBE) × EAD. Why is the supervisor only requiring capital on the difference rather than on the full downturn LGD?</li>
+    <li>SS4/24 §13.17 floors the LGD discount rate at max(SOFR + 5%, 9%). Why is the 9% floor specifically applied to downturn LGD?</li>
+    <li>An obligor cures from default after the probation and independence periods. How does the realised LGD on this account compare to the realised LGD on an account that defaulted and was written off?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/lgd/01-target_variable.md</code> &mdash; the three-component decomposition, LGD reference value, observed average LGD, outcome-period choice.</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/lgd/01-model_methodology.md</code> &mdash; the four estimation methods, the LGD1 / LGD2 split, the composite LGD formula.</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/lgd/07-risk_quantification.md</code> &mdash; downturn LGD as a principles-based construct.</li>
+      <li><code>docs/wiki/.../a-irb_capital/01_introduction/03-definitions.md</code> &mdash; cure / no-cure logic, ELBE, economic loss (already lectured in 03).</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="../01-notation.html">Notation</a> &mdash; the LGD-family symbols (realised LGD, workout LGD, market LGD, downturn LGD, recovery rate) are defined there.</li>
+      <li><a href="02-credit_losses.html">Credit losses</a> &mdash; EL = PD × LGD × EAD; downturn LGD as the regulatory parameter.</li>
+      <li><a href="03-definitions.html">Definitions</a> &mdash; cure, probation, independence period, ELBE, economic loss formula.</li>
+      <li>The PD sequence (lectures 09 to 15) &mdash; the pipeline architecture this LGD sequence will mirror.</li>
+    </ul>
+
+    <p><strong>Forward references inside the LGD sequence:</strong></p>
+    <ul>
+      <li>17-lgd_target_and_data (next) &mdash; the realised LGD construction, 60-month MRP, 5/7-year history.</li>
+      <li>18-lgd_sampling_and_representativeness (planned) &mdash; resolved vs unresolved, MRP truncation, collateral representativeness.</li>
+      <li>19-lgd_feature_engineering (planned) &mdash; collateral, LTV, workout-stage features.</li>
+      <li>20-lgd_risk_differentiation (planned) &mdash; the three-component mixture model build.</li>
+      <li>21-lgd_risk_quantification (planned) &mdash; downturn LGD calibration, ELBE, MoC.</li>
+      <li>22-lgd_testing (planned) &mdash; Somers' D, Spearman, MAE / RMSE.</li>
+    </ul>
+
+    <p><strong>Forward to RWA and IFRS 9:</strong></p>
+    <ul>
+      <li>31-rwa (planned) &mdash; the K formula uses downturn LGD for non-defaulted exposures and (LGD_downturn − ELBE) for defaulted exposures.</li>
+      <li>IFRS 9 LGD (planned) &mdash; uses the same workout-LGD machinery but excludes indirect costs, does not require the downturn add-on, and uses a different discount rate.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Articles 181 and 5(2). The legislative anchors for LGD and economic loss.</li>
+      <li>PRA SS4/24, paragraphs 13 to 16. UK supervisory expectations for realised LGD, downturn LGD, reference value and ELBE.</li>
+      <li>EBA/GL/2017/16, paragraphs 96 to 153. The European authority's interpretation, including the workout LGD framework.</li>
+      <li>BCBS Working Paper 14, "Studies on the Validation of Internal Rating Systems" (May 2005), section on LGD validation.</li>
+      <li>Schuermann, T. (2004), "What do we know about loss given default?". The canonical academic survey.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 16 of n &middot; LGD 1 of 7.</span>
+  <span><a href="15-pd_testing.html">Previous: PD testing</a> &middot; <a href="17-lgd_target_and_data.html">Next: target and data</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

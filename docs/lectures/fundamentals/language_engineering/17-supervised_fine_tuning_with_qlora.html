@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 17: supervised fine-tuning with QLoRA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Supervised fine-tuning with QLoRA</h1>
+  <p class="subtitle">A base model does not answer questions; it continues them. Turning one into something that follows instructions is the second of three training stages, and doing it used to require the compute of the first. Two independent tricks removed that requirement. One replaces each weight update with a pair of thin matrices, cutting a 150,994,944-parameter update to 196,608. The other stores the frozen weights at four bits instead of thirty-two. Together they put fine-tuning a billion-parameter model on a free Colab GPU, in about an hour.</p>
+  <div class="meta">
+    <span>Lecture 17 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part V: training your own</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Three stages produce a usable generative model. <strong>Pretraining</strong> predicts the next token over an enormous unlabelled corpus and yields a <strong>base model</strong> that completes text and follows no instructions. <strong>Supervised fine-tuning</strong> continues next-token prediction on instruction-and-response pairs, which converts a completer into something that answers. <strong>Preference tuning</strong>, lecture 18, aligns it with human judgements about which answer is better.</p>
+
+  <p>Full fine-tuning updates every parameter and is expensive in compute, time and storage. <strong>Parameter-efficient fine-tuning</strong> avoids it. The earliest form, <strong>adapters</strong>, inserts small trainable modules into each transformer block: fine-tuning 3.6 per cent of BERT's parameters came within 0.4 per cent of full fine-tuning on GLUE.</p>
+
+  <p><strong>LoRA</strong> is the technique that stuck. Rather than adding layers, it represents the <em>change</em> to a weight matrix as the product of two thin matrices. For a 12,288 × 12,288 matrix in GPT-3, that is <strong>150,994,944</strong> parameters replaced by two 12,288 × 8 matrices totalling <strong>196,608</strong>, a <strong>768-fold</strong> reduction, and it works because the useful update turns out to have very low intrinsic dimension.</p>
+
+  <p><strong>QLoRA</strong> adds quantisation to the frozen base: store it in 4-bit normalised floats with <strong>blockwise</strong> and <strong>double quantisation</strong>, and a 1.1-billion-parameter model loads in about 1 GB of VRAM rather than about 4 GB. The adapters train in 16-bit on top. Afterwards the adapter is <strong>merged</strong> back into the base weights, so inference costs nothing extra.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You want to correct a very long reference book. You could reprint every page, which is what full fine-tuning does. Or you could notice that your corrections are not scattered randomly: they follow a few consistent patterns, so a short list of rules plus where to apply them reproduces almost all of them. That list is thousands of times smaller than the book. And while you work, you keep the original on microfiche rather than in print, because you only need to read it, never to rewrite it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is access. Full fine-tuning of a seven-billion-parameter model needs enterprise hardware, principally because the optimiser states and gradients are several times the size of the weights themselves. LoRA removes the gradients and optimiser states for almost every parameter, and quantisation shrinks what remains. The result is that the technique is available to anyone with a consumer GPU, which is a change in who can do this work rather than merely how fast it goes.</p>
+
+  <p>The second reason is that the artefact is small and swappable. A LoRA adapter is a few tens of megabytes rather than a few tens of gigabytes, so one base model can serve many specialisations, each stored and versioned separately. That is a materially different deployment story from holding a full copy of the model per task.</p>
+
+  <p>The third reason is that the choice between fine-tuning and the alternatives is a real decision and this lecture is where you can price it. Prompting is free, retrieval is cheap, fine-tuning costs a training run and gives you a model to host, version and revalidate. Fine-tuning is the right answer for changing <em>behaviour</em>, the format, the register, the willingness to follow a house style. It is the wrong answer for supplying <em>facts</em>, which is lecture 11's job.</p>
+
+  <p>And a fourth reason about why it works at all. LoRA is not a lossy compromise that happens to be tolerable. It rests on a finding, that the update needed to adapt a language model has very low intrinsic dimension, and understanding that claim is what tells you when to expect the technique to hold and when to be suspicious.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Three stages, and two independent savings that stack.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The three LLM training stages: pretraining, supervised fine-tuning and preference tuning. Below, LoRA decomposing a weight update into two thin matrices with the GPT-3 arithmetic, and quantisation shrinking the frozen base model from 32-bit to 4-bit.">
+      <rect x="0" y="0" width="880" height="400" fill="#FFFFFF"/>
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three stages, and the two tricks that make the second one affordable</text>
+
+      <!-- STAGES -->
+      <rect x="20" y="32" width="840" height="120" rx="9" fill="#FFFFFF" stroke="#71717a" stroke-width="1.5"/>
+
+      <rect x="40" y="48" width="250" height="86" rx="7" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="165" y="66" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#3f3f46">1. PRETRAINING</text>
+      <text x="165" y="82" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">next-token prediction, no labels</text>
+      <text x="165" y="95" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">enormous corpus, months of compute</text>
+      <text x="165" y="112" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#0F62FE">&#8594; a BASE model</text>
+      <text x="165" y="126" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#DC2855">completes text; ignores instructions</text>
+
+      <line x1="290" y1="91" x2="310" y2="91" stroke="#71717a" stroke-width="1.8"/><polygon points="315,91 307,87 307,95" fill="#71717a"/>
+
+      <rect x="320" y="48" width="250" height="86" rx="7" fill="#EDE9FE" stroke="#5B47E0" stroke-width="2"/>
+      <text x="445" y="66" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#4c1d95">2. SUPERVISED FINE-TUNING</text>
+      <text x="445" y="82" text-anchor="middle" font-family="Inter" font-size="8" fill="#4c1d95">same objective, on instruction pairs</text>
+      <text x="445" y="95" text-anchor="middle" font-family="Inter" font-size="8" fill="#4c1d95">thousands of examples, an hour</text>
+      <text x="445" y="112" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#4c1d95">&#8594; an INSTRUCT model</text>
+      <text x="445" y="126" text-anchor="middle" font-family="Inter" font-size="8" font-weight="700" fill="#5B47E0">THIS LECTURE</text>
+
+      <line x1="570" y1="91" x2="590" y2="91" stroke="#71717a" stroke-width="1.8"/><polygon points="595,91 587,87 587,95" fill="#71717a"/>
+
+      <rect x="600" y="48" width="240" height="86" rx="7" fill="#FFE4E6" stroke="#be185d" stroke-width="1.5"/>
+      <text x="720" y="66" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#831843">3. PREFERENCE TUNING</text>
+      <text x="720" y="82" text-anchor="middle" font-family="Inter" font-size="8" fill="#831843">learns from A-versus-B judgements</text>
+      <text x="720" y="95" text-anchor="middle" font-family="Inter" font-size="8" fill="#831843">not from correct answers</text>
+      <text x="720" y="112" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#831843">&#8594; an ALIGNED model</text>
+      <text x="720" y="126" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#be185d">lecture 18</text>
+
+      <!-- LORA -->
+      <rect x="20" y="162" width="500" height="222" rx="9" fill="#FFFFFF" stroke="#5B47E0" stroke-width="2"/>
+      <text x="270" y="181" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#4c1d95">LoRA: DO NOT STORE THE UPDATE, FACTORISE IT</text>
+
+      <rect x="46" y="196" width="86" height="86" fill="#e4e4e7" stroke="#71717a" stroke-width="1.5"/>
+      <text x="89" y="242" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#3f3f46">W</text>
+      <text x="89" y="256" text-anchor="middle" font-family="Inter" font-size="7.5" fill="#3f3f46">frozen</text>
+      <text x="89" y="294" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">d x d</text>
+
+      <text x="146" y="242" font-family="Inter" font-size="14" fill="#3f3f46">+</text>
+
+      <rect x="166" y="196" width="20" height="86" fill="#5B47E0" stroke="#4c1d95" stroke-width="1.5"/>
+      <text x="176" y="294" text-anchor="middle" font-family="Inter" font-size="8" fill="#4c1d95">d x r</text>
+      <text x="196" y="242" font-family="Inter" font-size="12" fill="#3f3f46">&#215;</text>
+      <rect x="212" y="230" width="86" height="20" fill="#5B47E0" stroke="#4c1d95" stroke-width="1.5"/>
+      <text x="255" y="270" text-anchor="middle" font-family="Inter" font-size="8" fill="#4c1d95">r x d</text>
+      <text x="232" y="294" text-anchor="middle" font-family="Inter" font-size="8" font-weight="700" fill="#5B47E0">trained</text>
+
+      <text x="330" y="212" font-family="JetBrains Mono" font-size="8.5" fill="#3f3f46">full update   d x d      = d&#178;</text>
+      <text x="330" y="228" font-family="JetBrains Mono" font-size="8.5" fill="#4c1d95">LoRA update   2 x (d x r) = 2dr</text>
+      <text x="330" y="246" font-family="JetBrains Mono" font-size="8.5" font-weight="600" fill="#5B47E0">saving = d / 2r</text>
+
+      <text x="330" y="270" font-family="Inter" font-size="8.5" font-weight="600" fill="#18181b">GPT-3, one matrix, rank 8</text>
+      <text x="330" y="285" font-family="JetBrains Mono" font-size="8" fill="#3f3f46">12,288&#178;      = 150,994,944</text>
+      <text x="330" y="298" font-family="JetBrains Mono" font-size="8" fill="#4c1d95">2 x 12,288 x 8 =     196,608</text>
+      <text x="330" y="313" font-family="JetBrains Mono" font-size="8.5" font-weight="700" fill="#5B47E0">768x  (0.130%)</text>
+
+      <text x="46" y="336" font-family="Inter" font-size="8.5" fill="#3f3f46">Why it works: the update needed to adapt a language model has</text>
+      <text x="46" y="349" font-family="Inter" font-size="8.5" fill="#3f3f46">very low intrinsic dimension. The base model is already good;</text>
+      <text x="46" y="362" font-family="Inter" font-size="8.5" fill="#3f3f46">what changes is a thin correction, not a new model.</text>
+      <text x="46" y="377" font-family="Inter" font-size="8.5" font-weight="600" fill="#3E7A45">Merge it back afterwards: inference costs nothing extra.</text>
+
+      <!-- QUANTISATION -->
+      <rect x="536" y="162" width="324" height="222" rx="9" fill="#FFFFFF" stroke="#0F62FE" stroke-width="2"/>
+      <text x="698" y="181" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#0b4bbd">QUANTISATION: SHRINK WHAT STAYS FROZEN</text>
+
+      <text x="556" y="204" font-family="Inter" font-size="8.5" fill="#3f3f46">float32</text>
+      <rect x="620" y="195" width="220" height="14" rx="2" fill="#e4e4e7"/>
+      <text x="700" y="205" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#3f3f46">1.1B params = ~4.4 GB</text>
+
+      <text x="556" y="228" font-family="Inter" font-size="8.5" fill="#3f3f46">float16</text>
+      <rect x="620" y="219" width="110" height="14" rx="2" fill="#C8BFFF"/>
+      <text x="675" y="229" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#3f3f46">~2.2 GB</text>
+
+      <text x="556" y="252" font-family="Inter" font-size="8.5" font-weight="600" fill="#0b4bbd">4-bit NF4</text>
+      <rect x="620" y="243" width="28" height="14" rx="2" fill="#0F62FE"/>
+      <text x="700" y="253" font-family="JetBrains Mono" font-size="8" font-weight="600" fill="#0b4bbd">~1 GB loaded</text>
+
+      <text x="556" y="278" font-family="Inter" font-size="8.5" font-weight="600" fill="#18181b">Two ideas make 4 bits survivable</text>
+      <text x="556" y="294" font-family="Inter" font-size="8" fill="#0b4bbd">BLOCKWISE: quantise in blocks, so nearby</text>
+      <text x="556" y="306" font-family="Inter" font-size="8" fill="#0b4bbd">weights do not collapse onto one value</text>
+      <text x="556" y="322" font-family="Inter" font-size="8" fill="#0b4bbd">DISTRIBUTION-AWARE: weights are roughly</text>
+      <text x="556" y="334" font-family="Inter" font-size="8" fill="#0b4bbd">normal in [-1, 1], so spend the levels where</text>
+      <text x="556" y="346" font-family="Inter" font-size="8" fill="#0b4bbd">the density is</text>
+
+      <text x="556" y="366" font-family="Inter" font-size="8.5" font-weight="600" fill="#DC2855">The base is quantised. The adapters are not:</text>
+      <text x="556" y="378" font-family="Inter" font-size="8.5" font-weight="600" fill="#DC2855">gradients still need precision.</text>
+    </svg>
+    <figcaption>The two savings are independent and multiply. LoRA removes almost all of the trainable parameters, and with them the gradients and optimiser states that dominate training memory. Quantisation shrinks the frozen base, which is read but never written. Neither compromises the other, which is why the combination fits a billion-parameter model on hardware that could not previously hold it.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Why a base model needs stage two</h3>
+
+  <p>A base model was trained to predict the next token, and that is all it does. Give one an instruction and it will often produce more instructions, because in its training corpus a question is frequently followed by further questions rather than by an answer. It has the knowledge and none of the conversational contract.</p>
+
+  <p>Supervised fine-tuning does not change the objective. It is still next-token prediction; what changes is the data. Train on pairs of instruction and response, formatted in a chat template, and the highest-probability continuation of a question becomes an answer. Lecture 1 called this a thin layer over autocomplete, and this is where that layer is applied.</p>
+
+  <h3>Full fine-tuning, adapters, and the shape of the alternative</h3>
+
+  <p>Full fine-tuning updates every parameter, which is straightforward and expensive. The cost is not mainly the weights: it is that each trainable parameter needs a gradient and, for an optimiser like Adam, two more optimiser states, so training memory is several times the model size.</p>
+
+  <p><strong>Adapters</strong>, the first widely used parameter-efficient method, insert small trainable modules after the attention and feedforward sub-layers of every transformer block, and freeze everything else. Fine-tuning 3.6 per cent of BERT's parameters reached within 0.4 per cent of full fine-tuning on GLUE. Because an adapter is a self-contained set of modules, one specialising in clinical text and another in entity recognition can be swapped into the same frozen base.</p>
+
+  <p>Adapters add depth, which adds inference latency. LoRA does not.</p>
+
+  <h3>LoRA: factorise the update</h3>
+
+  <p>The insight is to leave the original weight matrix alone and represent only the <em>change</em> to it. If a layer's weight matrix is <em>W</em>, ordinary fine-tuning learns some update Δ<em>W</em> of the same shape. LoRA constrains Δ<em>W</em> to be the product of two much thinner matrices, so instead of learning <em>d</em> × <em>d</em> numbers you learn <em>d</em> × <em>r</em> and <em>r</em> × <em>d</em>, where the <strong>rank</strong> <em>r</em> is small.</p>
+
+  <div class="worked">THE ARITHMETIC
+
+  GENERAL CASE, a d x d weight matrix at rank r
+    full update      d x d              = d^2
+    LoRA update      (d x r) + (r x d)  = 2dr
+    saving factor    d^2 / 2dr          = d / 2r
+
+    note the saving grows with d. LoRA helps MORE on larger
+    models, which is the opposite of most efficiency tricks.
+
+  TOY CASE, the 10 x 10 matrix
+    full     10 x 10          = 100 weights
+    rank 1   (10 x 1) + (1 x 10) = 20 weights
+    saving   10 / 2            = 5x
+
+  REAL CASE, GPT-3 at 175B parameters
+    each of 96 transformer blocks holds a 12,288 x 12,288 matrix
+      12,288^2                = 150,994,944  (~151 M per matrix)
+    at rank 8
+      2 x (12,288 x 8)        =     196,608  (~197 K)
+      saving  12,288 / 16     =         768x
+      as a fraction           =      0.130%
+
+  WHAT THIS BUYS BEYOND SPEED
+    no gradients or optimiser states for the frozen 99.87%
+    an adapter file of tens of MB, not tens of GB
+    many task adapters over one shared base model
+
+  WHY IT IS NOT MERELY A LOSSY SHORTCUT
+    "Intrinsic dimensionality explains the effectiveness of
+    language model fine-tuning" found that language models have
+    a very low intrinsic dimension: the useful adaptation lives
+    in a small subspace. So a low-rank Delta-W is not an
+    approximation of the update you wanted; for these models it
+    is close to the update you wanted.
+
+    the corollary is the honest caveat. Where the adaptation is
+    genuinely high-rank, teaching substantially new capability
+    rather than adjusting behaviour, low rank will not capture
+    it, and raising r until it does eventually costs what full
+    fine-tuning costs.</div>
+
+  <p>You also choose <em>which</em> matrices get an adapter. Targeting only the query and value projections is a common minimal configuration; targeting all attention and feedforward projections is more thorough and slower.</p>
+
+  <h3>Quantisation, and the Q in QLoRA</h3>
+
+  <p>LoRA shrinks what you train. Quantisation shrinks what you keep. Since the base model is frozen, it is only ever read, so it can be stored at much lower precision than training requires.</p>
+
+  <p>Naive quantisation fails for a specific reason: mapping a wide range of high-precision values onto few low-precision levels makes distinct weights collapse onto the same value, destroying the differences that carried the information. QLoRA's two corrections are worth knowing by name.</p>
+
+  <div class="worked">MAKING FOUR BITS SURVIVABLE
+
+  BLOCKWISE QUANTISATION
+    quantise in small blocks, each with its own scaling
+    constant, rather than mapping the entire tensor onto one
+    global scale. A block of similar weights then gets levels
+    spread across its own narrow range, so nearby weights stay
+    distinguishable.
+
+  DISTRIBUTION-AWARE LEVELS (the "NF" in NF4)
+    neural network weights are approximately normally
+    distributed in [-1, 1]. Evenly spaced levels waste
+    resolution in the sparse tails and starve the dense middle.
+    Normalised float 4 places its 16 levels according to that
+    distribution, so each level carries roughly equal
+    probability mass. This also blunts the effect of outliers.
+
+  DOUBLE QUANTISATION
+    the per-block scaling constants are themselves numerous
+    enough to matter, so they are quantised too. A second-order
+    saving, and free.
+
+  PAGED OPTIMIZERS
+    move optimiser state between GPU and CPU memory on demand,
+    so a transient spike does not end the run.
+
+  THE MEMORY, FOR TinyLlama AT 1.1B PARAMETERS
+    float32   1.1e9 x 4 bytes   = 4.4 GB
+    float16   1.1e9 x 2 bytes   = 2.2 GB
+    4-bit     1.1e9 x 0.5 bytes = 0.55 GB
+                                  ~1 GB as actually loaded,
+                                  the difference being
+                                  quantisation constants and
+                                  runtime overhead
+
+  AND THE PART PEOPLE GET WRONG
+    only the FROZEN BASE is quantised. The LoRA adapters train
+    in higher precision, because gradients at 4 bits are
+    useless. QLoRA is a 4-bit model with 16-bit adapters on it,
+    not a 4-bit training run.
+
+    note also that loading is not training. Activations,
+    gradients for the adapters and optimiser state all add on
+    top of that ~1 GB, so budget several times it.</div>
+
+  <h3>Doing it: instruction-tuning TinyLlama</h3>
+
+  <p>The worked example takes TinyLlama at 1.1 billion parameters, a genuine base model, and teaches it to follow instructions using 3,000 conversations from UltraChat.</p>
+
+  <p><strong>Templating first.</strong> The data has to arrive in exactly the chat format the model will later be prompted with, which lecture 7 established is not decoration. Use the tokenizer's own template rather than writing the markers by hand.</p>
+
+  <pre><code>template_tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+
+def format_prompt(example):
+    return {"text": template_tokenizer.apply_chat_template(example["messages"], tokenize=False)}
+
+dataset = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft") \
+            .shuffle(seed=42).select(range(3_000)).map(format_prompt)</code></pre>
+
+  <p>The result is text with <code>&lt;|user|&gt;</code> and <code>&lt;|assistant|&gt;</code> turns and an end-of-turn marker after each. Training on that is what teaches the model both to answer and to stop.</p>
+
+  <p><strong>Then quantise, then attach adapters.</strong></p>
+
+  <pre><code>from peft import LoraConfig, prepare_model_for_kbit_training, get_peft_model
+
+peft_config = LoraConfig(
+    r=64,                 # rank
+    lora_alpha=32,        # scaling applied to the LoRA update
+    lora_dropout=0.1,
+    bias="none",
+    task_type="CAUSAL_LM",
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                    "gate_proj", "up_proj", "down_proj"],
+)
+model = get_peft_model(prepare_model_for_kbit_training(model), peft_config)</code></pre>
+
+  <div class="callout warn">
+    <span class="tag">A contradiction in the source worth knowing about</span>
+    The usual rule of thumb for <code>lora_alpha</code> is roughly twice the rank, and the configuration above uses <code>r=64</code> with <code>lora_alpha=32</code>, which is half. Both appear in the source material. Since <code>alpha</code> scales the LoRA update relative to the frozen weights, halving it rather than doubling it makes the adaptation about four times weaker than the rule of thumb intends. Neither setting is wrong in principle, and both are defensible, but do not copy a rank and an alpha from different places and assume they compose. Set the ratio deliberately and record why.
+  </div>
+
+  <p><strong>Then train.</strong> The configuration is unremarkable except for three entries that exist because of the memory situation.</p>
+
+  <div class="worked">TRAINING CONFIGURATION, AND WHY
+
+    per_device_train_batch_size = 2
+    gradient_accumulation_steps = 4
+      -> effective batch of 8, accumulated rather than held in
+         memory at once. This is how you get a usable batch
+         size on a small card.
+
+    gradient_checkpointing = True
+      -> recompute activations during the backward pass instead
+         of storing them. Trades compute for memory.
+
+    optim = "paged_adamw_32bit"
+      -> the paged optimiser, so a spike pages out rather than
+         crashing.
+
+    learning_rate = 2e-4
+      -> roughly ten times a typical full fine-tuning rate,
+         because far fewer parameters are moving.
+
+    lr_scheduler_type = "cosine"
+      -> warm up linearly from zero, then decay on a cosine.
+
+    num_train_epochs = 1
+      -> more epochs tend to degrade instruction tuning, so
+         keep it low.
+
+    max_seq_length = 512
+
+  ON A FREE COLAB T4: about one hour.</div>
+
+  <p><strong>Then merge.</strong> After training you have a base model and a separate adapter. Reload the base in 16-bit rather than 4-bit and fold the adapter in.</p>
+
+  <pre><code>from peft import AutoPeftModelForCausalLM
+
+model = AutoPeftModelForCausalLM.from_pretrained("TinyLlama-1.1B-qlora", device_map="auto")
+merged_model = model.merge_and_unload()</code></pre>
+
+  <p>This matters for the reason adapters do not share: because Δ<em>W</em> has the same shape as <em>W</em>, the two can be added into a single matrix. The merged model has exactly the original architecture and exactly the original inference cost. Nothing has been inserted, so there is no latency penalty at all, which is the practical advantage of LoRA over adapters. Merge in 16-bit and not 4-bit, because merging into quantised weights would round away much of what you just trained.</p>
+
+  <p>Keeping the adapter unmerged is also a legitimate choice: it lets one loaded base serve several tasks, at a small runtime cost. Merge for a single-purpose deployment, keep separate for a multi-tenant one.</p>
+
+  <div class="callout insight">
+    <span class="tag">The same technique, pointed elsewhere</span>
+    This lecture uses QLoRA for its headline purpose, turning a base model into an instruction follower. The mechanism does not care. Point it at question-and-SQL pairs and you get a model that writes your schema's SQL; point it at documents and correctly formatted JSON and you get reliable structured output, which is the third of the output controls lecture 8 named and deferred. Anywhere you have query-and-response pairs and want changed behaviour rather than new facts, this is the tool.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Three stages make a usable generative model, and this lecture is the second: supervised fine-tuning keeps next-token prediction as the objective and changes the data to instruction-and-response pairs formatted in the model's own chat template, converting a completer into something that answers and stops. Full fine-tuning does this expensively, mostly because gradients and optimiser states multiply the memory cost of every trainable parameter. LoRA removes almost all of them by representing the weight update as a product of two thin matrices, taking a 150,994,944-parameter update down to 196,608 at rank 8, a factor of 768, and it works because the adaptation a language model needs has very low intrinsic dimension. QLoRA stacks quantisation on top, storing the frozen base in 4-bit normalised floats with blockwise and double quantisation so a 1.1-billion-parameter model loads in about 1 GB, while the adapters keep the precision that gradients require. Merging the adapter back afterwards restores the original architecture, so inference is not slowed at all.</p>
+
+  <div class="callout insight">
+    <span class="tag">The instinct, one last time</span>
+    Freeze the large thing and train something small beside it. BLIP-2's bridge in lecture 13 was 2.3 per cent of its parameters. Freezing all but the top BERT block in lecture 16 recovered most of a full fine-tune. LoRA is 0.130 per cent. The recurring finding is that large pretrained models are already nearly right, and adapting them is a small correction rather than a rebuild. That is the single most useful idea in Part V.
+  </div>
+
+  <p>Lecture 18 closes the course with the third stage. Supervised fine-tuning teaches a model to imitate correct answers, which works only where a single correct answer exists; most of what we want from a generative model is a matter of better and worse rather than right and wrong. Preference tuning learns from comparisons instead, first through a reward model and then, with direct preference optimisation, without one. And it ends where any responsible treatment must, on how to tell whether any of this actually worked.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the three training stages, what data each needs, and what kind of model each produces.</li>
+      <li>Explain why a base model responds to an instruction with more instructions.</li>
+      <li>State what supervised fine-tuning changes and what it leaves the same.</li>
+      <li>Explain why full fine-tuning's memory cost is several times the model size.</li>
+      <li>State what adapters do, the fraction of BERT's parameters they trained, and how close that came to full fine-tuning.</li>
+      <li>Explain the structural difference between adapters and LoRA, and the consequence for inference latency.</li>
+      <li><strong>Do the arithmetic.</strong> For a <em>d</em> × <em>d</em> matrix at rank <em>r</em>, give the full and LoRA parameter counts and the saving factor.</li>
+      <li><strong>Do the arithmetic.</strong> Apply it to GPT-3's 12,288 × 12,288 matrix at rank 8. Give both counts, the factor, and the percentage.</li>
+      <li>Why does LoRA's saving grow with model size, and why is that unusual?</li>
+      <li>State the intrinsic-dimension finding, and give the case in which you should expect LoRA to underperform.</li>
+      <li>Explain why naive quantisation destroys information, and how blockwise quantisation avoids it.</li>
+      <li>Explain what "normalised float" means and why the distribution of weights makes it work.</li>
+      <li><strong>Do the arithmetic.</strong> Give the memory for 1.1B parameters at float32, float16 and 4-bit, and explain the gap between the 4-bit figure and the ~1 GB actually loaded.</li>
+      <li>State precisely which parts of a QLoRA setup are quantised and which are not, and why.</li>
+      <li>Explain why loading memory is not training memory.</li>
+      <li>Explain what the chat template contributes to instruction tuning beyond formatting.</li>
+      <li>Give the purpose of gradient accumulation and gradient checkpointing, and what each trades away.</li>
+      <li>Why is the learning rate here about ten times a typical full fine-tuning rate?</li>
+      <li>Explain what merging does, why it is possible, and why it must be done in 16-bit rather than 4-bit.</li>
+      <li>Give one reason to leave an adapter unmerged.</li>
+      <li>Name a use of QLoRA other than instruction tuning, and the distinction that tells you when fine-tuning is the wrong tool.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Depends on:</strong> Lecture 7 (<a href="07-prompt_engineering.html">prompt engineering</a>) for why the chat template is load-bearing, and lecture 1 (<a href="01-the_language_ai_landscape.html">the language AI landscape</a>) for the base-versus-instruct distinction this lecture operationalises.</li>
+      <li><strong>Pattern:</strong> The frozen-large-thing-plus-small-trainable-part arrangement is BLIP-2's Q-Former in lecture 13 (<a href="13-multimodal_models.html">multimodal models</a>) and layer freezing in lecture 16 (<a href="16-fine_tuning_representation_models.html">fine-tuning representation models</a>).</li>
+      <li><strong>Answers:</strong> Lecture 8 (<a href="08-reasoning_and_output_control.html">reasoning and output control</a>) named fine-tuning as the third way to control output format and deferred it here.</li>
+      <li><strong>Related tooling:</strong> The 4-bit quantised models of lecture 9 (<a href="09-chains_memory_and_state.html">chains, memory and state</a>) use the same idea for inference rather than training.</li>
+      <li><strong>Next:</strong> Lecture 18 (<a href="18-preference_tuning_and_evaluation.html">preference tuning and evaluation</a>) covers the third stage and how to evaluate any of it.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 17 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

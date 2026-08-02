@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 11: semantic search and RAG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Semantic search and RAG</h1>
+  <p class="subtitle">Lecture 10 ended by saying that most agents are reached for because the model lacks a fact, and that a lookup does not need a loop. This lecture is that lookup. Embed the corpus once, embed the question, fetch the nearest passages, and put them in the prompt. It is the fourth memory strategy from lecture 9, and on the worked figures it does the same job as a ten-step agent for a fourteenth of the tokens.</p>
+  <div class="meta">
+    <span>Lecture 11 of 18</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part III: building systems</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Retrieval-augmented generation is two systems joined by a prompt. A <strong>retriever</strong> finds passages related to a question, using the embeddings from lecture 3 rather than keyword matching, and a <strong>generator</strong> answers using those passages as its evidence. The model gains no knowledge; it gains a place to read from.</p>
+
+  <p>The corpus has to be cut into pieces first, because a whole document will not fit in a prompt and a whole document is not what the question is about. On a 100,000-token corpus, 512-token chunks with a 64-token overlap give <strong>224 chunks</strong> and cost 14.7 per cent extra storage for the overlap, which is cheap insurance against a passage being cut in half. Storage never becomes the constraint: even a billion tokens embeds to under seven gigabytes.</p>
+
+  <p>The <strong>context window is the constraint</strong>. With a 4,096-token window, a 400-token system prompt and a 500-token answer reserved, there is room for six chunks. So the retriever must place the answer in the top six, and <strong>recall at six is the metric that matters</strong>, not recall at a hundred.</p>
+
+  <p>Dense retrieval fails in a specific and predictable way: it matches meaning, so it misses exact identifiers, rare tokens, negation and numerical constraints. Lexical retrieval fails on paraphrase. Because those are <em>different queries</em>, combining the two is worth much more than it looks. On 80 and 70 per cent recall with independent failures the union reaches <strong>94 per cent</strong>; if the failures were identical it would reach 80.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Chop the documents into paragraphs, turn each into a list of numbers, and do the same to the question. Find the paragraphs whose numbers are closest, paste them above the question, and ask. The model is not remembering anything; it is reading what you handed it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that this addresses the failure lecture 8 could not. Output control makes a reply well-formed; it cannot make it true. Retrieval does not make it true either, but it does something almost as useful: it makes the answer <em>checkable</em>, because a claim accompanied by the passage it came from can be verified by a person or a program. Step 5 argues that auditability, rather than accuracy, is what RAG actually buys.</p>
+
+  <p>The second reason is cost, and it is the direct payoff of lecture 10. A six-chunk retrieval prompt is 3,532 tokens against 48,750 for a ten-step agent doing the same lookup, which is <strong>13.8 times</strong> cheaper, with one generation instead of ten and a bounded step count instead of an unbounded one.</p>
+
+  <p>The third reason is that the failure modes of dense retrieval are unintuitive if you have come from keyword search. A system that answers a paraphrased question perfectly may fail to find a document by its own reference number, and a user who does not know that will conclude the system is broken at random. Knowing which query types fail is what makes the hybrid design in step 4 obvious rather than clever.</p>
+
+  <p>And a fourth reason about where the effort goes. Almost every disappointing RAG system is disappointing at the retrieval step rather than the generation step: the answer was never in the prompt. That is a search problem with fifty years of literature behind it, and lecture 12 measures it properly.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>One pipeline that runs once, one that runs per question, and a prompt where they meet.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The retrieval-augmented generation pipeline. An indexing pass chunks documents, embeds them and stores the vectors. A query pass embeds the question, searches for nearest chunks, assembles a prompt containing them, and generates a grounded answer with citations.">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two passes: one over the corpus, once; one over the question, every time</text>
+
+      <rect x="20" y="38" width="840" height="112" rx="10" fill="#F4F4F5" stroke="#a1a1aa" stroke-width="1.6"/>
+      <text x="36" y="58" font-family="Inter" font-size="10.5" font-weight="700" fill="#3f3f46">INDEXING &nbsp;&middot;&nbsp; runs once, offline, and again when the corpus changes</text>
+
+      <rect x="40" y="70" width="150" height="64" rx="8" fill="#FFFFFF" stroke="#71717a" stroke-width="1.5"/>
+      <text x="115" y="90" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#3f3f46">DOCUMENTS</text>
+      <text x="115" y="108" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#71717a">policies, notes, wiki,</text>
+      <text x="115" y="122" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#71717a">tickets, transcripts</text>
+
+      <rect x="230" y="70" width="180" height="64" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="1.8"/>
+      <text x="320" y="90" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#713f12">CHUNK</text>
+      <text x="320" y="108" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#713f12">512 tokens, 64 overlap</text>
+      <text x="320" y="122" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#a16207">the unit of retrieval, not the document</text>
+
+      <rect x="450" y="70" width="180" height="64" rx="8" fill="#EDE9FE" stroke="#5B47E0" stroke-width="1.8"/>
+      <text x="540" y="90" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#4c1d95">EMBED</text>
+      <text x="540" y="108" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#4c1d95">one vector per chunk</text>
+      <text x="540" y="122" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#5B47E0">lecture 3's machinery</text>
+
+      <rect x="670" y="70" width="170" height="64" rx="8" fill="#DCFCE7" stroke="#3E7A45" stroke-width="1.8"/>
+      <text x="755" y="90" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#14532d">STORE</text>
+      <text x="755" y="108" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#14532d">vector index + the text</text>
+      <text x="755" y="122" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#3E7A45">1B tokens is under 7 GB</text>
+
+      <line x1="190" y1="102" x2="224" y2="102" stroke="#71717a" stroke-width="1.8"/><polygon points="230,102 220,97 220,107" fill="#71717a"/>
+      <line x1="410" y1="102" x2="444" y2="102" stroke="#71717a" stroke-width="1.8"/><polygon points="450,102 440,97 440,107" fill="#71717a"/>
+      <line x1="630" y1="102" x2="664" y2="102" stroke="#71717a" stroke-width="1.8"/><polygon points="670,102 660,97 660,107" fill="#71717a"/>
+
+      <rect x="20" y="166" width="840" height="126" rx="10" fill="#FFF7ED" stroke="#be185d" stroke-width="1.8"/>
+      <text x="36" y="186" font-family="Inter" font-size="10.5" font-weight="700" fill="#831843">QUERY &nbsp;&middot;&nbsp; runs per question, in the request path</text>
+
+      <rect x="40" y="198" width="150" height="76" rx="8" fill="#FFFFFF" stroke="#be185d" stroke-width="1.5"/>
+      <text x="115" y="218" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#831843">EMBED THE QUESTION</text>
+      <text x="115" y="238" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">same model as the</text>
+      <text x="115" y="252" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">chunks, necessarily</text>
+      <text x="115" y="268" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#be185d">a different model gives nonsense</text>
+
+      <rect x="230" y="198" width="180" height="76" rx="8" fill="#FFFFFF" stroke="#be185d" stroke-width="1.5"/>
+      <text x="320" y="218" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#831843">SEARCH</text>
+      <text x="320" y="238" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">nearest vectors by cosine</text>
+      <text x="320" y="252" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">plus BM25, then merge</text>
+      <text x="320" y="268" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#be185d">hybrid, for the reason in step 4</text>
+
+      <rect x="450" y="198" width="180" height="76" rx="8" fill="#FFFFFF" stroke="#be185d" stroke-width="1.5"/>
+      <text x="540" y="218" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#831843">ASSEMBLE THE PROMPT</text>
+      <text x="540" y="238" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">instructions + k chunks</text>
+      <text x="540" y="252" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">+ the question</text>
+      <text x="540" y="268" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#be185d">k is set by the window, not by taste</text>
+
+      <rect x="670" y="198" width="170" height="76" rx="8" fill="#FFFFFF" stroke="#be185d" stroke-width="1.5"/>
+      <text x="755" y="218" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#831843">GENERATE</text>
+      <text x="755" y="238" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">answer from the passages,</text>
+      <text x="755" y="252" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">citing which one</text>
+      <text x="755" y="268" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#be185d">the citation is the point</text>
+
+      <line x1="190" y1="236" x2="224" y2="236" stroke="#be185d" stroke-width="1.8"/><polygon points="230,236 220,231 220,241" fill="#be185d"/>
+      <line x1="410" y1="236" x2="444" y2="236" stroke="#be185d" stroke-width="1.8"/><polygon points="450,236 440,231 440,241" fill="#be185d"/>
+      <line x1="630" y1="236" x2="664" y2="236" stroke="#be185d" stroke-width="1.8"/><polygon points="670,236 660,231 660,241" fill="#be185d"/>
+      <path d="M 755 134 L 755 152 L 320 152 L 320 192" fill="none" stroke="#3E7A45" stroke-width="1.6" stroke-dasharray="5 3"/>
+      <polygon points="320,198 315,188 325,188" fill="#3E7A45"/>
+      <text x="540" y="166" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#14532d">the index built above is what the search reads</text>
+
+      <rect x="20" y="306" width="840" height="60" rx="9" fill="#DEEAFB" stroke="#0F62FE" stroke-width="1.8"/>
+      <text x="36" y="326" font-family="Inter" font-size="10.5" font-weight="700" fill="#0b4bbd">THE CONSTRAINT THAT SETS EVERY OTHER CHOICE</text>
+      <text x="36" y="346" font-family="JetBrains Mono" font-size="9.5" fill="#18181b">room for chunks = (context &minus; system prompt &minus; question &minus; reserved answer) / chunk size</text>
+      <text x="36" y="360" font-family="Inter" font-size="9" font-weight="600" fill="#be185d">at a 4,096-token window that is SIX chunks, so the retriever must succeed in its top six.</text>
+    </svg>
+    <figcaption>The dashed arrow is the only connection between the two passes. Everything expensive happens above it, once; everything latency-sensitive happens below it, per question.</figcaption>
+  </figure>
+
+  <div class="defcard">
+    <div class="term">Chunk</div>
+    <div class="def">The unit of retrieval. Not a document, because a document is too big to place in a prompt and too broad to be relevant as a whole; not a sentence, because a sentence usually lacks the context to be understood alone. A few hundred tokens with a small overlap is the working compromise.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Dense retrieval</div>
+    <div class="def">Search by vector similarity: embed the question, embed the chunks, return the nearest. Matches meaning, so it finds a passage that answers the question in different words. Its failures follow directly from that strength.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Grounding</div>
+    <div class="def">Instructing the model to answer only from the supplied passages and to say so when they do not contain the answer. It does not compel obedience; it makes disobedience detectable, which is a different and more useful property.</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Chunking: the arithmetic and the judgement</h3>
+
+  <div class="worked">CHUNK COUNT AND THE COST OF OVERLAP
+
+  A CORPUS OF 100,000 TOKENS
+
+   chunk size  overlap  chunks  stored tokens  duplication
+      256         0       391      100,096        0.1%
+      256        32       447      114,432       14.4%
+      512         0       196      100,352        0.4%
+      512        64       224      114,688       14.7%
+      512       128       261      133,632       33.6%
+     1024       128       112      114,688       14.7%
+
+  OVERLAP IS INSURANCE AGAINST A BOUNDARY
+    a definition split across two chunks is in neither of
+    them intelligibly. A 12.5 per cent overlap costs 14.7 per
+    cent more storage and embedding compute, which is cheap,
+    and removes a failure that is not.
+
+  EMBEDDING STORAGE AT 768 DIMENSIONS AND 4 BYTES A FLOAT
+    100k tokens  ->        224 chunks  ->    0.7 MB
+     10M tokens  ->     22,322 chunks  ->   68.6 MB
+      1B tokens  ->  2,232,143 chunks  -> 6,857 MB
+
+    storage is never the binding constraint, and neither is
+    search: approximate nearest-neighbour indexes handle
+    millions of vectors in milliseconds.
+
+  THE SIZE JUDGEMENT
+    SMALL chunks are precisely relevant and often lack the
+    context to be understood, so the model sees a sentence
+    that assumes a definition three paragraphs earlier.
+    LARGE chunks carry their context and dilute the signal,
+    both in the embedding, which averages over more content,
+    and in the prompt, where the relevant line is buried.
+    Structure beats arithmetic: split on headings, clauses or
+    turns where the document has them, and fall back to fixed
+    sizes only where it does not.</div>
+
+  <h3>The context window sets the retrieval target</h3>
+
+  <div class="worked">HOW MANY CHUNKS FIT
+
+  reserving 400 tokens of instructions, 60 for the question
+  and 500 for the answer, with 512-token chunks
+
+    context   4,096  ->  room for   6 chunks
+    context   8,192  ->  room for  14 chunks
+    context  32,768  ->  room for  62 chunks
+    context 128,000  ->  room for 248 chunks
+
+  SO THE RETRIEVAL TARGET IS RECALL AT SIX, NOT AT A HUNDRED
+    a retriever with 95 per cent recall at 100 and 60 per cent
+    at 6 is a bad retriever for a 4k window and a fine one for
+    a 128k window. The metric has to match the budget, which
+    is why lecture 12 spends its length on rank-sensitive
+    measures rather than on recall alone.
+
+  AND A LARGER WINDOW IS NOT A FREE UPGRADE
+    every chunk you add costs tokens on every request, and
+    the "lost in the middle" finding of Liu and colleagues in
+    2023 is that accuracy is highest when the relevant
+    passage sits at the START or the END of the context and
+    lowest when it is buried in the middle.
+
+    chunks sent   prompt tokens   answer present   attention risk
+         1              972            low             none
+         3            1,996            moderate        low
+         6            3,532            good            low
+        10            5,580            good            moderate
+        20           10,700            very good       high
+
+    the two columns pull in opposite directions, which is
+    the argument for retrieving widely and then RERANKING to
+    send few. That is lecture 12.</div>
+
+  <h3>Where dense retrieval fails, and why the fix is a different retriever</h3>
+
+  <p>Dense retrieval matches meaning. Four query types therefore defeat it, and all four are ordinary rather than exotic.</p>
+
+  <div class="defcard">
+    <div class="term">Exact identifiers</div>
+    <div class="def">A product code, an error number, a policy reference, a person's surname. The embedding of <code>POL-4417</code> is close to the embedding of <code>POL-4418</code>, because they look alike, and neither is close to the passage that actually defines it.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Negation</div>
+    <div class="def">"Which policies do <em>not</em> cover contract staff." The embedding of a negated sentence sits near the embedding of its affirmative form, so the retriever returns the passages saying exactly the opposite of what was asked.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Numerical and temporal constraints</div>
+    <div class="def">"Claims above £50,000 settled after March." Embeddings represent that these are numbers and dates; they do not evaluate the comparison. Filtering on structured metadata is the answer, not a better embedding.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Rare or in-house vocabulary</div>
+    <div class="def">Terms the embedding model never saw during training receive uninformative representations. This is the case that domain fine-tuning in Part V addresses, and the only one of the four that a better model fixes.</div>
+  </div>
+
+  <div class="worked">WHY HYBRID RETRIEVAL IS WORTH MORE THAN IT LOOKS
+
+  suppose dense retrieval succeeds on 80 per cent of queries
+  and lexical BM25 on 70 per cent. Taking both and merging
+  gives a union whose value depends entirely on whether the
+  two fail on the SAME queries.
+
+   correlation of failures   union recall   gain over dense
+      0.0  independent           94.0%        +14.0 pp
+      0.3  mildly correlated     88.5%         +8.5 pp
+      0.6  strongly correlated   83.0%         +3.0 pp
+      1.0  identical failures    80.0%          0.0 pp
+
+  AND THE EMPIRICAL POINT IS THAT THE FAILURES ARE DISJOINT
+    dense fails on identifiers, rare tokens, negation, numerals
+    lexical fails on paraphrase, synonymy, question-to-statement
+      mismatch
+
+    those are different queries. So a hybrid system sits near
+    the independent row rather than the identical one, and the
+    fourteen-point gain is roughly what practitioners report.
+
+  WHICH MAKES THE DESIGN RULE SIMPLE
+    do not choose between semantic and keyword search. Run
+    both, merge the rankings, and let each cover the other's
+    blind spot. The merge itself is usually reciprocal rank
+    fusion, which needs no score calibration between the two
+    systems and is three lines of code.</div>
+
+  <h3>Grounded generation</h3>
+
+  <p>The prompt is where the two halves meet, and its instructions are doing more work than they appear to. Three elements matter: the passages must be delimited and identified, the model must be told to use only them, and it must be told what to do when they are insufficient.</p>
+
+  <pre><code>You answer questions using ONLY the passages below.
+If the passages do not contain the answer, say
+"The provided material does not answer this" and stop.
+Cite the passage id in square brackets after each claim.
+
+[1] {chunk_1}
+[2] {chunk_2}
+...
+[6] {chunk_6}
+
+Question: {question}</code></pre>
+
+  <p>The escape clause in the second line is the part most often omitted and the most valuable. Without it the model has no permitted way to fail, so when the retrieval misses it will answer from its parameters instead, producing exactly the unsourced claim the system was built to avoid, and producing it in the same confident register as a grounded one.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Retrieval-augmented generation indexes a corpus once and consults it per question. Chunking is the first design decision and the arithmetic is undramatic: 512-token chunks with a 64-token overlap turn 100,000 tokens into 224 pieces at 14.7 per cent duplication, and even a billion tokens embeds into under seven gigabytes. The context window, not storage, is what binds: six chunks at a 4,096-token window, which makes recall at six the target. Dense retrieval fails on identifiers, negation, numerical constraints and in-house vocabulary; lexical retrieval fails on paraphrase; and because those are different queries, a hybrid reaches 94 per cent where dense alone reaches 80.</p>
+
+  <div class="callout insight">
+    <span class="tag">What RAG actually buys</span>
+    It is tempting to say that retrieval makes a model accurate. It does not. A model handed the right passage can still misread it, and a model handed the wrong passage will answer from it confidently. What retrieval changes is that the answer now comes with the evidence it was drawn from, so a claim can be <em>checked</em>, by a person, a reviewer, or an automated test that asks whether the cited passage supports the sentence. An ungrounded answer cannot be checked at all without independently knowing the answer. Auditability is the deliverable; accuracy is a consequence of it only when somebody audits.
+  </div>
+
+  <p>And it is dramatically cheaper than the alternative it replaces. A six-chunk retrieval prompt is 3,532 tokens with one generation. An agent doing the same lookup takes 12,500 tokens over five steps or 48,750 over ten, so retrieval is between 3.5 and <strong>13.8 times</strong> cheaper, with a step count of one rather than a step count the model chooses. That is lecture 10's closing claim made concrete: if the task is really a lookup, do not put it in a loop.</p>
+
+  <p>Lecture 12 asks the question this lecture has deferred at three separate points: how good is the retrieval, actually? It covers cross-encoder reranking, which is how you retrieve widely and still send few; the rank-sensitive measures nDCG and mean average precision, which is how recall at six gets measured properly; and the four axes on which a whole RAG system is evaluated, since a system can retrieve well and answer badly, or answer well from the wrong passage.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the two systems in a RAG pipeline and state what the model gains and does not gain.</li>
+      <li>Which parts of the pipeline run once and which run per question?</li>
+      <li>Why is the chunk, rather than the document, the unit of retrieval?</li>
+      <li><strong>Do the arithmetic.</strong> How many 512-token chunks with a 64-token overlap does a 100,000-token corpus produce, and what duplication does the overlap cost?</li>
+      <li>What does overlap protect against, and why is the cost acceptable?</li>
+      <li><strong>Do the arithmetic.</strong> At 768 dimensions and four bytes a float, how much storage does a ten-million-token corpus need? What is the real constraint instead?</li>
+      <li>Give the trade-off between small and large chunks, and the rule that beats fixed sizes.</li>
+      <li><strong>Do the arithmetic.</strong> With a 4,096-token window, 400 tokens of instructions, 60 for the question and 500 reserved for the answer, how many 512-token chunks fit?</li>
+      <li>Why is recall at six the right metric rather than recall at a hundred, and when would that change?</li>
+      <li>State the "lost in the middle" finding and its design consequence.</li>
+      <li>Name the four query types that defeat dense retrieval, with an example of each.</li>
+      <li>Which of the four is fixed by a better embedding model, and which needs structured metadata instead?</li>
+      <li><strong>Do the arithmetic.</strong> With dense recall of 80 per cent and lexical of 70, what does the union reach if the failures are independent, and what if they are identical?</li>
+      <li>Why do the two retrievers fail on different queries, and what does that imply for the design?</li>
+      <li>Give the three elements a grounding prompt needs, and say which is most often omitted.</li>
+      <li>What happens when a model has no permitted way to fail?</li>
+      <li><strong>Do the arithmetic.</strong> Compare the token cost of a six-chunk retrieval against a ten-step agent doing the same lookup.</li>
+      <li>State precisely what RAG buys, and why accuracy is a consequence rather than the deliverable.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 10 (<a href="10-agents_and_react.html">agents and ReAct</a>) established that most agents are lookups in disguise; this lecture is the lookup done directly. Lecture 9 (<a href="09-chains_memory_and_state.html">chains, memory and state</a>) framed retrieval as the fourth memory strategy: fetch a small part of a large store rather than re-sending a transcript.</li>
+      <li><strong>Depends on:</strong> Lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>) for the vectors and the similarity measure, and lecture 2 (<a href="02-tokenisation.html">tokenisation</a>) for why chunk sizes are quoted in tokens rather than words.</li>
+      <li><strong>Fixes:</strong> The inaccuracy that lecture 8 (<a href="08-reasoning_and_output_control.html">reasoning and output control</a>) named as the one failure output control cannot address, at least to the extent of making it checkable.</li>
+      <li><strong>Next:</strong> Lecture 12 (<a href="12-retrieval_quality_and_evaluation.html">retrieval quality and evaluation</a>) measures everything deferred here: reranking, rank-sensitive metrics, and the four evaluation axes.</li>
+      <li><strong>Forward:</strong> When the embedding model itself is the weak link, Part V fixes it: lecture 14 (<a href="14-contrastive_learning_and_sbert.html">contrastive learning and SBERT</a>) explains why a retrieval embedding must be trained differently, and lecture 15 (<a href="15-training_embedding_models.html">training embedding models</a>) adapts one to a domain without labels.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 11 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 36: regression diagnostics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Model evaluation</a></div>
+  <h1>Regression diagnostics</h1>
+  <p class="subtitle">The four assumptions of OLS are all visible in the residuals. The four diagnostic plots in this lecture surface each, and the metrics that follow quantify how well the predictions match the data without lying about which kind of error you tolerate.</p>
+  <div class="meta">
+    <span>Lecture 36 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>residual</strong> is the gap between what the model predicted and what actually happened, $r_i = y_i - \hat{y}_i$. Every classical assumption of OLS (linearity in $X$, constant residual variance, normally distributed residuals, independent residuals) is a statement about the shape of the residual distribution, and each shows up in one of four diagnostic plots. A <strong>histogram of residuals</strong> checks normality at a glance; the <strong>QQ plot</strong> is the same check but sharper, especially in the tails. <strong>Residuals against predicted values</strong> reveals heteroscedasticity (a fan or funnel shape) and uncaptured non-linearity (a curve through the cloud). <strong>Residuals against a feature</strong> reveals feature-specific non-linearity that the global predicted-value plot can hide. Once the diagnostics are read, the point metrics quantify what is left. <strong>MSE</strong> and <strong>RMSE</strong> measure squared error (RMSE in the original units), <strong>MAE</strong> the average absolute error, <strong>MAPE</strong> the average percentage error, and <strong>R-squared</strong> the fraction of variance the model explains. The single rule that ties them together: an R-squared on the training set is biased upward, an out-of-sample R-squared can be negative, and MAPE blows up whenever the target is near zero. Read residuals first, then choose the metric your loss function actually cares about.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A regression model is a guess about $y$ given $x$, and the residual is how wrong each guess turned out to be. If the model has caught every signal the features carry, what is left over should look like noise: roughly symmetric around zero, with the same spread everywhere, no pattern against the predicted value, no pattern against any feature. Diagnostic plots are the four ways of asking the same question (are the leftovers noise) from four angles. Once you trust the residuals are noise, the metrics turn that noise into a single number you can compare across models.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Textbooks teach diagnostics as a checklist of assumptions to verify. In credit risk practice the diagnostics drive model design, not just validation. A funnel shape against predicted exposure leads to a log-transformed target. A bathtub shape in residuals against age leads to binning age into life stages. A heavy left tail in the QQ plot of a recovery-rate model leads to switching from Gaussian errors to a beta GLM. The four plots are a structured conversation with the data about what the model is failing to learn; treating them as a pass-fail audit wastes the information they carry.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 6 of the pipeline. Lecture 35 on <a href="01-relative_performance.html">relative performance</a> introduced AIC and BIC for comparing fitted models to each other; this lecture asks the prior question of whether a single fitted model is fit for purpose at all. Lecture 37 on <a href="03-classification_metrics.html">classification metrics</a> answers the same question for binary outcomes, where residuals are categorical and the diagnostic toolkit changes shape. The statistical machinery here is also the bridge to <a href="../../statistics/05-generalised_linear_models.html">generalised linear models</a>, which exist precisely because the OLS assumptions checked in this lecture fail in predictable ways for non-Gaussian targets.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons diagnostics earn their keep. First, <strong>a single number cannot tell you which assumption failed.</strong> Two regression models can have identical RMSE, identical MAE, and identical R-squared, yet one is well-specified and the other is badly broken. The well-specified model has residuals that look like Gaussian noise; the broken one has a U-shape in residuals against fitted values, indicating it has fit a straight line to a curve. The metrics agree because they aggregate; the residual plot disagrees because it disaggregates. Skipping the residual plots is choosing to ignore information that is sitting in the data, waiting to be read.</p>
+
+  <p>Second, <strong>diagnostics dictate which metric is honest.</strong> RMSE assumes squared error is what you actually care about, which presupposes residuals are roughly symmetric (otherwise the squared term over-penalises one direction). MAPE assumes the target is never close to zero (otherwise the percentage error explodes). R-squared assumes the variance of $y$ is a meaningful baseline (which fails when $y$ is itself an artefact of a denominator). Each metric encodes a decision about which errors matter and which do not, and that decision is only defensible after you have looked at the residuals.</p>
+
+  <p>Third, <strong>diagnostics determine the next move.</strong> A funnel in residuals against fitted values is a prescription: log-transform the target, switch to a Gamma GLM, or use weighted least squares with weights inversely proportional to fitted variance. A curve in residuals against a feature is a prescription: add a polynomial term, bin the feature, or fit a generalised additive model. A heavy-tailed QQ plot is a prescription: use a robust loss, winsorise the target, or model the tail separately. None of these prescriptions are visible in the metrics alone. The residual plot is where modelling decisions are made.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A loan-amount regression was rebuilt with an R-squared of 0.42 on the training set, up from 0.31. The new model was promoted to validation. Out of sample the R-squared was -0.18: the model was systematically worse than predicting the training mean. The training residual plot revealed why. A handful of high-value relationship-manager loans had been fit almost exactly by a high-order polynomial in income, and the same polynomial extrapolated wildly outside the training income range in the validation set. The R-squared on training said "great"; the residual plot, had anyone looked, said "you are about to fit the noise and call it signal". Out-of-sample R-squared, which can be negative, said it after the fact.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Four small plots arranged in a 2-by-2 grid summarise everything OLS assumes about the residuals. Each plot tells a different lie when an assumption fails: the histogram skews, the QQ tails peel away from the line, the residuals-versus-fitted cloud opens into a funnel, the residuals-versus-feature cloud curves. A model passes only when all four plots show the same boring picture, residuals scattered around zero with constant spread.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four diagnostic plots: one good and three pathological">
+      <defs>
+        <marker id="rdArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Reading the four diagnostic plots: one good model and three pathologies</text>
+
+      <!-- Top-left: GOOD histogram -->
+      <g>
+        <rect x="40" y="50" width="340" height="180" rx="10" fill="#FFFFFF" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="210" y="72" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">PLOT 1: histogram of residuals</text>
+        <text x="210" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">good model: roughly symmetric, bell-shaped</text>
+        <!-- axes -->
+        <line x1="70" y1="200" x2="370" y2="200" stroke="#71717a" stroke-width="1"/>
+        <line x1="70" y1="100" x2="70" y2="200" stroke="#71717a" stroke-width="1"/>
+        <text x="220" y="220" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">residual</text>
+        <line x1="220" y1="200" x2="220" y2="204" stroke="#71717a" stroke-width="1"/>
+        <text x="220" y="214" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">0</text>
+        <!-- bars: symmetric bell -->
+        <rect x="85" y="190" width="18" height="10" fill="#0d9488" opacity="0.5"/>
+        <rect x="105" y="180" width="18" height="20" fill="#0d9488" opacity="0.55"/>
+        <rect x="125" y="160" width="18" height="40" fill="#0d9488" opacity="0.6"/>
+        <rect x="145" y="135" width="18" height="65" fill="#0d9488" opacity="0.65"/>
+        <rect x="165" y="115" width="18" height="85" fill="#0d9488" opacity="0.7"/>
+        <rect x="185" y="105" width="18" height="95" fill="#0d9488" opacity="0.75"/>
+        <rect x="205" y="105" width="18" height="95" fill="#0d9488" opacity="0.75"/>
+        <rect x="225" y="115" width="18" height="85" fill="#0d9488" opacity="0.7"/>
+        <rect x="245" y="135" width="18" height="65" fill="#0d9488" opacity="0.65"/>
+        <rect x="265" y="160" width="18" height="40" fill="#0d9488" opacity="0.6"/>
+        <rect x="285" y="180" width="18" height="20" fill="#0d9488" opacity="0.55"/>
+        <rect x="305" y="190" width="18" height="10" fill="#0d9488" opacity="0.5"/>
+      </g>
+
+      <!-- Top-right: SKEWED histogram (pathological) -->
+      <g>
+        <rect x="440" y="50" width="340" height="180" rx="10" fill="#FFFFFF" stroke="#b45309" stroke-width="1.5"/>
+        <text x="610" y="72" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">PLOT 2: QQ plot of residuals</text>
+        <text x="610" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">pathology: heavy tails curl away from the line</text>
+        <!-- axes -->
+        <line x1="470" y1="200" x2="770" y2="200" stroke="#71717a" stroke-width="1"/>
+        <line x1="470" y1="100" x2="470" y2="200" stroke="#71717a" stroke-width="1"/>
+        <text x="620" y="220" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">theoretical quantile (normal)</text>
+        <text x="460" y="150" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a" transform="rotate(-90 460 150)">sample quantile</text>
+        <!-- 45-degree reference -->
+        <line x1="480" y1="195" x2="760" y2="105" stroke="#71717a" stroke-width="1" stroke-dasharray="3 3"/>
+        <!-- points: middle on line, tails peel off -->
+        <circle cx="490" cy="198" r="2.5" fill="#b45309"/>
+        <circle cx="505" cy="194" r="2.5" fill="#b45309"/>
+        <circle cx="525" cy="187" r="2.5" fill="#b45309"/>
+        <circle cx="550" cy="180" r="2.5" fill="#b45309"/>
+        <circle cx="580" cy="170" r="2.5" fill="#b45309"/>
+        <circle cx="610" cy="158" r="2.5" fill="#b45309"/>
+        <circle cx="640" cy="144" r="2.5" fill="#b45309"/>
+        <circle cx="670" cy="130" r="2.5" fill="#b45309"/>
+        <circle cx="695" cy="118" r="2.5" fill="#b45309"/>
+        <!-- tail peeling -->
+        <circle cx="715" cy="108" r="2.5" fill="#b45309"/>
+        <circle cx="730" cy="96" r="2.5" fill="#b45309"/>
+        <circle cx="745" cy="82" r="2.5" fill="#b45309"/>
+        <circle cx="755" cy="68" r="2.5" fill="#b45309"/>
+        <!-- left tail peeling down -->
+        <circle cx="485" cy="200" r="2.5" fill="#b45309"/>
+        <circle cx="482" cy="207" r="2.5" fill="#b45309"/>
+      </g>
+
+      <!-- Bottom-left: FUNNEL residuals vs predicted (pathological) -->
+      <g>
+        <rect x="40" y="250" width="340" height="180" rx="10" fill="#FFFFFF" stroke="#b45309" stroke-width="1.5"/>
+        <text x="210" y="272" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">PLOT 3: residuals vs predicted</text>
+        <text x="210" y="286" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">pathology: funnel shape, variance grows with fitted value</text>
+        <!-- axes -->
+        <line x1="70" y1="365" x2="370" y2="365" stroke="#71717a" stroke-width="1"/>
+        <line x1="70" y1="300" x2="70" y2="420" stroke="#71717a" stroke-width="1"/>
+        <line x1="70" y1="365" x2="370" y2="365" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+        <text x="220" y="425" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">predicted value</text>
+        <text x="62" y="365" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">0</text>
+        <!-- funnel: narrow on left, wide on right -->
+        <circle cx="90" cy="364" r="2" fill="#b45309"/>
+        <circle cx="100" cy="367" r="2" fill="#b45309"/>
+        <circle cx="110" cy="362" r="2" fill="#b45309"/>
+        <circle cx="120" cy="369" r="2" fill="#b45309"/>
+        <circle cx="130" cy="361" r="2" fill="#b45309"/>
+        <circle cx="140" cy="370" r="2" fill="#b45309"/>
+        <circle cx="155" cy="358" r="2" fill="#b45309"/>
+        <circle cx="170" cy="372" r="2" fill="#b45309"/>
+        <circle cx="185" cy="355" r="2" fill="#b45309"/>
+        <circle cx="200" cy="376" r="2" fill="#b45309"/>
+        <circle cx="215" cy="350" r="2" fill="#b45309"/>
+        <circle cx="230" cy="381" r="2" fill="#b45309"/>
+        <circle cx="245" cy="344" r="2" fill="#b45309"/>
+        <circle cx="260" cy="388" r="2" fill="#b45309"/>
+        <circle cx="275" cy="336" r="2" fill="#b45309"/>
+        <circle cx="290" cy="395" r="2" fill="#b45309"/>
+        <circle cx="305" cy="325" r="2" fill="#b45309"/>
+        <circle cx="320" cy="405" r="2" fill="#b45309"/>
+        <circle cx="335" cy="315" r="2" fill="#b45309"/>
+        <circle cx="350" cy="412" r="2" fill="#b45309"/>
+        <!-- funnel outline -->
+        <line x1="80" y1="362" x2="360" y2="310" stroke="#b45309" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>
+        <line x1="80" y1="368" x2="360" y2="420" stroke="#b45309" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>
+      </g>
+
+      <!-- Bottom-right: CURVE residuals vs feature (pathological) -->
+      <g>
+        <rect x="440" y="250" width="340" height="180" rx="10" fill="#FFFFFF" stroke="#b45309" stroke-width="1.5"/>
+        <text x="610" y="272" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">PLOT 4: residuals vs feature</text>
+        <text x="610" y="286" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">pathology: U-shape, uncaptured non-linearity in this feature</text>
+        <!-- axes -->
+        <line x1="470" y1="365" x2="770" y2="365" stroke="#71717a" stroke-width="1"/>
+        <line x1="470" y1="300" x2="470" y2="420" stroke="#71717a" stroke-width="1"/>
+        <line x1="470" y1="365" x2="770" y2="365" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+        <text x="620" y="425" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">feature value (e.g. age)</text>
+        <text x="462" y="365" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">0</text>
+        <!-- U-shape: high on left, low in middle, high on right -->
+        <circle cx="490" cy="320" r="2" fill="#b45309"/>
+        <circle cx="505" cy="328" r="2" fill="#b45309"/>
+        <circle cx="520" cy="335" r="2" fill="#b45309"/>
+        <circle cx="535" cy="342" r="2" fill="#b45309"/>
+        <circle cx="550" cy="348" r="2" fill="#b45309"/>
+        <circle cx="565" cy="355" r="2" fill="#b45309"/>
+        <circle cx="580" cy="362" r="2" fill="#b45309"/>
+        <circle cx="595" cy="375" r="2" fill="#b45309"/>
+        <circle cx="610" cy="385" r="2" fill="#b45309"/>
+        <circle cx="625" cy="390" r="2" fill="#b45309"/>
+        <circle cx="640" cy="388" r="2" fill="#b45309"/>
+        <circle cx="655" cy="382" r="2" fill="#b45309"/>
+        <circle cx="670" cy="372" r="2" fill="#b45309"/>
+        <circle cx="685" cy="360" r="2" fill="#b45309"/>
+        <circle cx="700" cy="348" r="2" fill="#b45309"/>
+        <circle cx="715" cy="336" r="2" fill="#b45309"/>
+        <circle cx="730" cy="324" r="2" fill="#b45309"/>
+        <circle cx="745" cy="316" r="2" fill="#b45309"/>
+        <circle cx="760" cy="310" r="2" fill="#b45309"/>
+        <!-- U-trend line -->
+        <path d="M 485 320 Q 620 410 760 308" stroke="#b45309" stroke-width="1.5" fill="none" stroke-dasharray="3 3" opacity="0.6"/>
+      </g>
+
+      <!-- Footer rule -->
+      <line x1="40" y1="450" x2="780" y2="450" stroke="#0d9488" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="468" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">Plot 1 checks normality. Plot 2 sharpens that check in the tails. Plot 3 catches heteroscedasticity and global non-linearity. Plot 4 catches feature-specific non-linearity.</text>
+    </svg>
+    <figcaption>The top-left panel shows the picture a well-specified model produces. The other three panels each isolate a different assumption failure: heavy tails (QQ plot), heteroscedasticity (funnel against predicted), and uncaptured non-linearity in a single feature (U-shape against feature value). A real diagnostic run plots all four and looks for the boring picture in every panel.</figcaption>
+  </figure>
+
+  <p>Three things to read off the grid. The plots are not redundant. The histogram and QQ plot answer the same question (are residuals normal), but the QQ plot resolves the tails much more sharply, because the histogram's tail bins always look thin no matter what the distribution. The residuals-versus-fitted and residuals-versus-feature plots also share a question (is the mean structure right), but they isolate different culprits: the fitted-value plot tells you something is wrong globally, the feature plot tells you which feature is responsible. Reading the four together is what makes the diagnosis specific enough to act on.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The residual and the four OLS assumptions</h3>
+
+  <p>The <strong>residual</strong> for observation $i$ is the difference between the observed target and the model's prediction,</p>
+  $$r_i = y_i - \hat{y}_i.$$
+  <p>Ordinary least squares makes four assumptions about the errors (the unobserved true noise the residuals approximate). The conditional mean of $y$ given $X$ is <strong>linear</strong> in the parameters. The error variance is <strong>constant</strong> across observations, a property called homoscedasticity. The errors are <strong>normally distributed</strong>. The errors are <strong>independent</strong> across observations. Each of these is invisible in the fitted coefficients, but each leaves a fingerprint in the residuals. The diagnostic plots are an attempt to read those fingerprints.</p>
+
+  <p>A common confusion is between the error and the residual. The error $\epsilon_i = y_i - E[y_i \mid x_i]$ is the true unobservable noise; the residual $r_i = y_i - \hat{y}_i$ is the model's estimate of it. The residuals will look slightly different from genuine independent noise even when the model is correct, because fitting the regression imposes constraints (the residuals sum to zero, and are orthogonal to the columns of $X$). For large samples the difference is cosmetic; for small samples the constraints can produce mild patterns that are not real assumption violations. Standardised residuals correct for the in-sample constraint.</p>
+
+  <h3>Histogram of residuals: the first-look normality check</h3>
+
+  <p>A <strong>histogram of residuals</strong> with a kernel density overlay is the quickest visual check that the residual distribution is approximately symmetric, bell-shaped, and centred at zero. A right-skewed histogram (long right tail) suggests the model is consistently under-predicting the upper end of the target. A bimodal histogram suggests a mixture: the model is fitting two populations as if they were one. A histogram with a sharp peak at zero and heavy tails suggests the model is right on average but wrong dramatically for a subset of observations.</p>
+
+  <p>The histogram has two weaknesses. First, it depends on the choice of bin width: too narrow and the picture is noisy, too wide and structure is hidden. Second, it makes the tails almost impossible to read, because tail bins always have small counts and look thin regardless of the underlying distribution. The histogram is a coarse first-look check; the QQ plot is the precise follow-up.</p>
+
+  <h3>QQ plot: the sharp normality check</h3>
+
+  <p>The <strong>quantile-quantile plot</strong> arranges the empirical quantiles of the residual sample against the theoretical quantiles of a reference distribution (usually the standard normal). A point at coordinate $(q, r_{(i)})$ shows that the $i$-th smallest residual was $r_{(i)}$, and the corresponding theoretical quantile of a normal distribution is $q$. If the residuals are genuinely normal, the points fall on a straight diagonal line.</p>
+
+  <p>Departures from the diagonal are diagnostic. Both tails curling away from the line into an S-shape indicates heavy tails (kurtosis higher than the normal). Both tails bending back toward the centre indicates light tails (kurtosis lower than the normal). One tail curling away while the other stays on the line indicates skew. A few extreme points well off the line at the ends, with the bulk of the data on the line, indicates outliers rather than a distributional misfit. The QQ plot is much more sensitive to tail behaviour than a histogram, which is exactly the region where the OLS normality assumption tends to fail in practice and where it matters most for inference.</p>
+
+  <h3>Residuals against predicted values: heteroscedasticity and non-linearity</h3>
+
+  <p>The <strong>residuals-versus-predicted-values plot</strong> places $\hat{y}_i$ on the x-axis and $r_i$ on the y-axis. A well-specified model produces a horizontal band around zero with constant vertical spread across the x-axis. Two patterns matter. A <strong>funnel shape</strong>, where the spread widens (or narrows) systematically as the predicted value grows, is heteroscedasticity: the error variance depends on the mean. This violates the constant-variance assumption and the usual standard errors are wrong, even though the coefficients are still consistent. A <strong>U-shape</strong> or other systematic curve through the cloud is uncaptured non-linearity: the model has fit a straight line to a curved relationship and the residuals carry the unmodelled curvature.</p>
+
+  <p>Heteroscedasticity in a loan-amount model is the canonical example. Small loans are predicted accurately to within a few hundred pounds; large loans miss by tens of thousands. Plotting residuals against fitted values produces a textbook fan opening to the right. The standard responses are to log-transform the target (which stabilises proportional rather than absolute error), to fit a Gamma GLM (which models a variance proportional to the squared mean), or to use weighted least squares with weights inversely proportional to fitted variance. None of these become obvious from the metrics; all of them follow naturally from looking at the plot.</p>
+
+  <h3>Residuals against a feature: feature-specific non-linearity</h3>
+
+  <p>The <strong>residuals-versus-feature plot</strong> uses a single feature $X_j$ on the x-axis instead of the fitted value. It catches a problem the global plot can hide. If the model is well-specified for most of $X$ but mis-specified for one feature, the global plot averages over the failure and may look fine; the per-feature plot isolates which feature is responsible. A retail credit example: residuals against fitted values look acceptable, but residuals against age show a U-shape (young and old applicants are under-predicted, middle-aged over-predicted), because the bathtub default-rate curve in age is not captured by a linear term. The remedy is feature-specific: add a polynomial, bin age into life stages, or fit a generalised additive model with a smooth function of age. A full diagnostic run plots residuals against every meaningful feature, not just against fitted values.</p>
+
+  <h3>Pearson residuals: standardising for scale comparison</h3>
+
+  <p>Raw residuals are in the units of the target, so a residual of 500 means something different for a model predicting house prices in pounds and a model predicting exam scores out of 100. The <strong>Pearson residual</strong> standardises by the estimated residual standard error,</p>
+  $$r_i^{(P)} = \frac{r_i}{\hat{\sigma}},$$
+  <p>where $\hat{\sigma}$ is the estimated standard deviation of the residuals. The result is dimensionless and approximately standard normal under the OLS assumptions, so the conventional thresholds (absolute value greater than 2 is unusual, greater than 3 is a candidate outlier) apply consistently across models. Pearson residuals matter more in <a href="../../statistics/05-generalised_linear_models.html">generalised linear models</a>, where the residual variance depends on the mean and a different standardisation per observation is needed, but they are useful even in OLS for outlier flagging.</p>
+
+  <h3>The sum-of-squares decomposition</h3>
+
+  <p>Under OLS with an intercept, the total variability in $y$ decomposes exactly into two pieces,</p>
+  $$\operatorname{SST} = \operatorname{SSR} + \operatorname{SSE}.$$
+  <p>The <strong>total sum of squares</strong> measures the variability of the target around its mean,</p>
+  $$\operatorname{SST} = \sum_{i=1}^{n} (y_i - \bar{y})^2.$$
+  <p>The <strong>regression sum of squares</strong> measures the variability the model has explained, the variability of the fitted values around the mean,</p>
+  $$\operatorname{SSR} = \sum_{i=1}^{n} (\hat{y}_i - \bar{y})^2.$$
+  <p>The <strong>error sum of squares</strong> measures the variability the model has left unexplained, the variability of the residuals,</p>
+  $$\operatorname{SSE} = \sum_{i=1}^{n} (y_i - \hat{y}_i)^2 = \sum_{i=1}^{n} r_i^2.$$
+  <p>The identity $\operatorname{SST} = \operatorname{SSR} + \operatorname{SSE}$ holds exactly when the regression has an intercept and the residuals sum to zero; without an intercept it can fail and R-squared becomes ill-defined. Every point metric below is a function of $\operatorname{SSE}$, $\operatorname{SST}$, $n$, or some combination, so this decomposition is the algebraic backbone of regression evaluation.</p>
+
+  <h3>Point metrics: MSE, RMSE, MAE, MAPE, R-squared, adjusted R-squared</h3>
+
+  <p>The <strong>mean squared error</strong> averages the squared residuals,</p>
+  $$\operatorname{MSE} = \frac{\operatorname{SSE}}{n} = \frac{1}{n} \sum_{i=1}^{n} r_i^2.$$
+  <p>MSE is the natural loss for OLS (it is what the regression minimises) and the natural scale for variance-based theory, but it is in squared units of the target, which is rarely intuitive. The <strong>root mean squared error</strong> takes the square root and returns the metric to the original units,</p>
+  $$\operatorname{RMSE} = \sqrt{\operatorname{MSE}} = \sqrt{\frac{1}{n} \sum_{i=1}^{n} r_i^2}.$$
+  <p>RMSE is the standard deviation of the residuals (when they have mean zero, which they do for an OLS fit with intercept). It penalises large errors quadratically: doubling a residual quadruples its contribution, so RMSE is sensitive to outliers and to the worst-case errors in the tail.</p>
+
+  <p>The <strong>mean absolute error</strong> averages absolute residuals,</p>
+  $$\operatorname{MAE} = \frac{1}{n} \sum_{i=1}^{n} |r_i|.$$
+  <p>MAE is in the original units like RMSE, but penalises errors linearly rather than quadratically. It is robust to outliers (a single residual of size 100 contributes 100, not 10000) and tends to be smaller than RMSE on the same data because squaring amplifies the larger errors. The gap between MAE and RMSE is itself a diagnostic: a large gap indicates the residuals have a heavy tail and a few large errors are doing most of the squared-error work.</p>
+
+  <p>The <strong>mean absolute percentage error</strong> divides each absolute residual by the actual value,</p>
+  $$\operatorname{MAPE} = \frac{1}{n} \sum_{i=1}^{n} \left| \frac{r_i}{y_i} \right|.$$
+  <p>MAPE is scale-free, which makes it useful when comparing performance across models whose target ranges differ wildly. It has two well-known traps. First, it is undefined when any $y_i = 0$ and unstable when $y_i$ is near zero (a residual of 100 against an actual of 1 contributes 10000 per cent to the average). Second, it is asymmetric: a prediction that is too low by 50 per cent contributes 50 per cent, but a prediction that is too high by 50 per cent on a doubled actual contributes only 25 per cent. The asymmetry creates a systematic incentive for models to under-predict if MAPE is the chosen objective. Both pathologies make MAPE a poor choice on targets that include zero, near-zero, or negative values.</p>
+
+  <p>The <strong>coefficient of determination</strong>, or R-squared, is the fraction of variance in $y$ that the model explains,</p>
+  $$R^2 = 1 - \frac{\operatorname{SSE}}{\operatorname{SST}} = \frac{\operatorname{SSR}}{\operatorname{SST}}.$$
+  <p>It ranges from 0 (the model is no better than predicting the mean) to 1 (the model fits perfectly) on the training set with an intercept. Out of sample, the second equality fails and R-squared can be negative: a model that predicts worse than the training mean on test data has $\operatorname{SSE} > \operatorname{SST}$, giving $R^2 < 0$. This is not a coding error; it is a model that has overfit so badly it would have been better never to look at the features.</p>
+
+  <p>The <strong>adjusted R-squared</strong> penalises model complexity,</p>
+  $$R^2_{\text{adj}} = 1 - \frac{(1 - R^2)(n - 1)}{n - k - 1},$$
+  <p>where $k$ is the number of fitted features (excluding the intercept) and $n$ is the sample size. Adding a feature that contributes no real signal will increase $R^2$ by chance but typically decrease $R^2_{\text{adj}}$. Adjusted R-squared is the right metric for comparing nested OLS models on the same training data; for non-nested or non-OLS comparisons, AIC and BIC from lecture 35 do the equivalent job in a likelihood framework.</p>
+
+  <h3>When to use which metric</h3>
+
+  <p>The metric is a statement of which errors matter. RMSE is appropriate when large errors are disproportionately costly (financial losses, safety-critical predictions, regulatory exposure calculations); the quadratic penalty matches the loss. MAE is appropriate when all errors are equally costly per unit (a forecasting model where the operational impact scales linearly with the miss); it is also the better choice when outliers in the target are real but should not dominate the metric. MAPE is appropriate when comparing models on targets with very different scales and the percentage error is the natural unit of comparison, but only when the target is strictly positive and bounded away from zero. R-squared and adjusted R-squared are appropriate for relative comparison between models on the same target; they are diagnostic, not absolute (an R-squared of 0.1 is excellent on a noisy retail-default-amount target and terrible on a controlled physics experiment). The metric that matches the operational loss is the metric that should drive model selection. A model selected on RMSE and deployed against an MAE-based business cost is two different optimisation problems.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four pitfalls account for almost every regression-diagnostic mistake. Each is invisible in the metric summary and visible in the residual plot, which is why the plot has to come first.</p>
+
+  <div class="callout warn">
+    <span class="tag">R-squared on the training set is biased upward</span>
+    Every additional feature, signal or noise, can only reduce $\operatorname{SSE}$ on the training data, because OLS chooses coefficients to minimise it. Training R-squared therefore monotonically increases with model complexity, and a model with $k$ features fit to $n = k$ observations has $R^2 = 1$ by construction. The fix is to evaluate R-squared on a held-out set (which can return a negative value, correctly diagnosing overfit), or to use adjusted R-squared (which penalises the addition of features), or to use information criteria like AIC and BIC (which penalise based on likelihood). Reporting only training R-squared is a routine error in undergraduate teaching that survives into industry far too often.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Out-of-sample R-squared can be negative</span>
+    Discovering a negative R-squared on validation is unsettling for anyone trained on the "R-squared is between 0 and 1" textbook line. The 0-1 bound only holds in-sample with an intercept. Out of sample, $\operatorname{SSE}$ can exceed $\operatorname{SST}$ when the model is systematically worse than predicting the test mean, and $R^2 = 1 - \operatorname{SSE}/\operatorname{SST}$ goes negative. A negative R-squared is a real signal: the model is worse than no model. The diagnostic action is to inspect residuals against fitted values and against features; the cause is almost always a feature that has drifted between training and test, or a non-linearity that does not extrapolate.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">MAPE is unstable near zero and asymmetric</span>
+    A model predicting daily transaction volume where some days have zero transactions cannot have its MAPE computed at all on those days. Replacing zeros with a small constant or filtering them out both bias the metric and obscure where the model is actually failing. MAPE's asymmetric penalty (under-prediction is bounded at 100 per cent, over-prediction is unbounded) also creates a systematic incentive to under-predict. The fix is either to use a different metric (RMSE, MAE, or a quantile loss), or to switch to symmetric MAPE (sMAPE), or to use mean absolute scaled error (MASE) which divides by the in-sample MAE of a naive forecast. Default to MAPE only after confirming the target is strictly positive and well away from zero across the entire evaluation set.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Reading metrics without reading residuals</span>
+    Two models can have identical RMSE, MAE, and R-squared and be qualitatively different: one with residuals that look like Gaussian noise and one with a clear funnel against fitted values. The aggregate metrics agree by construction; the residuals disagree because they preserve the structure the metrics average away. A model that passes the metrics but fails the residual plots is well-tuned for the wrong objective: the coefficients are unbiased, but the standard errors are wrong and any inference (confidence intervals, p-values, prediction intervals) is misleading. The fix is procedural: every regression evaluation report begins with the residual plots, not the metric table, and the metric table is only trusted to the extent that the residual plots vindicate the modelling assumptions.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Regression diagnostics is the part of model evaluation that asks not "how well does the model score" but "is the model fit to be scored at all". Every classical OLS assumption is a statement about residuals, and four plots (histogram, QQ, residuals against predicted, residuals against feature) collectively check all four assumptions. The histogram and QQ plot check normality, the QQ plot more sharply in the tails. The residuals-versus-fitted plot catches heteroscedasticity (funnel) and global non-linearity (curve). The residuals-versus-feature plot catches non-linearity in a single feature that the global plot averages away. Underneath the plots is the sum-of-squares decomposition $\operatorname{SST} = \operatorname{SSR} + \operatorname{SSE}$, from which every point metric follows: MSE and RMSE square-penalise, MAE absolute-penalises, MAPE percentage-penalises, R-squared compares to a mean baseline, adjusted R-squared penalises complexity. Pick the metric that matches the business loss, but pick it only after the residuals have shown the model is honest.</p>
+
+  <p>What this lecture deliberately did not do. It did not cover autocorrelation diagnostics for time-series residuals (Durbin-Watson, Ljung-Box, ACF plots), which apply when independence is the assumption most likely to fail. It did not cover classification metrics (accuracy, precision, recall, F1, AUC, ROC), which apply when the target is categorical and residuals are not defined the same way. It did not cover formal hypothesis tests of the OLS assumptions (Breusch-Pagan for heteroscedasticity, Jarque-Bera for normality, White's test); the visual diagnostics dominate in practice because they show direction as well as significance. The next two lectures pick up where this one stops.</p>
+
+  <p>Lecture 37, <a href="03-classification_metrics.html">classification metrics</a>, takes the same evaluation framing but for binary and multiclass targets. The residual is replaced by the confusion matrix; the point metrics are replaced by accuracy, precision, recall, and F1; R-squared is replaced by AUC and Gini. Many of the same pitfalls reappear in different costumes (training metrics biased upward, baselines that produce surprisingly high accuracy on imbalanced data, threshold choices that change the metric without changing the model). The mental model carries over; the toolkit changes.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the four classical OLS assumptions and name the diagnostic plot most directly suited to checking each. Why is the QQ plot a sharper normality check than a histogram, even though both target the same assumption?</li>
+      <li>A residuals-versus-predicted plot shows a clear funnel opening to the right (variance grows with fitted value). Which OLS assumption is violated, and what are three modelling responses that address the violation? Why are the OLS coefficient estimates still consistent in the presence of this violation?</li>
+      <li>For a loan-amount regression with $\operatorname{SST} = 1{,}039{,}620{,}255{,}598$ and $\operatorname{SSE} = 938{,}238{,}766{,}267$, compute R-squared to three decimal places and interpret what the value tells you about the model. (Hint: this is the worked example from the source notebook.)</li>
+      <li>You report training R-squared of 0.42 and test R-squared of -0.18. Explain how a test R-squared can be negative when textbook treatments say R-squared is between 0 and 1, and state the diagnostic next step.</li>
+      <li>A daily-transactions forecasting model has RMSE = 240 and MAE = 80 on a target with mean 1500. Why might the gap between RMSE and MAE itself be informative? What does it suggest about the residual distribution? Would MAPE be a sensible additional metric, and what condition on the target would you check before using it?</li>
+      <li>A regression of recovery rate on loan and borrower features produces a QQ plot of residuals that hugs the line in the middle but curls sharply away from the line in both tails. Name the distributional pathology and suggest two appropriate responses, one transformation-based and one model-based.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 37 (<a href="03-classification_metrics.html">classification metrics</a>) extends the evaluation framing from regression to classification, replacing residuals with the confusion matrix and point metrics with accuracy, precision, recall, F1, AUC, and Gini.</li>
+      <li><strong>Previous:</strong> Lecture 35 (<a href="01-relative_performance.html">relative performance</a>) introduced AIC and BIC for comparing fitted models; this lecture answered the prior question of whether a single fitted model is fit for purpose at all.</li>
+      <li><strong>Prerequisite:</strong> Statistics lecture 1 (<a href="../../statistics/01-descriptive_statistics.html">descriptive statistics</a>) covers the distributional shapes (skew, kurtosis, central tendency, dispersion) that the histogram and QQ plot read off the residuals.</li>
+      <li><strong>Bridge to GLMs:</strong> Statistics lecture 5 (<a href="../../statistics/05-generalised_linear_models.html">generalised linear models</a>) is the natural next step when OLS diagnostics fail in predictable ways. Heteroscedasticity proportional to the mean is what a Gamma GLM is designed for; bounded targets are what a beta GLM handles. The diagnostic plots in this lecture are the entry route into that framework.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Model evaluation course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 36 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

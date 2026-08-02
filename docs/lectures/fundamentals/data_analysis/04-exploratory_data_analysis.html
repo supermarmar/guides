@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 4: Exploratory data analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data analysis</a></div>
+  <h1>Exploratory data analysis</h1>
+  <p class="subtitle">EDA is the discipline of looking at a dataset honestly before fitting anything to it. The output is a verdict: what is in the data, what is missing, what looks wrong, and whether it is fit for the modelling question. Skimpy gives you a fast first pass; missing-value diagnosis, outlier review, and bivariate analysis are the rest of the kit. Get this right and the model design choices that follow are almost dictated; skip it and every downstream result inherits the data's flaws.</p>
+  <div class="meta">
+    <span>Lecture 4 of 5</span>
+    <span>Reading time, 60 minutes</span>
+    <span>Part II: looking at data</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Exploratory data analysis</strong> (EDA) is a three-pass discipline. The <strong>shape pass</strong> asks how many rows and columns the dataset has, what types the columns are, and whether they look approximately as expected; <code>skimpy.skim()</code>, <code>df.info()</code>, and <code>df.describe()</code> are the tools. The <strong>quality pass</strong> asks what is wrong with the data: missingness patterns, duplicates, outliers, mass points, dtype mismatches; this is where most data issues either get caught or get baked into the model. The <strong>relationship pass</strong> asks how variables move together: correlation matrices, conditional default rates by candidate predictor, scatter and pair plots. The output of the three passes is a one-page memo: what the data is, what is wrong with it, what should be done about it, and whether the modelling question is answerable from it.</p>
+
+  <p>The discipline this lecture trains is <strong>treating EDA as a verdict, not a warm-up</strong>. In a regulated environment (Basel A-IRB, IFRS 9, Solvency II) the EDA section of a model development document is the auditor's first stop, and a sloppy descriptive chapter signals a sloppy model. Outside regulation, an EDA that fails to catch the column that is 70 per cent missing or the outlier that is twenty standard deviations from the mean produces a model that inherits both problems silently.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    If you cannot describe a dataset before fitting a model to it, the model will describe it for you, badly. EDA is the act of writing the description yourself in a form a sceptic would accept. Three questions: what is in it, what is wrong with it, and what relates to what. Every model development document opens with the answers; every monitoring report compares this month's answers to last month's. The discipline does not change.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits</span>
+    Lectures 01-03 covered the dataframe layer: how to load, fold, and join rectangles. This lecture leaves shape alone and asks what the data <em>says</em>. The theoretical companion is the statistics course's <a href="../statistics/01-descriptive_statistics.html">descriptive statistics</a> lecture, which gives every summary statistic here a sampling distribution. The communication companion is Lecture 05 (visualisation), which is the partner discipline: every EDA verdict either is or should be backed by a picture.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons to take EDA seriously even though it predates any model. First, <strong>most production errors live in the EDA layer and only surface much later</strong>. A column read as a string and silently compared to a number; a missing-value indicator that looked like a real value (-1, 999, 9999); a duplicate key that multiplied rows in a join; a sentinel date (1900-01-01) that pulled every time-related average towards a century ago. Each is invisible to a model that simply consumes the table and produces predictions. Each is caught by ten minutes of EDA. Without that ten minutes, the bug surfaces as a strange coefficient, a poor out-of-time test, or a regulator's question.</p>
+
+  <p>Second, <strong>the model design decisions that follow EDA are almost dictated by what it finds</strong>. Variables with a heavy right tail need a log transform; variables with mass points need a separate indicator for the mass; variables with high missingness either get dropped, imputed, or kept with a missing-indicator pattern; variables with non-monotone relationships to the target are binned or splined rather than entered linearly. None of these decisions are decidable from the modelling literature; they are decidable from this dataset, in this state, today.</p>
+
+  <p>Third, in regulated environments (Basel A-IRB, IFRS 9, ICAAP stress testing, Solvency II) <strong>the EDA chapter is the auditor's first stop and the regulator's first question</strong>. A well-built EDA chapter buys you trust for everything downstream; a sloppy one means every modelling choice in the document gets a closer read. The investment is two days of careful work at the start of a project; the payback is weeks of avoided regulatory back-and-forth at the end.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Three passes, in order. Each pass answers a single question and produces a single output. Each pass should be done in full before the next starts; the temptation to fit a model after the shape pass is the most common way EDA gets cut short.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three EDA passes">
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three passes of EDA</text>
+
+      <!-- Pass 1 -->
+      <g>
+        <rect x="20" y="50" width="270" height="220" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="155" y="80" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#115e59">PASS 1 &middot; SHAPE</text>
+        <text x="155" y="100" text-anchor="middle" font-family="Inter" font-size="11" fill="#0d9488">What is in it?</text>
+
+        <text x="155" y="135" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#115e59">Tools</text>
+        <text x="155" y="153" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">skim() &middot; info() &middot; describe()</text>
+        <text x="155" y="167" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">shape &middot; dtypes &middot; head()</text>
+
+        <text x="155" y="200" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#115e59">Output</text>
+        <text x="155" y="218" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">"32,581 loans, 12 cols, 2 dates,</text>
+        <text x="155" y="232" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">3 categoricals, 7 numericals,</text>
+        <text x="155" y="246" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">no obvious dtype problems"</text>
+      </g>
+
+      <!-- arrow 1 -->
+      <path d="M 295 160 L 305 160" stroke="#0d9488" stroke-width="2" marker-end="url(#edaArr1)"/>
+
+      <!-- Pass 2 -->
+      <g>
+        <rect x="310" y="50" width="270" height="220" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="445" y="80" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#92400e">PASS 2 &middot; QUALITY</text>
+        <text x="445" y="100" text-anchor="middle" font-family="Inter" font-size="11" fill="#b45309">What is wrong with it?</text>
+
+        <text x="445" y="135" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">Tools</text>
+        <text x="445" y="153" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">isna().sum() &middot; missingno</text>
+        <text x="445" y="167" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">IQR rule &middot; duplicated() &middot; nunique()</text>
+
+        <text x="445" y="200" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">Output</text>
+        <text x="445" y="218" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">"emp_length 3% missing (MAR),</text>
+        <text x="445" y="232" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">int_rate 9% missing on grade G,</text>
+        <text x="445" y="246" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">5 ages &gt; 100 → data errors"</text>
+      </g>
+
+      <!-- arrow 2 -->
+      <path d="M 585 160 L 595 160" stroke="#b45309" stroke-width="2" marker-end="url(#edaArr2)"/>
+
+      <!-- Pass 3 -->
+      <g>
+        <rect x="600" y="50" width="270" height="220" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="735" y="80" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#5b21b6">PASS 3 &middot; RELATIONSHIPS</text>
+        <text x="735" y="100" text-anchor="middle" font-family="Inter" font-size="11" fill="#7c3aed">What relates to what?</text>
+
+        <text x="735" y="135" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">Tools</text>
+        <text x="735" y="153" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">corr() &middot; groupby + agg</text>
+        <text x="735" y="167" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">scatter &middot; pairplot &middot; heatmap</text>
+
+        <text x="735" y="200" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">Output</text>
+        <text x="735" y="218" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#5b21b6">"DR monotone in grade A→G,</text>
+        <text x="735" y="232" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#5b21b6">loan_to_income / income corr 0.6,</text>
+        <text x="735" y="246" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#5b21b6">DR U-shaped in age"</text>
+      </g>
+
+      <defs>
+        <marker id="edaArr1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#0d9488"/></marker>
+        <marker id="edaArr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#b45309"/></marker>
+      </defs>
+
+      <text x="440" y="290" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#71717a">Each pass should complete before the next begins. The first instinct to skip ahead and fit a model is the most common way EDA goes wrong.</text>
+    </svg>
+    <figcaption>The three EDA passes, ordered by question class: shape, quality, relationships. Skim is one tool inside pass 1; missing values and outliers belong to pass 2; correlation and bivariate default rates belong to pass 3. The output of all three is a short memo a modeller and an auditor can both read.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Pass 1: shape and content</h3>
+
+  <p>The shape pass asks four questions. How many rows and columns? What dtypes? What does a typical row look like? What are the basic summary statistics? Three tools cover all four. The pandas methods you already know from Lecture 01 (<code>info</code>, <code>describe</code>, <code>head</code>) and the <code>skimpy</code> library, which gives a single combined output that is easier to scan than the three pandas calls.</p>
+
+  <div class="worked">
+    <strong>The shape pass with skimpy</strong>
+    <p><code>from skimpy import skim
+import pandas as pd
+
+df = pd.read_csv("data/credit_risk_dataset.csv")
+skim(df)</code></p>
+    <p>The <code>skim</code> output is a multi-section table: header (row count, column count, missing cell count, duplicate row count), one row per column with dtype, missing rate, completeness rate, and (for numerical columns) mean, std, min, p25, p50, p75, max, plus a sparkline histogram. For categorical columns it shows count, unique, top, and frequency of top. The whole output fits on one screen for a typical dataset and gives you a verdict on the shape pass in fifteen seconds.</p>
+  </div>
+
+  <p><code>df.describe(include="all")</code> is the no-extra-dependency alternative. With <code>include="all"</code> it covers categorical columns too; with <code>include="number"</code> or <code>include="object"</code> it filters to a type subset; with <code>.T</code> it transposes the output so each variable is a row (much easier to scan when you have more than ten columns).</p>
+
+  <p>What to look for. <strong>Row count</strong>: confirm against the source system; off-by-one or off-by-a-percent usually signals an export problem (a missing partition, a duplicated header row, an early break in a streaming export). <strong>Column count and dtypes</strong>: every dtype should match expectation; integer IDs read as float means a missing value crept in; date columns read as object means the format was not recognised. <strong>Numerical describe</strong>: min and max should fall inside policy ranges (loan amounts between £1k and £50k, ages between 18 and 100, rates between 0 and 100); means and medians should be on the same order of magnitude (a factor-of-ten gap signals heavy skew or a contamination problem). <strong>Categorical describe</strong>: the number of unique values for a category column should match the documented vocabulary (loan grades A-G means seven unique values, not eight); a "top" value with frequency near 100 per cent means the column is constant and useless.</p>
+
+  <h3>Pass 2: quality</h3>
+
+  <p>The quality pass has three sub-passes: missing values, duplicates, and outliers. Each has a standard diagnostic and a treatment decision tree.</p>
+
+  <h4>Missing values: diagnosis and treatment</h4>
+
+  <p>Missing values are usually the largest single quality problem and the most often handled badly. The diagnostic question is twofold: how much is missing, and what mechanism produces the missingness.</p>
+
+  <p>How much is the easy part. <code>df.isna().sum()</code> gives a per-column count; <code>df.isna().mean()</code> gives a per-column rate. A column with above 50 per cent missingness is usually dropped; a column with 5-50 per cent is a treatment decision (impute, missing indicator, drop the rows, or accept); a column with below 5 per cent is almost always imputed or row-dropped.</p>
+
+  <p>The harder part is the mechanism. Rubin's (1976) taxonomy distinguishes three:</p>
+
+  <div class="defcard"><span class="term">MCAR</span><span class="def"><strong>Missing completely at random</strong>. The probability of missingness does not depend on the value or on any other variable. Borrowers' income is missing because some database fields got truncated in an export, with no pattern. Under MCAR, dropping the missing rows produces an unbiased subsample and is a safe default.</span></div>
+
+  <div class="defcard"><span class="term">MAR</span><span class="def"><strong>Missing at random</strong> (a misnomer; better called "missing conditionally at random"). The probability of missingness depends on observed variables but not on the value of the missing variable itself. Employment length is missing more often for unemployed applicants because the field is not asked of them. Mean imputation under MAR is biased; model-based imputation conditional on the predictors of missingness is unbiased.</span></div>
+
+  <div class="defcard"><span class="term">MNAR</span><span class="def"><strong>Missing not at random</strong>. The probability of missingness depends on the value itself. High-income individuals refuse to disclose income; defaulted borrowers stop reporting payments. No standard imputation method handles MNAR correctly; you either need an explicit model of the missingness mechanism or you accept a known bias.</span></div>
+
+  <p>The mechanism is rarely identifiable from the data alone. The practical move is to <strong>diagnose by visualisation</strong>: the <code>missingno</code> library produces a missingness matrix, a heatmap of pairwise missingness, and a dendrogram of co-missing columns. Patterns in the matrix (whole blocks of rows missing across a set of columns, or all rows above a date) usually identify the mechanism: a system change, a regulatory cut-off, a data integration boundary.</p>
+
+  <div class="worked">
+    <strong>Missing-value diagnosis</strong>
+    <p><code>import missingno as msno
+import matplotlib.pyplot as plt
+
+# how much is missing?
+df.isna().mean().sort_values(ascending=False).head(10)
+
+# is there a pattern?
+msno.matrix(df.sample(1_000))                   # one row per record, one column per variable
+msno.heatmap(df)                                # correlation of missingness across columns
+msno.dendrogram(df)                             # which columns are co-missing
+
+# is missingness related to a known driver?
+df.groupby("loan_grade", observed=True)["loan_int_rate"].apply(lambda s: s.isna().mean())</code></p>
+    <p>The final groupby is the diagnostic that distinguishes MCAR from MAR: if interest rate is uniformly 9 per cent missing across loan grades, the missingness is probably MCAR; if it is 25 per cent missing on grade G and 1 per cent on grade A, the missingness is MAR and the imputation strategy must account for it.</p>
+  </div>
+
+  <p>Treatment, in increasing sophistication: <strong>row drop</strong> (<code>df.dropna(subset=["x"])</code>: throw away rows missing in <code>x</code>; safe under MCAR, biased under MAR or MNAR); <strong>constant fill</strong> (<code>df["x"].fillna(0)</code>: replace missing with a sentinel; common for amounts where missing genuinely means zero); <strong>mean/median fill</strong> (<code>df["x"].fillna(df["x"].median())</code>: replace missing with a column statistic; biased even under MAR and shrinks the variance of the column, but cheap and reasonable for low missingness rates); <strong>group-wise fill</strong> (<code>df.groupby("g")["x"].transform(lambda s: s.fillna(s.median()))</code>: replace with the within-group median, better than overall mean under MAR); <strong>missing-indicator pattern</strong> (add a binary column <code>x_is_missing</code> before imputing; lets a downstream model learn from the fact that the value was missing rather than its imputed value); <strong>model-based imputation</strong> (<code>sklearn.impute.IterativeImputer</code> or <code>missForest</code>: fit a regression of each column on the others and impute predictions; the best general-purpose option for MAR but slower and harder to validate).</p>
+
+  <div class="callout warn">
+    <span class="tag">Common error</span>
+    Imputing the mean into a heavy-tailed column. A 5 per cent missing rate on income, filled with the income mean, pulls the column distribution towards the mean and shrinks the standard deviation by approximately 5 per cent. Downstream regressions on the imputed column are biased towards zero. For heavy-tailed columns, prefer the median or a group-wise median, and add a missing indicator.
+  </div>
+
+  <h4>Duplicates and key uniqueness</h4>
+
+  <p>Duplicates are the second source of silent quality problems. Two questions: are there fully duplicated rows (every column identical), and are there duplicated key values (rows with the same loan_id but different attributes)?</p>
+
+  <div class="worked">
+    <strong>Duplicate diagnosis</strong>
+    <p><code># fully duplicated rows
+df.duplicated().sum()
+df.loc[df.duplicated(keep=False)]
+
+# duplicate on a key column
+df["loan_id"].duplicated().sum()
+df.loc[df["loan_id"].duplicated(keep=False)].sort_values("loan_id")
+
+# uniqueness check, the assert form
+assert df["loan_id"].is_unique, "loan_id is not unique"</code></p>
+    <p>Full duplicates are usually export artefacts and safe to drop with <code>df.drop_duplicates()</code>. Key duplicates are more interesting: two rows with the same loan_id but different attributes mean either (a) the same loan was extracted twice with a state change between extractions, or (b) the key is not actually a key. Both want investigation, not deletion. The <code>is_unique</code> assertion at the top of a pipeline is the cheapest insurance against the second case.</p>
+  </div>
+
+  <h4>Outliers: detection and treatment</h4>
+
+  <p>An outlier is a data point unusually far from the rest. The question is always <em>why</em>. A data entry error (a salary of £50,000,000 caused by a missing decimal) gets corrected. A genuine extreme observation (a real billionaire in your customer book) is information, not noise, and removing it biases everything downstream. The treatment decision needs the diagnosis.</p>
+
+  <p>Three detection rules are standard. The <strong>z-score rule</strong> flags observations more than three standard deviations from the mean; it assumes approximate normality and breaks badly on heavy-tailed data (a single very large value pulls the mean and the SD towards itself, masking other outliers). The <strong>IQR rule</strong> (Tukey 1977) flags observations outside $Q_1 - 1.5 \cdot \text{IQR}$ to $Q_3 + 1.5 \cdot \text{IQR}$; it is robust because the quartiles do not move under outlier presence, and it is the rule a boxplot uses. The <strong>modified z-score</strong> uses the median absolute deviation instead of the standard deviation and is the robust analogue of the z-score; thresholds around 3.5 are standard.</p>
+
+  <div class="worked">
+    <strong>Outlier detection</strong>
+    <p><code>import numpy as np
+
+# z-score (not robust)
+z = (df["loan_amnt"] - df["loan_amnt"].mean()) / df["loan_amnt"].std()
+outliers_z = df.loc[z.abs() &gt; 3]
+
+# IQR rule (robust)
+q1, q3 = df["loan_amnt"].quantile([0.25, 0.75])
+iqr = q3 - q1
+outliers_iqr = df.loc[(df["loan_amnt"] &lt; q1 - 1.5 * iqr) | (df["loan_amnt"] &gt; q3 + 1.5 * iqr)]
+
+# modified z-score (robust)
+med = df["loan_amnt"].median()
+mad = (df["loan_amnt"] - med).abs().median()
+mz = 0.6745 * (df["loan_amnt"] - med) / mad
+outliers_mz = df.loc[mz.abs() &gt; 3.5]</code></p>
+    <p>For credit-risk data prefer the IQR or modified z-score. Loan amounts, incomes, and balances are right-skewed and the z-score rule will simultaneously mask real outliers and flag false ones.</p>
+  </div>
+
+  <p>Treatment, after diagnosis: <strong>investigate</strong> every flagged value first (open the row, check the source, confirm with the data steward); <strong>correct demonstrable errors</strong> (the missing decimal); <strong>cap or winsorise</strong> when the extreme values are plausible but the modelling method is sensitive (replace the top 1 per cent with the 99th percentile; a soft alternative to dropping); <strong>keep and transform</strong> when the values are genuine and informative (log-transform income, work on quantiles rather than levels); <strong>drop</strong> only when the values are demonstrably errors and cannot be corrected.</p>
+
+  <h3>Pass 3: relationships</h3>
+
+  <p>The relationship pass asks how variables move together, and in particular how the candidate predictors relate to the modelling target. Two angles: pairwise relationships (correlation matrices, scatter plots) and target-conditional analysis (the default rate by bucket of each predictor).</p>
+
+  <h4>Correlation matrices and the choice of correlation</h4>
+
+  <p>Pearson, Spearman, and Kendall correlations were covered in the statistics course's <a href="../statistics/01-descriptive_statistics.html">descriptive statistics</a> lecture; this lecture covers the practical pandas idioms.</p>
+
+  <div class="worked">
+    <strong>Correlation matrix</strong>
+    <p><code># Pearson (linear)
+df.select_dtypes("number").corr()
+
+# Spearman (monotone)
+df.select_dtypes("number").corr(method="spearman")
+
+# Kendall (concordance)
+df.select_dtypes("number").corr(method="kendall")</code></p>
+    <p>Use Pearson for confirmed linear relationships; Spearman for monotone relationships of any shape; Kendall for small samples or ordinal-only data. Read the matrix for two patterns: <strong>high correlations between predictors</strong> (multicollinearity that will distort a regression's coefficients), and <strong>moderate correlations between predictors and target</strong> (the candidate single-variable predictors). For binary targets like the default flag the natural correlation is the <strong>point-biserial</strong>, which is Pearson computed with the binary coded as 0/1; it equals Pearson on the same coding and so reuses <code>.corr()</code>.</p>
+  </div>
+
+  <h4>Target-conditional analysis: the most informative bivariate</h4>
+
+  <p>For modelling problems with a target variable (default flag, recovery rate, claim severity), the single most informative bivariate analysis is <strong>the target rate by bucket of each candidate predictor</strong>. For categorical predictors this is a groupby on the predictor. For numerical predictors it is a groupby on quantile buckets of the predictor.</p>
+
+  <div class="worked">
+    <strong>Default rate by predictor</strong>
+    <p><code># categorical predictor: default rate by grade
+df.groupby("loan_grade", observed=True)["loan_status"].agg(["count", "mean"])
+
+# numerical predictor: default rate by decile of loan_to_income
+df = df.assign(lti=df["loan_amnt"] / df["person_income"])
+df["lti_decile"] = pd.qcut(df["lti"], q=10, labels=False, duplicates="drop")
+
+dr_by_lti = (
+    df.groupby("lti_decile")
+      .agg(n=("loan_status", "count"), default_rate=("loan_status", "mean"))
+)</code></p>
+    <p>The pattern to look for in <code>dr_by_lti</code> is monotonicity. A predictor whose decile default rate moves monotonically from low to high (or high to low) carries strong predictive signal. A predictor whose decile default rate is U-shaped or flat carries weaker signal, and either needs non-linear treatment in the model (binning, splines) or should be dropped. The ratio of the top-decile default rate to the bottom-decile default rate is a quick measure of single-variable predictive power: ratios above 5 are strong, below 2 are weak.</p>
+  </div>
+
+  <h4>Automated profiling tools</h4>
+
+  <p>For a first pass on a new dataset, several automated profilers produce a multi-page HTML report covering all three EDA passes. The most established is <strong><code>ydata-profiling</code></strong> (formerly <code>pandas-profiling</code>); alternatives include <strong><code>sweetviz</code></strong> (which is particularly good at side-by-side comparisons of two datasets) and <strong><code>dtale</code></strong> (an interactive in-browser explorer).</p>
+
+  <div class="worked">
+    <strong>An automated profile</strong>
+    <p><code>from ydata_profiling import ProfileReport
+
+profile = ProfileReport(df, title="Credit risk dataset profile")
+profile.to_file("reports/credit_risk_profile.html")</code></p>
+    <p>The output is a multi-section HTML report covering overview, alerts (duplicates, high correlation, high cardinality, constant columns), per-variable distributions, interactions, correlations, and missing-value patterns. The whole report runs in seconds on a 30,000-row dataset and minutes on a few-million-row dataset. It is the best ten-minute investment available at the start of a new project, and the worst thing to rely on as a substitute for the deliberate three-pass discipline described above. Profilers find the obvious; the three passes find what the profiler missed.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Worked example: a full EDA on the credit-risk dataset</h2></div>
+
+  <p>The 32,581-row credit-risk dataset has 12 columns: age, income, home ownership, employment length, loan intent, loan grade, loan amount, interest rate, loan status (default flag), loan-to-income, prior-default-on-file flag, and credit history length. The output of a full EDA is a one-page memo. Below is the memo, written in the order an auditor would expect to read it.</p>
+
+  <div class="worked">
+    <strong>Pass 1 verdict, the shape</strong>
+    <p>The dataset contains 32,581 rows and 12 columns. Three columns are categorical (home ownership, loan intent, loan grade), one is a boolean coded as integer (loan status), seven are numerical (age, income, employment length, loan amount, interest rate, loan-to-income, credit history length), and one is a categorical flag (prior default on file). The smallest age is 20 and the largest is 144, the second flagging immediate data quality concern. Loan amounts range from £500 to £35,000, consistent with policy. Interest rates range from 5.42 to 23.22, plausible for unsecured consumer lending. The portfolio default rate (mean of loan status) is 21.8 per cent, high for retail unsecured and worth checking against an external benchmark.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Pass 2 verdict, the quality</strong>
+    <p>Two columns have material missingness: employment length is 2.7 per cent missing and interest rate is 9.5 per cent missing. Employment-length missingness is approximately uniform across loan grades and intents (consistent with MCAR), suggesting safe row-drop or median imputation. Interest-rate missingness rises from 2 per cent on grade A to 47 per cent on grade G; the mechanism is MAR conditional on grade, and the appropriate treatment is grade-wise median imputation plus a missing indicator (the missingness is itself predictive of high-risk grades).</p>
+    <p>No fully duplicated rows. No duplicate loan_id values (the loan_id column is unique).</p>
+    <p>Outlier review on the numerical columns flags five records with person_age above 100 (one each at 123, 144, and so on); these are demonstrable data errors and should be dropped. Income contains 11 records above £1,000,000, plausible but high; keep and log-transform. Employment length contains seven records above 60 years, two of which exceed the corresponding person_age; the latter two are data errors, the rest are likely real and kept.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Pass 3 verdict, the relationships</strong>
+    <p>Default rate by loan grade is monotone: 9.7 per cent at A, 16.2 per cent at B, 22.0 per cent at C, 29.3 per cent at D, 42.6 per cent at E, 54.9 per cent at F, 79.5 per cent at G. The ratio of top to bottom is 8.2, indicating a strong single-variable predictor (as expected; grade is the bank's own internal risk classification). Default rate by decile of loan-to-income is monotone increasing from 13 per cent in decile 1 to 31 per cent in decile 10. Default rate by decile of income is monotone decreasing, with a top-bottom ratio of 2.1, a moderate predictor. Default rate by decile of person_age is U-shaped, lowest in the middle deciles (ages 30-45) and highest at both tails; this rules out a linear treatment in the model and points to binning or splines.</p>
+    <p>The Pearson correlation matrix shows three notable pairs. Loan amount and loan-to-income correlate at 0.55, expected (the ratio depends on the numerator). Interest rate and loan grade correlate at 0.94 on the ordinal coding, near-redundant (the grade is essentially a binned version of the rate). Income and home-ownership-IS-MORTGAGE correlate at 0.41, also expected (mortgaged borrowers earn more). The multicollinearity warning is the interest rate / loan grade pair; one or the other should be in the final model, not both.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Summary memo for the modeller</strong>
+    <p>Drop 5 records with implausible age. Drop 2 records with employment length exceeding person_age. Log-transform person_income before modelling. Median-impute employment length; grade-wise median impute interest rate and add a missing indicator. Treat person_age non-linearly (binned or splined) given the U-shape. Choose between interest_rate and loan_grade in the model; do not include both. Expect loan_to_income, loan_grade (or interest_rate), and person_income to be the three strongest single-variable predictors.</p>
+  </div>
+
+  <p>The memo is what every model development document opens with, and is the auditor's first read. The discipline of writing it in this form, rather than copy-pasting profiling-report screenshots, separates a model document a regulator trusts from one they read sceptically.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Common pitfalls and how to avoid them</h2></div>
+
+  <h3>Stopping at the profiler</h3>
+
+  <p>Automated profiling reports look comprehensive and are the most common substitute for the three-pass discipline. The report will tell you that a column is 30 per cent missing; it will not tell you whether the missingness is MCAR or MAR conditional on grade. The report will flag a correlation; it will not tell you whether the correlation is causal, ecological, or driven by a third variable. Treat the profiler as the input to your EDA, not the output.</p>
+
+  <h3>Treating mean imputation as safe by default</h3>
+
+  <p>Mean imputation under MAR is biased and under MNAR is worse than biased (the imputed value misleads downstream tests). On any column with above 5 per cent missingness or where a quick groupby reveals the missingness varies by an observed variable, prefer group-wise median imputation plus a missing-indicator column. The cost is one additional column; the benefit is preserving the relationship between the missingness and the target.</p>
+
+  <h3>Confusing outliers with leverage points</h3>
+
+  <p>An outlier is a value far from the rest in the marginal distribution of one variable. A leverage point is an observation that strongly influences a model fit. The two overlap but are not the same: a record with an extreme income but a typical credit score is an outlier on income, not necessarily a leverage point on a default model. The treatment decision depends on the downstream use: an outlier-on-income matters for any income-conditioned summary; a leverage point matters for the model. Diagnose both, not just the former.</p>
+
+  <h3>Computing correlations on dirty data</h3>
+
+  <p>A Pearson correlation on a column with an unaddressed outlier or with sentinel values (99999 as a missing code) is meaningless. Always run the quality pass before the relationship pass. The natural pipeline is: shape, then quality (with cleaning decisions made and applied to a working copy of the dataframe), then relationships computed on the cleaned working copy.</p>
+
+  <h3>Reading correlations as causation</h3>
+
+  <p>The relationship pass produces associations, not explanations. A predictor with a strong univariate correlation to default may have that correlation because it is itself caused by an unobserved confounder (the credit cycle, the segment risk profile). Partial correlations conditional on the obvious confounders are usually much smaller, and the difference is the lesson. For a model that needs to extrapolate (a stress test, a through-the-cycle PD), the partial correlations matter more than the marginal ones. The statistics course's <a href="../statistics/12-causal_inference.html">causal inference</a> lecture covers the formal framework.</p>
+
+  <h3>Skipping the EDA on already-clean data</h3>
+
+  <p>The temptation to skip EDA is strongest when the data comes from a trusted internal source. The temptation is wrong: even clean data has surprises (a schema change last quarter, a re-categorisation, a regulatory cut-off date). Ten minutes of shape pass on a familiar source has caught more production bugs than any other ten-minute investment in the analyst's workflow.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Synthesis
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the EDA discipline. Three passes, each with a question, a toolkit, and a verdict. Pass 1 is shape (skim, info, describe), Pass 2 is quality (missingness with mechanism, duplicates, outliers with diagnosis), Pass 3 is relationships (correlation, target-conditional bucket analysis). The output is a one-page memo a modeller can use to design the model and an auditor can use to trust the design. The pitfalls (stopping at the profiler, mean imputation on MAR data, confusing outliers with leverage, correlations on dirty data, association-as-causation, skipping the pass on familiar data) are the silent failures the discipline is designed to prevent.</p>
+
+  <p>Two things are missing. First, every EDA verdict is or should be backed by a picture; the next lecture is the partner discipline of visualisation. Second, the inferential question (is this difference real or noise, is this correlation significantly different from zero) belongs to the statistics course's <a href="../statistics/03-inferential_statistics.html">inferential statistics</a> lecture; EDA produces hypotheses, inference tests them.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the three passes of EDA and the question each answers. Which pass catches the largest fraction of production bugs?</li>
+      <li>Distinguish MCAR, MAR, and MNAR in one sentence each. Which imputation strategies are unbiased under each?</li>
+      <li>Why is mean imputation a bad default on a heavy-tailed column? What is the cheapest alternative that preserves the missingness signal?</li>
+      <li>You see a Pearson correlation of 0.05 and a Spearman correlation of 0.85 between two variables. State the underlying relationship and the appropriate model treatment.</li>
+      <li>You flag five records with person_age &gt; 100. State the diagnosis-treatment workflow in three sentences.</li>
+      <li>A predictor's default rate by decile is U-shaped. What does this rule out, and what does it suggest?</li>
+      <li>State one situation where the modified z-score is preferable to the IQR rule for outlier detection, and one where it is not.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lectures <a href="01-pandas_core.html">01</a>, <a href="02-aggregation_pivoting_joining.html">02</a>, <a href="03-polars.html">03</a> produce the cleaned dataframe this lecture consumes.</li>
+      <li><strong>Next:</strong> Lecture 05 (<a href="05-visualisation.html">visualisation</a>) is the partner discipline: every EDA verdict is backed by a picture.</li>
+      <li><strong>Theoretical companion:</strong> <a href="../statistics/01-descriptive_statistics.html">descriptive statistics</a> in the statistics course gives every summary here a sampling distribution.</li>
+      <li><strong>Where this lands:</strong> the <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/">credit-risk modelling lifecycle</a> opens every model document with the EDA chapter this lecture describes.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data analysis course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 4 of 5</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

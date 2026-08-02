@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 40: model-specific interpretation methods</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Model interpretation</a></div>
+  <h1>Model-specific interpretation methods</h1>
+  <p class="subtitle">When the model is interpretable by construction, the explanation is free: linear coefficients tell you the marginal effect, tree paths tell you the rule, ensemble importances tell you which features matter. The next lecture covers what to do when none of these is available.</p>
+  <div class="meta">
+    <span>Lecture 40 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part VI: interpretation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>model-specific interpretation method</strong> is an explanation derived from the structure of the model itself, not from probing its predictions. Three families cover almost every interpretable algorithm in practical use. <strong>Linear and generalised linear models</strong> hand you a coefficient per feature; in linear regression the coefficient is the marginal effect on the response, in logistic regression it is the marginal effect on log-odds and, after exponentiation, a multiplicative effect on the odds. <strong>Decision trees</strong> hand you the tree itself: every path from root to leaf is a conjunction of conditions producing a prediction, and the splits provide a feature importance derived from impurity reduction. <strong>Tree ensembles</strong> (random forests, gradient boosting, XGBoost, LightGBM, CatBoost) extend the same impurity-based importance across hundreds of trees, with a small zoo of variants (gain, weight, cover) that disagree more often than practitioners expect. The headline is simple: when the model is interpretable by construction, you do not need the model-agnostic machinery of the next lecture. The catch is equally simple: each of these explanations comes with assumptions that, if violated, make the explanation misleading rather than wrong.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A model-specific explanation is an explanation you can read directly off the fitted object. For a linear regression, the coefficients are the explanation. For a decision tree, the tree drawing is the explanation. For a random forest, the average impurity reduction across trees is the explanation. You do not need to perturb inputs, build surrogate models, or compute Shapley values. The trade-off is that these explanations exist only because the model was constrained to be interpretable in the first place, which usually costs you some predictive power. Model-agnostic methods exist precisely so the constraint can be relaxed.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Coefficient and impurity-based explanations dominate regulated credit and insurance modelling for the same reason WoE binning dominates feature engineering there: the explanation is documentable, the same number lands on the audit report and the model card, and a supervisor can ask "why did this customer get this score" and receive a one-line answer. The cost is a model class restriction. A logistic regression scorecard typically gives up two to five points of AUC against a gradient-boosted tree on the same features. The price is paid willingly because the alternative is a model that cannot be explained to the people who must approve its use.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Lecture 39 (<a href="01-explaining_models.html">explaining models</a>) set out why interpretation is a separate stage of the ML lifecycle. This lecture covers the easy case: the model is interpretable by construction. Lecture 41 (<a href="03-model_agnostic_methods.html">model-agnostic methods</a>) covers the hard case: the model is a black box and an explanation must be built on top. The boundary between this lecture and the next is exactly the boundary between trusting the model's structure and reverse-engineering it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons model-specific interpretation deserves a lecture of its own. First, <strong>the explanations are exact, not approximate.</strong> A linear regression coefficient $\beta_j$ is the marginal effect of $X_j$ on the response, full stop, under the model's assumptions. A model-agnostic explanation like a permutation importance or a SHAP value is a summary statistic computed from a sample of perturbed predictions; it has sampling variance, depends on a baseline distribution, and is only as good as the perturbation scheme. When a model is interpretable by construction you skip that whole stack and read the explanation off the fitted object.</p>
+
+  <p>Second, <strong>regulators and auditors expect them.</strong> The PRA's SS1/23 and the EBA's guidelines on internal models repeatedly distinguish between "models whose mechanics can be understood from their parameters" and "models requiring post-hoc explanation". The first class can be approved on the basis of the documented coefficients or splits; the second class requires an additional layer of evidence that the explanation method itself is faithful to the model. The simpler audit trail is one reason logistic-regression scorecards and shallow trees persist in regulated work long after the academic literature has moved on.</p>
+
+  <p>Third, <strong>the explanation pinpoints the assumption that must hold.</strong> A linear regression coefficient is the marginal effect of $X_j$ <em>holding all other features constant</em>. If two features are highly correlated, "holding all other features constant" is not a real condition any datum could satisfy, and the coefficient is an estimate of a counterfactual that never occurs in the data. A decision-tree path is a rule that is locally precise but globally unstable: refit the tree on a different sample and the splits change. Knowing which assumption underlies the explanation is the same as knowing when not to trust it.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail PD scorecard contained two features whose Pearson correlation was 0.86: months on book and number of past statements. Both had statistically significant coefficients with opposite signs. The model owner, when asked at validation what those coefficients meant, said "more months on book reduces default risk, more statements increases it". The validator pointed out that this could not be read off the coefficients in any operational sense, because no customer in the portfolio had ever had a high months-on-book figure with a low statement count, or vice versa. The model was approved only after one of the two features was dropped and the remaining coefficient was re-estimated. The coefficients had not changed in sign, but the explanation had become defensible.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Pick a model class. The class determines the explanation type, the explanation type determines the unit of attribution, and the unit of attribution determines the assumption you must defend. Linear regression gives you coefficients in the units of the response; the unit of attribution is "change in $Y$ per unit change in $X_j$", and the assumption is that other features can be held constant. Logistic regression gives you coefficients in log-odds space; the unit of attribution is "change in log-odds per unit change in $X_j$", and after exponentiation a multiplicative effect on odds. Decision trees give you a path; the unit of attribution is "this rule fired for this observation". Tree ensembles give you an aggregate impurity reduction; the unit of attribution is "this feature contributed this much to the average split quality across the forest".</p>
+
+  <figure>
+    <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logistic regression coefficients, odds ratios, and probability change for a three-feature PD model">
+      <defs>
+        <marker id="lrArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A small PD model: coefficient bars, odds ratios via exp, probability shift</text>
+
+      <!-- Left panel: coefficients -->
+      <text x="140" y="56" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">log-odds space</text>
+      <text x="140" y="70" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">coefficient (beta_j)</text>
+
+      <!-- axis -->
+      <line x1="60" y1="240" x2="240" y2="240" stroke="#71717a" stroke-width="1"/>
+      <line x1="150" y1="90" x2="150" y2="250" stroke="#a1a1aa" stroke-width="0.5" stroke-dasharray="2 2"/>
+      <text x="150" y="262" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">0</text>
+      <text x="80" y="262" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">-1</text>
+      <text x="220" y="262" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">+1</text>
+
+      <!-- bar 1: utilisation +0.85 (positive, increases PD) -->
+      <rect x="150" y="100" width="76" height="22" fill="#fee2e2" stroke="#dc2626" stroke-width="1"/>
+      <text x="58" y="115" font-family="Inter" font-size="10" fill="#18181b">utilisation</text>
+      <text x="232" y="115" font-family="Inter" font-size="9" fill="#991b1b">+0.85</text>
+
+      <!-- bar 2: income -0.60 (negative, decreases PD) -->
+      <rect x="96" y="142" width="54" height="22" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+      <text x="58" y="157" font-family="Inter" font-size="10" fill="#18181b">log income</text>
+      <text x="78" y="157" text-anchor="end" font-family="Inter" font-size="9" fill="#14532d">-0.60</text>
+
+      <!-- bar 3: tenure -0.30 -->
+      <rect x="123" y="184" width="27" height="22" fill="#dcfce7" stroke="#15803d" stroke-width="1"/>
+      <text x="58" y="199" font-family="Inter" font-size="10" fill="#18181b">tenure (yrs)</text>
+      <text x="115" y="199" text-anchor="end" font-family="Inter" font-size="9" fill="#14532d">-0.30</text>
+
+      <!-- arrow to middle panel -->
+      <line x1="260" y1="160" x2="320" y2="160" stroke="#71717a" stroke-width="1.5" marker-end="url(#lrArrow)"/>
+      <text x="290" y="152" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">exp</text>
+
+      <!-- Middle panel: odds ratios -->
+      <text x="410" y="56" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">odds space</text>
+      <text x="410" y="70" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">odds ratio = exp(beta_j)</text>
+
+      <g>
+        <rect x="340" y="92" width="140" height="40" rx="6" fill="#FFFFFF" stroke="#dc2626" stroke-width="1"/>
+        <text x="410" y="108" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">utilisation</text>
+        <text x="410" y="124" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#991b1b">x 2.34 odds</text>
+      </g>
+      <g>
+        <rect x="340" y="142" width="140" height="40" rx="6" fill="#FFFFFF" stroke="#15803d" stroke-width="1"/>
+        <text x="410" y="158" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">log income</text>
+        <text x="410" y="174" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#14532d">x 0.55 odds</text>
+      </g>
+      <g>
+        <rect x="340" y="192" width="140" height="40" rx="6" fill="#FFFFFF" stroke="#15803d" stroke-width="1"/>
+        <text x="410" y="208" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">tenure</text>
+        <text x="410" y="224" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#14532d">x 0.74 odds</text>
+      </g>
+
+      <!-- arrow to right panel -->
+      <line x1="500" y1="160" x2="560" y2="160" stroke="#71717a" stroke-width="1.5" marker-end="url(#lrArrow)"/>
+      <text x="530" y="152" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">logistic</text>
+
+      <!-- Right panel: probability change at baseline -->
+      <text x="680" y="56" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">probability space</text>
+      <text x="680" y="70" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">change at baseline p = 0.05</text>
+
+      <g>
+        <rect x="580" y="92" width="200" height="40" rx="6" fill="#FFFFFF" stroke="#dc2626" stroke-width="1"/>
+        <text x="680" y="108" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">utilisation +1 sd</text>
+        <text x="680" y="124" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#991b1b">p: 0.05 -> 0.11 (+6 pp)</text>
+      </g>
+      <g>
+        <rect x="580" y="142" width="200" height="40" rx="6" fill="#FFFFFF" stroke="#15803d" stroke-width="1"/>
+        <text x="680" y="158" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">log income +1 sd</text>
+        <text x="680" y="174" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#14532d">p: 0.05 -> 0.028 (-2.2 pp)</text>
+      </g>
+      <g>
+        <rect x="580" y="192" width="200" height="40" rx="6" fill="#FFFFFF" stroke="#15803d" stroke-width="1"/>
+        <text x="680" y="208" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">tenure +1 sd</text>
+        <text x="680" y="224" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#14532d">p: 0.05 -> 0.038 (-1.2 pp)</text>
+      </g>
+
+      <!-- Footer note -->
+      <line x1="40" y1="300" x2="780" y2="300" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="320" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">The same coefficient means three different things depending on the space you read it in</text>
+      <text x="410" y="338" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">additive in log-odds, multiplicative in odds, non-linear and baseline-dependent in probability</text>
+    </svg>
+    <figcaption>A logistic regression with three features: utilisation, log income, and tenure. The same fitted coefficients live in three spaces. In log-odds the effect is additive (left panel). After exponentiation the effect is multiplicative on the odds (middle). After the logistic link, the effect on probability depends on the baseline rate (right). All three explanations are correct; which one is most useful depends on what question you are answering.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The coefficient sign and magnitude live on the left, in log-odds units, and that is the only space in which the effects are additive across features. The odds ratio in the middle is a multiplicative interpretation that line managers find more intuitive ("doubling of odds") but that misleads if interpreted as a doubling of probability. The probability change on the right is the operational quantity (it is what determines pricing, expected loss, and customer outcomes), but it is non-linear in the coefficient and depends on the baseline rate. The same model is a different story in each panel.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Linear regression: coefficients and intercept</h3>
+
+  <p>A linear regression fits</p>
+  $$\hat{y}_i = \beta_0 + \beta_1 X_{i1} + \beta_2 X_{i2} + \dots + \beta_p X_{ip},$$
+  <p>by minimising the sum of squared residuals. The coefficient $\beta_j$ is the <strong>marginal effect</strong> of a one-unit increase in $X_j$ on the predicted response, holding all other features constant. The phrase "holding all other features constant" is the explanation's load-bearing assumption: it is interpretable as a real counterfactual only if a unit change in $X_j$ with the other features fixed is something that can plausibly occur in the data-generating process. When features are correlated, that counterfactual rarely lives in the support of the data, and the coefficient becomes an estimate of an effect no customer actually experiences. This is the same multicollinearity problem covered in the regression-diagnostics lecture; the diagnostic test (variance inflation factor) and the remedy (drop or combine correlated features) are documented there.</p>
+
+  <p>The <strong>intercept</strong> $\beta_0$ is the predicted response when every feature is zero. For features in raw units this is often non-physical (no customer has zero age, zero income, and zero years on book). The standard fix is to centre the features at their training means, so the intercept becomes the predicted response at the average feature vector. After standardisation (z-scoring) the intercept is the predicted response at every feature's training mean, which is also the marginal mean of $y$ in a centred design. The intercept is rarely the quantity of substantive interest, but it must be reported with the coefficients because the model is incomplete without it.</p>
+
+  <p>Coefficients in <strong>raw units</strong> ("unstandardised") have an intuitive interpretation but are not comparable across features on different scales. A coefficient of 1500 on years of experience and 0.12 on advertising spend (in pounds) cannot be directly compared because the features are measured in different units. Coefficients on <strong>standardised features</strong> ("beta coefficients") are dimensionless and represent the change in $y$ for a one-standard-deviation increase in $X_j$; these are comparable in magnitude across features and are the right object for ranking feature importance in a linear model. Reporting both is standard practice: raw coefficients for operational interpretation, standardised for ranking.</p>
+
+  <p>Each coefficient comes with a <strong>standard error</strong> $\operatorname{SE}(\hat{\beta}_j)$, from which a $t$-statistic $t_j = \hat{\beta}_j / \operatorname{SE}(\hat{\beta}_j)$ and a p-value are derived under the null that $\beta_j = 0$. A 95 per cent confidence interval is approximately $\hat{\beta}_j \pm 1.96 \cdot \operatorname{SE}(\hat{\beta}_j)$. A coefficient with $p > 0.05$ is not reliably different from zero at the conventional threshold, and reading a substantive story from it is overreach. The same caveat applies more strongly in high-dimensional settings: with twenty features tested at $\alpha = 0.05$, roughly one significant coefficient is expected by chance.</p>
+
+  <p>For <strong>dummy variables</strong> the interpretation is always relative to the reference category. If "region" has levels {London, Midlands, North, Scotland} with London as the reference, the coefficient on the Midlands dummy is the predicted difference in $y$ between a Midlands observation and an otherwise identical London observation. The intercept absorbs the London baseline. With $k$ levels you fit $k - 1$ dummies; fitting all $k$ produces the dummy variable trap, in which the columns sum to one and the design matrix is rank-deficient (see <a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a>). The choice of reference category does not change the model's fitted values or predictions, but it does change which coefficient is reported as "the effect" of each level, so the reference category should be chosen for interpretability (the largest or the most natural baseline).</p>
+
+  <p>None of these interpretations is valid if the model's assumptions are violated. Linearity of $E[y \mid X]$ in $X$, independence of errors, constant residual variance (homoscedasticity), and approximate normality of residuals are the classical conditions. Failure of linearity biases the coefficients; failure of homoscedasticity biases the standard errors and therefore the p-values and confidence intervals; failure of independence (clustered or autocorrelated data) does both. The diagnostic procedures (residuals vs fitted, Q-Q plot, scale-location, leverage, Durbin-Watson, Breusch-Pagan) are covered in <a href="../07_model_evaluation/02-regression_diagnostics.html">regression diagnostics</a>. Run them before reading any coefficient as a marginal effect.</p>
+
+  <p>A small numerical example clarifies the standardised-versus-raw distinction. Suppose a daily bike-rental regression has $\beta_{\text{temp}} = 1195$ on standardised temperature and $\beta_{\text{wind}} = -321$ on standardised windspeed, with an intercept of 4561 rentals. The standardised coefficients are directly comparable: a one-standard-deviation increase in temperature adds 1195 rentals, while the same increase in windspeed removes 321. The intercept of 4561 is the predicted rental count at the average feature vector, which is also the sample mean of $y$ when the design is centred. Converting back to raw units requires multiplying the standardised coefficient by $1 / \sigma_{X_j}$; the resulting raw coefficient is the change in rentals per one-degree-Celsius rise in temperature, which is the right unit to quote in a customer-facing report but the wrong unit for cross-feature ranking.</p>
+
+  <h3>Worked numerical example: bike-rental linear regression</h3>
+
+  <p>Suppose the fitted model is</p>
+  $$\widehat{\text{rentals}} = 4561 + 1195 \cdot \text{temp}_s - 321 \cdot \text{windspeed}_s + 480 \cdot \text{is\_summer},$$
+  <p>where the first two features are standardised (subscript $s$) and the third is a dummy. The intercept of 4561 is the predicted rental count at the average temperature, average windspeed, and outside summer. A summer day at average temperature and average windspeed has $\widehat{\text{rentals}} = 4561 + 480 = 5041$. A summer day with temperature one standard deviation above the mean and windspeed half a standard deviation above the mean has $\widehat{\text{rentals}} = 4561 + 1195 - 0.5 \cdot 321 + 480 = 6075.5$. The coefficient on the summer dummy is interpreted relative to the reference category (non-summer), the standardised coefficients are directly comparable across the temperature and windspeed features, and the intercept is the predicted response at zero on all features.</p>
+
+  <p>If the temperature coefficient has standard error 95 and the windspeed coefficient has standard error 110, the $t$-statistics are $1195 / 95 \approx 12.6$ and $-321 / 110 \approx -2.9$. Both are significant at the 0.05 level, but the temperature coefficient is roughly four times more precisely estimated than the windspeed coefficient. The 95 per cent confidence intervals are approximately $[1009, 1381]$ for temperature and $[-537, -105]$ for windspeed. Reporting the point estimates without the intervals hides the difference in evidential weight between the two features.</p>
+
+  <h3>Logistic regression: log-odds, odds ratios, probability change</h3>
+
+  <p>Logistic regression models a binary outcome by</p>
+  $$\ln\!\left(\frac{p}{1 - p}\right) = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \dots + \beta_p X_p,$$
+  <p>where $p$ is the probability the outcome is 1. The left-hand side is the log-odds, also called the logit. The model is linear in the coefficients in log-odds space, which is what makes the GLM theory (see <a href="../../statistics/05-generalised_linear_models.html">generalised linear models</a>) carry over from linear regression with only a change of link function.</p>
+
+  <p>Three readings of the same coefficient. <strong>In log-odds space</strong>, $\beta_j$ is the change in the log-odds of the outcome for a one-unit increase in $X_j$, holding other features constant. Additive across features, but log-odds are not an operational quantity anyone outside the modelling team can interpret directly. <strong>In odds space</strong>, exponentiating gives the odds ratio</p>
+  $$\operatorname{OR}_j = e^{\beta_j},$$
+  <p>which is the multiplicative effect on the odds of a one-unit increase in $X_j$. An odds ratio of 2 means the odds double per unit; of 0.5 they halve; of 1 there is no effect. Multiplicative across features ($\operatorname{OR}_{\text{combined}} = \prod_j \operatorname{OR}_j$), which is convenient for combining several predictors and the reason odds ratios are the standard reporting unit in clinical and credit-risk papers. <strong>In probability space</strong>, the change in $p$ from a unit change in $X_j$ depends on the baseline probability. At $p = 0.5$ the logistic curve is steepest and a unit increase produces the largest probability change; at $p$ near 0 or 1 the curve is flat and the same unit increase moves $p$ very little. The probability is</p>
+  $$p = \sigma(\eta) = \frac{1}{1 + e^{-\eta}}, \qquad \eta = \beta_0 + \sum_j \beta_j X_j,$$
+  <p>and the marginal effect $\partial p / \partial X_j = \beta_j \, p (1 - p)$ varies with $p$. This is why a 0.85 coefficient on utilisation can produce a six-percentage-point increase in PD at one baseline rate and a one-percentage-point increase at another.</p>
+
+  <p>A worked PD micro-example, following the diagram above. Suppose three standardised features (utilisation, log income, tenure) and an intercept tuned so the marginal default rate is five per cent. With coefficients $\beta_{\text{util}} = 0.85$, $\beta_{\text{inc}} = -0.60$, $\beta_{\text{ten}} = -0.30$, and intercept $\beta_0 = \operatorname{logit}(0.05) \approx -2.94$, a customer at the population mean has $\eta = -2.94$ and $p = 0.050$. Increase utilisation by one standard deviation: $\eta$ becomes $-2.94 + 0.85 = -2.09$, $p$ becomes $\sigma(-2.09) \approx 0.110$, a six-percentage-point rise. Increase log income by one standard deviation: $\eta$ becomes $-3.54$, $p$ becomes $0.028$, a 2.2-percentage-point fall. Increase tenure by one standard deviation: $\eta$ becomes $-3.24$, $p$ becomes $0.038$, a 1.2-percentage-point fall. The odds ratios are $e^{0.85} \approx 2.34$, $e^{-0.60} \approx 0.55$, $e^{-0.30} \approx 0.74$. Same model, three different stories depending on the audience.</p>
+
+  <p>Dummy variables, standardised versus raw coefficients, statistical significance, and assumption diagnostics all carry over from linear regression with minimal change. The model is fit by maximum likelihood rather than least squares, so the diagnostics live in the deviance residuals rather than the raw residuals, but the interpretation principles are the same.</p>
+
+  <p>One feature unique to logistic regression deserves separate mention. When features are encoded by weight of evidence (see <a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a>), the WoE values are already on a log-odds scale by construction. The logistic regression coefficient on a WoE feature is then a scaling factor that says how much weight to place on the WoE-derived signal: a coefficient near one means the feature's WoE is taken at face value, a coefficient much smaller than one means the WoE is shrunk toward zero, and a coefficient near zero indicates a feature that contributes little after the others are accounted for. This is the structural reason WoE is the regulator-preferred encoding for credit scorecards: the explanation lives in the WoE table for each feature, and the logistic regression coefficient is a single auditable number summarising how much that table mattered.</p>
+
+  <h3>Decision trees (regression): MSE-based feature importance</h3>
+
+  <p>A regression tree partitions the feature space into rectangular regions and assigns each leaf the mean response in that region. At each candidate split the algorithm chooses the feature and threshold that maximally reduce the node's mean squared error, defined for node $t$ with $n_t$ observations as</p>
+  $$\operatorname{MSE}(t) = \frac{1}{n_t} \sum_{i \in t} (y_i - \bar{y}_t)^2.$$
+  <p>The reduction at a split into children $t_L, t_R$ is</p>
+  $$\Delta \operatorname{MSE} = \operatorname{MSE}(t) - \frac{n_L}{n_t} \operatorname{MSE}(t_L) - \frac{n_R}{n_t} \operatorname{MSE}(t_R).$$
+  <p>Feature importance is the sum of $\Delta \operatorname{MSE} \cdot n_t$ across all splits using the feature, normalised so the importances sum to one across features. The default in scikit-learn's <code>DecisionTreeRegressor</code> is <code>criterion="squared_error"</code>; alternatives (<code>friedman_mse</code>, <code>absolute_error</code>, <code>poisson</code>) change the impurity but not the principle that feature importance is impurity reduction weighted by sample size.</p>
+
+  <h3>Decision trees (classification): the tree as the explanation</h3>
+
+  <p>A fitted decision tree is its own explanation: every path from the root to a leaf is a conjunction of conditions on individual features, and the leaf carries a single predicted value (a class probability for classification, a mean for regression). To explain a prediction, you read the path the observation took. To explain the model globally, you read the tree. This is the cleanest interpretation in the lecture and the reason shallow trees persist as a baseline in regulated work even when more accurate models exist (see <a href="../03_supervised_learning/02-decision_trees.html">decision trees</a> for the tree-fitting mechanics).</p>
+
+  <p>Beyond the rules themselves, a tree exposes a numeric <strong>feature importance</strong> based on impurity reduction at each split. For a classification tree using Gini impurity, the impurity at a node with class proportions $p_1, p_2, \dots, p_C$ is</p>
+  $$\operatorname{Gini}(t) = 1 - \sum_{c=1}^{C} p_c^2,$$
+  <p>and a split that partitions the node into children $t_L$ and $t_R$ with sample sizes $n_L$ and $n_R$ reduces impurity by</p>
+  $$\Delta \operatorname{Gini} = \operatorname{Gini}(t) - \frac{n_L}{n_L + n_R} \operatorname{Gini}(t_L) - \frac{n_R}{n_L + n_R} \operatorname{Gini}(t_R).$$
+  <p>For a regression tree the impurity is the mean squared error at the node and the reduction is computed analogously. The importance of feature $X_j$ is the sum of $\Delta \operatorname{Gini}$ (or $\Delta \operatorname{MSE}$) across all nodes split on $X_j$, weighted by the sample size at the node. Features that win the early high-sample splits get the largest importance; features that only feature in deep, small-sample splits get less. This quantity is what scikit-learn returns as <code>feature_importances_</code> and what is universally called Gini importance or mean decrease in impurity.</p>
+
+  <p>Three limitations matter. First, <strong>impurity importance is biased toward high-cardinality features.</strong> A feature with many distinct values (a continuous variable with no ties, or a high-cardinality categorical) has more candidate split points and a higher chance of producing a low-impurity split by chance alone, even if it has no predictive signal. The bias inflates the importance of identifiers (customer ID, postcode), free-text-derived features, and anything else with near-row-unique values. Permutation importance, covered in the next lecture, does not have this bias.</p>
+
+  <p>Second, <strong>impurity importance is unstable across re-fits.</strong> Two trees fit on bootstrap samples of the same data can rank features quite differently, especially when several features are correlated and substitute for each other at the top of the tree. The instability is the structural counterpart of the high variance that motivates ensemble methods in the first place: if the fitted tree itself changes between bootstrap samples, the importance derived from that tree must change too.</p>
+
+  <p>Third, <strong>the importance is descriptive, not causal.</strong> It tells you the feature was useful for the splits this particular tree chose, not that the feature drives the outcome. A feature that is downstream of the outcome (a future-looking variable that subtly leaks the target) will appear important by impurity reduction. So will a feature that is a noisy proxy for the true driver. Neither is grounds for a causal claim, and reading impurity importance as if it were is the modelling counterpart of reading a correlation as if it were a causal effect.</p>
+
+  <h3>Reading a tree path as a customer-level explanation</h3>
+
+  <p>Suppose a four-level retail PD tree splits on utilisation first, then on months on book, then on income, then on a delinquency indicator. A specific customer who took the path "utilisation $> 0.6$, months on book $\le 24$, income $\le \pounds 18\,000$, no delinquency" lands in a leaf with a predicted default rate of 14 per cent. That path is the explanation: four conditions, one prediction. A customer-facing summary writes itself: "your application was treated as higher risk because utilisation is above 60 per cent and tenure is below two years, partially offset by no delinquency in the last 12 months". This is the kind of explanation that satisfies the GDPR right to meaningful information about automated decisions, and it costs nothing because the tree was the model in the first place.</p>
+
+  <p>The same explanation breaks down once the model is a random forest of 500 trees, because each tree gives a different path and the prediction is an average. There is no single path to quote. Methods that recover a tree-path-like explanation for ensembles (TreeSHAP, tree interpreter, local surrogate models) are covered in the next lecture and are computed on top of the model rather than read off it.</p>
+
+  <h3>Ensemble feature importance</h3>
+
+  <p>A tree ensemble extends impurity importance from a single tree to many. For a <strong>random forest</strong> (covered in <a href="../03_supervised_learning/05-ensemble_learning.html">ensemble learning</a>), the importance of feature $X_j$ is the average of $\Delta \operatorname{Gini}$ (or $\Delta \operatorname{MSE}$) for $X_j$ across all trees in the forest, weighted by sample sizes. Bagging stabilises the ranking compared to a single tree, but the high-cardinality bias remains and is sometimes worse: each bootstrap sample gives a high-cardinality feature multiple chances to look predictive.</p>
+
+  <p>For <strong>gradient boosting</strong> the picture is more complex because there are several reasonable definitions of importance. <strong>Gain</strong> is the average impurity reduction across all splits that used the feature, weighted by the sample size at each split. This is the closest analogue to random-forest importance and the most commonly reported. <strong>Weight</strong> (also called frequency) is simply the number of splits in which the feature appears, with no impurity weighting; it overrates features that produce many small splits and underrates features that produce a few decisive ones. <strong>Cover</strong> is the average number of observations affected by splits on the feature; it captures how widely the feature acts in the dataset rather than how much it reduced the loss. The three can disagree substantially. A feature that appears in many shallow splits will dominate weight but not gain; a feature that produces one large impurity reduction near the root will dominate gain but not weight.</p>
+
+  <p>The XGBoost, LightGBM, and CatBoost libraries each expose all three importances (and more besides: total gain, total cover, split count). Defaults differ: XGBoost defaults to weight unless you ask for gain, scikit-learn's <code>HistGradientBoostingClassifier</code> reports a Gini analogue, LightGBM reports split count under <code>importance_type="split"</code> and gain under <code>importance_type="gain"</code>. The single most common error in production model reports is comparing a "feature importance" from one library to one from another without checking which definition each is using. The rankings are not comparable.</p>
+
+  <p>Boosting introduces one further complication absent from random forests. Trees in a boosted ensemble are correlated by construction: each tree is fit on the residuals of the previous one, so the second tree depends on what the first chose to split on, and so on down the sequence. A feature that wins the first split tends to win subsequent splits too, because the residual landscape has been carved by the first split's logic. This produces a tendency to <strong>over-attribute importance to a feature that won the initial competition</strong>, even when an alternative feature was almost as good. The pathological case is two near-substitutable features: in a single tree they would be ranked roughly equally; in a boosted ensemble the one that happens to win round one may have ten times the importance of the loser. Permutation importance and SHAP values, both model-agnostic methods covered in the next lecture, partially correct for this.</p>
+
+  <p>A practical implication for model monitoring. Two production runs of an XGBoost model on slightly different feature matrices can produce very different importance rankings even when their predictions are nearly identical. The reason is not that the model has changed, but that a re-shuffling of the first-split competition has reallocated credit across the correlated features. A model-monitoring dashboard that flags "drift in feature importance" as a leading indicator of model degradation will misfire constantly unless the importance metric is replaced with something more stable. Reporting the predictions, residuals, and calibration directly is more informative than reporting feature-importance drift.</p>
+
+  <h3>Practical summary: which explanation goes with which model</h3>
+
+  <p>A short routing rule, since the choices stack up across the lecture. If the model is a linear regression, report the standardised coefficients, the raw coefficients, the standard errors, the p-values, the 95 per cent confidence intervals, and the residual diagnostics. If the model is a logistic regression, report the coefficients in log-odds space, the odds ratios, and the marginal probability change at the relevant baseline (the population mean for the overall story, the customer's own predicted probability for a customer-facing story). If the model is a single decision tree, draw the tree and quote the path for any individual prediction; the impurity-based importance is a useful global summary but is biased and unstable enough to need a permutation-importance sanity check. If the model is a random forest, the average impurity importance is acceptable as a coarse ranking but should not be relied on as a precise ordering. If the model is a gradient-boosting ensemble, pick one importance type (gain is the default recommendation), pin it explicitly in every report, and supplement with permutation importance or SHAP for anything that will be used to justify a decision.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for most misreadings of a model-specific explanation. Each is invisible if the explanation is taken at face value and obvious once the underlying assumption is checked.</p>
+
+  <div class="callout warn">
+    <span class="tag">Coefficients on correlated features</span>
+    Two features with correlation above about 0.7 produce coefficients whose individual interpretation is unreliable. The "holding all other features constant" counterfactual is not in the support of the data, the standard errors inflate, the signs may flip on small changes in the sample, and a coefficient that is significant in one fold becomes non-significant in another. The fix is to detect the problem (variance inflation factor above 5 to 10), then either drop one of the correlated features, combine them (sum, ratio, or principal component), or accept that the joint effect is interpretable but the individual coefficients are not. The diagnostics belong to <a href="../07_model_evaluation/02-regression_diagnostics.html">regression diagnostics</a>; the remedies belong here.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Odds ratios read as probability ratios</span>
+    Senior stakeholders frequently read "the odds ratio is 2" as "the probability doubles". This is wrong unless the baseline probability is small. At a baseline of one per cent, an odds ratio of two takes $p$ from 0.01 to about 0.0198, so the probability roughly doubles. At a baseline of 30 per cent, the same odds ratio takes $p$ from 0.30 to about 0.46, which is a 1.5-times multiplier on probability and not a doubling. The fix is to report the probability change at the relevant baseline alongside the odds ratio, never the odds ratio alone. The diagram in section 3 is the visual form of this point.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">High-cardinality feature dominates impurity importance</span>
+    A model accidentally trained with a quasi-identifier (customer ID, postcode, transaction reference) will show that feature at the top of the impurity importance ranking. The reason is mechanical, not predictive: a feature with more split points has more chances to find a low-impurity partition by chance. The fix is to use permutation importance or SHAP as a sanity check on any impurity-based ranking, and to remove identifiers from the feature matrix before fitting (a common mistake when feature pipelines auto-include everything not explicitly excluded). If a high-cardinality feature is genuinely predictive, both importance methods will rank it highly; if the importance is an artefact, only impurity will.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Mixing importance types across libraries</span>
+    A monthly model-monitoring report compares "feature importance" from a new LightGBM model against the previous quarter's "feature importance" from an XGBoost model. The two libraries default to different importance types (split count for LightGBM, weight for XGBoost in older versions, gain in newer ones), and the rankings are not comparable. The drift the report flags is an artefact of the comparison. The fix is to pin the importance type explicitly in every report (<code>importance_type="gain"</code> in both libraries, or compute permutation importance using the same routine on both models) and to document which definition is in use on the model card. Defaults will change between library versions; the documentation must be defensive against that.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Model-specific interpretation works because the model class was chosen to be interpretable in the first place. Linear regression coefficients are the marginal effects on the response, in the units of the response, conditional on the other features being held constant. Logistic regression coefficients are the same idea in log-odds space, with two further readings: the multiplicative effect on odds via exponentiation, and the non-linear baseline-dependent effect on probability via the logistic link. Decision trees are their own explanation, with impurity-based feature importance as a numeric summary. Tree ensembles extend the same idea across many trees, with gain, weight, and cover as the standard variants that disagree more often than reporters realise. Underneath every one of these explanations is an assumption: features can be held constant, the assumed link function is correct, the impurity reduction reflects predictive contribution rather than cardinality, the trees are independent enough for the importance to be stable. Knowing the assumption is the same as knowing when to trust the explanation.</p>
+
+  <p>What this lecture deliberately did not cover. It did not address explanations that are computed on top of a model without using the model's structure (permutation importance, partial dependence plots, individual conditional expectation, SHAP values, LIME). Those are the subject of <a href="03-model_agnostic_methods.html">lecture 41</a> and exist precisely because the constraints required for model-specific interpretation (linearity, additivity, a small number of features, a tree structure) sacrifice predictive power that is sometimes unaffordable. Nor did it cover counterfactual explanations, which compute the smallest change to a feature vector that would flip a prediction; those belong with model-agnostic methods because they treat the model as a black-box predictor.</p>
+
+  <p>Lecture 41 picks up the case where the model is a deep neural network, a stacked ensemble, or a complex gradient-boosted tree with a hundred features and a five-deep interaction structure. The model-specific explanations in this lecture no longer apply (a deep net has no coefficients to read, a stacked ensemble has no single tree path, a hundred-feature boosting model has importances that are not stable enough to defend). The model-agnostic toolkit replaces them by perturbing inputs, observing predictions, and summarising the relationship in ways that are faithful to the model's actual behaviour rather than to its parameters. The trade-off is approximation: the explanation is built from samples, has variance, and depends on the baseline distribution used for the perturbations.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the interpretation of a linear regression coefficient $\beta_j$, including the assumption that makes the interpretation valid, and explain why correlated features undermine that assumption.</li>
+      <li>A logistic regression has $\beta_{\text{util}} = 0.85$ on a standardised utilisation feature and intercept tuned so the baseline default rate is five per cent. Compute the odds ratio for a one-standard-deviation increase in utilisation, and the new probability of default at that point.</li>
+      <li>Why is the probability change from a unit increase in $X_j$ not constant in logistic regression, and at what baseline probability is it largest?</li>
+      <li>Define mean decrease in impurity for a decision tree and state two reasons why it is biased toward high-cardinality features.</li>
+      <li>A gradient-boosting model reports a different feature ranking under <code>importance_type="weight"</code> than under <code>importance_type="gain"</code>. Which one is closer to a random forest's impurity importance, and why might they disagree?</li>
+      <li>Explain why boosted trees can over-attribute importance to a feature that wins the first split, and name one model-agnostic method from the next lecture that partially corrects for this.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 41 (<a href="03-model_agnostic_methods.html">model-agnostic methods</a>) covers permutation importance, partial dependence, ICE plots, SHAP, and LIME for models without an interpretable structure.</li>
+      <li><strong>Previous:</strong> Lecture 39 (<a href="01-explaining_models.html">explaining models</a>) set out the case for interpretation as a stage of the ML lifecycle and distinguished local from global, model-specific from model-agnostic.</li>
+      <li><strong>Prerequisite:</strong> Decision tree mechanics in <a href="../03_supervised_learning/02-decision_trees.html">supervised learning lecture 2</a> and ensemble construction in <a href="../03_supervised_learning/05-ensemble_learning.html">ensemble learning</a>; the impurity definitions and the boosting sequence here are taken as given from those lectures.</li>
+      <li><strong>Prerequisite:</strong> Linear regression diagnostics in <a href="../07_model_evaluation/02-regression_diagnostics.html">regression diagnostics</a> and the GLM theory in <a href="../../statistics/05-generalised_linear_models.html">generalised linear models</a> determine when the coefficient interpretations in this lecture are valid in the first place.</li>
+      <li><strong>Outside this course:</strong> Coefficient-based explanations are the regulator-preferred form in retail credit scoring, where a logistic regression on WoE-encoded features lands in the IFRS 9 ECL pipeline and the Pillar 1 A-IRB capital pipeline alike. The application-scoring track at <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/index.html">application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/</a> shows how the explanation flows into the regulatory documentation.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Model interpretation course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 40 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

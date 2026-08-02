@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EAD feature engineering: reduction and transformation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>EAD feature engineering: reduction and transformation</h1>
+  <p class="subtitle">Apply the two-pipeline pattern from PD and LGD to the EAD context: reduce the candidate feature set on the development sample, then transform each survivor so it is well-behaved in the GLM link space. Three EAD-specific adjustments fall out: univariate screening uses R-squared and Lift ratio (not IV / Gini), the utilisation feature dominates and is treated explicitly, and the transformation pipeline caps EASFs at the 1st and 99th percentiles for live-use stability.</p>
+  <div class="meta">
+    <span>A-IRB 26 of n &mdash; EAD 4 of 7</span>
+    <span>Reading time, 28 minutes</span>
+    <span>Sources: <code>04_feature_engineering/ead/05-variable-reduction.md</code>, <code>06-variable-transformation.md</code>; supplemented from <a href="12-pd_feature_engineering.html">lecture 12</a> and <a href="19-lgd_feature_engineering.html">lecture 19</a>.</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">EAD feature engineering follows the two-pipeline pattern established in PD lecture 12 and adapted in LGD lecture 19. A five-step <strong>reduction</strong> pipeline screens the candidate set (data quality, predictive-power screening, correlation clustering, PCA clustering, collinearity assessment); a five-step <strong>transformation</strong> pipeline conditions the survivors (special-value treatment, missing-value imputation, outlier capping, scaling, monotonising transformation). The output is 15 to 25 features ready to enter the GLM in lecture 27.</p>
+
+  <p>Three EAD-specific adjustments matter. First, the <strong>predictive-power screen uses R-squared and Lift ratio</strong> rather than IV and Gini. IV and Gini are designed for binary targets; the EADF target is continuous (in [0, 1+]), so the screen needs continuous-target metrics. R-squared captures linear fit; the Lift ratio captures discriminatory power as the ratio of top-decile mean to overall mean. Second, the <strong>utilisation feature is treated explicitly</strong>: at-observation utilisation alone explains 40 to 60% of EADF variance and is typically protected from the reduction pipeline (similar to how bureau scores are protected in PD). Third, <strong>outlier capping uses the 1st and 99th percentiles consistently</strong>: variables, predicted EADF and realised EADF are all capped at the same thresholds during development; this prevents extreme observations from dominating GLM coefficients and matches the operational requirement of capping live EAD predictions at sensible upper bounds.</p>
+
+  <p>The transformation pipeline ends in <strong>log-link space</strong> rather than logit-link space when the GLM uses a Gaussian + Identity or Gamma + Log specification. For Beta GLMs with logit link, the transformation pipeline matches the PD logit-space pattern. The GLM choice in lecture 27 therefore feeds back into the transformation step here; the modelling team usually picks the GLM specification before finalising transformation choices.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The EAD feature-engineering pipeline is structurally simpler than either PD or LGD. The sample is smaller than PD but larger than LGD, the target is continuous but well-behaved (most mass between current utilisation and 1), and one feature (utilisation) does most of the explanatory work. The discipline is the same as PD: five-step reduction, five-step transformation, per-segment if segmentation is in play. The differences are in metric choice and outlier treatment; the structure is the same funnel pattern in a smaller, cleaner instance.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The shift from IV / Gini to R-squared / Lift is not optional. IV is computed by binning the target and the feature, computing the Weight of Evidence per bin, and summing the IV contributions; the procedure assumes a binary target with two clearly distinguished classes. Applied to a continuous target, IV requires arbitrary binning of the EADF, which introduces both information loss and design choices that the supervisor will probe. The continuous-target metrics avoid the binning problem: R-squared is a standard regression diagnostic, Lift is a rank-based ratio that captures the spread between high-prediction and average prediction.</p>
+
+  <p>The protected status of utilisation matters because of how much of the work it does. Empirical studies (Tong 2016 and others) consistently show that at-observation utilisation is the single strongest predictor of EADF, with R-squared values in the 0.4 to 0.6 range against the realised target. Dropping utilisation through the reduction pipeline because of correlation with other utilisation-like features (utilisation 6 months ago, utilisation trend, bureau utilisation) would lose the dominant signal. The standard approach is to protect at-observation utilisation in step 1 of the reduction pipeline, then let the correlation-clustering step drop the secondary utilisation variables that are highly correlated with it.</p>
+
+  <p>The outlier-capping discipline matters operationally. EADFs above 1 are operationally valid (limit decreases between observation and default; late post-observation drawdowns) but rare; without capping they pull GLM coefficients in directions that produce poor in-population fit. The 1st / 99th percentile cap is the standard supervisory-accepted treatment. The same cap is applied to predicted EADFs in live use; this ensures the bank's deployed EAD numbers do not produce nonsensical capital allocations on edge cases.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The EAD funnel has the same shape as the PD funnel. The diagram below shows the two pipelines side by side with the three EAD-specific adjustments called out.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EAD feature engineering pipelines">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">EAD feature engineering: reduction and transformation pipelines (EAD adjustments highlighted)</text>
+
+      <!-- Reduction column -->
+      <g>
+        <rect x="40" y="50" width="380" height="380" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.3"/>
+        <text x="230" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Reduction pipeline (5 steps)</text>
+
+        <rect x="60" y="90" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="108" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">1. Data quality</text>
+        <text x="230" y="124" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">drop no-variance, &gt;100 cats, dates, &gt;20% missing; protect utilisation_t</text>
+
+        <rect x="60" y="155" width="340" height="50" fill="#fee2e2" stroke="#991b1b"/>
+        <text x="230" y="173" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">2. Predictive-power screen (EAD-specific)</text>
+        <text x="230" y="189" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">R-squared, Lift ratio (not IV / Gini); drop below 50th percentile</text>
+
+        <rect x="60" y="220" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="238" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">3. Correlation clustering</text>
+        <text x="230" y="254" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">Pearson + Spearman; 99% / 85% / 70% iterations</text>
+
+        <rect x="60" y="285" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="303" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">4. PCA-based clustering</text>
+        <text x="230" y="319" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">15-25 clusters (tighter than PD); keep top + dissimilar within</text>
+
+        <rect x="60" y="350" width="340" height="50" fill="#fff" stroke="#1e3a8a"/>
+        <text x="230" y="368" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#1e3a8a">5. Collinearity assessment</text>
+        <text x="230" y="384" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">VIF &lt; 2 (LGD-tight); condition index &lt; 20</text>
+      </g>
+
+      <!-- Transformation column -->
+      <g>
+        <rect x="460" y="50" width="380" height="380" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="650" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">Transformation pipeline (5 steps)</text>
+
+        <rect x="480" y="90" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="650" y="108" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">1. Special-value treatment</text>
+        <text x="650" y="124" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">codes 997/998/999; monotonicity check</text>
+
+        <rect x="480" y="155" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="650" y="173" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">2. Missing-value imputation</text>
+        <text x="650" y="189" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">MAR / structural &rarr; nearest decile; MNAR &rarr; 0</text>
+
+        <rect x="480" y="220" width="340" height="50" fill="#fee2e2" stroke="#991b1b"/>
+        <text x="650" y="238" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">3. Outlier capping (EAD-specific)</text>
+        <text x="650" y="254" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">cap variables AND predicted EADF at 1st / 99th percentile</text>
+
+        <rect x="480" y="285" width="340" height="50" fill="#fff" stroke="#0f766e"/>
+        <text x="650" y="303" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#134e4a">4. Scaling / normalisation</text>
+        <text x="650" y="319" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">log / sqrt for concentrated extremes</text>
+
+        <rect x="480" y="350" width="340" height="50" fill="#fee2e2" stroke="#991b1b"/>
+        <text x="650" y="368" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">5. Monotonising (GLM link space)</text>
+        <text x="650" y="384" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">log (Gaussian / Gamma) or logit (Beta) depending on GLM choice</text>
+      </g>
+    </svg>
+    <figcaption>EAD feature-engineering pipelines. The funnel shape and step names are identical to PD lecture 12. Three steps (highlighted in red) carry EAD-specific adjustments: step 2 of reduction uses R-squared and Lift instead of IV and Gini, step 3 of transformation caps both variables and predicted EADF at 1st / 99th percentiles for live-use stability, step 5 of transformation operates in the GLM-specific link space (log for Gaussian / Gamma, logit for Beta).</figcaption>
+  </figure>
+
+  <p>Three properties of the EAD funnel are worth noting. First, the <strong>protected list expands beyond PD</strong>: at-observation utilisation is added to the protected feature list (along with the standard target / identifier / bureau / application-form variables) because of its dominant predictive power. Second, the <strong>collinearity thresholds match LGD's tightness</strong> (VIF &lt; 2, CI &lt; 20) because the EAD sample is closer in size to LGD than PD. Third, the <strong>transformation pipeline's final step depends on the downstream GLM specification</strong>: the modelling team picks the GLM (Gaussian + Identity, Gamma + Log, or Beta + Logit) before finalising transformation choices, since the link function determines which space "monotone in the link" actually means.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The candidate feature set</h3>
+
+  <p>From <a href="24-ead_target_and_data.html">lecture 24</a>, the EAD feature families:</p>
+
+  <ul>
+    <li><strong>At-observation</strong>: utilisation_t, drawn balance_t, limit_t, days-past-due_t, transactor / revolver flag, age on book, segment / product type, channel</li>
+    <li><strong>Pre-observation trend</strong>: balance trend, utilisation trend, count of limit changes, payment regularity, draw volatility</li>
+    <li><strong>Macroeconomic</strong>: unemployment rate, credit-card industry utilisation, consumer-confidence index, regional HPI</li>
+  </ul>
+
+  <p>The candidate set typically contains 100 to 300 variables once trend variables, lag windows and bureau-derived features are expanded. The reduction pipeline takes this down to 15 to 25.</p>
+
+  <h3>Reduction Step 1: data quality</h3>
+
+  <p>Same as PD: drop no-variance, &gt;100 categories, dates, &gt;20% missing. The protected feature list (which bypasses reduction) is expanded for EAD:</p>
+
+  <ul>
+    <li><strong>Target-derived</strong>: EAD-at-default, EADF, default date.</li>
+    <li><strong>Identifiers</strong>: facility_id, obligor_id, snapshot date.</li>
+    <li><strong>Product / partner type</strong>: needed for segmentation.</li>
+    <li><strong>At-observation utilisation</strong>: the dominant feature; never reduced.</li>
+    <li><strong>At-observation limit</strong>: needed for the EADF target itself; never reduced.</li>
+    <li><strong>External bureau scores</strong>: as in PD, retained on supervisory expectation grounds even when their EAD predictive power is moderate.</li>
+  </ul>
+
+  <h3>Reduction Step 2: predictive-power screen (R-squared and Lift)</h3>
+
+  <p>For each candidate feature, two metrics are computed against the EADF target.</p>
+
+  <p><strong>R-squared</strong>. Univariate linear regression of EADF on the feature; report the coefficient of determination. Captures the linear-fit quality. For numeric features the standard form; for categorical features, the dummy-encoded version (R-squared of the one-way ANOVA model). Threshold: drop features below the 50th percentile of the R-squared distribution within the sample.</p>
+
+  <p><strong>Lift ratio</strong>. Rank obligors by predicted EADF (univariate model), bin into deciles, take the ratio of mean realised EADF in the top decile to the overall mean:</p>
+
+  <pre><code>Lift = mean(EADF | top decile of predicted EADF)
+       / mean(EADF | full population)
+</code></pre>
+
+  <p>A feature with Lift &gt; 1.5 has strong discriminatory power; Lift between 1.2 and 1.5 is moderate; below 1.2 is weak. Threshold: drop features with Lift below 1.2.</p>
+
+  <p>A feature passes the screen if it satisfies both criteria, or one criterion strongly. Variables that score strongly on one metric but weakly on the other are investigated case-by-case; the standard heuristic is to retain if either metric is in the top 25%.</p>
+
+  <h3>Reduction Step 3: correlation clustering</h3>
+
+  <p>Same as PD: three iterations (99%, 85%, 70%) using Pearson plus Spearman. For EAD, the Spearman correlation is particularly important because utilisation-related features have non-linear but monotonic relationships to each other (current utilisation, 3-month average utilisation, max utilisation in last 6 months are highly Spearman-correlated even when Pearson is moderate).</p>
+
+  <p>The protected feature (at-observation utilisation) survives every iteration. Other utilisation-like features are clustered against it; the highest-R² survivor per cluster is kept.</p>
+
+  <h3>Reduction Step 4: PCA-based clustering</h3>
+
+  <p>Same approach as PD; cluster count capped at 15 to 25 (rather than PD's 35) because of the smaller sample. RS Own / R-squared / Lift ranking within each cluster; top variable retained plus one dissimilar variable where the RS Own structure justifies it.</p>
+
+  <h3>Reduction Step 5: collinearity assessment</h3>
+
+  <p>Tighter than PD: VIF &lt; 2, condition index &lt; 20. One-drop procedure: compute the variance-decomposition matrix, drop the variable contributing most to the largest condition index, refit, repeat until no condition index exceeds 20.</p>
+
+  <h3>Transformation pipeline</h3>
+
+  <p>Steps 1 (special values), 2 (missing values), 4 (scaling) are identical to PD. Two EAD-specific adjustments:</p>
+
+  <h4>Step 3: outlier capping at 1st / 99th percentile</h4>
+
+  <p>Three operational rules:</p>
+
+  <ul>
+    <li><strong>Feature values</strong>: each numeric feature capped and floored at the 1st and 99th percentile of its development-sample distribution. Standard PD treatment.</li>
+    <li><strong>Realised EADF</strong>: the target itself is capped at the 1st and 99th percentile during development. Values below the 1st percentile (rare negative EADFs from data errors) and above the 99th percentile (rare cases where EAD at default exceeded limit at observation by large margins) are clipped to the percentile.</li>
+    <li><strong>Predicted EADF</strong>: the GLM's predicted EADF in production is also capped at the same thresholds. This ensures live EAD predictions remain sensible on outlier facilities and produces a consistent comparison framework when back-testing predicted versus realised.</li>
+  </ul>
+
+  <p>The triple-cap pattern (features, realised, predicted) is the standard supervisory-accepted treatment for EAD outliers and is the documentation pattern the supervisor expects in the validation pack.</p>
+
+  <h4>Step 5: monotonising transformation in GLM link space</h4>
+
+  <p>The transformation aim is the same as PD: make the relationship between feature and target (in link space) approximately linear and monotone. For EAD the link space depends on the GLM choice in lecture 27:</p>
+
+  <table>
+    <thead>
+      <tr><th>GLM choice</th><th>Link function</th><th>Transformation space</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Gaussian + Identity</td><td>identity</td><td>EADF directly; standard regression diagnostics apply</td></tr>
+      <tr><td>Gamma + Log</td><td>log</td><td>log(EADF); right-skewed targets handled naturally</td></tr>
+      <tr><td>Beta + Logit</td><td>logit</td><td>logit(EADF); same machinery as PD</td></tr>
+    </tbody>
+  </table>
+
+  <p>The standard retail-card choice is Gaussian + Identity (the wiki's reference build): the target distribution is approximately symmetric around its mean for performing-book defaults, and the identity link gives interpretable coefficients (a one-unit change in feature produces a beta-unit change in predicted EADF). Tukey's Ladder and the Bulging Rule apply in the relevant link space; for Gaussian + Identity that is the raw EADF space, so the transformation pipeline aims for linearity in untransformed target.</p>
+
+  <h3>Sub-population testing</h3>
+
+  <p>Once the candidate feature set has converged, performance is checked across sub-populations:</p>
+
+  <ul>
+    <li>Utilisation bands at observation (under 30%, 30 to 70%, over 70%): the dominant segmentation dimension.</li>
+    <li>Credit-limit bands: low, medium, high.</li>
+    <li>Product / partner type.</li>
+    <li>Months on book.</li>
+    <li>External score bands.</li>
+  </ul>
+
+  <p>Sub-populations with materially weaker R-squared or higher MAE trigger either segment-specific re-modelling, a partner / product flag, or an MoC overlay.</p>
+
+  <h3>The protected list, expanded</h3>
+
+  <p>The full EAD protected feature list:</p>
+
+  <ol>
+    <li>Target and target-derived: EAD-at-default, EADF, default date.</li>
+    <li>Identifiers: facility_id, obligor_id, snapshot_month.</li>
+    <li>Product / partner type: for segmentation.</li>
+    <li><strong>At-observation utilisation</strong>: dominant feature; never reduced.</li>
+    <li><strong>At-observation limit</strong>: target denominator; never reduced.</li>
+    <li><strong>At-observation drawn balance</strong>: usually paired with utilisation; retained for the same reasons.</li>
+    <li>External bureau scores: retained on supervisory expectation grounds.</li>
+    <li>Application-form variables: retained for use-test alignment with origination.</li>
+  </ol>
+
+  <p>Roughly 8 to 12 features bypass the reduction pipeline; the remaining 100 to 300 candidates pass through the funnel to produce the final 15 to 25 features. The protected features always enter the GLM; the reduction-pipeline survivors compete for the remaining slots.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the metric change from IV / Gini to R-squared / Lift is not cosmetic</strong>. IV and Gini are designed for binary classification and rely on Weight-of-Evidence binning that introduces information loss when applied to continuous targets. R-squared and Lift are designed for continuous targets and stay unbiased throughout the EAD pipeline. Modellers who try to apply IV to EADF (by binning the target) get coefficient instability that does not show up until validation; the metric choice in this lecture is what avoids the problem upstream.</p>
+
+  <p>The second lesson is on <strong>the utilisation feature's dominance</strong>. At-observation utilisation explains 40 to 60% of EADF variance on most retail portfolios; the remaining features add incremental signal but rarely dominant signal. The temptation in modelling is to construct a fancy model with multiple correlated utilisation-like variables and high apparent R-squared; the reality is that one well-transformed utilisation variable plus a handful of complementary features outperforms a many-variable model on OOT. Modellers who resist the urge to over-feature their EADF model produce more robust scorecards.</p>
+
+  <p>The third lesson is on <strong>the triple-cap discipline</strong>. The PD pipeline caps features but not predicted PD (logistic regression naturally bounds predictions in [0, 1]). The LGD pipeline caps features but typically not predicted LGD (the mixture aggregation naturally bounds composite LGD in [0, 1] though edge cases are rare). The EAD pipeline caps features <em>and</em> predicted EADF <em>and</em> realised EADF, all at the same 1st / 99th percentile thresholds. The triple cap is what makes the model robust in live use; banks that omit the predicted-EADF cap discover edge cases where the model produces nonsensically high EAD numbers months into production.</p>
+
+  <p>The fourth lesson is on <strong>linking the transformation pipeline to the GLM choice</strong>. The transformation pipeline ends in "linearity in link space"; the link space depends on which GLM the model uses. Most retail builds use Gaussian + Identity, which means linearity in raw EADF and the Bulging Rule applies directly. Builds using Gamma + Log or Beta + Logit need to apply the rule in the relevant transformed space. The standard practice is to commit to a GLM choice before finalising transformation; modellers who try to keep all options open through transformation usually find they have to redo the transformation step once the GLM is fixed.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Why does the EAD univariate screen use R-squared and Lift ratio rather than IV and Gini? What problem does using IV on a continuous target introduce?</li>
+    <li>Write the Lift ratio formula. What is the standard cut-off and what does it test?</li>
+    <li>Name three features (in addition to the standard target / ID protected items) that are protected from the reduction pipeline for EAD. For each, explain why.</li>
+    <li>What fraction of EADF variance does at-observation utilisation typically explain in retail unsecured? What does this imply for feature engineering design?</li>
+    <li>Why are the EAD collinearity thresholds (VIF &lt; 2, condition index &lt; 20) tighter than the PD thresholds (VIF &lt; 3, condition index &lt; 30)?</li>
+    <li>Explain the triple-cap discipline (features, realised target, predicted target). What goes wrong if predicted EADF is not capped in production?</li>
+    <li>Three GLM specifications were named for the EAD model. For each, state the link function and the space in which the transformation pipeline's monotonising step operates.</li>
+    <li>A modelling team has not yet decided between Gaussian + Identity and Beta + Logit for the GLM. Can they complete the transformation pipeline? Why or why not?</li>
+    <li>State three sub-population dimensions used to test the candidate feature set before fitting the GLM.</li>
+    <li>The EAD reduction pipeline ends with 15 to 25 features in the final set, of which 8 to 12 are protected. What does this leave for the reduction-pipeline survivors, and what does this imply for the value of feature engineering for EAD specifically?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/ead/05-variable-reduction.md</code> &mdash; R-squared and Lift screen, multivariate GLM step.</li>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/ead/06-variable-transformation.md</code> &mdash; EASF capping at 1st / 99th percentile, predicted-actual capping consistency.</li>
+      <li>Supplementary: the pipeline pattern from <a href="12-pd_feature_engineering.html">PD feature engineering</a>, with EAD-specific adjustments documented here.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="12-pd_feature_engineering.html">PD feature engineering</a> &mdash; the two-pipeline pattern this lecture adapts.</li>
+      <li><a href="19-lgd_feature_engineering.html">LGD feature engineering</a> &mdash; the per-component branching and continuous-target context.</li>
+      <li><a href="23-ead_concept.html">EAD concept</a> &mdash; EADF as the target and the GLM modelling architecture.</li>
+      <li><a href="24-ead_target_and_data.html">EAD target and data</a> &mdash; the three feature families this lecture's pipelines operate on.</li>
+      <li><a href="25-ead_sampling_and_representativeness.html">EAD sampling and representativeness</a> &mdash; the development sample these pipelines run over.</li>
+    </ul>
+
+    <p><strong>Forward references inside the EAD sequence:</strong></p>
+    <ul>
+      <li>27-ead_risk_differentiation (next) &mdash; the GLM fit on the engineered feature set; the GLM choice determines the transformation link space here.</li>
+      <li>28-ead_risk_quantification (planned) &mdash; LRA and downturn calibration.</li>
+      <li>29-ead_testing (planned) &mdash; back-tests on OOS and OOT.</li>
+    </ul>
+
+    <p><strong>Cross-component:</strong></p>
+    <ul>
+      <li>The PD and LGD feature-engineering lectures (12, 19) for the protocol pattern.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>EBA/GL/2017/16 paragraphs on EAD modelling and risk-driver selection.</li>
+      <li>Tong, E. (2016), "A comparison of EAD models in the credit card industry". Empirical evidence on the dominance of utilisation as a predictor.</li>
+      <li>Anderson, R. (2007), <em>The Credit Scoring Toolkit</em>, chapter 14 (revolving products). Feature-engineering practices for credit-card portfolios.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 26 of n &middot; EAD 4 of 7.</span>
+  <span><a href="25-ead_sampling_and_representativeness.html">Previous: sampling and representativeness</a> &middot; <a href="27-ead_risk_differentiation.html">Next: risk differentiation</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

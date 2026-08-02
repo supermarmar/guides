@@ -1,0 +1,397 @@
+﻿<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 6: debugging and profiling</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Debugging and profiling</h1>
+  <p class="subtitle">Tests prevent and detect; debugging diagnoses. This lecture covers the scientific-method discipline that separates surgical debugging from random poking, the Python tools that support it (logging, pdb, faulthandler), and the profiling step that turns "this is slow" into a numbered list of where the time and memory go.</p>
+  <div class="meta">
+    <span>Lecture 6 of 16</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part II: testing and debugging</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Debugging</strong> is the activity of reducing the gap between what a program does and what it is supposed to do. The premise is that the program contains at least one defect, the symptom is observed (a wrong output, an exception, a crash, a slow run, a memory leak), and the goal is to identify the cause precisely enough to fix it. Debugging is mostly a matter of inference, not coding; the actual fix is usually one or two lines once the cause is known.</p>
+
+  <p>Andreas Zeller's <em>Why Programs Fail</em> (2nd edition, 2009) frames debugging as the <strong>scientific method</strong> applied to a misbehaving program. You observe a symptom, form a hypothesis about what could cause it, run an experiment that would distinguish that hypothesis from competitors, and refine until you reach a single explanation that survives every test. The discipline matters because the alternative, "change something and see if it goes away", produces fixes that mask the real cause and reappear elsewhere.</p>
+
+  <p><strong>Profiling</strong> is the corresponding activity for performance. "The program is slow" or "the program uses too much memory" are symptoms; the profiler tells you which function, which line, which allocation is responsible. Donald Knuth's much-quoted "premature optimisation is the root of all evil" (Knuth 1974) is, in full, "We <em>should</em> forget about small efficiencies, say about 97 per cent of the time: premature optimisation is the root of all evil. Yet we should not pass up our opportunities in that critical 3 per cent." The profiler is what tells you which 3 per cent.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A bug is a difference between your mental model of the program and the program itself. The model says "this function returns the discount-adjusted price"; the program says "it returns the gross price minus zero, because the discount lookup silently fails". Debugging is the process of finding which of the two is wrong (almost always the model), and updating it. The reason the discipline is hard is that the wrong half of the model is exactly the half you do not know is wrong: you cannot just inspect your own assumptions, because the wrong ones are the ones that feel obvious.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The deepest bugs are not in the code but in the specification: the code does exactly what its author intended, and the intention was wrong. Naur's "Programming as theory building" essay (Lecture 1) is the canonical statement of why these are the hardest bugs to find: the theory in the team's heads diverges from the world, and no inspection of the source can detect that. The remedy is conversation with the people who know the world, not better debugging tools.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Two empirical observations motivate the discipline. The first is that debugging absorbs an unusually large fraction of professional time. Britton, Jeng, Carver, Cheak and Katzenellenbogen (Cambridge 2012) measured a sample of developers and found 50 to 75 per cent of time was spent on activity that could be classed as debugging or its prevention. Whatever the exact number, the order of magnitude is robust across surveys: debugging is the single largest line item in the engineering budget, larger than writing new features. Improving it by even 20 per cent is therefore more valuable than improving any other phase.</p>
+
+  <p>The second is that debugging is unevenly distributed across engineers. The same study, and the much longer informal record of Brooks's <em>Mythical Man-Month</em>, finds productivity differences between engineers of roughly an order of magnitude, with the gap most pronounced when the task is diagnosing existing problems. The gap is almost entirely a matter of <em>method</em>: experienced engineers use the scientific approach; inexperienced engineers change the code at random. The cost of acquiring the method is one careful session with a hard bug; the saving is permanent.</p>
+
+  <p>The performance argument is symmetric. A program that is 10x slower than necessary costs 10x in cloud bills, 10x in user latency, and an unbounded amount in opportunity (some features only ship at all if they fit a budget). Profiling, like debugging, is a method rather than a tool: the tool is two commands, the method is the discipline of measuring before guessing.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Scientific debugging (Zeller)</h3>
+
+  <p>Zeller's framing turns debugging into a four-step loop, modelled on the scientific method:</p>
+
+  <figure>
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zeller's scientific debugging loop">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Zeller's scientific debugging loop</text>
+
+      <defs>
+        <marker id="ar-zell" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#7B61FF"/>
+        </marker>
+      </defs>
+
+      <!-- Four nodes in a loop -->
+      <g font-family="Inter" font-size="12" font-weight="600">
+        <circle cx="200" cy="100" r="60" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="200" y="95"  text-anchor="middle" fill="#3D2EB5">1. Observe</text>
+        <text x="200" y="113" text-anchor="middle" font-weight="400" fill="#37352F" font-size="10">symptom in detail</text>
+
+        <circle cx="560" cy="100" r="60" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2"/>
+        <text x="560" y="95"  text-anchor="middle" fill="#1E9D54">2. Hypothesise</text>
+        <text x="560" y="113" text-anchor="middle" font-weight="400" fill="#37352F" font-size="10">what could cause it</text>
+
+        <circle cx="560" cy="240" r="60" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="560" y="235" text-anchor="middle" fill="#C76B2A">3. Predict</text>
+        <text x="560" y="253" text-anchor="middle" font-weight="400" fill="#37352F" font-size="10">what an experiment</text>
+        <text x="560" y="267" text-anchor="middle" font-weight="400" fill="#37352F" font-size="10">would show</text>
+
+        <circle cx="200" cy="240" r="60" fill="#FBEDE4" stroke="#F08C42" stroke-width="2"/>
+        <text x="200" y="235" text-anchor="middle" fill="#C76B2A">4. Experiment</text>
+        <text x="200" y="253" text-anchor="middle" font-weight="400" fill="#37352F" font-size="10">change one thing,</text>
+        <text x="200" y="267" text-anchor="middle" font-weight="400" fill="#37352F" font-size="10">observe outcome</text>
+      </g>
+
+      <!-- Arrows -->
+      <g fill="none" stroke="#7B61FF" stroke-width="2">
+        <path d="M 262 95 L 498 95" marker-end="url(#ar-zell)"/>
+        <path d="M 560 162 L 560 178" marker-end="url(#ar-zell)"/>
+        <path d="M 498 245 L 262 245" marker-end="url(#ar-zell)"/>
+        <path d="M 200 178 L 200 162" marker-end="url(#ar-zell)"/>
+      </g>
+
+      <!-- Centre note -->
+      <text x="380" y="170" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#5C5B57">If the experiment disconfirms, revise the hypothesis.</text>
+      <text x="380" y="186" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#5C5B57">If it confirms, narrow further. Repeat until unique.</text>
+    </svg>
+    <figcaption>The loop is exactly Popper's hypothetico-deductive method, applied to a misbehaving program rather than a misbehaving theory. Each turn of the loop should be a deliberate single change to a single variable; changing two things at once is the most common mistake an inexperienced debugger makes, because either change could explain the result.</figcaption>
+  </figure>
+
+  <p>The crucial discipline is that each turn of the loop must <em>distinguish</em> hypotheses. A debugger who keeps running the same failing test learns nothing on each iteration. A debugger who, on each iteration, changes exactly one variable and predicts a specific outcome learns one bit per turn; in log<sub>2</sub>(N) iterations they will have isolated the cause from N candidates.</p>
+
+  <h3>Agans's nine rules</h3>
+
+  <p>David Agans's <em>Debugging</em> (2002) is the most-cited practitioner book on the subject. The book is one rule per chapter; the rules together are an excellent checklist.</p>
+
+  <ol>
+    <li><strong>Understand the system.</strong> Read the documentation; know what it is supposed to do before you ask why it is not.</li>
+    <li><strong>Make it fail.</strong> Reproduce the bug. If you cannot, you cannot debug it.</li>
+    <li><strong>Quit thinking and look.</strong> Get the actual data: logs, values, traces. Your model of the program is suspect by definition; the program itself is the ground truth.</li>
+    <li><strong>Divide and conquer.</strong> Binary search the code or the input. Bisect commits with <code>git bisect</code>.</li>
+    <li><strong>Change one thing at a time.</strong> Otherwise you do not know which change mattered.</li>
+    <li><strong>Keep an audit trail.</strong> Write down each hypothesis, each experiment, each result. Hard bugs take hours; you will lose your place.</li>
+    <li><strong>Check the plug.</strong> The obvious-but-stupid cause is the cause more often than your pride lets you accept.</li>
+    <li><strong>Get a fresh view.</strong> Explain the bug to a colleague (or a rubber duck). Often the explanation is the diagnosis.</li>
+    <li><strong>If you didn't fix it, it ain't fixed.</strong> Resist the temptation to believe a bug "just went away". It will return at the worst time.</li>
+  </ol>
+
+  <h3>Profiling: the same loop for performance</h3>
+
+  <p>Profiling is the equivalent loop for performance bugs. Observe the symptom ("this script takes 30 minutes"), hypothesise where the time goes, measure with a profiler to confirm or refute, change one thing, measure again. Without measurement, performance work is guessing, and almost everyone guesses wrong: human intuition about where time goes in a program is famously bad. Knuth's "97 per cent" line is partly a statement about this fact.</p>
+
+  <p>Profilers come in two flavours. A <strong>deterministic</strong> profiler instruments every function call (cProfile, the Python default); accurate but slows the program by 10-100x. A <strong>sampling</strong> profiler interrupts the program at fixed intervals and records the stack (py-spy, scalene); approximate but adds 1-5 per cent overhead. For production-like workloads, prefer sampling; for small benchmarks, prefer deterministic.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Reading a Python stack trace</h3>
+
+  <p>The first artefact every debugger reads is the <strong>stack trace</strong> Python prints when an exception is unhandled. A trace has three structural pieces: the chain of frames (each line is one function call), the location within each frame (file and line number), and the exception type plus message at the bottom. Read it from the bottom up: the exception name and message are the symptom; the deepest frame is where the program actually failed; the frames above are how it got there.</p>
+
+  <pre><code>Traceback (most recent call last):
+  File "main.py", line 42, in &lt;module&gt;
+    run_pipeline("input.csv")
+  File "src/pipeline.py", line 15, in run_pipeline
+    scores = compute_pd(df)
+  File "src/pricing.py", line 87, in compute_pd
+    return df["score"] / df["normaliser"]
+ZeroDivisionError: float division by zero</code></pre>
+
+  <p>The exception type tells you the genus of fault. <code>KeyError</code> means a dict lookup missed; <code>AttributeError</code> means an object did not have the named attribute (almost always a typo or a None where you expected an object); <code>IndexError</code> means an out-of-range sequence access; <code>TypeError</code> means an operation was applied to a value of the wrong type. Each has a small set of typical causes; learning the catalogue is one of the highest-leverage parts of becoming fluent.</p>
+
+  <p>For exceptions raised inside another exception ("during handling of the above exception, another exception occurred"), Python prints both with a separator. Read each chain from the bottom: the original cause is the most informative, even when the surface message is about the handler.</p>
+
+  <h3>Three levels of "let me see what is happening"</h3>
+
+  <p>From least to most powerful:</p>
+
+  <p><strong>print debugging</strong> is the unfashionable workhorse. Add a <code>print(x)</code>, run, look, remove. It works on every platform, in every IDE, and in the most hostile environments (production over SSH at 3 a.m.). The two refinements worth the effort: print the variable name with the value, and print to <code>stderr</code> so the output is not interleaved with the program's normal output:</p>
+
+  <pre><code>import sys
+
+x = 17
+print(f"DEBUG: x = {x!r}", file=sys.stderr)</code></pre>
+
+  <p>Python 3.8 added a special debug syntax that does both: <code>print(f"{x=}")</code> prints <code>x=17</code>. Use it.</p>
+
+  <p><strong>logging</strong> is print debugging with structure. The standard <code>logging</code> module gives you levels (DEBUG, INFO, WARNING, ERROR, CRITICAL), per-module loggers, and configurable output formatting. The advantage over <code>print</code> is that the logging calls stay in the code; in production you set the level to INFO and the DEBUG calls do nothing; in an outage you set the level to DEBUG and the full trace is available.</p>
+
+  <pre><code>import logging
+
+logger = logging.getLogger(__name__)
+
+def calibrate(scores, odr):
+    logger.debug("calibrating scores=%d odr=%.4f", len(scores), odr)
+    result = ...
+    logger.info("calibration converged in %d iterations", result.iters)
+    return result</code></pre>
+
+  <p>Use <code>%</code>-style placeholders, not f-strings, in log messages: the logging machinery defers string formatting until it knows the log will actually be emitted, saving the cost on filtered-out messages. Configure the logger once, at program start, with <code>logging.basicConfig</code>; never <code>print</code> in library code.</p>
+
+  <p><strong>the debugger</strong> is the most powerful tool. Python ships with <code>pdb</code>; the more user-friendly <code>ipdb</code> wraps it with the IPython REPL. The single-most-useful command is the one-liner that breaks at the current source line:</p>
+
+  <pre><code>breakpoint()       # pauses here; runs the configured debugger (pdb by default)</code></pre>
+
+  <p>Inside the debugger, the eight commands that cover 90 per cent of use:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Command</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>l</code> (list)</td><td>Show source around the current line.</td></tr>
+      <tr><td><code>p &lt;expr&gt;</code></td><td>Print an expression.</td></tr>
+      <tr><td><code>pp &lt;expr&gt;</code></td><td>Pretty-print (for dicts, lists).</td></tr>
+      <tr><td><code>n</code> (next)</td><td>Step to the next line, skipping into calls.</td></tr>
+      <tr><td><code>s</code> (step)</td><td>Step into the next call.</td></tr>
+      <tr><td><code>c</code> (continue)</td><td>Resume until the next breakpoint.</td></tr>
+      <tr><td><code>w</code> (where)</td><td>Show the stack.</td></tr>
+      <tr><td><code>u</code>, <code>d</code></td><td>Move up/down the stack frames.</td></tr>
+      <tr><td><code>b &lt;file:line&gt;</code></td><td>Set a breakpoint.</td></tr>
+      <tr><td><code>q</code> (quit)</td><td>Exit.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Modern IDEs (PyCharm, VS Code) wrap pdb in a graphical interface. The commands are the same; the GUI just makes the current state visible. For headless or remote use, the raw REPL is faster.</p>
+
+  <h3>Post-mortem debugging</h3>
+
+  <p>When a test or script fails with an unhandled exception, you can launch the debugger at the exact point of failure rather than re-running with a breakpoint. The <code>--pdb</code> flag does this for pytest:</p>
+
+  <pre><code>pytest --pdb            # drop into pdb on the first failure
+python -m pdb script.py # debug a crash, replaying it
+import pdb; pdb.pm()    # post-mortem of the last unhandled exception</code></pre>
+
+  <p>This is the single largest debugging time-saver most engineers do not know about. Instead of inserting <code>breakpoint()</code> calls and re-running, you let the failure happen and then inspect the corpse.</p>
+
+  <h3>Common bug genera</h3>
+
+  <p>A short taxonomy worth recognising. Naming the genus often suggests the fix.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Genus</th><th>Symptom</th><th>Typical cause</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Off-by-one</td><td>First or last item missing or doubled.</td><td>Confusion between inclusive and exclusive ranges; <code>range(n)</code> stops before n.</td></tr>
+      <tr><td>None-where-an-object-was-expected</td><td><code>AttributeError</code> on the next line.</td><td>A function returned <code>None</code> to signal "missing"; the caller did not check.</td></tr>
+      <tr><td>Aliasing</td><td>One mutable object changes when you change a "copy" of it.</td><td>Assignment shares references; use <code>copy</code> or <code>deepcopy</code>.</td></tr>
+      <tr><td>Mutable default</td><td>Function accumulates state across calls.</td><td>The <code>def f(x=[])</code> anti-pattern from Lecture 2.</td></tr>
+      <tr><td>Type mismatch</td><td>String concatenated with number, or pandas index misaligned.</td><td>Implicit conversion; missing <code>str()</code> or <code>int()</code> at the boundary.</td></tr>
+      <tr><td>Race / order</td><td>Bug appears only sometimes.</td><td>Concurrent access, ordering of dict iteration in old Python, randomness without a seed.</td></tr>
+      <tr><td>Encoding</td><td>Mojibake on output, or <code>UnicodeDecodeError</code>.</td><td>Bytes treated as a particular encoding when they are not.</td></tr>
+      <tr><td>Floating-point</td><td><code>0.1 + 0.2 != 0.3</code>; test fails by 1e-16.</td><td>Binary floats cannot represent decimal fractions exactly; use <code>math.isclose</code>.</td></tr>
+      <tr><td>Specification</td><td>Code does what was asked; output is wrong.</td><td>Talk to the stakeholder; the bug is in the requirements.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>git bisect: binary search through history</h3>
+
+  <p>When a bug was introduced by some commit between "yesterday it worked" and "today it doesn't", <code>git bisect</code> binary-searches the history. Mark a known-bad commit, mark a known-good one, and git checks out the midpoint. You test, mark good or bad; it picks the next midpoint; in log<sub>2</sub>(N) steps you arrive at the offending commit. For N = 1024 commits, that is 10 tests.</p>
+
+  <pre><code>git bisect start
+git bisect bad           # current HEAD is broken
+git bisect good v1.2     # a known-good earlier version
+# git checks out the midpoint; run the test
+git bisect good          # if the midpoint works
+# ... or
+git bisect bad           # if it does not
+# repeat until git reports "first bad commit"
+git bisect reset         # return to where you started</code></pre>
+
+  <p>This is profoundly cheap once you have a reproducer and a test command. For a deterministic check (a unit test that fails), pass <code>--bisect-run</code> and a script and walk away.</p>
+
+  <h3>Profiling: where does the time go?</h3>
+
+  <p>The Python standard library ships <code>cProfile</code>, a deterministic profiler:</p>
+
+  <pre><code>python -m cProfile -o profile.out -s cumulative script.py
+
+# Or, in code:
+import cProfile, pstats
+profiler = cProfile.Profile()
+profiler.enable()
+run_pipeline("input.csv")
+profiler.disable()
+pstats.Stats(profiler).sort_stats("cumulative").print_stats(20)</code></pre>
+
+  <p>The output is one row per function: <em>ncalls</em> (how many times it was called), <em>tottime</em> (total time spent in the function, excluding sub-calls), <em>cumtime</em> (total time including sub-calls), <em>percall</em> (average per call), and the function name. Sort by <em>cumtime</em> to see the time spent at the top of the call tree; sort by <em>tottime</em> to see the leaf functions doing the actual work.</p>
+
+  <p>For interpretation, two principles. First, the <strong>Pareto principle</strong> almost always applies: 80 to 95 per cent of the time is in 5 to 20 per cent of the functions. The slowest function is rarely subtle; usually one row at the top dwarfs the rest. Second, the cost of optimisation is the engineering attention you spend; if a function takes 1 per cent of the time, optimising it to zero saves 1 per cent. Spend your attention on the rows at the top, not at the bottom.</p>
+
+  <p>For long-running or production workloads, <strong>py-spy</strong> is a sampling profiler that attaches to a running process without modifying the code:</p>
+
+  <pre><code>pip install py-spy
+py-spy record -o profile.svg --pid &lt;PID&gt;       # produces a flamegraph
+py-spy top --pid &lt;PID&gt;                          # live top-like view</code></pre>
+
+  <p>The output is a <strong>flamegraph</strong> (Gregg 2011, originally for DTrace): the x-axis is the cumulative time fraction across samples; the y-axis is the call stack at the moment of each sample. Wide flames are functions where the program spent its time. Reading flamegraphs is its own skill but the pattern is intuitive: the widest bars at the bottom name the hot paths.</p>
+
+  <h3>Memory profiling</h3>
+
+  <p>Time profilers do not tell you where memory goes. Two tools fill the gap.</p>
+
+  <p><code>tracemalloc</code> is in the standard library and tracks Python-level allocations:</p>
+
+  <pre><code>import tracemalloc
+
+tracemalloc.start()
+run_pipeline("input.csv")
+snapshot = tracemalloc.take_snapshot()
+for stat in snapshot.statistics("lineno")[:10]:
+    print(stat)</code></pre>
+
+  <p><strong>scalene</strong> (Berger et al. 2020) is a third-party profiler that handles time, CPU, and memory together, including line-level resolution and a separate breakdown of Python vs native code. It is the closest thing to a one-stop tool.</p>
+
+  <p>The most common Python memory bug is the <strong>silent accumulation</strong>: a long-running loop appends to a list that is never cleared, or builds an ever-larger pandas DataFrame, or caches everything it sees. The signature in <code>tracemalloc</code> output is a single line of code with steadily-growing allocations. The fix is usually a generator (Lecture 3) or an explicit eviction policy.</p>
+
+  <h3>Big-O: the other reason your program is slow</h3>
+
+  <p>A profiler tells you which function is slow on the inputs you ran. The <strong>complexity</strong> of an algorithm tells you how the time grows as the input grows. A function that is fast on 10 items and slow on 10,000 has an algorithmic problem the profiler will name but not explain. The complexity hierarchy worth committing to memory:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Big-O</th><th>Name</th><th>10x input → time</th><th>Typical operation</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>O(1)</td><td>constant</td><td>×1</td><td>Dict lookup; appending to a list.</td></tr>
+      <tr><td>O(log n)</td><td>logarithmic</td><td>~×1.1</td><td>Binary search; balanced-tree lookup.</td></tr>
+      <tr><td>O(n)</td><td>linear</td><td>×10</td><td>Single pass over a list.</td></tr>
+      <tr><td>O(n log n)</td><td>linearithmic</td><td>~×13</td><td>Sorting; FFT.</td></tr>
+      <tr><td>O(n²)</td><td>quadratic</td><td>×100</td><td>Nested loop over a list; string concatenation in a loop.</td></tr>
+      <tr><td>O(2ⁿ)</td><td>exponential</td><td>×∞</td><td>Brute-force subset enumeration.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The most common algorithmic bug is the inadvertent O(n²): a loop that does an <code>in</code> check on a list (each check is O(n)) instead of a set (O(1)). For small <em>n</em>, the loop is fast; for production-sized <em>n</em>, it dominates. The fix is one character: change <code>[]</code> to <code>set()</code> at the point of construction.</p>
+
+  <div class="worked">
+    <strong>Worked example: a slow pipeline, diagnosed in five steps</strong>
+    <p>Symptom: a calibration pipeline that ran in 2 minutes last quarter now takes 18 minutes on the same hardware.</p>
+    <p>Step 1 (observe). Reproduce: run with the production input on a clean machine. 18 minutes confirmed. Look at the log: no errors, no warnings.</p>
+    <p>Step 2 (hypothesise). Three candidates: (a) the input is 9x bigger; (b) a recent commit introduced an O(n²); (c) the database fixture is slower.</p>
+    <p>Step 3 (experiment). <code>git bisect</code> between last quarter's tag and HEAD with a 1-minute test workload. Twelve bisections later: one commit increases runtime fourfold, and it touched <code>load_calibration_history</code>.</p>
+    <p>Step 4 (verify). Profile that function with cProfile. <code>tottime</code> for one helper, <code>find_segment_history</code>, is 96 per cent of the whole. <code>ncalls</code> is roughly N². The helper does <code>for h in history: if h.segment in segments_of_interest: ...</code>, with <code>segments_of_interest</code> declared as a list.</p>
+    <p>Step 5 (fix). Change <code>segments_of_interest</code> from a list to a set. Re-run: 90 seconds. The other two hypotheses are discarded by the experiment.</p>
+    <p>The total wall-clock time is roughly 30 minutes (the bisection runs and the profile dominate). The fix is one character. Without the discipline, the same diagnosis from "the pipeline is slow" via "let me try a few things" is a day's work.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Debugging is the application of the scientific method to a misbehaving program. Observe the symptom precisely; hypothesise causes that the evidence would let you distinguish; predict what an experiment would show under each hypothesis; run the experiment with one variable changed; repeat. Use logging in preference to <code>print</code>, the debugger in preference to logging, <code>git bisect</code> when the bug is recent, and post-mortem inspection in preference to re-running with breakpoints. Recognise the common genera (off-by-one, None, aliasing, mutable default, type, race, encoding, floating-point, specification); the diagnosis usually follows from the name.</p>
+
+  <p>Profiling is the same loop for performance. Measure first; the human intuition for where time goes is famously bad. Use cProfile for benchmarks, py-spy for production, scalene for combined time-and-memory. Read the output for the Pareto rows at the top. Combine the profiler's diagnosis with the Big-O table to tell the difference between "this function is slow" and "this function is asymptotically wrong".</p>
+
+  <p>Part II is nearly complete. The discipline of tests (Lecture 5) plus the discipline of debugging (this lecture) together cover the verification half of the engineering process when the code is on your laptop: knowing when it is wrong, and finding out why. Lecture 7 turns to the production-side counterpart, logging and observability: how to diagnose a system you cannot attach a debugger to. Part III then turns to documentation, the medium through which the team's theory of the code is communicated and preserved.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State Zeller's four-step loop. What is the difference between an experiment that distinguishes hypotheses and one that does not?</li>
+      <li>List Agans's first four rules in order. Pick one and explain why it is rule number one for that position.</li>
+      <li>Describe the difference between a deterministic and a sampling profiler. When is each the right choice?</li>
+      <li>What is <code>git bisect</code>, and what is its time complexity in the number of commits? What is the prerequisite for using it effectively?</li>
+      <li>Name three Python exception types and a typical underlying cause for each.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="05-testing.html">Lecture 5 (testing)</a> covered prevention and detection; this lecture covers diagnosis.</li>
+      <li><strong>Next:</strong> <a href="07-logging_and_observability.html">Lecture 7 (logging and observability)</a> takes the same diagnostic discipline to production, where you cannot attach a debugger and the only signals are what the code says about itself.</li>
+      <li><strong>Then:</strong> <a href="08-markdown_and_docs.html">Lecture 8 (markdown and documentation)</a> opens Part III by treating the prose that surrounds the code.</li>
+      <li><strong>Cross-link:</strong> <a href="13-git.html">Lecture 13 (git)</a> covers <code>git bisect</code> in more depth; the bisect workflow rewards small, focused commits.</li>
+      <li><strong>Cross-link:</strong> <a href="15-ci_cd.html">Lecture 15 (CI/CD)</a> is where the logging and observability machinery is wired into the deployment pipeline.</li>
+      <li><strong>Outside this course:</strong> Zeller, <em>Why Programs Fail</em> (2nd edition, 2009); Agans, <em>Debugging: The 9 Indispensable Rules</em> (2002); Gregg, <em>Systems Performance</em> (2nd edition, 2020) and the flamegraph essays; Knuth, "Structured programming with go to statements" (1974, source of the "premature optimisation" quote).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 6 of 16</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 10: batch ingestion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Batch ingestion</h1>
+  <p class="subtitle">Ingestion is the one part of a pipeline that shares a boundary with a system whose owners never agreed to your schedule, your schema, or your definition of complete. Everything downstream can be rewritten if it turns out wrong. Data you failed to collect on the night it existed is gone, and no amount of engineering recovers it.</p>
+  <div class="meta">
+    <span>Lecture 10 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part III: ingestion</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Ingestion</strong> moves data from a source system into your platform. Batch ingestion does it in discrete runs on a schedule, which covers the overwhelming majority of banking risk data, because the reporting cycle is monthly and the source systems produce daily extracts.</p>
+
+  <p>Every batch ingestion answers three questions. <em>What do I copy?</em> Either everything (a <strong>full load</strong>) or only what changed since last time (an <strong>incremental load</strong>). <em>How do I know what changed?</em> Either by comparing, by trusting a timestamp column, or by reading the database's own change log (<strong>change data capture</strong>). <em>What happens if this runs twice, or fails halfway?</em> The answer must be "nothing bad", which means the load is idempotent in the sense of Lecture 06.</p>
+
+  <p>The default recommendation is blunter than most architecture writing admits: if a full load fits your window, do a full load. It is trivially correct, it detects deletions and corrections for free, and it has no state to get wrong. Incremental loading is an optimisation you adopt when full loading stops fitting, and it buys performance with a permanent increase in the number of ways the pipeline can be silently wrong.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Three ways to keep up with a newspaper. Reprint the entire archive every morning: expensive, and unambiguously complete. Take delivery of today's edition only: cheap, but if a delivery is missed you have a hole you will not notice for years, and if a page is corrected in a later edition you never learn. Subscribe to the wire service that carries every edit as it is made: complete and current, and considerably more machinery. Full load, incremental load, change data capture. The middle one is where the holes come from.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Silent loss is worse than failure</span>
+    A pipeline that crashes gets fixed, because somebody is paged. A pipeline that ingests 1.94 million of 2.00 million accounts and reports success produces a portfolio that is three per cent too small, an exposure total that is wrong, and a default rate that is subtly off, with no error anywhere. Design ingestion so that incompleteness is loud: reconcile counts and control totals against the source on every run, and fail the load rather than publishing a partial one.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Incremental loads never see a deletion.</strong> If the pipeline asks for rows where <code>updated_at &gt; last_watermark</code>, a row that was deleted from the source produces nothing at all, so your copy keeps it forever. In a bank this shows up as accounts that were opened in error, reversed, and remain in the risk data mart as live exposures. Any incremental design needs an explicit answer for deletions: a soft-delete flag in the source, a periodic full reconciliation, or change data capture that emits delete events.</p>
+
+  <p><strong>Late-arriving data breaks the assumption that a period is ever finished.</strong> Payment corrections, backdated collections outcomes, and manual adjustments arrive weeks after the month they belong to. If the pipeline treats March as closed on 1 April, those corrections either vanish or land in April and misattribute the period. The design question is not whether to allow late arrivals but how wide the restatement window is, and that decision must be explicit, documented, and matched by the reporting process.</p>
+
+  <p><strong>Backfills are a first-class requirement, not an emergency procedure.</strong> A definition changes, a bug is found, a new field becomes available: all three require reprocessing history. A pipeline that can only run for "today" turns each of these into a bespoke project. A pipeline parameterised by date, idempotent per partition, and runnable for an arbitrary range turns them into a loop. Since the second costs almost nothing more to build, building the first is a false economy that is paid for repeatedly.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Full load, incremental load, and change data capture">
+      <defs>
+        <marker id="ar-ing" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three ways to learn what the source knows</text>
+
+      <!-- full -->
+      <rect x="30" y="42" width="700" height="94" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="46" y="64" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">FULL LOAD</text>
+      <text x="46" y="82" font-family="Inter" font-size="10" fill="#0d9488">Copy the whole table each run; replace the target partition wholesale.</text>
+      <text x="46" y="98" font-family="Inter" font-size="10" fill="#115e59">Sees inserts, updates, AND deletions. No state to maintain. Trivially idempotent.</text>
+      <text x="46" y="114" font-family="Inter" font-size="10" fill="#DC2855">Cost grows with table size, not with change volume. Eventually stops fitting the window.</text>
+      <text x="46" y="130" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">Default choice. Use until it does not fit.</text>
+
+      <!-- incremental -->
+      <rect x="30" y="146" width="700" height="110" rx="10" fill="#FEF3C7" stroke="#a16207" stroke-width="2"/>
+      <text x="46" y="168" font-family="Inter" font-size="12" font-weight="700" fill="#713f12">INCREMENTAL LOAD (watermark)</text>
+      <text x="46" y="186" font-family="Inter" font-size="10" fill="#a16207">Ask for rows where updated_at &gt; last successful high-water mark; merge them in.</text>
+      <text x="46" y="202" font-family="Inter" font-size="10" fill="#713f12">Cost grows with change volume. Fits large tables.</text>
+      <text x="46" y="218" font-family="Inter" font-size="10" fill="#DC2855">Blind to deletions. Trusts a timestamp the source may not maintain honestly.</text>
+      <text x="46" y="234" font-family="Inter" font-size="10" fill="#DC2855">Boundary hazards: clock skew, out-of-order commits, ties at the watermark.</text>
+      <text x="46" y="250" font-family="Inter" font-size="10" font-weight="600" fill="#713f12">Needs an overlap window, a merge key, and a periodic full reconciliation.</text>
+
+      <!-- cdc -->
+      <rect x="30" y="266" width="700" height="94" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="46" y="288" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">CHANGE DATA CAPTURE</text>
+      <text x="46" y="306" font-family="Inter" font-size="10" fill="#7c3aed">Read the database's own write-ahead log; receive insert, update, and delete events in commit order.</text>
+      <text x="46" y="322" font-family="Inter" font-size="10" fill="#5b21b6">Complete, ordered, low impact on the source, and it sees deletions and every intermediate state.</text>
+      <text x="46" y="338" font-family="Inter" font-size="10" fill="#DC2855">Needs source cooperation, extra infrastructure, and schema-change handling.</text>
+      <text x="46" y="354" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">Right when the table is large, change is small, and deletions matter.</text>
+
+      <text x="380" y="384" text-anchor="middle" font-family="Inter" font-size="10.5" font-style="italic" fill="#52525b">The progression is downwards in cost per run and upwards in the number of ways to be silently wrong.</text>
+    </svg>
+    <figcaption>The three patterns. Note that the risks are not symmetric: a full load that is too slow fails visibly, whereas an incremental load with a subtly wrong watermark succeeds while quietly losing rows. Prefer the failure mode you will notice.</figcaption>
+  </figure>
+
+  <h3>Watermarks, and the four ways they betray you</h3>
+
+  <p>A <strong>watermark</strong> is the high-water mark of what you have already ingested, usually the maximum <code>updated_at</code> from the last successful run, stored somewhere durable. The next run asks for everything above it. Four failure modes deserve naming, because each has bitten production pipelines.</p>
+
+  <p><em>Ties at the boundary.</em> If the query is <code>updated_at &gt; watermark</code> and several rows share the exact watermark timestamp, one of them was ingested and the others were not, and they never will be. If the query is <code>&gt;=</code>, the boundary rows are ingested repeatedly, which is harmless only if the load is idempotent. Use <code>&gt;=</code> with an idempotent merge, never <code>&gt;</code> with an append.</p>
+
+  <p><em>Out-of-order commits.</em> A transaction that starts at 02:00 and commits at 02:10 writes rows stamped 02:00. A run at 02:05 takes a watermark of 02:05, and those rows are then invisible forever, because they are stamped earlier than the watermark but became visible later. This is the most insidious of the four and the reason for an <strong>overlap window</strong>: subtract a margin comfortably larger than the longest source transaction from the watermark on every run, and rely on idempotency to absorb the re-read.</p>
+
+  <p><em>Clock skew.</em> The source's clock and yours differ, and if the timestamp is set by an application server rather than the database, several servers' clocks differ from each other. Always take the watermark from the data, never from your own clock.</p>
+
+  <p><em>A dishonest timestamp.</em> Some systems set <code>updated_at</code> on insert only, or update rows through a path that bypasses the trigger, or backdate it deliberately. This is not a hypothetical: it is common in older core banking systems. The only defence is verification, which means periodically doing a full comparison and checking that the incremental path found everything the full path would have.</p>
+
+  <div class="callout insight">
+    <span class="tag">At-least-once plus idempotent equals effectively once</span>
+    Distributed systems make exactly-once delivery expensive and often impossible to guarantee end to end. The standard engineering resolution is to accept at-least-once delivery, which is cheap and reliable, and make the write idempotent so duplicates are harmless. That is why Lecture 06 spent so long on the overwrite-partition and merge patterns: they are what makes an overlap window safe, retries free, and a rerun boring. Chasing exactly-once delivery is usually the wrong problem; making duplicates harmless is the right one.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Extraction patterns, chosen by constraint</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Pattern</th><th>Mechanism</th><th>Sees deletions</th><th>Choose when</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Full extract</strong></td><td>Source produces the whole table; you replace the partition</td><td>Yes</td><td>It fits the window; always the first choice</td></tr>
+      <tr><td><strong>Watermark incremental</strong></td><td>Filter on an <code>updated_at</code> column, merge by key</td><td>No</td><td>Large table, honest timestamp, deletions rare or soft</td></tr>
+      <tr><td><strong>Log-based CDC</strong></td><td>Read the write-ahead log (Debezium and similar)</td><td>Yes</td><td>Large table, small change volume, deletions matter, source team cooperates</td></tr>
+      <tr><td><strong>Trigger-based CDC</strong></td><td>Database triggers write to an audit table you read</td><td>Yes</td><td>No log access available; accept the write overhead on the source</td></tr>
+      <tr><td><strong>Source-pushed events</strong></td><td>The application publishes events you consume</td><td>Depends on the contract</td><td>The source already emits events; see Lecture 12</td></tr>
+      <tr><td><strong>File drop</strong></td><td>The source writes a file to a landing area on a schedule</td><td>If the file is a full extract</td><td>The most common arrangement in banking; treat the file itself as the interface</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>File drops, and how to know a file is finished</h3>
+
+  <p>Most banking ingestion is a file arriving in a landing area, which introduces a problem nobody expects the first time: a file that is being written already exists. Reading it produces a truncated extract, and the load reports success. Three conventions solve it, in ascending order of reliability. The source writes to a temporary name and renames on completion, since rename is atomic on most file systems. The source writes a marker file, historically <code>_SUCCESS</code>, after the data file. Or the source writes a <strong>manifest</strong> listing the expected files with their row counts and checksums, and the pipeline refuses to proceed until every listed file is present and matches.</p>
+
+  <p>Insist on the manifest where you can negotiate it. It converts three separate questions, has the file arrived, is it complete, and is it the file we expected, into one check, and it gives you the source's own row count to reconcile against.</p>
+
+  <h3>Reconciliation controls</h3>
+
+  <pre><code>-- three controls, cheapest first, run against source and target after every load
+
+-- 1. row count: catches truncation and duplication
+SELECT COUNT(*) FROM &lt;table&gt;;
+
+-- 2. control total: catches wrong or shifted values that a count would miss
+SELECT SUM(balance), SUM(arrears_months), COUNT(DISTINCT account_id) FROM &lt;table&gt;;
+
+-- 3. hash total: catches any difference at all, including reordering of columns
+SELECT SUM(HASH(account_id, reporting_date, balance, arrears_months)) FROM &lt;table&gt;;</code></pre>
+
+  <p>Row counts alone are not enough, because a load that reads the right number of rows from the wrong day passes. A control total on the monetary columns is the single most valuable check in a bank, because it is the same figure the finance function reconciles to, and any divergence is immediately meaningful to somebody. Store the results of every check, not just the pass or fail, because the series of daily control totals is itself the monitoring signal of Lecture 18.</p>
+
+  <h3>Deletions, restatement, and schema drift</h3>
+
+  <p><em>Deletions.</em> Establish which of three regimes the source is in. If it soft-deletes, ingest the flag and you are done. If it hard-deletes and offers CDC, take the delete events. If it hard-deletes and offers nothing, you need a periodic full key comparison: pull the complete list of keys, compare with your copy, and mark the missing ones as deleted with a system date. A weekly key-only extract is cheap even for large tables, because one column compresses to almost nothing.</p>
+
+  <p><em>Restatement.</em> Decide the window in which a closed period may still change, state it in the data contract of Lecture 18, and reprocess that window on a schedule rather than on request. A common shape for a bank: reprocess the trailing three months every night, and freeze anything older behind an explicit approval. That way ordinary late arrivals are absorbed automatically and extraordinary ones are visible.</p>
+
+  <p><em>Schema drift.</em> Sources add columns, rename them, widen types, and occasionally reorder them. Assert the expected schema on arrival by comparing against a stored definition, and classify the outcome: a new column is usually additive and can be accepted with a log entry, a removed or retyped column should stop the load, and a reordered column is harmless if you read by name and catastrophic if you read by position. This is where the <code>information_schema</code> introspection from Lecture 05 and the validation of Lecture 16 meet ingestion.</p>
+
+  <div class="worked">
+    <strong>Worked example: incremental ingestion of a payments table whose timestamp cannot be trusted</strong>
+    <p>The source: a payments table in the core banking system, 400 million rows, growing by roughly 1.5 million a day. Full extract takes six hours and the window is two. There is an <code>updated_at</code> column. The source team confirms it is set by the application, that batch corrections sometimes run in long transactions, and that payments are occasionally deleted outright when a duplicate is identified. Design the ingestion.</p>
+    <p><em>1. Watermark with an overlap window.</em> Store the maximum <code>updated_at</code> ingested, and on each run read from <code>watermark - 48 hours</code>. Forty-eight hours is chosen to comfortably exceed the longest observed source transaction plus any clock skew, with margin; the exact number should come from measuring the source, not from a default. Use <code>&gt;=</code> at the boundary.</p>
+    <pre><code>-- extract predicate, parameterised, never using the local clock
+WHERE updated_at &gt;= (SELECT high_water_mark - INTERVAL '48 hours'
+                     FROM   ingestion_state
+                     WHERE  source_table = 'core.payments')</code></pre>
+    <p><em>2. Land raw, then merge idempotently.</em> The extract lands in bronze partitioned by extraction date, unmodified, so the arrival is evidence. The silver table is then updated with a merge keyed on the payment identifier, deduplicating the source by keeping the highest <code>updated_at</code> per key, exactly the <code>QUALIFY ROW_NUMBER</code> idiom from Lecture 05. The 48-hour overlap therefore re-reads roughly three million rows a day and changes nothing, which is the intended cost of correctness.</p>
+    <p><em>3. Handle the deletions the watermark cannot see.</em> Negotiate a nightly key-only extract: one column, 400 million values, which compresses to a few hundred megabytes and extracts in minutes. Compare with the silver key set, and for any key present in silver and absent in the source, set <code>is_deleted</code> and <code>deleted_detected_at</code> rather than removing the row. Never delete; the row is evidence that the payment was once asserted, which matters when a reconciliation asks why a total moved.</p>
+    <p><em>4. Verify the timestamp is honest, monthly.</em> Once a month, in a window where six hours is available, take a full extract and compare it against what the incremental path produced. Report the number of rows the incremental path missed. If that number is ever non-zero, the timestamp is not maintained on some update path, and the design must change to CDC. Without this check you are trusting an assumption you were told rather than one you verified, and the failure mode is silent for years.</p>
+    <p><em>5. Reconcile every run.</em> Row count of the day's changes, sum of payment amounts for the trailing seven days compared with the source's own figure for the same window, and the count of distinct accounts touched. Persist all three. A load that cannot reconcile does not publish: it writes to bronze, raises, and leaves silver untouched, so consumers see yesterday's complete data rather than today's partial data.</p>
+    <p><em>6. Then the backfill.</em> Reprocessing twenty-four months is now a loop over month partitions calling the same idempotent code path with an explicit date parameter, run with limited concurrency so the source is not overwhelmed, with each month reconciled independently and the failures retried individually. Note what makes this cheap: nothing about the backfill is special. It is the daily job with a different parameter, which is exactly the property that Lecture 17's orchestrator needs and that a pipeline hard-coded to "yesterday" cannot offer.</p>
+    <p><em>What the design costs and buys.</em> It re-reads three million rows a day it does not need, runs an extra key extract, and spends six hours once a month proving an assumption. In exchange, no payment is ever silently lost, deletions are captured, late corrections are absorbed, reruns are free, and a backfill is a loop. That trade is nearly always correct in a regulated environment, and the mistake to avoid is treating the overlap and the monthly verification as waste to be optimised away.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Batch ingestion is three questions: what to copy, how to know what changed, and what happens on a rerun. Full loads are the default because they are trivially correct and see deletions. Incremental loads are an optimisation that adds four watermark hazards and blindness to deletion, both of which need explicit countermeasures: an overlap window with an idempotent merge, and a periodic key comparison. Change data capture solves both at the cost of infrastructure and source cooperation. Whatever the pattern, reconcile counts and control totals on every run, refuse to publish a load that cannot reconcile, and parameterise by date so that a backfill is a loop rather than a project.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Give the three extraction families and say which one sees deletions without extra machinery.</li>
+      <li>Name the four ways a watermark loses data, and give the countermeasure for each.</li>
+      <li>Why is <code>&gt;=</code> with an idempotent merge preferable to <code>&gt;</code> with an append at the watermark boundary?</li>
+      <li>Explain "at-least-once plus idempotent equals effectively once" and why chasing exactly-once delivery is usually the wrong goal.</li>
+      <li>A source hard-deletes rows and offers no change log. How do you detect deletions, and why is the answer cheap?</li>
+      <li>Give three conventions for knowing a dropped file is complete, and say why a manifest is preferable.</li>
+      <li>Why is a control total on monetary columns more valuable in a bank than a row count?</li>
+      <li>What property must a pipeline have for a twenty-four-month backfill to be a loop rather than a project?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="09-duckdb.html">Lecture 09</a> closed Part II with the engine; this lecture opens Part III with how data reaches it.</li>
+      <li><strong>Next:</strong> <a href="11-extraction_apis_and_pdfs.html">Lecture 11</a> handles the sources that are not tables at all: APIs, awkward files, and PDFs.</li>
+      <li><strong>Then:</strong> <a href="12-streaming.html">Lecture 12</a> covers the unbounded case, including the change data capture streams mentioned here.</li>
+      <li><strong>Cross-link:</strong> the idempotent load pattern is <a href="06-sql_manipulation.html">Lecture 06</a>; the reconciliation controls become monitors in <a href="18-observability_and_contracts.html">Lecture 18</a>; the scheduling, retries, and backfill mechanics are <a href="17-orchestration.html">Lecture 17</a>.</li>
+      <li><strong>Banking link:</strong> the restatement window decision here is what determines whether a risk report can be reproduced as at its original publication date, which is the BCBS 239 expectation from <a href="01-introduction.html">Lecture 01</a>.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 10 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

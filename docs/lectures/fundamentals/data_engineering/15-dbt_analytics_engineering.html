@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 15: analytics engineering with dbt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Analytics engineering with dbt</h1>
+  <p class="subtitle">For thirty years, transformation logic lived where software engineering could not reach it: inside graphical ETL tools, stored procedures, and spreadsheets, with no version control, no tests, no review, and no way to tell what depended on what. Analytics engineering is the project of hauling that logic back into a repository. The tooling is incidental; the relocation is the point.</p>
+  <div class="meta">
+    <span>Lecture 15 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part IV: transformation at scale</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>dbt</strong> (data build tool) manages the T of ELT. You write each transformation as a <code>SELECT</code> statement in a file; dbt wraps it in the right <code>CREATE TABLE</code> or <code>CREATE VIEW</code>, works out the dependency order from the references between files, executes them in that order in your warehouse, and runs tests against the results.</p>
+
+  <p>The mechanism that makes it work is one function. Instead of naming a table, a model refers to another model with <code>{{ ref('other_model') }}</code>. From those references dbt builds a dependency graph, which gives it four things at once: execution order without a hand-maintained schedule, environment portability because the reference resolves to whichever schema you are building into, lineage documentation for free, and the ability to build only what changed and what depends on it.</p>
+
+  <p>What you get beyond scheduling is the software engineering apparatus applied to SQL: version control and code review on every definition, <strong>tests</strong> that assert uniqueness, non-nullity, accepted values, and referential integrity, generated <strong>documentation</strong> including the lineage graph, and reusable logic through macros. It runs against a warehouse or engine that does the compute, so it is a layer over Lectures 09, 13, and 14 rather than a competitor to them.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Two teams maintain the same calculation. The first keeps it in a graphical tool where the logic is boxes and arrows saved in a proprietary file: you cannot diff two versions, you cannot see who changed the definition of default last March, and finding what breaks if you change a column means opening every box. The second keeps it as a folder of SQL files in git: every change is a reviewed commit, the dependency graph is derived from the code, and the question "what breaks if I change this?" is answered by the tool. Same calculation, same warehouse. One of them can be audited.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Why this matters more in a bank than elsewhere</span>
+    Model risk and BCBS 239 both demand that you can say what a number is, where it came from, and who changed its definition when. A transformation layer in version control answers all three by construction: the definition is a file, the lineage is a graph derived from the code, and the change history is the git log with a reviewer's name attached. Compare the alternative, which is a data dictionary maintained by hand and hoped to be current. This is the cheapest lineage story available, and it is a by-product of a practice you would want anyway.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Definitions stop being duplicated.</strong> Lecture 04 argued that the regulatory default definition should live in one place. dbt makes that practical: one model computes it, every downstream model references that model, and changing it changes everything at once. The alternative, which is the current state of many risk functions, is the same definition implemented in the PD extract, the LGD extract, the IFRS 9 staging job, and two dashboards, drifting apart quietly until a validation exercise finds the difference.</p>
+
+  <p><strong>The dependency graph answers the questions that cost the most time.</strong> What does this model depend on, upstream to the raw source? What breaks if I change this column? Which models must rebuild after this source lands late? Each of these is a graph traversal that dbt performs and a hand-maintained pipeline cannot answer at all. In a platform of a few hundred models, that is the difference between a change taking an afternoon and taking a fortnight of cautious archaeology.</p>
+
+  <p><strong>Tests convert assumptions into failures.</strong> Lecture 04 put as much as possible into constraints, and noted that analytical engines enforce less than transactional ones. dbt tests fill the gap in the right place: uniqueness of the grain, non-nullity of keys, accepted values of categoricals, and referential integrity between models, all declared alongside the model and run on every build. A model whose grain is asserted unique cannot silently start double counting, which is the most common way an analytical table goes wrong.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A dbt project as a dependency graph over the medallion layers">
+      <defs>
+        <marker id="ar-dbt" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#a1a1aa"/>
+        </marker>
+      </defs>
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Models reference models; the graph is derived, not maintained</text>
+
+      <!-- sources -->
+      <text x="80" y="46" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#3f3f46">SOURCES</text>
+      <rect x="30" y="56" width="100" height="30" rx="6" fill="#F4F4F5" stroke="#52525b" stroke-dasharray="4 3"/>
+      <text x="80" y="75" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#27272a">core.accounts</text>
+      <rect x="30" y="94" width="100" height="30" rx="6" fill="#F4F4F5" stroke="#52525b" stroke-dasharray="4 3"/>
+      <text x="80" y="113" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#27272a">core.payments</text>
+      <rect x="30" y="132" width="100" height="30" rx="6" fill="#F4F4F5" stroke="#52525b" stroke-dasharray="4 3"/>
+      <text x="80" y="151" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#27272a">coll.arrears</text>
+
+      <!-- staging -->
+      <text x="230" y="46" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#115e59">STAGING (views)</text>
+      <rect x="175" y="56" width="110" height="30" rx="6" fill="#ECFEF6" stroke="#0d9488"/>
+      <text x="230" y="75" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#115e59">stg_accounts</text>
+      <rect x="175" y="94" width="110" height="30" rx="6" fill="#ECFEF6" stroke="#0d9488"/>
+      <text x="230" y="113" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#115e59">stg_payments</text>
+      <rect x="175" y="132" width="110" height="30" rx="6" fill="#ECFEF6" stroke="#0d9488"/>
+      <text x="230" y="151" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#115e59">stg_arrears</text>
+
+      <!-- intermediate -->
+      <text x="395" y="46" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#92400e">INTERMEDIATE</text>
+      <rect x="330" y="76" width="130" height="34" rx="6" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="395" y="90" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#92400e">int_default_flag</text>
+      <text x="395" y="103" text-anchor="middle" font-family="Inter" font-size="7.5" font-style="italic" fill="#b45309">the ONE definition</text>
+      <rect x="330" y="120" width="130" height="30" rx="6" fill="#FFF7ED" stroke="#b45309"/>
+      <text x="395" y="139" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#92400e">int_payments_monthly</text>
+
+      <!-- marts -->
+      <text x="600" y="46" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#5b21b6">MARTS (tables)</text>
+      <rect x="520" y="56" width="160" height="30" rx="6" fill="#F5F3FF" stroke="#7c3aed"/>
+      <text x="600" y="75" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#5b21b6">fact_account_month</text>
+      <rect x="520" y="94" width="160" height="30" rx="6" fill="#F5F3FF" stroke="#7c3aed"/>
+      <text x="600" y="113" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#5b21b6">pd_observation_dataset</text>
+      <rect x="520" y="132" width="160" height="30" rx="6" fill="#F5F3FF" stroke="#7c3aed"/>
+      <text x="600" y="151" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#5b21b6">ifrs9_staging_input</text>
+
+      <!-- edges -->
+      <g stroke="#a1a1aa" stroke-width="1.2" fill="none">
+        <line x1="133" y1="71" x2="171" y2="71" marker-end="url(#ar-dbt)"/>
+        <line x1="133" y1="109" x2="171" y2="109" marker-end="url(#ar-dbt)"/>
+        <line x1="133" y1="147" x2="171" y2="147" marker-end="url(#ar-dbt)"/>
+        <line x1="288" y1="71" x2="326" y2="88" marker-end="url(#ar-dbt)"/>
+        <line x1="288" y1="147" x2="326" y2="95" marker-end="url(#ar-dbt)"/>
+        <line x1="288" y1="109" x2="326" y2="132" marker-end="url(#ar-dbt)"/>
+        <line x1="463" y1="88" x2="516" y2="71" marker-end="url(#ar-dbt)"/>
+        <line x1="463" y1="93" x2="516" y2="106" marker-end="url(#ar-dbt)"/>
+        <line x1="463" y1="98" x2="516" y2="143" marker-end="url(#ar-dbt)"/>
+        <line x1="463" y1="135" x2="516" y2="78" marker-end="url(#ar-dbt)"/>
+      </g>
+
+      <!-- what the graph gives you -->
+      <rect x="30" y="190" width="700" height="94" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="380" y="212" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#5b21b6">WHAT THE GRAPH GIVES YOU, FROM THE SAME ONE FUNCTION</text>
+      <g font-family="Inter" font-size="9.5" fill="#5b21b6">
+        <text x="50" y="234">Execution order, without a hand-written schedule of steps</text>
+        <text x="50" y="250">Environment portability: ref() resolves to dev or prod schema automatically</text>
+        <text x="50" y="266">Lineage documentation, generated rather than maintained</text>
+        <text x="400" y="234">Impact analysis: what breaks if I change this column</text>
+        <text x="400" y="250">Selective builds: dbt build --select int_default_flag+</text>
+        <text x="400" y="266">Tests attached to the node, run in dependency order</text>
+      </g>
+
+      <!-- the one definition point -->
+      <rect x="30" y="298" width="700" height="86" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="380" y="320" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#92400e">THE STRUCTURAL WIN</text>
+      <text x="380" y="340" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#7c2d12">int_default_flag has three downstream consumers: the risk mart, the PD modelling dataset,</text>
+      <text x="380" y="354" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#7c2d12">and the IFRS 9 staging input. All three use one implementation of the default definition.</text>
+      <text x="380" y="374" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="600" fill="#92400e">They cannot drift apart, because there is nothing to drift.</text>
+    </svg>
+    <figcaption>A small project laid out over the medallion layers of Lecture 08. Staging models are thin views that rename and type; intermediate models hold shared business logic; marts are the tables consumers read. The lower panel is the reason to do this at all in a risk function.</figcaption>
+  </figure>
+
+  <h3>The three-layer convention</h3>
+
+  <div class="defcard tint-mint"><span class="term">Staging</span><span class="def">One model per source table, materialised as a view. It renames columns to your conventions, casts types, and does nothing else. No joins, no business logic, no filtering beyond obvious junk. This layer exists so that a source's naming and quirks are isolated in exactly one place per table.</span></div>
+  <div class="defcard tint-peach"><span class="term">Intermediate</span><span class="def">Shared business logic that several marts need: the default flag, the payment history aggregated to month, the customer-to-account resolution. Usually not exposed to consumers. This is where the definitions live, and the layer whose existence prevents duplication.</span></div>
+  <div class="defcard tint-lavender"><span class="term">Marts</span><span class="def">The tables consumers read, modelled dimensionally per Lecture 08 and materialised as tables for performance. Named for the business meaning rather than the source, and documented as products with owners.</span></div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>A model is a select statement</h3>
+
+  <pre><code>-- models/staging/stg_account_snapshots.sql
+{{ config(materialized = 'view') }}
+
+SELECT
+    account_id::VARCHAR                     AS account_id,
+    reporting_date::DATE                    AS reporting_date,
+    customer_id::VARCHAR                    AS customer_id,
+    product_code::VARCHAR                   AS product_code,
+    balance::DECIMAL(18,2)                  AS balance,
+    arrears_months::INTEGER                 AS arrears_months,
+    COALESCE(unlikely_to_pay, FALSE)        AS unlikely_to_pay,
+    loaded_at::TIMESTAMP                    AS loaded_at
+FROM {{ source('core_banking', 'account_snapshots') }}
+QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id, reporting_date
+                           ORDER BY loaded_at DESC) = 1</code></pre>
+
+  <pre><code>-- models/intermediate/int_default_flag.sql
+-- The single implementation of the regulatory default definition.
+-- Changing this file changes every downstream consumer, by design.
+{{ config(materialized = 'table') }}
+
+SELECT
+    account_id,
+    reporting_date,
+    arrears_months,
+    unlikely_to_pay,
+    (arrears_months &gt;= {{ var('default_arrears_threshold') }} OR unlikely_to_pay) AS in_default
+FROM {{ ref('stg_account_snapshots') }}</code></pre>
+
+  <p>Note the pieces. <code>source()</code> names a raw table declared in a YAML file, which lets dbt track freshness and lineage back past its own graph. <code>ref()</code> names another model. <code>var()</code> pulls a value from project configuration, so the arrears threshold is a documented parameter rather than a magic number buried in SQL. And the <code>config</code> block chooses the materialisation, which is a performance decision independent of the logic.</p>
+
+  <h3>Materialisations</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Materialisation</th><th>What it builds</th><th>Use for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>view</code></td><td>A view; recomputed on every query</td><td>Staging models and anything cheap and rarely queried</td></tr>
+      <tr><td><code>table</code></td><td>Dropped and rebuilt in full each run</td><td>Marts and intermediate models where a full rebuild is affordable</td></tr>
+      <tr><td><code>incremental</code></td><td>Built once, then only new or changed rows merged in</td><td>Large fact tables where a full rebuild does not fit the window</td></tr>
+      <tr><td><code>ephemeral</code></td><td>Nothing; inlined as a common table expression in dependants</td><td>Small intermediate steps that need no independent existence</td></tr>
+      <tr><td><code>snapshot</code></td><td>A type 2 history table, maintained automatically</td><td>Slowly changing dimensions over a source that keeps only current state</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The <code>snapshot</code> materialisation deserves particular attention from this audience, because it solves the problem Lecture 07 flagged and Lecture 08 formalised. Point it at a source table that holds only current values, declare the key and either a timestamp or the columns to watch, and dbt maintains validity intervals for you, appending a new version whenever it observes a change. That is a type 2 dimension built by configuration rather than by hand-written merge logic, and it is the correct answer to "the source overwrites the customer segment and we need to know what it was at origination".</p>
+
+  <pre><code>-- snapshots/customer_segment_snapshot.sql
+{% snapshot customer_segment_snapshot %}
+{{ config(
+     target_schema = 'snapshots',
+     unique_key    = 'customer_id',
+     strategy      = 'check',
+     check_cols    = ['segment', 'risk_grade', 'region']
+) }}
+SELECT customer_id, segment, risk_grade, region FROM {{ source('core_banking', 'customers') }}
+{% endsnapshot %}</code></pre>
+
+  <h3>Incremental models, and the same idempotency argument</h3>
+
+  <pre><code>-- models/marts/fact_account_month.sql
+{{ config(
+     materialized = 'incremental',
+     unique_key   = ['account_id', 'reporting_date'],
+     incremental_strategy = 'merge',
+     partition_by = 'reporting_date'
+) }}
+
+SELECT s.account_id,
+       s.reporting_date,
+       s.customer_id,
+       s.balance,
+       s.arrears_months,
+       d.in_default,
+       COALESCE(p.payment_count, 0) AS payment_count
+FROM        {{ ref('stg_account_snapshots') }} s
+INNER JOIN  {{ ref('int_default_flag') }}      d USING (account_id, reporting_date)
+LEFT JOIN   {{ ref('int_payments_monthly') }}  p USING (account_id, reporting_date)
+
+{% if is_incremental() %}
+  -- on an incremental run, rebuild a trailing window rather than only the newest month,
+  -- so late-arriving corrections from Lecture 10 are absorbed
+  WHERE s.reporting_date &gt;= (SELECT DATEADD('month', -3, MAX(reporting_date)) FROM {{ this }})
+{% endif %}</code></pre>
+
+  <p>The trailing three-month window is the restatement policy of Lecture 10 expressed in the transformation layer, and the merge on the declared key is the idempotency of Lecture 06. Together they mean a rerun changes nothing and a late correction is picked up automatically. Note the discipline this requires: the incremental filter must be on a column that reflects when the business event belongs, and the unique key must genuinely be the grain, or the merge either misses rows or duplicates them.</p>
+
+  <h3>Tests</h3>
+
+  <pre><code># models/marts/schema.yml
+version: 2
+models:
+  - name: fact_account_month
+    description: |
+      Periodic snapshot fact at the account-month grain. One row per account per calendar
+      month end for every account open at any point in the month. Balance is semi-additive:
+      do not sum across reporting dates.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [account_id, reporting_date]
+    columns:
+      - name: account_id
+        tests: [not_null]
+      - name: reporting_date
+        tests: [not_null]
+      - name: customer_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customer')
+              field: customer_id
+      - name: arrears_months
+        tests:
+          - not_null
+          - dbt_utils.accepted_range: {min_value: 0, max_value: 120}
+      - name: in_default
+        tests: [not_null]</code></pre>
+
+  <p>Four kinds of test cover most needs. <em>Generic</em> tests are the built-in four: <code>unique</code>, <code>not_null</code>, <code>accepted_values</code>, and <code>relationships</code>, the last being referential integrity enforced in a layer where the engine may not enforce it. <em>Package</em> tests from <code>dbt_utils</code> and similar add composite uniqueness, ranges, expression checks, and mutual exclusivity. <em>Singular</em> tests are arbitrary SQL files that must return zero rows, which is the escape hatch for anything else, including the cross-table reconciliations that a constraint cannot express. And <em>unit</em> tests supply fixed inputs to a model and assert the output, which is the right tool for the tricky logic: the default flag with forbearance interaction, the window that handles a missing month.</p>
+
+  <p>Note the description block above. It states the grain in one sentence and warns about the semi-additive measure, and because it is generated into the documentation site, it is where a consumer will actually see it. Documentation adjacent to the code, published automatically, is the only kind that stays true.</p>
+
+  <h3>Running it</h3>
+
+  <pre><code>dbt build                                  # run models, then their tests, in dependency order
+dbt build --select int_default_flag+       # that model and everything downstream of it
+dbt build --select +fact_account_month     # that model and everything it depends on
+dbt build --select state:modified+         # what changed on this branch, plus dependants
+dbt test --select tag:critical             # a subset, for a quick gate
+dbt docs generate &amp;&amp; dbt docs serve        # the lineage graph and column documentation
+dbt source freshness                       # has the raw data actually arrived?</code></pre>
+
+  <p>The <code>state:modified+</code> selector is what makes continuous integration practical: a pull request builds and tests only the models it changed and their dependants, against a temporary schema, so a reviewer sees evidence rather than assurances. That is the <a href="../software_engineering/15-ci_cd.html">CI/CD lecture</a> applied to data, and it is the point at which the transformation layer genuinely joins the software engineering discipline.</p>
+
+  <div class="callout warn">
+    <span class="tag">What dbt is not, and its failure mode</span>
+    dbt does not extract or load; it transforms what has already landed, so Lectures 10 to 12 remain necessary. It is not an orchestrator either: it resolves the order within its own graph, but something must decide to run it, retry it, and coordinate it with ingestion, which is Lecture 17. And its characteristic failure mode is a sprawl of hundreds of thinly-reasoned models with duplicated logic in the intermediate layer, no tests beyond <code>not_null</code>, and a lineage graph nobody can read. The tool enforces order of execution, not clarity of thought. The three-layer convention, real tests, and code review are what keep a project comprehensible; without them dbt reproduces the old mess in a format that merely diffs better.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: changing the default definition, and knowing what it touched</strong>
+    <p>The situation: the regulator's definition of unlikely-to-pay is being widened to include a forbearance concession granted in the last twelve months. Today the definition exists in <code>int_default_flag</code> and nowhere else. Walk the change through.</p>
+    <p><em>1. Establish the blast radius before writing anything.</em> <code>dbt ls --select int_default_flag+</code> lists every downstream node: the risk mart, the PD observation dataset, the IFRS 9 staging input, two aggregate models, and four exposures registered against BI dashboards. That list is the impact assessment, produced in a second, and in a pre-dbt estate it is a week of grep and interviews with an answer nobody fully trusts.</p>
+    <p><em>2. Make the change in one file, on a branch.</em> The forbearance condition is added to <code>int_default_flag</code>, with the lookback window as a project variable rather than a literal. Because every consumer references this model, no other model changes.</p>
+    <p><em>3. Add the tests that encode the new rule.</em> A unit test with fixed rows: an account with two months of arrears and a recent concession is in default; the same account with a concession fourteen months old is not; an account with three months of arrears is in default regardless. These are the edge cases a reviewer would otherwise have to reason about in their head, and they will still be checked in three years when somebody else edits the file.</p>
+    <p><em>4. Quantify the effect before merging.</em> Build the branch into a temporary schema and compare the new default population against production for the last twenty-four months: how many accounts newly qualify, what exposure they carry, and how the monthly default rate series moves. This is the number the credit risk committee will ask for, and the pull request is the natural place to put it. Note that this comparison is only possible because both versions can be built side by side, which is what environment-portable references buy.</p>
+    <p><em>5. Review, merge, and rebuild deliberately.</em> The review sees a small diff to one file, the new unit tests, and the quantified impact. On merge, continuous integration has already built and tested the affected subgraph. The production rebuild is <code>dbt build --select int_default_flag+ --full-refresh</code>, because a definition change must reprocess history rather than apply only to new months, and that distinction is a decision the operator must make consciously; an incremental run would leave the history under the old definition and the recent months under the new one, which is the worst of both.</p>
+    <p><em>6. What the auditor now gets.</em> The definition is a file with a git history naming every change, its author, its reviewer, and its date. The lineage graph shows every consumer. The tests document the intended edge cases. The impact analysis is in the pull request. Compare with the pre-dbt answer to "when did the default definition change and what did it affect?", which is usually a search through email. This is the case for analytics engineering in a regulated environment, and it has very little to do with any feature of the tool beyond <code>ref()</code>.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Analytics engineering relocates transformation logic into a repository, where version control, review, tests, and generated documentation apply to it. dbt does this with one idea, references between models, from which execution order, environment portability, lineage, impact analysis, and selective builds all follow. Organise models in three layers so that source quirks are isolated, shared definitions have exactly one home, and marts are products. Test the grain, the keys, the ranges, and the edge cases. And remember what the tool does not do: it does not extract, load, orchestrate, or think for you. Part IV closes here; Part V is the undercurrents that decide whether any of it is trusted.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name five things dbt derives from the single act of referencing one model from another.</li>
+      <li>Give the three model layers and say what belongs in each, with the failure that omitting the middle layer causes.</li>
+      <li>Contrast the five materialisations, and say which one solves the type 2 dimension problem from Lecture 08.</li>
+      <li>In an incremental model, why filter on a trailing window rather than only the newest period?</li>
+      <li>Distinguish generic, singular, and unit tests, and give a risk-data example of each.</li>
+      <li>What does <code>state:modified+</code> make possible, and which software engineering practice does it complete?</li>
+      <li>A definition change is deployed with an ordinary incremental run. What is now wrong with the table, and what should have been run?</li>
+      <li>State dbt's characteristic failure mode and the three practices that prevent it.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="14-lakehouse_table_formats.html">Lecture 14</a> is the storage these models write into; <a href="13-spark.html">Lecture 13</a> and <a href="09-duckdb.html">Lecture 09</a> are engines dbt can drive.</li>
+      <li><strong>Next:</strong> <a href="16-data_quality.html">Lecture 16</a> opens Part V by taking validation well past what model tests cover.</li>
+      <li><strong>Cross-link:</strong> the single-definition argument starts in <a href="04-sql_definitions.html">Lecture 04</a>; the dimensional models are <a href="08-dimensional_modelling.html">Lecture 08</a>; the restatement window is <a href="10-batch_ingestion.html">Lecture 10</a>; scheduling is <a href="17-orchestration.html">Lecture 17</a>; the generated lineage feeds <a href="18-observability_and_contracts.html">Lecture 18</a>.</li>
+      <li><strong>Outside this course:</strong> <a href="../software_engineering/14-code_review_and_prs.html">code review</a> and <a href="../software_engineering/15-ci_cd.html">CI/CD</a> are the practices this lecture applies to SQL; the arguments there are not repeated here.</li>
+      <li><strong>Further reading:</strong> the dbt documentation's guides on model structure and on incremental strategies; Kimball for what the marts should look like.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 15 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

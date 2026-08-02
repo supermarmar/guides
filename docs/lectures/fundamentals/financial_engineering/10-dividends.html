@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 10: dividends and other adjustments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>Dividends and other adjustments</h1>
+  <p class="subtitle">Every closed-form price built in lecture 9 assumed the share pays nothing to its holder before maturity. Almost no real share honours that assumption. This lecture removes it: one organising idea, that a dividend transfers value out of the share and past the derivative holder, gets applied to the risk-neutral drift, the closed-form call and put, discrete dividend dates, currencies, futures, put-call parity, and the American exerciser's decision of when to walk away early.</p>
+  <div class="meta">
+    <span>Lecture 10 of 13</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Source: <code>UP / 9 - Dividends.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Paying a <strong>dividend</strong> transfers value out of the share and into the pocket of whoever holds the share on the record date. A derivative on that share is not the share: its holder receives nothing on that date, yet the share price falls by roughly the dividend anyway, since the cash has left the company. Every pricing formula built on the assumption of no income has to be corrected for this leakage, and the correction is always the same one: remove the present value of what leaks out before applying the machinery that already works. This lecture states that adjustment once, then applies it to the risk-neutral drift, the closed-form call and put, discrete dividend dates, currencies, futures, put-call parity, and the American exerciser's timing decision.</p>
+
+  <p>Lecture 9 built the Black-Scholes formula for a share that pays nothing before <code>T</code>. Replace <code>$S_0$</code> everywhere in that formula with $S_0 e^{-qT}$, for a continuous dividend yield <code>q</code>, and the whole apparatus, the PDE, the risk-neutral SDE, the closed forms, survives with no further changes. That single substitution is, in a precise sense, the entire content of this lecture; everything else is working out what it means for discrete dividends, other underlyings and early exercise.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You own a share worth 100 today, and it goes ex-dividend tomorrow for a payment of 2. Nobody has told you the price will fall, yet you already know it will, by roughly 2, because the company is about to hand 2 in cash to whoever held the share yesterday, and a share that has just given away 2 in cash is worth 2 less than it was. Now suppose you instead hold a call option on that share, not the share itself. Tomorrow's dividend never reaches you: the option contract has no claim on it. So while the shareholder is compensated for the price drop by the cash they receive, you are not, and the option must be priced lower today than it would be on a share that never pays anything away. Work out by how much, and you have this entire lecture.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP source derives the Black-Scholes PDE for a continuous dividend yield by the same replicating-portfolio argument as the non-dividend case, states the general terminal-value-problem solution $F(t,x) = e^{-b(T-t)}\mathbb{E}_{t,x}[\Psi(X_T)]$, works one full example (a stock-or-nothing put, by direct integration against the risk-neutral density) and states, without full derivation, the resulting dividend-adjusted call and put formulae. It stops there: no discrete dividends, no escrowed-versus-forward distinction, no Black 76 form, no Garman-Kohlhagen, no futures options, and nothing on American early exercise. This lecture adds all of it: the discrete-dividend approximation and its lognormality caveat, the escrowed-dividend and forward-price conventions and why they disagree, dividend-adjusted put-call parity, the Black 76 formula that absorbs any carry into the forward, Garman-Kohlhagen as its currency special case, futures options, the condition under which a discrete dividend makes early exercise of an American call rational, and the practical link to dividend swaps and implied-volatility skew.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Almost nothing traded in practice is a genuinely non-dividend-paying share with a single certain maturity and no other income attached. Equity indices carry a dividend yield that has to be estimated and hedged. Currencies carry a foreign interest rate that plays exactly the same role as a dividend. Commodities carry storage costs and convenience yields, already met in lecture 1's cost-of-carry extension. Futures contracts embed all of this carry into a single quoted number. A pricing library that only implements lecture 9's no-dividend formula is useless on a real trading floor, not because the mathematics of Black-Scholes is wrong, but because almost no traded underlying satisfies its assumptions.</p>
+
+  <p>The good news, and the reason this lecture is short relative to how much ground it covers, is that dividends do not require new mathematics. Lecture 9 already solved the hard problem: finding the replicating portfolio and the PDE it satisfies under geometric Brownian motion. Every adjustment in this lecture is a change to one input, the drift under the risk-neutral measure, propagated mechanically through machinery that was built once and does not need to be rebuilt. Recognising when a genuinely new derivation is needed (discrete dividends, where the reduced-spot process stops being lognormal) against when it is just relabelling (currencies, futures, commodities) is the practical skill this lecture is trying to build.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures carry the lecture. The first shows what a dividend actually does to a share price path: nothing to the shareholder's total wealth, but a discrete drop in the quoted price on the ex-dividend date. The second shows the consequence for option prices: a call that gets cheaper, and a put that gets more expensive, the larger the dividend yield the underlying is assumed to carry.</p>
+
+  <h3>Picture one: the ex-dividend drop versus the total return</h3>
+
+  <p>A shareholder's wealth has two components: the quoted share price, and the cash dividends received and banked along the way. The <strong>total return</strong> path, price plus reinvested dividends, is smooth: nothing happens to the shareholder's fortune on the ex-dividend date itself, since the drop in the share is exactly offset by the dividend received. The <strong>price return</strong> path, the quoted price alone, is not smooth: it steps down on the ex-dividend date by (approximately) the dividend amount, because the cash has left the company and the share no longer carries a claim on it. A derivative written on the price return path, which is how essentially every listed option is written, inherits that step down and has to be priced accordingly.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Share price path dropping on the ex-dividend date compared with a smooth cumulative total return path">
+      <defs>
+        <marker id="divArrDiv" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+        <linearGradient id="trGradDiv" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="#ccfbf1" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#ccfbf1" stop-opacity="0.35"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Price return path versus total return path</text>
+
+      <!-- Axes -->
+      <line x1="70" y1="340" x2="740" y2="340" stroke="#71717a" stroke-width="1.5" marker-end="url(#divArrDiv)"/>
+      <line x1="70" y1="340" x2="70" y2="55" stroke="#71717a" stroke-width="1.5" marker-end="url(#divArrDiv)"/>
+      <text x="745" y="345" text-anchor="start" font-family="Inter" font-size="12" fill="#71717a">time</text>
+      <text x="55" y="55" text-anchor="end" font-family="Inter" font-size="12" fill="#71717a">value</text>
+
+      <!-- Ex-dividend marker -->
+      <line x1="420" y1="335" x2="420" y2="70" stroke="#b45309" stroke-width="1.3" stroke-dasharray="4,3"/>
+      <text x="420" y="358" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#92400e">ex-dividend date</text>
+
+      <!-- Total return path: smooth rising polyline across the dividend date -->
+      <polyline points="70,300 150,288 230,270 310,258 420,235 500,222 580,205 660,190 730,178"
+                fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- Price return path: identical up to ex-div, then a step down, then continues at reduced level -->
+      <polyline points="70,300 150,288 230,270 310,258 420,235"
+                fill="none" stroke="#1d4ed8" stroke-width="3" stroke-linecap="round"/>
+      <line x1="420" y1="235" x2="420" y2="265" stroke="#1d4ed8" stroke-width="3" stroke-linecap="round"/>
+      <polyline points="420,265 500,253 580,238 660,224 730,213"
+                fill="none" stroke="#1d4ed8" stroke-width="3" stroke-linecap="round" stroke-dasharray="0"/>
+
+      <!-- Drop annotation -->
+      <line x1="440" y1="235" x2="440" y2="265" stroke="#52525b" stroke-width="1"/>
+      <line x1="433" y1="235" x2="447" y2="235" stroke="#52525b" stroke-width="1"/>
+      <line x1="433" y1="265" x2="447" y2="265" stroke="#52525b" stroke-width="1"/>
+      <text x="452" y="254" font-family="Inter" font-size="11" fill="#3f3f46">drop &#8776; D</text>
+
+      <!-- Labels -->
+      <rect x="560" y="150" width="150" height="26" rx="13" fill="#0f766e"/>
+      <text x="635" y="168" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">Total return (smooth)</text>
+
+      <rect x="560" y="300" width="150" height="26" rx="13" fill="#1d4ed8"/>
+      <text x="635" y="318" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">Price return (steps down)</text>
+    </svg>
+    <figcaption>The dividend does not destroy wealth, it only relabels it. The total return path (share price plus reinvested dividends) is smooth through the ex-dividend date; the price return path, which is what strikes and quotes are written against, steps down by approximately the dividend amount. Every dividend-adjusted formula in this lecture is a statement about the price return path.</figcaption>
+  </figure>
+
+  <h3>Picture two: what a dividend assumption does to a call and a put</h3>
+
+  <p>Holding everything else fixed, a higher assumed dividend yield lowers the forward price of the underlying, which lowers the call and raises the put by put-call parity. The two lines below plot exactly this, using the base case from section 4: $S_0 = 100$, $K = 100$, $r = 5\%$, $\sigma = 20\%$, $T = 1$, with the dividend yield $q$ varied from zero to eight per cent. Notice where the two lines cross: at $q = r = 5\%$ the forward price equals the spot, the option is exactly at the money forward, and call and put take the same value.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Call price falling and put price rising as the assumed dividend yield increases, crossing where the yield equals the risk-free rate">
+      <defs>
+        <marker id="qArrDiv" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Call and put price against assumed dividend yield q</text>
+      <text x="400" y="44" text-anchor="middle" font-family="Inter" font-size="11" fill="#71717a">S&#8320; = 100, K = 100, r = 5%, &sigma; = 20%, T = 1</text>
+
+      <!-- Axes -->
+      <line x1="80" y1="360" x2="740" y2="360" stroke="#71717a" stroke-width="1.5" marker-end="url(#qArrDiv)"/>
+      <line x1="80" y1="360" x2="80" y2="65" stroke="#71717a" stroke-width="1.5" marker-end="url(#qArrDiv)"/>
+      <text x="745" y="365" text-anchor="start" font-family="Inter" font-size="12" fill="#71717a">q</text>
+      <text x="60" y="65" text-anchor="end" font-family="Inter" font-size="12" fill="#71717a">price</text>
+
+      <!-- x tick labels: q = 0..8% mapped across x=80..720, step 80px per 1% -->
+      <text x="80" y="378" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">0%</text>
+      <text x="240" y="378" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">2%</text>
+      <text x="400" y="378" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">4%</text>
+      <text x="480" y="378" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">5%</text>
+      <text x="560" y="378" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">6%</text>
+      <text x="720" y="378" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">8%</text>
+
+      <!-- Crossing guide at q=5% -->
+      <line x1="480" y1="355" x2="480" y2="200" stroke="#d4d4d8" stroke-width="1" stroke-dasharray="3,3"/>
+
+      <!-- Call price line: values 10.45,9.83,9.23,8.65,8.10,7.58,7.08,6.60,6.14 at q=0..8, scaled y: price*17 offset from baseline 360 -->
+      <polyline points="80,183 160,193 240,203 320,212 400,221 480,229 560,238 640,247 720,255"
+                fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- Put price line: values 5.57,5.94,6.33,6.73,7.15,7.58,8.02,8.48,8.95 -->
+      <polyline points="80,265 160,258 240,251 320,244 400,236 480,229 560,220 640,212 720,203"
+                fill="none" stroke="#be123c" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- Crossing marker -->
+      <circle cx="480" cy="229" r="4.5" fill="#18181b"/>
+      <text x="490" y="222" font-family="Inter" font-size="10" fill="#3f3f46">q = r: call = put</text>
+
+      <!-- Labels -->
+      <rect x="600" y="140" width="130" height="26" rx="13" fill="#0f766e"/>
+      <text x="665" y="158" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">Call price</text>
+
+      <rect x="600" y="300" width="130" height="26" rx="13" fill="#be123c"/>
+      <text x="665" y="318" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">Put price</text>
+    </svg>
+    <figcaption>Raising the assumed dividend yield lowers the forward price of the underlying, so the call falls and the put rises, in a straight line with parity. The two curves cross at $q = r$, where the underlying's forward price equals its spot price and the option is exactly at the money forward.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The cumulative dividend process and the modified self-financing condition</h3>
+
+  <p>The source sets up dividends through a <strong>cumulative dividend process</strong> $D(t)$: the holder of one unit of the underlying receives $D(t) - D(s)$ in cash over $[s,t]$. For a continuous yield <code>q</code>, this takes the special form $\mathrm{d}D(t) = qS_t\,\mathrm{d}t$, so the dividend received over an instant is proportional to the current share price. A replicating portfolio $\Pi_t = \Delta(t)S_t + \alpha(t)B_t$ is defined to be self-financing when its change in value comes only from price moves, dividends received on the stock leg, and interest on the bond leg, with no injection or withdrawal of outside cash:</p>
+
+  <p>$$ \mathrm{d}\Pi_t = \Delta(t)\bigl(\mathrm{d}S_t + \mathrm{d}D_t\bigr) + \alpha(t)\,\mathrm{d}B_t. $$</p>
+
+  <div class="defcard">
+    <div class="term">Continuous dividend yield</div>
+    <div class="def">A modelling assumption in which the underlying pays dividends continuously at rate <code>q</code> per unit time, proportional to the current price: $\mathrm{d}D_t = qS_t\,\mathrm{d}t$. It is an idealisation, since real dividends are paid in discrete lumps on announced dates, but it is standard for equity indices (where many constituents pay on different dates, so the aggregate looks smooth) and for any underlying whose income is genuinely proportional and continuous, such as a foreign currency's interest rate.</div>
+  </div>
+
+  <p>Matching the diffusion and drift terms of $\mathrm{d}\Pi_t$ against $\mathrm{d}V(t,S_t)$ from Ito's lemma, exactly as lecture 9 did for the non-dividend case, produces a hedge ratio $\Delta(t) = V_S(t,S_t)$ unchanged from the non-dividend result, but a modified drift-matching equation, because the stock leg of the portfolio now earns $qS_t$ in dividends as well as capital appreciation. Substituting the bond-holding identity through exactly as before and simplifying gives the dividend-adjusted Black-Scholes PDE:</p>
+
+  <p>$$ \frac{\partial V}{\partial t} + (r - q)\,S\,\frac{\partial V}{\partial S} + \frac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} - rV = 0, \qquad V(T,S) = \Psi(S). $$</p>
+
+  <p>Compare this with lecture 9's PDE for the non-dividend case: the discounting term $-rV$ is untouched, and the only change is that the drift coefficient on $\partial V/\partial S$ has become $r - q$ instead of <code>r</code>. This single substitution, $r \to r - q$ in the drift only, is the entire mathematical content of the dividend adjustment, and it is why the source can state a general terminal-value problem with drift constant <code>a</code> and discount constant <code>b</code>, then recover both the non-dividend case ($a = b = r$) and the dividend case ($a = r-q$, $b=r$) as special instances of the same solved problem $F(t,x) = e^{-b(T-t)}\,\mathbb{E}_{t,x}[\Psi(X_T)]$.</p>
+
+  <p>Under the risk-neutral measure <code>Q</code>, the corresponding share price dynamics carry the same modified drift:</p>
+
+  <p>$$ \mathrm{d}S_t = (r-q)\,S_t\,\mathrm{d}t + \sigma S_t\,\mathrm{d}W_t^{Q}. $$</p>
+
+  <p>The intuition matches the PDE exactly. Under the risk-neutral measure, every traded asset's total return, capital gain plus income, has to equal the risk-free rate, or an arbitrage would exist between it and the bond. If a share pays out income at rate <code>q</code>, its capital appreciation alone can only be $r - q$, with the missing <code>q</code> supplied by the dividends themselves. A non-dividend share is the special case $q = 0$, recovering lecture 9's drift of exactly <code>r</code>.</p>
+
+  <h3>The closed forms, and why the substitution is the whole story</h3>
+
+  <p>Solving the modified PDE by the same risk-neutral expectation and change-of-measure technique used in lecture 9 (the source works through one such calculation explicitly, for a stock-or-nothing put, by completing the square inside the Gaussian integral) gives the dividend-adjusted European call and put:</p>
+
+  <p>$$ C = S_0\,e^{-qT}\,N(d_1) - K\,e^{-rT}\,N(d_2), \qquad P = K\,e^{-rT}\,N(-d_2) - S_0\,e^{-qT}\,N(-d_1), $$</p>
+
+  <p>$$ d_1 = \frac{\ln(S_0/K) + (r - q + \sigma^2/2)\,T}{\sigma\sqrt{T}}, \qquad d_2 = d_1 - \sigma\sqrt{T}. $$</p>
+
+  <p>Compare this with lecture 9's formula for the non-dividend call, $C = S_0 N(d_1) - Ke^{-rT}N(d_2)$ with $d_1 = [\ln(S_0/K) + (r+\sigma^2/2)T]/(\sigma\sqrt{T})$. Every occurrence of the bare $S_0$ has become $S_0e^{-qT}$: once inside $d_1$ (through the drift term $r$ becoming $r-q$, which is algebraically the same as replacing $S_0$ with $S_0e^{-qT}$ inside the logarithm and cancelling the $qT$ against the drift) and once outside, multiplying $N(d_1)$. There is no dividend-specific mathematics beyond this substitution: the function that maps $(S_0, K, r, \sigma, T)$ to a call price is identical before and after, only the first argument changes from $S_0$ to $S_0e^{-qT}$.</p>
+
+  <div class="worked">Why replacing S&#8320; with S&#8320;&middot;exp(-qT) is exactly the dividend adjustment:
+
+  Start from the no-dividend d1: d1_nodiv = [ln(S0/K) + (r + sigma^2/2)T] / (sigma*sqrt(T))
+
+  Substitute S0 -> S0*exp(-qT) inside the logarithm only:
+    ln( (S0*exp(-qT)) / K ) = ln(S0/K) - qT
+
+  So the "naive" substitution gives:
+    [ln(S0/K) - qT + (r + sigma^2/2)T] / (sigma*sqrt(T))
+      = [ln(S0/K) + (r - q + sigma^2/2)T] / (sigma*sqrt(T))
+      = d1_div      <- exactly the dividend-adjusted d1 derived from the PDE
+
+  And the leading S0 in the call formula becomes S0*exp(-qT) directly, with no further
+  change needed. The dividend adjustment is therefore nothing but "discount the spot by
+  the dividend yield before feeding it into the ordinary Black-Scholes machine", applied
+  consistently to both the S0 that multiplies N(d1) and the S0 inside d1 itself.</div>
+
+  <p>The forward price for this underlying is $F_0 = S_0 e^{(r-q)T}$, exactly lecture 1's dividend-yield forward. Writing the call formula in terms of the forward instead of the spot, $S_0 e^{-qT} = F_0 e^{-rT}$, gives $C = e^{-rT}\bigl(F_0 N(d_1) - K N(d_2)\bigr)$ with $d_1 = [\ln(F_0/K) + \sigma^2 T/2]/(\sigma\sqrt{T})$: the dividend yield has vanished from the formula entirely, absorbed into <code>$F_0$</code>. This is the Black 76 form, developed fully later in this section.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Underlying</th><th>Carry parameter</th><th>Drift under <code>Q</code></th><th>Pricing formula</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Non-dividend stock</td><td><code>q = 0</code></td><td><code>r</code></td><td>Lecture 9's plain Black-Scholes: $S_0N(d_1) - Ke^{-rT}N(d_2)$</td></tr>
+        <tr><td>Dividend-paying stock</td><td>Continuous yield <code>q</code></td><td><code>r - q</code></td><td>$S_0e^{-qT}N(d_1) - Ke^{-rT}N(d_2)$</td></tr>
+        <tr><td>Equity index</td><td>Aggregate dividend yield <code>q</code></td><td><code>r - q</code></td><td>Same formula; <code>q</code> is a blended, forecast yield across constituents</td></tr>
+        <tr><td>Currency</td><td>Foreign rate <code>r_f</code> in place of <code>q</code></td><td>$r_d - r_f$</td><td>Garman-Kohlhagen: $S_0e^{-r_fT}N(d_1) - Ke^{-r_dT}N(d_2)$</td></tr>
+        <tr><td>Futures contract</td><td>Carry already embedded in <code>F</code></td><td>zero (F is a <code>Q</code>-martingale)</td><td>Black 76: $e^{-rT}\bigl(FN(d_1) - KN(d_2)\bigr)$</td></tr>
+        <tr><td>Commodity</td><td>Storage cost <code>u</code> minus convenience yield <code>y</code></td><td>$r + u - y$</td><td>Same form with <code>q</code> replaced by <code>y - u</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Discrete dividends: the escrowed-dividend approximation</h3>
+
+  <p>Real dividends are not a smooth continuous trickle, they are lumps paid on announced dates. When a single known cash dividend <code>D</code> is due at time $t_d \in (0,T)$, before the option matures, the standard practitioner shortcut is the <strong>escrowed dividend model</strong>: subtract the present value of the dividend from today's spot, then price as if the reduced spot were a non-dividend share.</p>
+
+  <p>$$ S_0' = S_0 - D\,e^{-rt_d}, \qquad C \approx S_0' N(d_1') - Ke^{-rT}N(d_2'), \quad d_1' = \frac{\ln(S_0'/K) + (r+\sigma^2/2)T}{\sigma\sqrt{T}}. $$</p>
+
+  <p>The logic is that $S_0'$ is the part of today's price that belongs to the option holder: the remaining $D e^{-rt_d}$ is, in present-value terms, already earmarked to be paid away to the shareholder and never reaches anyone holding a derivative instead of the share. This is exactly the same present-value-of-leakage argument used for the forward price in lecture 1's discrete-dividend extension, $F(t) = (S(t) - I)e^{r(T-t)}$, applied here to the option instead of the forward.</p>
+
+  <div class="callout warn">
+    <span class="tag">Important caveat</span>
+    The escrowed-dividend price is an approximation, not an exact solution to a well-posed model. If $S_t$ is genuinely lognormal, $S_t - D e^{-r(t_d-t)}$ (the "ex-dividend" residual, for $t < t_d$) is lognormal minus a deterministic constant, and the difference of a lognormal and a constant is not itself lognormal. Feeding $S_0'$ into the ordinary Black-Scholes formula therefore prices the option under a distributional assumption that is not exactly consistent with the model that produced <code>$S_0'$</code> in the first place. The approximation is good when the dividend is small relative to the spot and there is a long time before <code>$t_d$</code>, and progressively worse for a large discrete dividend close in size to the spot, or several large dividends stacked before maturity.
+  </div>
+
+  <p>What practitioners actually do about this is one of two things, depending on how much the caveat matters for the trade at hand. For small, well-forecast dividends on liquid single names, the escrowed-dividend approximation is used directly and the residual model error is absorbed into the calibration of implied volatility (which is fitted to observed option prices anyway, so it silently corrects for a great deal of model misspecification). For larger dividends or longer-dated options, desks instead model the dividend directly as a piecewise-deterministic jump in the SDE, $S_t$ following geometric Brownian motion between dividend dates and dropping by exactly <code>D</code> at $t_d$, and price by simulation or a PDE solved on a grid with the known jump built in, avoiding the lognormality distortion altogether at the cost of a closed form.</p>
+
+  <h3>Escrowed dividends versus the forward-price approach</h3>
+
+  <p>A second convention, common on trading desks and increasingly the market standard for listed single-stock options, sidesteps the escrowed-spot approximation entirely: quote and price everything off the observed or modelled <strong>forward price</strong> $F_0 = (S_0 - I)e^{rT}$ (or $S_0e^{(r-q)T}$ for a yield), using the Black 76 form directly, rather than adjusting the spot and feeding it through the spot-based formula.</p>
+
+  <p>The two conventions do not, in general, agree, and the reason matters for anyone reading a quoted implied volatility. The escrowed-spot approach effectively assumes the dividend amount is certain and subtracted once, upfront, from a lognormal spot process; the forward-price approach assumes the forward itself is the lognormal object, with the entire carry, dividends included, embedded in a single deterministic drift with no separate deduction. When dividends are genuinely small and certain, the two are close. When they are large, uncertain, or there are several of them at different dates, the two conventions can produce meaningfully different option prices for the same quoted spot, strike and volatility input, and consequently different implied volatilities from the same market price. A volatility surface built under one convention is not directly comparable to one built under the other without first re-expressing both on a common forward.</p>
+
+  <h3>Put-call parity with dividends</h3>
+
+  <p>Lecture 2 derived $C - P = S_0 - Ke^{-rT}$ by replication, and noted in passing that a continuous yield <code>q</code> modifies it by discounting the asset leg. That result now follows directly from the closed forms above: subtracting the put formula from the call formula,</p>
+
+  <p>$$ C - P = S_0 e^{-qT} - K e^{-rT}. $$</p>
+
+  <p>The replication argument behind it is unchanged from lecture 2's, with one leg adjusted: buy $e^{-qT}$ units of the underlying today rather than one whole unit, and let the continuous dividend income reinvest in more of the underlying, so that exactly one unit has accumulated by <code>T</code>. That portfolio, plus borrowing $Ke^{-rT}$, again pays $S_T - K$ in every state, and the parity identity follows by the same no-arbitrage argument as before. For a discrete dividend of present value <code>I</code>, the same substitution as the forward price applies:</p>
+
+  <p>$$ C - P = (S_0 - I) - K e^{-rT}. $$</p>
+
+  <p>Either version collapses to lecture 2's plain identity when the income term is set to zero, confirming that dividends enter put-call parity exactly where they enter the forward price, and nowhere else: the identity is, after all, just the statement that a long call and a short put replicate a forward, and the forward is the object lecture 1 already adjusted for income.</p>
+
+  <h3>The Black 76 form: pricing off the forward</h3>
+
+  <p>Rearranging the dividend-adjusted call formula in terms of the forward price $F_0 = S_0e^{(r-q)T}$ rather than the spot gives a formula with no explicit dividend, foreign rate, or carry term at all:</p>
+
+  <p>$$ C = e^{-rT}\bigl(F_0\,N(d_1) - K\,N(d_2)\bigr), \qquad d_1 = \frac{\ln(F_0/K) + \sigma^2T/2}{\sigma\sqrt{T}}, \qquad d_2 = d_1 - \sigma\sqrt{T}. $$</p>
+
+  <p>This is the <strong>Black 76</strong> formula, named for its origin in pricing options on commodity futures. Its appeal is that every source of carry, dividends, foreign interest, storage cost, convenience yield, is pre-packaged into the single observed number <code>$F_0$</code>, so the option pricer never needs to know, or take a view on, the dividend yield, the foreign rate, or the storage cost separately: the forward market has already done that work and published the answer as a traded price. This is why trading desks quote implied volatility against the forward rather than the spot wherever a liquid forward or futures market exists: it removes an entire input (and an entire source of model disagreement between counterparties) from the pricing conversation.</p>
+
+  <h3>Currency options: Garman-Kohlhagen as <code>q = r_f</code></h3>
+
+  <p>An option to buy or sell one unit of foreign currency at a fixed exchange rate is priced by exactly the dividend-adjusted formula, with the foreign risk-free rate $r_f$ playing the role of the dividend yield, since holding a unit of foreign currency earns interest at $r_f$ in exactly the way holding a dividend-paying share earns <code>q</code>:</p>
+
+  <p>$$ C = S_0\,e^{-r_fT}N(d_1) - K\,e^{-r_dT}N(d_2), \qquad d_1 = \frac{\ln(S_0/K) + (r_d - r_f + \sigma^2/2)T}{\sigma\sqrt{T}}. $$</p>
+
+  <p>This is the <strong>Garman-Kohlhagen</strong> formula. It is the direct option-pricing counterpart of lecture 1's covered interest parity, $F_0 = S_0e^{(r_d-r_f)T}$: the same two rates that pin down the FX forward pin down the FX option, because both results trace back to the same fact, that holding foreign currency is economically identical to holding a continuous-yield asset paying $r_f$.</p>
+
+  <h3>Futures options: Black 76 again</h3>
+
+  <p>An option on a futures contract, rather than on the spot underlying, is priced by Black 76 directly, using the current futures price <code>F</code> in place of $F_0$ and discounting at the domestic risk-free rate <code>r</code>. No separate dividend or carry adjustment is needed, because the futures price has already absorbed the entire carry structure of the underlying by construction (that is precisely what distinguishes a futures price from a spot price): $C = e^{-rT}(FN(d_1) - KN(d_2))$, with <code>$d_1, d_2$</code> as above. This is the standard model for options on commodity futures, index futures, and interest rate futures, and is the reason Black published the formula in a commodities context in 1976 rather than waiting for someone to relabel Black-Scholes.</p>
+
+  <h3>American exercise: when a discrete dividend makes early exercise rational</h3>
+
+  <p>Lecture 2 showed that an American call on a non-dividend-paying stock is never optimally exercised early: waiting always dominates, because immediate exercise forfeits both the interest on the deferred strike and the remaining insurance against the stock falling. A discrete dividend changes the second half of that argument. Exercising immediately before the stock goes ex-dividend lets the holder capture the dividend <code>D</code>, which the option itself has no claim on; exercising at any other time forfeits <code>D</code> for no compensating benefit, so early exercise, if it happens at all, only ever happens in the instant before an ex-dividend date, never between dividend dates.</p>
+
+  <p>Whether it is worth doing trades off the dividend just captured against the interest and insurance value given up. Exercising at $t_d$ instead of holding to <code>T</code> gives up the interest that would have accrued on the deferred strike, worth approximately $K\bigl(1 - e^{-r(T-t_d)}\bigr)$ in present-value terms at $t_d$, against gaining the dividend <code>D</code> outright. Early exercise just before the final ex-dividend date is therefore only ever a candidate when</p>
+
+  <p>$$ D \;>\; K\bigl(1 - e^{-r(T-t_d)}\bigr), $$</p>
+
+  <p>which says the dividend has to be larger than the present value of interest the holder would otherwise earn by deferring payment of the strike. For a small, routine quarterly dividend on a large-cap stock this condition essentially never binds, which is why American calls on ordinary dividend payers are, in practice, almost always priced and hedged as if European. For a stock about to pay an unusually large special dividend, or an American call with very little time remaining after the ex-dividend date (so the remaining interest-and-insurance benefit of waiting is small), the condition can bind, and pricing the option as European materially understates its value.</p>
+
+  <h3>Worked numerical example</h3>
+
+  <p>Take the base case already used in lecture 9: $S_0 = 100$, $K = 100$, $r = 5\%$, $\sigma = 20\%$, $T = 1$ year, where the no-dividend call was found to be $C_0 = 10.4506$ and, by parity, the no-dividend put $P_0 = C_0 - S_0 + Ke^{-rT} = 5.5735$.</p>
+
+  <p><strong>Continuous yield, <code>q = 3%</code>.</strong> The dividend-adjusted <code>$d_1, d_2$</code> are</p>
+
+  <p>$$ d_1 = \frac{\ln(100/100) + (0.05 - 0.03 + 0.02)\times 1}{0.20\times 1} = \frac{0.04}{0.20} = 0.2000, \qquad d_2 = 0.2000 - 0.20 = 0.0000. $$</p>
+
+  <div class="worked">Continuous dividend yield q = 3%, base case S0 = K = 100, r = 5%, sigma = 20%, T = 1:
+
+  N(d1) = N(0.2000) = 0.5793
+  N(d2) = N(0.0000) = 0.5000
+
+  S0 * exp(-qT) = 100 * exp(-0.03) = 97.0446
+  K  * exp(-rT) = 100 * exp(-0.05) = 95.1229
+
+  Call = 97.0446 * 0.5793 - 95.1229 * 0.5000
+       = 56.2140 - 47.5615
+       = 8.6525
+
+  Put  = 95.1229 * (1 - 0.5000) - 97.0446 * (1 - 0.5793)
+       = 47.5615 - 40.8306
+       = 6.7309
+
+  Check by parity: Call - Put = 97.0446 - 95.1229 = 1.9217
+                    8.6525 - 6.7309 = 1.9216   (rounding)  -- confirmed</div>
+
+  <p><strong>Single discrete dividend, escrowed-spot approximation.</strong> Suppose instead of a continuous yield the stock pays one known dividend of $D = 3$ at $t_d = 0.5$ years, chosen so its present value is close to the continuous-yield case, for comparability. The present value of the dividend, and the reduced spot, are</p>
+
+  <p>$$ D\,e^{-rt_d} = 3\times e^{-0.05\times0.5} = 3\times 0.97531 = 2.9259, \qquad S_0' = 100 - 2.9259 = 97.0741. $$</p>
+
+  <div class="worked">Single discrete dividend D = 3 at t_d = 0.5, escrowed-spot approximation:
+
+  S0' = 100 - 3*exp(-0.05*0.5) = 100 - 2.9259 = 97.0741
+
+  d1' = [ln(97.0741/100) + (0.05 + 0.02)*1] / (0.20*1)
+      = [-0.02970 + 0.07000] / 0.20
+      = 0.04030 / 0.20
+      = 0.2015
+
+  d2' = 0.2015 - 0.20 = 0.0015
+
+  N(d1') = N(0.2015) = 0.5799
+  N(d2') = N(0.0015) = 0.5006
+
+  Call' = 97.0741 * 0.5799 - 95.1229 * 0.5006
+        = 56.2879 - 47.6187
+        = 8.6696
+
+  Put'  = Call' - S0' + K*exp(-rT) = 8.6696 - 97.0741 + 95.1229 = 6.7184</div>
+
+  <p>The comparison is the point. Three prices for the same call, same strike, same maturity, same volatility: no dividend at all, $C_0 = 10.4506$; a continuous yield of three per cent, $C_q = 8.6525$; a single discrete dividend of three units with an almost identical present value, $C_D = 8.6696$. Ignoring the dividend entirely overprices the call by about 1.80, roughly 21 per cent of its correctly adjusted value, and underprices the put by a similar amount, which is the practical cost of using lecture 9's formula on an underlying that does not satisfy its assumptions. The continuous and discrete adjustments, in turn, agree to within about two cents on a price of roughly 8.65, which confirms the escrowed-dividend approximation is a good one here: the dividend is a modest fraction of the spot and there is ample time either side of the ex-dividend date, exactly the regime in which the caveat above does not bind.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Dividends are the cleanest instance of a much bigger idea</h3>
+
+  <p>Everything in this lecture generalises past dividends, and recognising that is more valuable than any individual formula in it. The underlying pattern is: whenever holding an asset generates or costs cash flow beyond pure price appreciation, that cash flow has to be stripped out of the risk-neutral drift before the ordinary no-income machinery can be applied, and it reappears, with the opposite sign, discounting the spot in every closed form. Dividends are one instance. Repo rates on a security lending desk are another: the fee a stock lender earns for lending out shares to a short seller functions exactly like a negative dividend yield from the borrower's perspective, and hard-to-borrow stocks trade options at prices that reflect this borrow cost the same way they would reflect an ordinary dividend. Cross-currency basis, the persistent deviation of long-dated FX forwards from textbook covered interest parity, is a third instance: it behaves as an additional carry term layered onto the $r_d - r_f$ already in the Garman-Kohlhagen drift, priced by desks as one more yield to net out before applying the same formula. Once the pattern is recognised, the question for any new asset class is never "does the standard formula need to be rederived", it is "what is the carry, and what sign does it enter with".</p>
+
+  <h3>Future dividends are forecast, not known, and that is a genuine model risk</h3>
+
+  <p>Every formula in this lecture treats <code>q</code>, or <code>D</code>, or the forward price, as a known input. In reality, dividends more than a few months out are a forecast: companies can cut, suspend, or raise them, and a share's future dividend policy is one of the least certain inputs in the entire pricing exercise, arguably less certain than the volatility itself for longer-dated options. This uncertainty is large enough, and important enough to institutional hedgers, that it trades in its own right: <strong>dividend swaps</strong> and <strong>dividend futures</strong> let a market participant take a pure view on realised future dividends, separate from the share price, and their quoted levels are exactly the market-implied forward dividend expectation that belongs inside the option formulae above. A desk pricing long-dated single-stock or index options does not guess at <code>q</code>; it reads the dividend curve off the dividend swap or futures market, the same way it reads the discount curve off the interest rate swap market.</p>
+
+  <h3>A wrong dividend assumption hides inside the skew</h3>
+
+  <p>Implied volatility is, by construction, whatever number makes the model price match the observed market price, given every other input. If the dividend assumption fed into that calculation is wrong, the error does not vanish: it is silently absorbed into the backed-out implied volatility instead, and it does not land uniformly across strikes. Because dividends enter through the forward, and the forward shifts the whole strike axis relative to the spot, an incorrect dividend assumption systematically misprices the moneyness of every option relative to its true forward-based moneyness, producing a spurious tilt in the implied volatility smile that has nothing to do with the market's actual view on skewness or tail risk. Practitioners who see an implied volatility surface that looks unexpectedly skewed for a name with a well-known dividend policy are trained to check the dividend curve used in the pricer before concluding anything about the volatility market itself.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common error</span>
+    Applying the continuous-yield formula, $S_0e^{-qT}$, to a single large discrete dividend by converting it into an "equivalent" annualised yield is a frequent and avoidable mistake. A continuous yield spreads the income evenly across the whole life of the option; a single discrete dividend is concentrated entirely on one date, and every option with a maturity that straddles that date should see the entire present value of the dividend removed at once, not smeared proportionally across the full year. The two approaches can agree tolerably well for a small dividend on a long-dated option, exactly the case worked above, and diverge badly for a large special dividend, or for two options on the same stock with maturities just before and just after the ex-dividend date, which a naive continuous-yield conversion prices as barely different from each other despite one of them capturing the dividend entirely and the other not at all.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the single organising principle behind every adjustment in this lecture, in one sentence. Then state the risk-neutral SDE and the modified Black-Scholes PDE for a continuous dividend yield <code>q</code>, and identify exactly which term changes relative to the non-dividend case.</li>
+      <li>Show that replacing <code>$S_0$</code> with $S_0e^{-qT}$ inside the no-dividend $d_1$ formula, both inside the logarithm and as the leading coefficient, reproduces the dividend-adjusted call formula exactly. Which term absorbs the substitution inside <code>$d_1$</code>?</li>
+      <li>A stock pays a single known dividend $D = 4$ in three months. The spot is 90, $r = 4\%$. Compute the escrowed spot $S_0'$ to be used in place of $S_0$ for an option maturing in nine months.</li>
+      <li>Explain, without formulae, why the escrowed-dividend approximation is not an exact solution to a well-specified model, and identify the specific circumstance (large dividend, or several dividends, or a short time to the dividend date) in which the approximation is weakest.</li>
+      <li>Distinguish the escrowed-spot convention from the forward-price convention for handling a discrete dividend. Why can the two conventions imply different values for the same quoted option, and what does this mean for comparing implied volatilities computed under each?</li>
+      <li>Derive dividend-adjusted put-call parity for a continuous yield <code>q</code>, starting from the two dividend-adjusted closed forms. Confirm it reduces to lecture 2's identity when <code>q = 0</code>.</li>
+      <li>Write down the Black 76 formula for a European call in terms of the forward price <code>F</code>. Explain why a trading desk might prefer to quote and hedge using this form rather than the spot-based formula, even though the two are mathematically equivalent.</li>
+      <li>State the Garman-Kohlhagen formula and identify precisely which parameter plays the role of the dividend yield, and why that identification is exact rather than merely analogous.</li>
+      <li>Derive the condition on a discrete dividend <code>D</code>, paid at $t_d$ before maturity <code>T</code>, under which early exercise of an American call becomes rational just before the ex-dividend date. Explain in one sentence why early exercise, if it happens at all, only ever happens at that single moment.</li>
+      <li>A stock at 100 pays a continuous yield of 3% with $r = 5\%$, $\sigma = 20\%$, $T = 1$, $K = 100$. Using the worked example in section 4, state the call price, the put price, and explain why the two curves in the section 3 figure cross at $q = 5\%$ rather than at $q = 0$.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="11-hedging_and_greeks.html">Hedging and the Greeks</a>, where delta, gamma, theta and vega are all re-derived for the dividend-adjusted formulae of this lecture, and where a discrete dividend produces a visible jump in delta across the ex-dividend date that a hedger has to manage explicitly.</li>
+      <li>The remaining lectures on calibration and exotic structures build on the forward-based Black 76 quoting convention introduced here, since almost every desk-level implementation prices from the forward rather than the spot once dividends, repo and carry are all in play.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 9 - Dividends.pdf</code> (primary source)</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 4 (Black-Scholes theory), which carries the formula summary for the dividend-adjusted PDE and closed forms used in this lecture</li>
+      <li>Hull, <em>Options, Futures and Other Derivatives</em>, chapter 15 (dividend-adjusted Black-Scholes and the escrowed-dividend model) and chapter 17 (Black 76, Garman-Kohlhagen, and futures options)</li>
+      <li>Black (1976), <em>The Pricing of Commodity Contracts</em>, for the original forward-based formula</li>
+      <li>Garman and Kohlhagen (1983), <em>Foreign Currency Option Values</em>, for the currency-option special case</li>
+      <li>Bj&ouml;rk, <em>Arbitrage Theory in Continuous Time</em>, for the general terminal-value-problem framework the source's proof of the dividend PDE follows</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The source covers only the continuous dividend yield case, proved carefully by replication and by one full worked example (a stock-or-nothing put). It has no material at all on discrete dividends, the escrowed-spot approximation, the forward-price convention, put-call parity with dividends, Black 76, Garman-Kohlhagen, futures options, or the interaction between dividends and American early exercise. All of that content in this lecture is new relative to the source, not an elaboration of something already there.</li>
+      <li>The source contains two evident typographical slips that do not survive into the final stated results. The intermediate drift-matching equation is printed with a coefficient of $(r-\sigma)$ rather than $(r-\delta)$; the boxed theorem immediately afterwards correctly states $(r-\delta)$, so the earlier line is a rendering slip rather than a substantive error. Separately, the worked stock-or-nothing example defines $m = \sigma\sqrt{r-t}$ and $Y$ in terms of a lowercase $w_t$; both should read $\sigma\sqrt{T-t}$ and $W_t$, matching the correct forms used consistently in every subsequent line of the same derivation.</li>
+      <li>The source's own answer key to Exercise 2.6.1 states the European call as $EC_t = Se^{\delta(T-t)}N(d_1) - Ke^{-r(T-t)}N(d_2)$, with a positive sign on the dividend exponential. This contradicts the boxed formula for $\bar C(t,S_t)$ derived immediately above it in the main text, which correctly has $Se^{-\delta(T-t)}N(d_1)$. The negative exponent is the correct one, consistent with a dividend reducing rather than increasing the effective spot, and is the form used throughout this lecture; the exercise answer key appears to contain a genuine sign error, not merely a typesetting slip.</li>
+      <li>The source's notation uses <code>&delta;</code> for the dividend yield throughout; this lecture follows lecture 1's established convention of <code>q</code> for the same quantity, to keep notation consistent across the course. This is a labelling choice only and does not affect any formula carried over.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 10: dividends and other adjustments</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

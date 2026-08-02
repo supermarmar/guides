@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 26: convolutional networks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Deep learning</a></div>
+  <h1>Convolutional networks</h1>
+  <p class="subtitle">Lecture 1 previewed convolutional networks in one paragraph: weight sharing across spatial position, encoding the belief that a feature means the same thing wherever it appears. This lecture works through the actual mechanics that paragraph glossed over: kernel size, stride, padding, the receptive field, and pooling, for both the 1D case (a claims-development history, a telematics trace, a mortality time series) and the 2D case (a mortality surface, a scanned document, a satellite image).</p>
+  <div class="meta">
+    <span>Lecture 26 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part IV: deep learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>convolutional layer</strong> replaces the fully connected layer's "every output connects to every input" rule with two constraints: <strong>local connectivity</strong> (each output unit looks only at a small window, the <strong>receptive field</strong>, of the input) and <strong>parameter sharing</strong> (the identical small set of weights, the <strong>filter</strong> or <strong>kernel</strong>, is applied at every position as it slides across the input). Two hyperparameters control the slide: the <strong>kernel size</strong> $K$, how wide the window is, and the <strong>stride</strong> $s$, how far the window moves between applications. A <strong>1D convolution</strong> slides the filter along a single axis (time, or position in a sequence); a <strong>2D convolution</strong> slides it across two spatial axes (an image's height and width) simultaneously. Stacking convolutional layers grows the <strong>effective receptive field</strong> geometrically with depth, letting early layers detect small local patterns (an edge, a short-term spike in a time series) and later layers combine those into larger-scale structure (a shape, a multi-period trend), without ever connecting every output to every input directly. <strong>Pooling</strong> layers (typically max or average pooling) downsample the spatial or temporal resolution between convolutional layers, and a final <strong>flatten</strong> layer reshapes the last convolutional output into a plain vector before it enters a standard fully connected readout.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine scanning a strip of paper with a small stencil that only shows you a few characters at a time, sliding the stencil one position to the right after each look, and writing down what pattern the stencil sees at each position. That is a 1D convolution: the stencil is the filter, its width is the kernel size, and how far you slide it each time is the stride. Do this with a small square stencil moved across a photograph instead of a strip, in both directions, and you have a 2D convolution. The point of using the identical stencil everywhere, rather than a different one at every position, is that a pattern worth detecting (an edge, a spike) means the same thing wherever it occurs, so one shared stencil, not a new one for every location, is all that is needed.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture develops the mechanics behind the CNN paragraph in lecture 1's closing "architectural specialisations" section. It is the grid-structured-data counterpart to the next lecture's sequence-structured RNN, and both are largely superseded, in modern practice, by the attention-based transformer two lectures ahead; this course still develops CNNs and RNNs in full because understanding what attention replaced is the fastest route to understanding why it displaced them.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons CNNs remain worth knowing in detail, actuarial data included.</p>
+
+  <p>First, <strong>parameter sharing is what makes a grid-structured input tractable at all</strong>. A fully connected layer on a modest 64-by-64 pixel image already needs millions of weights per neuron in the next layer; a convolutional layer with a small kernel needs only a handful of weights, shared across every position, cutting the parameter count by orders of magnitude and making the difference between a trainable model and an intractable one.</p>
+
+  <p>Second, <strong>1D CNNs are a genuinely useful, under-used tool for actuarial time-structured data</strong>: a claims-development triangle read as a time series, a telematics driving trace, an individual claim's settlement path, or a mortality-rate time series are all naturally 1D-convolutional inputs, where a local filter learns short-term shape (a sudden spike in claim payments, a hard-braking event) without needing to hand-engineer that feature first.</p>
+
+  <p>Third, <strong>2D CNNs remain the standard tool wherever the input genuinely has a spatial, grid structure</strong>, mortality surfaces indexed by age and calendar year being the clearest actuarial example, scanned or photographed documents (damage assessment photos, ID verification) being the operational one; knowing when a 2D CNN is the right tool, rather than reaching for a transformer by reflex, is a genuine architectural decision this lecture equips you to make.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A life insurer building a mortality-surface smoothing tool tried a fully connected network directly on the raw age-by-year mortality-rate grid, flattened to a vector, and found the network overfitting badly with fewer than a thousand grid cells of training data spread across ages and years. Switching to a small 2D convolutional architecture, exploiting the fact that mortality improvement is locally smooth in both age and calendar time, reduced the effective parameter count by a factor of over fifty for a comparable receptive field, and the resulting smoothed surface tracked known mortality-improvement patterns (cohort effects, period shocks) with far less visible overfitting noise than the fully connected version had shown.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a filter of width 3 sliding across a sequence with stride 1, versus the identical filter with stride 3, producing overlapping versus non-overlapping receptive fields.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A 1D convolutional filter sliding with stride 1 versus stride 3">
+      <defs>
+        <marker id="cnnArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Kernel size K = 3, stride 1 (overlapping) versus stride 3 (non-overlapping)</text>
+
+      <g transform="translate(40, 50)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">Stride 1: overlapping receptive fields</text>
+        <g font-family="JetBrains Mono" font-size="12" fill="#27272a">
+          <rect x="0" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="42" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="84" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="126" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="168" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="210" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="252" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+        </g>
+        <rect x="0" y="30" width="126" height="30" fill="none" stroke="#b45309" stroke-width="2.5"/>
+        <rect x="42" y="30" width="126" height="30" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="3 2"/>
+        <rect x="84" y="30" width="126" height="30" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-dasharray="2 2"/>
+        <text x="330" y="120" font-family="Inter" font-size="9" fill="#71717a">... windows keep overlapping across the sequence</text>
+      </g>
+
+      <g transform="translate(40, 190)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#0d9488">Stride 3: non-overlapping receptive fields</text>
+        <g font-family="JetBrains Mono" font-size="12" fill="#27272a">
+          <rect x="0" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="42" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="84" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="126" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="168" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="210" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+          <rect x="252" y="30" width="42" height="30" fill="#fff" stroke="#a1a1aa"/>
+        </g>
+        <rect x="0" y="30" width="126" height="30" fill="none" stroke="#0d9488" stroke-width="2.5"/>
+        <rect x="126" y="30" width="126" height="30" fill="none" stroke="#0d9488" stroke-width="2.5"/>
+        <text x="330" y="50" font-family="Inter" font-size="9" fill="#71717a">fewer, cheaper, less-detailed windows</text>
+      </g>
+    </svg>
+    <figcaption>A kernel of size $K = 3$ examines three consecutive positions at a time; the stride determines how far it moves before the next examination. Stride 1 produces overlapping windows and a high-resolution output, at the cost of more computation; stride 3 (matching the kernel size) produces non-overlapping windows, a coarser but cheaper output. The identical filter weights are reused at every position in both cases, the parameter-sharing property that distinguishes convolution from a fully connected layer.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>The filter is a stencil, not a per-position custom rule.</strong> The same small set of weights is asked to detect its pattern everywhere; nothing about the architecture lets it learn a different rule for position 5 than for position 500. <strong>Stacking convolutions grows the receptive field multiplicatively, not additively.</strong> A single layer with kernel size 3 sees 3 positions; two stacked layers of kernel size 3 see 5; three stacked layers see 7; the effective field of view grows roughly linearly in the number of layers for a fixed kernel size, and pooling (below) accelerates this growth further.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>1D convolution: the mechanics</h3>
+
+  <p>Let $X_{1:t} \in \mathbb{R}^{t \times q}$ be an input sequence of length $t$ with $q$ channels (a univariate time series has $q = 1$; a multivariate one, such as a telematics trace with speed, acceleration, and heading, has $q > 1$). A 1D convolutional layer with a single filter of kernel size $K$ and stride $s$ is a mapping</p>
+  $$z^{(1,1)}: \mathbb{R}^{t \times q} \to \mathbb{R}^{\tilde t}, \qquad \tilde t = \left\lfloor \frac{t - K}{s} \right\rfloor + 1,$$
+  <p>where $\tilde t$ is the number of receptive fields (output positions) the sliding window produces. Each output unit $u$ is computed by convolving the filter with the $u$-th receptive field,</p>
+  $$z_u^{(1,1)}(X_{1:t}) = \phi\!\left(w_0^{(1,1)} + \sum_{k=1}^K \big\langle w_k^{(1,1)}, X_{(u-1)s + k}\big\rangle\right),$$
+  <p>with bias $w_0^{(1,1)}$, filter weights $w_k^{(1,1)} \in \mathbb{R}^q$ for $k = 1, \ldots, K$, and activation function $\phi$ (ReLU, as in the standard recipe from lecture 1). The total parameter count for a single filter is $1 + Kq$, independent of the sequence length $t$, which is the parameter-sharing saving stated informally in section 1 made precise: a fully connected layer mapping the same input to the same output size would need $O(t \cdot \tilde t)$ parameters, while the convolutional layer needs $O(Kq)$, independent of $t$ entirely.</p>
+
+  <p>In practice, a convolutional layer applies many filters in parallel (a "layer width" analogous to the number of neurons in a fully connected layer), each learning to detect a different local pattern, and the layer's output is then a $\tilde t \times (\text{number of filters})$ tensor rather than the single-channel $\tilde t$-vector shown above for simplicity.</p>
+
+  <h3>2D convolution</h3>
+
+  <p>The 2D case extends the identical construction to two spatial axes. For an input image or surface $X \in \mathbb{R}^{h \times w \times q}$ (height, width, channels), a 2D filter of kernel size $K \times K$ slides across both spatial axes simultaneously, with a (typically shared) stride $s$ in each direction, producing an output of spatial size $\tilde h \times \tilde w$ where $\tilde h = \lfloor (h-K)/s \rfloor + 1$ and $\tilde w$ analogously. Each output pixel is computed identically to the 1D case, a weighted sum over the $K \times K \times q$ receptive field passed through an activation, with the identical filter weights reused at every spatial position. A colour image, three channels ($q=3$, red-green-blue) is the canonical example; a mortality surface indexed by age and calendar year, with a single channel (the mortality rate itself, or its logarithm), is the actuarial one.</p>
+
+  <h3>Padding</h3>
+
+  <p>Without adjustment, a convolutional layer's output is strictly smaller than its input (the $\tilde t < t$ formula above), which erodes the spatial or temporal extent of the representation with every layer stacked. <strong>Padding</strong> adds extra values (typically zeros) around the border of the input before convolving, so the output size can be controlled independently of the erosion the raw formula would otherwise impose; "same" padding chooses the padding amount so the output size exactly matches the input size, a common default that lets many convolutional layers be stacked without the spatial extent shrinking to nothing.</p>
+
+  <h3>Pooling</h3>
+
+  <p>A <strong>pooling</strong> layer downsamples its input by replacing each non-overlapping (or overlapping) window with a single summary statistic, most commonly the maximum (<strong>max pooling</strong>) or the average (<strong>average pooling</strong>) of the values in the window. Pooling serves two purposes: it reduces the spatial or temporal resolution (and hence the computational cost of subsequent layers), and it introduces a degree of local translation invariance, a small shift in exactly where a detected pattern occurs within the pooling window does not change the pooled output. Pooling has no learnable parameters; it is a fixed, deterministic downsampling operation, in contrast to every other layer type this course has developed.</p>
+
+  <h3>Locally-connected layers: dropping the parameter sharing, keeping the locality</h3>
+
+  <p>A <strong>locally-connected layer</strong> keeps a convolutional layer's local-connectivity constraint (each output unit looks only at a small receptive field) but drops the parameter-sharing constraint: a different filter is learned at every position rather than the identical one reused everywhere. This is appropriate precisely when the assumption behind weight sharing, that a pattern means the same thing wherever it occurs, is false; a facial-recognition network operating on aligned, cropped face images (where the eye region is always in roughly the same place) is the classic example, because a filter tuned to detect an eye should not need to also work as a mouth detector purely because weight sharing forces it to be applied everywhere. Locally-connected layers trade the convolutional layer's parameter efficiency for this additional flexibility, and are used far less often than ordinary convolutional layers because the assumption they relax is usually the right one to keep, not drop.</p>
+
+  <h3>Deep CNNs and the flatten layer</h3>
+
+  <p>Stacking convolutional and pooling layers alternately, the standard recipe, grows the effective receptive field with depth: early layers detect small, local patterns (an edge in an image, a short spike in a time series), and later layers, operating on the already-downsampled and already-pattern-detected output of earlier layers, combine those into larger-scale structure. After the final convolutional or pooling layer, a <strong>flatten</strong> layer reshapes the resulting multi-dimensional tensor into a single vector, which then feeds into one or more ordinary fully connected layers (the "readout" from lecture 1's GLM-plus-feature-extractor framing) to produce the final prediction. The convolutional and pooling stack is, in this sense, exactly a feature extractor in the sense of lecture 1's opening framing, with the specific inductive bias of local connectivity and weight sharing built into its structure rather than left for gradient descent to discover unconstrained.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Flattening raw tabular data and hoping convolution helps</span>
+    A CNN's parameter-sharing assumption only pays off when nearby positions in the input genuinely share meaning; flattening an ordinary tabular feature vector (age, income, vehicle age, in arbitrary column order) into a pseudo-sequence and applying a 1D convolution imposes a locality assumption the data does not have, because there is no reason a filter that works well on positions 3 to 5 should also be meaningful applied to positions 8 to 10 of an arbitrarily ordered feature vector. Tabular data belongs with the fully connected or tabular-transformer architectures (lecture 1 and lecture 9), not a CNN.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing kernel size and stride without checking the resulting receptive field</span>
+    A stack of layers with kernel size and stride chosen independently at each layer, with no check on the cumulative effective receptive field, can leave a deep network that has, in practice, a much smaller field of view than the modeller assumes, missing genuinely long-range structure (a multi-year mortality trend, a claims-development pattern spanning many periods). Computing the effective receptive field explicitly, layer by layer, is a cheap and worthwhile check before training.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Over-pooling and discarding resolution the task needs</span>
+    Aggressive pooling reduces computational cost but also discards exactly the fine-grained positional information some tasks need (the precise timing of a spike in a claims-development series, rather than merely its presence somewhere in a broad window). Match the pooling aggressiveness to how much positional precision the downstream prediction genuinely requires, rather than pooling maximally by default.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Reaching for a locally-connected layer as a default "more flexible" upgrade</span>
+    Dropping parameter sharing multiplies the parameter count by the number of spatial positions, reintroducing much of the overfitting risk convolution was adopted specifically to avoid. Use a locally-connected layer only when there is a concrete, stated reason the weight-sharing assumption is wrong for the specific input, not as a general-purpose capacity increase.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A convolutional layer trades the fully connected layer's unrestricted connectivity for two constraints, local connectivity and parameter sharing, controlled by the kernel size and the stride, which together determine the receptive field and the output resolution. Padding controls how much the spatial or temporal extent shrinks with each layer; pooling deliberately downsamples between convolutional layers, trading resolution for translation invariance and computational cost; locally-connected layers keep locality but drop sharing, at a substantial parameter-count cost, for the specific cases where weight sharing's assumption genuinely fails. Stacking convolutional layers grows the effective receptive field with depth, letting a deep CNN build hierarchical structure, edges into shapes, spikes into trends, from raw grid- or sequence-structured input.</p>
+
+  <p>The next lecture turns to the other classical architecture for sequential data, the recurrent neural network, which processes a sequence step by step rather than through a fixed-width sliding window, and carries forward an explicit notion of memory across time that a CNN's fixed receptive field does not have.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the two constraints a convolutional layer imposes relative to a fully connected layer, and explain how each contributes to the parameter-count saving.</li>
+      <li>Given a sequence of length $t = 20$, kernel size $K = 5$, and stride $s = 2$, compute the number of receptive fields $\tilde t$ the resulting 1D convolutional layer produces.</li>
+      <li>Explain the difference between max pooling and average pooling, and state one purpose pooling serves beyond dimensionality reduction.</li>
+      <li>Describe a locally-connected layer and give a concrete example of a dataset where dropping the weight-sharing assumption is justified.</li>
+      <li>Explain why flattening an arbitrarily ordered tabular feature vector and applying a 1D convolution is usually a poor architectural choice.</li>
+      <li>Describe how a mortality-rate surface, indexed by age and calendar year, maps onto the 2D convolutional input format developed in this lecture.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 5 (<a href="05-word_embeddings.html">word embeddings</a>) closed the representation-learning arc; this lecture and the next return to architecture, specialised for grid- and sequence-structured input respectively.</li>
+      <li><strong>Next:</strong> Lecture 7 (<a href="07-recurrent_networks.html">recurrent networks</a>) develops the sequential alternative to the fixed-window convolutional approach.</li>
+      <li><strong>Built on:</strong> Lecture 1's <a href="01-neural_networks.html">closing preview of architectural specialisations</a> introduced the inductive-bias framing this lecture makes precise.</li>
+      <li><strong>Used by:</strong> Lecture 8 (<a href="08-transformers.html">transformers</a>) is frequently compared directly against the CNN developed here, particularly for sequence data, where attention has displaced convolution in most modern applications.</li>
+      <li><strong>Outside this course:</strong> 1D CNNs on claims-development and telematics time series, and 2D CNNs on mortality surfaces, are established, if still under-used, tools in actuarial modelling practice; the actuarial-applications module later in this course references both.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Deep learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 26 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

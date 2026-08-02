@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 4: SQL I, definition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>SQL I: definition</h1>
+  <p class="subtitle">A constraint is a test that runs on every write, forever, without anyone remembering to run it. Most of what a team calls data quality tooling is an attempt to recover, after the fact and at great expense, guarantees that six lines of DDL would have enforced for free at the moment of writing. This lecture is about those six lines: types, keys, constraints, views, and indexes.</p>
+  <div class="meta">
+    <span>Lecture 4 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part II: SQL and data modelling</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>SQL</strong>, Structured Query Language, manages data held in relational databases through declarative statements. Declarative means you state the result you want, not the procedure for obtaining it: <code>SELECT</code> the accounts in arrears, rather than open the file, loop over the rows, and test each one. The engine chooses the procedure, which is why the same statement can run unchanged as the data grows from a thousand rows to a billion.</p>
+
+  <p>SQL statements group into four sub-languages. <strong>Data definition language</strong> (DDL) declares the structure: <code>CREATE</code>, <code>ALTER</code>, <code>DROP</code>. <strong>Data manipulation language</strong> (DML) changes the contents: <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>. <strong>Data query language</strong> (DQL) asks questions: <code>SELECT</code>. <strong>Data control language</strong> (DCL) governs permissions: <code>GRANT</code>, <code>REVOKE</code>. This lecture is DDL. Lecture 05 is DQL, Lecture 06 is DML, and DCL appears in Lecture 19 alongside the rest of access control.</p>
+
+  <p>DDL is the least glamorous of the four and the one with the largest effect on how much time you later spend firefighting. Every type declaration prevents a class of coercion error, every constraint is a permanent assertion about what the data may contain, and every foreign key makes a whole category of orphaned record impossible rather than merely unlikely.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Think of a form at a bank counter. A badly designed form has a blank box labelled "date" and accepts anything a customer writes there, so somebody downstream has to work out whether 03/04 was March or April, and sometimes guesses wrong. A well designed form has three boxes, DD, MM, YYYY, and rejects a thirteenth month at the counter. DDL is the second form. The constraint is not paperwork; it is the reason nobody downstream has to guess.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">One standard, several dialects</span>
+    SQL is an ANSI standard, so the core is portable, and every engine extends it. Microsoft SQL Server speaks T-SQL and dominates large enterprise estates. PostgreSQL is the open-source reference implementation, unusually complete and standards-faithful. SQLite fits an entire database in one file with no server. DuckDB is the analytical counterpart to SQLite, in-process and columnar, and is the engine used in this course's examples because it needs no installation beyond a Python import. The examples below are written in a portable style; where a dialect differs materially, the difference is flagged.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>A constraint is the cheapest data quality control that exists.</strong> Lecture 16 will build validation suites that check data after it lands, and those suites are necessary. But a check that runs after the fact discovers a problem; a constraint prevents one. The declaration <code>arrears_months INTEGER NOT NULL CHECK (arrears_months BETWEEN 0 AND 120)</code> means no process, no matter how carelessly written, will ever put a null or a negative arrears count in that column. That guarantee costs one line, is enforced by the engine on every write forever, and needs no scheduling, no monitoring, and no maintenance.</p>
+
+  <p><strong>The schema is documentation that cannot go stale.</strong> Prose describing a table drifts from reality within months. A DDL definition is the reality: if the document says the account identifier is unique and the table declares it unique, that is not a claim but a fact enforced by the system. This is why reviewing the DDL is the fastest way to understand an unfamiliar database, and why a schema kept in version control is a more reliable data dictionary than any wiki page.</p>
+
+  <p><strong>Types stop silent coercion.</strong> Lecture 02 catalogued the damage untyped text does. DDL is where the types are asserted: the account number is text so leading zeros survive, the balance is a fixed-precision decimal so sums reconcile, the reporting date is a date so no locale can reinterpret it. Each of these turns a silent wrong answer into a loud failure at load time, which is the whole strategy.</p>
+
+  <div class="callout warn">
+    <span class="tag">Where constraints are not free</span>
+    Constraints and indexes cost write performance, because every insert must be checked and every index updated. On a transactional system with heavy write rates this is a real trade-off requiring measurement. On analytical tables written once per month by a pipeline, it is close to irrelevant, and the argument against constraints is nearly always misapplied transactional folklore. Note the opposite caution for analytical engines: some, DuckDB included, support declaring keys but do not enforce foreign keys the way PostgreSQL does, and several warehouses accept constraint syntax while treating it as documentation. Check what your engine actually enforces rather than assuming, because an unenforced constraint is worse than none: it invites trust it has not earned.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four sub-languages of SQL">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Four sub-languages, four lectures</text>
+
+      <rect x="30" y="45" width="165" height="150" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="112" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">DDL</text>
+      <text x="112" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">definition</text>
+      <g font-family="JetBrains Mono" font-size="10" fill="#115e59" text-anchor="middle">
+        <text x="112" y="112">CREATE</text>
+        <text x="112" y="128">ALTER</text>
+        <text x="112" y="144">DROP</text>
+      </g>
+      <text x="112" y="172" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#0d9488">shape and rules</text>
+      <text x="112" y="188" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#0d9488">this lecture</text>
+
+      <rect x="212" y="45" width="165" height="150" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="294" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">DQL</text>
+      <text x="294" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">query</text>
+      <g font-family="JetBrains Mono" font-size="10" fill="#5b21b6" text-anchor="middle">
+        <text x="294" y="112">SELECT</text>
+        <text x="294" y="128">JOIN</text>
+        <text x="294" y="144">GROUP BY</text>
+      </g>
+      <text x="294" y="172" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#7c3aed">asking questions</text>
+      <text x="294" y="188" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#7c3aed">Lecture 05</text>
+
+      <rect x="394" y="45" width="165" height="150" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="476" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">DML</text>
+      <text x="476" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">manipulation</text>
+      <g font-family="JetBrains Mono" font-size="10" fill="#92400e" text-anchor="middle">
+        <text x="476" y="112">INSERT</text>
+        <text x="476" y="128">UPDATE</text>
+        <text x="476" y="144">DELETE / MERGE</text>
+      </g>
+      <text x="476" y="172" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#b45309">changing contents</text>
+      <text x="476" y="188" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#b45309">Lecture 06</text>
+
+      <rect x="576" y="45" width="154" height="150" rx="12" fill="#FCE7F3" stroke="#be185d" stroke-width="2"/>
+      <text x="653" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#831843">DCL</text>
+      <text x="653" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#be185d">control</text>
+      <g font-family="JetBrains Mono" font-size="10" fill="#831843" text-anchor="middle">
+        <text x="653" y="112">GRANT</text>
+        <text x="653" y="128">REVOKE</text>
+      </g>
+      <text x="653" y="172" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#be185d">who may do what</text>
+      <text x="653" y="188" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#be185d">Lecture 19</text>
+
+      <rect x="30" y="225" width="700" height="70" rx="12" fill="#F4F4F5" stroke="#52525b" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="380" y="249" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#27272a">DECLARATIVE, NOT PROCEDURAL</text>
+      <text x="380" y="269" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">You write what you want; the query planner decides how. The same SELECT runs over a thousand rows</text>
+      <text x="380" y="285" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">or a billion, on one core or two hundred, without being rewritten. This is SQL's durable advantage.</text>
+    </svg>
+    <figcaption>The four sub-languages. DDL and DCL are the two that persist as artefacts in version control; DQL and DML are mostly written and run. The declarative property in the grey band is why SQL has outlived every framework that promised to replace it.</figcaption>
+  </figure>
+
+  <h3>Three kinds of promise</h3>
+
+  <p>Everything in DDL is one of three promises, and it helps to know which you are making.</p>
+
+  <div class="defcard tint-mint"><span class="term">A type</span><span class="def">A promise about the domain of values a column may hold: integer, decimal with two places, date, boolean, text. Violating it is a load failure. Types also determine storage size and the operations available, so a date column can be compared to another date and a text column cannot be summed.</span></div>
+  <div class="defcard tint-lavender"><span class="term">A constraint</span><span class="def">A promise about which values within the type are admissible, and how rows relate to each other: not null, unique, a check expression, a primary key, a foreign key. Violating it rejects the write. This is where business rules become enforceable.</span></div>
+  <div class="defcard tint-peach"><span class="term">An index</span><span class="def">Not a promise about content at all, but a promise about performance: a separate data structure that lets the engine find matching rows without reading every one. Indexes never change what a query returns, only how long it takes. The exception is a unique index, which also constrains.</span></div>
+
+  <h3>Keys and referential integrity</h3>
+
+  <p>A <strong>primary key</strong> is the column, or set of columns, that uniquely identifies a row. It is equivalent to declaring unique and not null together, with two differences: a table may have only one primary key, and other tables reference it. When no single column identifies a row, a <strong>composite primary key</strong> of several columns does the job. This case is the norm in risk data: a monthly loan snapshot is keyed on account identifier <em>and</em> reporting date, because the same account appears sixty times.</p>
+
+  <p>A <strong>foreign key</strong> in a child table references the primary key of a parent, and the engine then guarantees <strong>referential integrity</strong>: no arrears record may exist for an account that is not in the accounts table. The behaviour when a parent row is deleted must be chosen explicitly. <code>ON DELETE RESTRICT</code> refuses the deletion while children exist, which is the safe default. <code>ON DELETE CASCADE</code> deletes the children too, which is convenient and occasionally catastrophic. In a bank, prefer restrict, and prefer never deleting anything at all.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Creating a table</h3>
+
+  <p><code>CREATE TABLE</code> names a table, names each column, gives each column a type, and attaches constraints. The examples use DuckDB, which needs no server: <code>duckdb.connect(':memory:')</code> for a database that vanishes at the end of the session, or <code>duckdb.connect('risk.db')</code> for one that persists in a file.</p>
+
+  <pre><code>CREATE OR REPLACE TABLE customers (
+    customer_id     VARCHAR      PRIMARY KEY,
+    surname         VARCHAR      NOT NULL,
+    date_of_birth   DATE         NOT NULL,
+    segment         VARCHAR      NOT NULL DEFAULT 'retail',
+    email           VARCHAR      UNIQUE,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (date_of_birth &lt; CURRENT_DATE),
+    CHECK (segment IN ('retail', 'sme', 'corporate'))
+);</code></pre>
+
+  <p>Read every line as an assertion. The customer identifier is text, not an integer, because identifiers with leading zeros or alphabetic prefixes are common and no arithmetic is ever performed on one. Surname and date of birth must be present. Segment defaults to retail and is restricted to three values, which is a poor man's enumerated type and considerably better than nothing. Email is unique but nullable, because not every customer has one, and note that most engines permit multiple nulls in a unique column since nulls are not equal to each other. The final two checks encode facts about the world: nobody is born in the future, and there is no fourth segment.</p>
+
+  <h3>Types worth choosing deliberately</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Use</th><th>Type</th><th>Why not the obvious alternative</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Monetary amount</td><td><code>DECIMAL(18, 2)</code></td><td><code>FLOAT</code> cannot represent 0.1 exactly, so sums drift and reconciliation fails by pennies nobody can trace</td></tr>
+      <tr><td>Rate or ratio</td><td><code>DECIMAL(9, 6)</code></td><td>Float is defensible here, but explicit scale documents the precision the business actually uses</td></tr>
+      <tr><td>Account identifier</td><td><code>VARCHAR</code></td><td><code>INTEGER</code> silently strips leading zeros and invites arithmetic that has no meaning</td></tr>
+      <tr><td>Calendar date</td><td><code>DATE</code></td><td>Text is locale-ambiguous; timestamp implies a time and a zone that do not exist for a month-end</td></tr>
+      <tr><td>Event time</td><td><code>TIMESTAMP WITH TIME ZONE</code></td><td>A naive timestamp is unusable across zones and breaks twice a year at the clock change</td></tr>
+      <tr><td>Flag</td><td><code>BOOLEAN</code></td><td>A <code>VARCHAR</code> holding 'Y', 'N', 'y', 'yes', and '1' is the single most common avoidable mess</td></tr>
+      <tr><td>Bounded category</td><td><code>VARCHAR</code> plus a <code>CHECK</code>, or an enum where supported</td><td>Free text drifts: 'GBP', 'gbp', and 'Pound' all arrive eventually</td></tr>
+      <tr><td>Counter</td><td><code>INTEGER</code></td><td>Decimal is wasteful and invites fractional arrears months, which do not exist</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>The constraints, one at a time</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Constraint</th><th>Guarantees</th><th>Example in a risk schema</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>NOT NULL</code></td><td>A value is always present</td><td><code>reporting_date DATE NOT NULL</code>: a snapshot row without a date is meaningless</td></tr>
+      <tr><td><code>UNIQUE</code></td><td>No two rows share the value</td><td><code>UNIQUE (account_id, reporting_date)</code>: one row per account per month</td></tr>
+      <tr><td><code>CHECK</code></td><td>An arbitrary boolean expression holds per row</td><td><code>CHECK (balance &gt;= 0 OR product = 'overdraft')</code></td></tr>
+      <tr><td><code>DEFAULT</code></td><td>A value when none is supplied</td><td><code>loaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP</code></td></tr>
+      <tr><td><code>PRIMARY KEY</code></td><td>Unique and not null, and referenceable</td><td><code>PRIMARY KEY (account_id, reporting_date)</code></td></tr>
+      <tr><td><code>FOREIGN KEY</code></td><td>The referenced parent row exists</td><td><code>account_id REFERENCES accounts(account_id)</code></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>A <code>CHECK</code> may reference several columns of the same row, so any logic you could write in a <code>WHERE</code> clause against one row can be enforced. What it cannot do is span rows or tables: "the sum of exposures must equal the portfolio total" is not a check constraint, it is a reconciliation test, and it belongs in Lecture 16.</p>
+
+  <h3>Altering, dropping, replacing</h3>
+
+  <pre><code>-- add a column; existing rows get NULL unless a default is supplied
+ALTER TABLE accounts ADD COLUMN forbearance_flag BOOLEAN DEFAULT FALSE;
+
+-- remove one
+ALTER TABLE accounts DROP COLUMN legacy_reference;
+
+-- tighten a column after backfilling it
+ALTER TABLE accounts ALTER COLUMN forbearance_flag SET NOT NULL;
+
+-- remove the whole table definition and its contents
+DROP TABLE IF EXISTS staging_accounts;</code></pre>
+
+  <p>Three distinctions catch people out. <code>DROP TABLE</code> removes the definition and the data; <code>TRUNCATE</code> removes the data and keeps the definition, and is far faster than an unqualified <code>DELETE</code> because it does not log each row. <code>CREATE OR REPLACE TABLE</code> is convenient in a pipeline that rebuilds a table from scratch and destructive if you believed the table held history. And adding a <code>NOT NULL</code> column to a populated table fails unless a default is supplied, so the usual sequence is add nullable, backfill, then tighten, exactly as in the third statement above.</p>
+
+  <h3>Views: a query with a name</h3>
+
+  <pre><code>CREATE OR REPLACE VIEW v_defaulted_accounts AS
+SELECT account_id,
+       reporting_date,
+       balance,
+       arrears_months
+FROM   account_snapshots
+WHERE  arrears_months &gt;= 3
+   OR  unlikely_to_pay_flag;</code></pre>
+
+  <p>A <strong>view</strong> stores a query, not a result: every reference re-executes it against current data. Views are the right tool for giving a definition one home. If the regulatory default definition lives in a view, then the PD dataset, the LGD dataset, and the IFRS 9 staging engine all read the same definition, and changing it changes all three at once. That is a governance win, not merely a convenience.</p>
+
+  <p>A <strong>materialised view</strong> stores the result and must be refreshed, trading freshness for speed. Support varies by engine, and in a modern stack the same job is usually done by a scheduled table build in dbt, covered in Lecture 15, which has the advantage of being version controlled and testable.</p>
+
+  <h3>Indexes</h3>
+
+  <p>An <strong>index</strong> is a separate structure that lets the engine locate rows without scanning the table. The default is a <strong>B-tree</strong>, a balanced tree that halves the search space at each level, so finding a value among a million rows takes on the order of log<sub>2</sub>(1,000,000), roughly twenty comparisons, instead of a million. That is the entire argument for indexes, and it is a strong one for selective lookups.</p>
+
+  <pre><code>-- single column
+CREATE INDEX accounts_customer_id_idx ON accounts(customer_id);
+
+-- multi-column: column order matters, this suits filters on
+-- (reporting_date) or (reporting_date, product), not (product) alone
+CREATE INDEX snap_date_product_idx ON account_snapshots(reporting_date, product);
+
+-- partial: index only the subset that is queried
+CREATE INDEX snap_defaulted_idx ON account_snapshots(account_id)
+WHERE arrears_months &gt;= 3;
+
+-- expression-based: make a case-insensitive lookup indexable
+CREATE UNIQUE INDEX customers_email_lower_idx ON customers(LOWER(email));</code></pre>
+
+  <p>Column order in a multi-column index matters because the structure is sorted by the first column, then within that by the second. An index on (reporting_date, product) serves a filter on reporting date alone, and does not serve a filter on product alone. The convention <code>&lt;table&gt;_&lt;columns&gt;_idx</code> is worth following; primary key indexes conventionally end <code>_pkey</code> and are created automatically, as are indexes backing unique constraints.</p>
+
+  <p>The distinction between <strong>clustered</strong> and <strong>non-clustered</strong> is worth the paragraph. A clustered index determines the physical order of the rows in the table, so it is like a dictionary where the entries themselves are alphabetical: once you find the position, the data is there. There can be only one, because a table can only be in one physical order. A non-clustered index is like a book's index: sorted keys plus a pointer to where the row actually lives, requiring a second lookup to fetch the rest of the row. Terminology and behaviour differ between engines, and in PostgreSQL the <code>CLUSTER</code> command is a one-off reordering rather than a maintained property.</p>
+
+  <h4>When an index helps, and when it is a liability</h4>
+
+  <p>Four rules of thumb, in decreasing order of how often they are forgotten.</p>
+
+  <p><em>Needles, not haystacks.</em> The more of the table a query returns, the less an index helps. Finding one row in a million is ideal; finding nine hundred thousand is worse than a sequential scan, and a good planner will ignore the index and scan anyway, leaving you with the maintenance cost and none of the benefit.</p>
+
+  <p><em>Reads benefit, writes pay.</em> Every insert, update, and delete must maintain every index on the table. A stable table read constantly is an excellent candidate; a table under heavy write load with six indexes is a performance problem. When bulk loading a large volume into an indexed table, dropping the indexes, loading, and recreating them is often faster than maintaining them row by row.</p>
+
+  <p><em>AND is friendly, OR is not.</em> Conjunctions narrow the result and compose well with a multi-column index. Disjunctions across different columns usually cannot use one index, and may require a scan or a union of index scans.</p>
+
+  <p><em>Cardinality matters.</em> Indexing a boolean flag with an even split rarely helps, because either value matches half the table. Indexing it as a <em>partial</em> index over the rare value can help a great deal, which is why the defaulted-accounts index above is written that way.</p>
+
+  <div class="callout insight">
+    <span class="tag">Analytical engines mostly do not want your indexes</span>
+    Everything above is transactional-database advice. Columnar analytical engines take a different route: instead of a B-tree, they keep per-block minimum and maximum statistics, exactly the Parquet row group footer from Lecture 02, and skip blocks that cannot match. These are variously called zone maps or block statistics, they cost nothing to maintain because they are computed at write time, and they work well when the data is physically ordered by the filter column. So the analytical equivalent of index design is not creating indexes: it is deciding the sort order in which you write the data. DuckDB, Snowflake, and BigQuery all follow this model, and adding conventional indexes to an analytical table is usually the wrong instinct.
+  </div>
+
+  <h3>Reading the plan</h3>
+
+  <p>Whether an index is being used is not a matter of opinion. Prefix a query with <code>EXPLAIN</code> to see the plan the engine chose, or <code>EXPLAIN ANALYZE</code> to execute it and see actual timings and row counts alongside the estimates.</p>
+
+  <pre><code>EXPLAIN ANALYZE
+SELECT account_id, balance
+FROM   account_snapshots
+WHERE  reporting_date = DATE '2026-03-31'
+  AND  arrears_months &gt;= 3;</code></pre>
+
+  <p>Three things to look for. The access method: a sequential scan reads every row, an index scan does not, and seeing the former where you expected the latter means the index is missing, unusable, or judged unhelpful. The row counts: a large divergence between estimated and actual rows means the statistics are stale and the planner is choosing badly for that reason, so refresh them. And where the time actually goes, which in analytical queries is nearly always a join or an aggregation rather than the scan you were worrying about. Optimise from the plan, never from intuition.</p>
+
+  <div class="worked">
+    <strong>Worked example: DDL for a monthly arrears snapshot, with the business rules made enforceable</strong>
+    <p>The requirement: a monthly snapshot of a mortgage book supporting PD modelling and IFRS 9 staging. Write the DDL so that as many known facts as possible are enforced by the engine rather than trusted.</p>
+    <pre><code>CREATE OR REPLACE TABLE account_snapshots (
+    account_id           VARCHAR        NOT NULL,
+    reporting_date       DATE           NOT NULL,
+    customer_id          VARCHAR        NOT NULL,
+    product              VARCHAR        NOT NULL,
+    currency             VARCHAR(3)     NOT NULL,
+    balance              DECIMAL(18, 2) NOT NULL,
+    limit_amount         DECIMAL(18, 2),
+    interest_rate        DECIMAL(9, 6)  NOT NULL,
+    origination_date     DATE           NOT NULL,
+    maturity_date        DATE           NOT NULL,
+    arrears_months       INTEGER        NOT NULL,
+    unlikely_to_pay      BOOLEAN        NOT NULL DEFAULT FALSE,
+    forbearance_flag     BOOLEAN        NOT NULL DEFAULT FALSE,
+    default_date         DATE,
+    source_system        VARCHAR        NOT NULL,
+    loaded_at            TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (account_id, reporting_date),
+    FOREIGN KEY (customer_id) REFERENCES customers(customer_id),
+
+    CHECK (arrears_months BETWEEN 0 AND 120),
+    CHECK (interest_rate BETWEEN 0 AND 1),
+    CHECK (currency = UPPER(currency)),
+    CHECK (maturity_date &gt; origination_date),
+    CHECK (origination_date &lt;= reporting_date),
+    CHECK (reporting_date = LAST_DAY(reporting_date)),
+    CHECK (default_date IS NULL OR default_date &gt;= origination_date),
+    CHECK ((arrears_months &gt;= 3 OR unlikely_to_pay) = (default_date IS NOT NULL))
+);</code></pre>
+    <p><em>What each group of checks buys.</em> The arrears bound catches a source system that starts sending days rather than months, which presents as arrears counts in the hundreds and would otherwise flow silently into a PD model as extreme values. The rate bound catches the perennial percentage-against-decimal confusion, where 4.29 arrives instead of 0.0429. The currency check catches casing drift. The date checks catch a whole family of extract errors: maturity before origination, accounts originated after the reporting date, and a reporting date that is not a month end, which is how a mid-month reprocessing run announces itself.</p>
+    <p><em>The last check is the important one.</em> It asserts that the default flag and the default date agree: an account is in default exactly when it has ninety days of arrears or is judged unlikely to pay, and exactly then does it carry a default date. This is the regulatory default definition, written once, enforced on every row, and impossible for a downstream consumer to contradict. Without it, the PD team and the LGD team can and eventually will disagree about which accounts defaulted, and the disagreement will surface in validation rather than at load time.</p>
+    <p><em>What is deliberately not here.</em> The primary key permits one row per account per month and nothing more, so a duplicated load fails rather than double counting. There is no <code>ON DELETE CASCADE</code>, because nothing in a risk history should be deletable as a side effect. And there is no index, because this is an analytical table that will be written monthly and scanned by date; the equivalent tuning is to write it partitioned and sorted by <code>reporting_date</code>, per Lecture 02.</p>
+    <p><em>The caveat.</em> Verify what your engine enforces. Some analytical engines accept this DDL and enforce only some of it, in which case the unenforced assertions must be duplicated as tests in Lecture 16. That is a reason to write the tests, not a reason to omit the DDL.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>DDL is where meaning becomes enforceable. Types constrain the domain, constraints constrain the admissible values and the relationships between rows, and indexes change performance without changing answers. In a bank the highest-value use of DDL is encoding definitions that several teams must share, the default definition above being the canonical case, because a definition held in a constraint or a view cannot be quietly reinterpreted downstream. The analytical caveat runs through all of it: verify what your engine enforces, and remember that on columnar engines the sort order you write is worth more than any index you create.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the four sub-languages of SQL with two statements each, and say which two you would expect to find in version control.</li>
+      <li>Give the type you would choose for a monetary amount, an account identifier, and a month-end date, with the failure mode each choice avoids.</li>
+      <li>Distinguish a primary key from a unique not-null column. Why does a monthly snapshot table usually need a composite key?</li>
+      <li>What does a <code>CHECK</code> constraint fail to express that a reconciliation test can?</li>
+      <li>Explain why an index on a boolean flag is usually useless and how a partial index changes that.</li>
+      <li>Your query on an indexed column shows a sequential scan in the plan. Give three possible explanations.</li>
+      <li>Why do columnar analytical engines mostly not want indexes, and what is the equivalent optimisation?</li>
+      <li>Write the check constraint that keeps a default flag and a default date consistent, and say which failure it prevents in a model build.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="03-databases_and_engines.html">Lecture 03</a> established the OLTP and OLAP split that decides whether the index advice above applies to you.</li>
+      <li><strong>Next:</strong> <a href="05-sql_queries.html">Lecture 05 (SQL II, querying)</a> uses the schema built here: joins, aggregation, common table expressions, and window functions.</li>
+      <li><strong>Then:</strong> <a href="06-sql_manipulation.html">Lecture 06 (SQL III, manipulation)</a> covers writing to it, including merge and the transaction semantics from Lecture 03.</li>
+      <li><strong>Cross-link:</strong> <a href="07-normalisation.html">Lecture 07</a> decides which tables should exist in the first place; <a href="16-data_quality.html">Lecture 16</a> covers the assertions a constraint cannot express; <a href="19-governance_and_privacy.html">Lecture 19</a> covers DCL.</li>
+      <li><strong>Outside this course:</strong> the type discipline here is the database-side twin of the dtype discipline in the <a href="../data_analysis/01-pandas_core.html">data analysis track</a>.</li>
+      <li><strong>Further reading:</strong> the PostgreSQL documentation on constraints and indexes is the best free reference on the subject; the DuckDB SQL introduction is short and matches the examples above.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 4 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

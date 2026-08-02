@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 9: support vector machines</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Supervised learning</a></div>
+  <h1>Support vector machines</h1>
+  <p class="subtitle">The model that thinks in margins. Find the widest gap between two classes and let only the points on the boundary decide. With kernels, the same idea works for any decision boundary you can imagine, however non-linear.</p>
+  <div class="meta">
+    <span>Lecture 9 of 62</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Part II: supervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>support vector machine</strong> draws the decision boundary between two classes by maximising the gap (the <strong>margin</strong>) between the boundary and the nearest training points. The boundary is a hyperplane $w \cdot x + b = 0$; the optimisation problem is $\min \tfrac{1}{2}\|w\|^2$ subject to every point being on the correct side of its class margin. Only the points sitting on the margin (the <strong>support vectors</strong>) determine the solution; deleting any other training point leaves the boundary unchanged. The <strong>soft margin</strong> generalises this to data that is not linearly separable by allowing controlled violations through slack variables, with a single hyperparameter $C$ trading margin width against violation severity. The <strong>kernel trick</strong> lifts the whole construction to non-linear decision boundaries: replace every inner product $x_i \cdot x_j$ in the dual problem with a kernel $K(x_i, x_j)$ that implicitly computes inner products in a much higher-dimensional space, and the model fits a curved boundary in the input space without ever forming that space explicitly. The two knobs that matter in practice are $C$ (regularisation strength) and, for an RBF kernel, $\gamma$ (the inverse length scale of the kernel).</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine two clouds of points on a sheet of paper, one red and one blue. You want to draw a straight line that separates them. There are infinitely many such lines if the clouds do not touch. The SVM picks the unique line that is as far as possible from both clouds, like running a road through the middle with the widest verge on either side. Only the points right at the edge of each verge matter; everyone deep in their own territory could vanish and the road would still go through the same place. If the clouds overlap, the SVM still draws a road, but now lets a few troublemakers sit on the wrong verge and pays a penalty proportional to how far over they are. If a straight road will not do, the SVM bends space (through a kernel) until a straight road in the bent space looks like a curved road in the original picture.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The SVM is the textbook poster child for convex optimisation and statistical learning theory: a unique global optimum, generalisation bounds that depend on the margin rather than the dimensionality, and a dual formulation whose elegance is a teaching set-piece. In production the picture is more pragmatic. Gradient-boosted trees and neural networks dominate large-scale tabular and unstructured problems, and SVMs have retreated to a narrower niche where they remain genuinely strong: small to medium tabular datasets with clear margin structure, text classification with TF-IDF features, and biomedical problems with more features than rows. Knowing when to reach for one over a tree ensemble is more useful than memorising the dual.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Fourth supervised model in sub-module 03, after <a href="01-k_nearest_neighbours.html">k-nearest neighbours</a> and <a href="02-decision_trees.html">decision trees</a>. The kNN comparison is informative: both methods care about distances, but kNN uses local neighbourhoods while the SVM uses the global margin. Decision trees ignore scale entirely; the SVM is acutely sensitive to it and assumes <a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a> has already standardised every column. Next up is <a href="04-naive_bayes.html">naive Bayes</a>, which solves the same binary classification problem from the opposite direction: a generative probabilistic model rather than a geometric margin maximiser.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the SVM is worth knowing in depth, even in a world increasingly dominated by gradient-boosted trees and neural networks. First, <strong>the SVM is the canonical example of a margin-based learner</strong>, and the margin is the single most important concept in classical statistical learning theory. Generalisation bounds for the SVM depend on the achieved margin, not on the number of features. This makes the SVM robust in regimes where the number of features exceeds the number of training rows, the so-called $p \gg n$ setting where most other methods need heroic regularisation to avoid overfitting. Text classification with TF-IDF features (vocabulary of tens of thousands, document count in the thousands) and high-throughput biology (gene expression with twenty thousand probes and a few hundred samples) are the two domains where the SVM still routinely wins.</p>
+
+  <p>Second, <strong>the kernel trick is a transferable idea</strong>. Once the SVM is understood, the same construction appears in Gaussian processes (kernel methods for regression with uncertainty quantification), kernel PCA (non-linear dimensionality reduction), kernel ridge regression (non-linear regression with closed-form solution), and a long list of less common but conceptually identical methods. Understanding the SVM is the cheapest way to acquire a working intuition for the entire kernel family.</p>
+
+  <p>Third, <strong>the SVM exposes the bias-variance trade-off through two interpretable knobs</strong> ($C$ and $\gamma$ for the RBF kernel), each with a geometric meaning rather than an abstract regularisation strength. Large $C$ punishes margin violations heavily, producing a narrow margin that fits training data tightly (low bias, high variance); small $C$ tolerates violations, producing a wide margin (high bias, low variance). Large $\gamma$ makes the RBF kernel localise around each training point, producing a wiggly boundary (low bias, high variance); small $\gamma$ smooths the kernel out, producing a near-linear boundary (high bias, low variance). This is the bias-variance dial from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a> made geometrically explicit.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A churn model on 12,000 customers with 80 engineered features was rebuilt from logistic regression to RBF-kernel SVM. Cross-validation accuracy improved by two points, the team celebrated, deployment failed. Inference latency was 400 ms per row because the trained model stored 6,200 support vectors and the RBF kernel had to be evaluated against every one at prediction time. The same dataset with $C$ reduced by a factor of ten produced 800 support vectors, four point inference latency, and one fewer accuracy point. The lesson: the number of support vectors is the SVM's hidden cost, and it scales with the amount of overfitting, not with the dataset size.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. A two-dimensional scatter plot with red and blue points, mostly well separated. The SVM finds three parallel lines: the decision boundary in the middle, and a positive and a negative margin line either side, each touching the closest opposing points. The width of the strip between the two margin lines is the margin; the SVM picks the boundary that maximises this width. The points touching either margin line are the support vectors. Everyone else could be deleted and the boundary would not move.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Maximum margin hyperplane with support vectors highlighted">
+      <defs>
+        <marker id="svmArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Maximum margin: the widest road between two classes</text>
+
+      <!-- Axes -->
+      <line x1="60" y1="320" x2="700" y2="320" stroke="#a1a1aa" stroke-width="1"/>
+      <line x1="60" y1="320" x2="60" y2="50" stroke="#a1a1aa" stroke-width="1"/>
+      <text x="700" y="338" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">x1</text>
+      <text x="48" y="60" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">x2</text>
+
+      <!-- Margin band (shaded) -->
+      <polygon points="60,260 700,140 700,200 60,320" fill="#FEF3C7" fill-opacity="0.4" stroke="none"/>
+
+      <!-- Decision boundary -->
+      <line x1="60" y1="290" x2="700" y2="170" stroke="#18181b" stroke-width="2"/>
+      <text x="600" y="195" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">decision boundary</text>
+      <text x="600" y="208" font-family="JetBrains Mono" font-size="9" fill="#71717a">w . x + b = 0</text>
+
+      <!-- Positive margin -->
+      <line x1="60" y1="260" x2="700" y2="140" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="5 3"/>
+      <text x="490" y="135" font-family="JetBrains Mono" font-size="9" fill="#115e59">w . x + b = +1</text>
+
+      <!-- Negative margin -->
+      <line x1="60" y1="320" x2="700" y2="200" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5 3"/>
+      <text x="490" y="222" font-family="JetBrains Mono" font-size="9" fill="#5b21b6">w . x + b = -1</text>
+
+      <!-- Margin width annotation -->
+      <line x1="180" y1="252" x2="180" y2="305" stroke="#92400e" stroke-width="1" marker-start="url(#svmArrow)" marker-end="url(#svmArrow)"/>
+      <text x="190" y="282" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">margin = 2 / ||w||</text>
+
+      <!-- Positive class points (teal) -->
+      <circle cx="120" cy="100" r="6" fill="#0d9488"/>
+      <circle cx="180" cy="130" r="6" fill="#0d9488"/>
+      <circle cx="250" cy="90" r="6" fill="#0d9488"/>
+      <circle cx="320" cy="160" r="6" fill="#0d9488"/>
+      <circle cx="400" cy="120" r="6" fill="#0d9488"/>
+      <circle cx="480" cy="100" r="6" fill="#0d9488"/>
+      <circle cx="560" cy="80" r="6" fill="#0d9488"/>
+      <circle cx="640" cy="105" r="6" fill="#0d9488"/>
+
+      <!-- Negative class points (violet) -->
+      <circle cx="110" cy="290" r="6" fill="#7c3aed"/>
+      <circle cx="200" cy="305" r="6" fill="#7c3aed"/>
+      <circle cx="290" cy="280" r="6" fill="#7c3aed"/>
+      <circle cx="380" cy="295" r="6" fill="#7c3aed"/>
+      <circle cx="470" cy="270" r="6" fill="#7c3aed"/>
+      <circle cx="560" cy="255" r="6" fill="#7c3aed"/>
+      <circle cx="640" cy="240" r="6" fill="#7c3aed"/>
+
+      <!-- Support vectors: positive class touching upper margin -->
+      <circle cx="320" cy="200" r="7" fill="#0d9488" stroke="#92400e" stroke-width="2.5"/>
+      <circle cx="540" cy="160" r="7" fill="#0d9488" stroke="#92400e" stroke-width="2.5"/>
+
+      <!-- Support vectors: negative class touching lower margin -->
+      <circle cx="240" cy="275" r="7" fill="#7c3aed" stroke="#92400e" stroke-width="2.5"/>
+      <circle cx="500" cy="245" r="7" fill="#7c3aed" stroke="#92400e" stroke-width="2.5"/>
+
+      <text x="320" y="190" font-family="Inter" font-size="9" font-weight="600" fill="#92400e" text-anchor="middle">support</text>
+      <text x="320" y="180" font-family="Inter" font-size="9" font-weight="600" fill="#92400e" text-anchor="middle">vector</text>
+
+      <text x="78" y="80" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">class +1</text>
+      <text x="78" y="345" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">class -1</text>
+    </svg>
+    <figcaption>The decision boundary (black) and the two margin lines (dashed) define a strip of width $2/\|w\|$. The two teal and two violet points sitting exactly on the margin lines are the support vectors; every other point is irrelevant to the solution. Maximising the margin is equivalent to minimising $\|w\|$ subject to every point being on the correct side of its margin.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. First, the boundary is determined by a tiny subset of the training set. The model is sparse in the training data: most rows contribute nothing to the final classifier, which is why the SVM is sometimes called a sparse kernel machine. Second, the margin width is $2/\|w\|$, so minimising $\|w\|^2$ is the same as maximising the margin. Third, the boundary depends only on inner products between training points; this is the foothold the kernel trick exploits to replace inner products with kernels and lift the same construction into non-linear decision boundaries without ever computing coordinates in the higher-dimensional space.</p>
+
+  <p>Now hold the second picture. The same two clouds of points, but now interleaved in a spiral or a checkerboard pattern that no straight line could separate. A linear SVM would either fail or place a useless boundary. An RBF-kernel SVM fits a curved boundary that winds between the classes, because in the implicit feature space defined by the Gaussian kernel, the data <em>is</em> linearly separable. The kernel does not change what the SVM is doing; it changes the space in which it does it.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Non-linear RBF decision boundary on interleaved classes">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">RBF kernel: a curved boundary on data no line could separate</text>
+
+      <!-- Axes -->
+      <line x1="60" y1="290" x2="700" y2="290" stroke="#a1a1aa" stroke-width="1"/>
+      <line x1="60" y1="290" x2="60" y2="50" stroke="#a1a1aa" stroke-width="1"/>
+      <text x="700" y="308" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">x1</text>
+      <text x="48" y="60" text-anchor="end" font-family="Inter" font-size="10" fill="#71717a">x2</text>
+
+      <!-- RBF decision boundary: a curvy S-shape -->
+      <path d="M 60 90 C 200 90, 220 250, 380 250 S 560 90, 700 90" fill="none" stroke="#18181b" stroke-width="2.5"/>
+
+      <!-- Positive class (teal): upper area + lower-right pocket -->
+      <circle cx="120" cy="70" r="5" fill="#0d9488"/>
+      <circle cx="200" cy="75" r="5" fill="#0d9488"/>
+      <circle cx="280" cy="65" r="5" fill="#0d9488"/>
+      <circle cx="160" cy="115" r="5" fill="#0d9488"/>
+      <circle cx="240" cy="105" r="5" fill="#0d9488"/>
+      <circle cx="320" cy="95" r="5" fill="#0d9488"/>
+      <circle cx="380" cy="80" r="5" fill="#0d9488"/>
+      <circle cx="500" cy="265" r="5" fill="#0d9488"/>
+      <circle cx="560" cy="260" r="5" fill="#0d9488"/>
+      <circle cx="620" cy="270" r="5" fill="#0d9488"/>
+      <circle cx="540" cy="285" r="5" fill="#0d9488"/>
+      <circle cx="600" cy="280" r="5" fill="#0d9488"/>
+
+      <!-- Negative class (violet): lower area + upper-right pocket -->
+      <circle cx="140" cy="265" r="5" fill="#7c3aed"/>
+      <circle cx="220" cy="270" r="5" fill="#7c3aed"/>
+      <circle cx="300" cy="275" r="5" fill="#7c3aed"/>
+      <circle cx="180" cy="240" r="5" fill="#7c3aed"/>
+      <circle cx="260" cy="245" r="5" fill="#7c3aed"/>
+      <circle cx="340" cy="240" r="5" fill="#7c3aed"/>
+      <circle cx="400" cy="265" r="5" fill="#7c3aed"/>
+      <circle cx="500" cy="65" r="5" fill="#7c3aed"/>
+      <circle cx="560" cy="75" r="5" fill="#7c3aed"/>
+      <circle cx="620" cy="70" r="5" fill="#7c3aed"/>
+      <circle cx="540" cy="100" r="5" fill="#7c3aed"/>
+      <circle cx="600" cy="110" r="5" fill="#7c3aed"/>
+
+      <text x="120" y="55" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">class +1</text>
+      <text x="120" y="285" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">class -1</text>
+      <text x="580" y="55" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">class -1</text>
+      <text x="580" y="305" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">class +1</text>
+    </svg>
+    <figcaption>The same maximum-margin idea, now in a feature space defined implicitly by an RBF kernel. The boundary is curved in the original $(x_1, x_2)$ plane because it is a hyperplane in the high-dimensional space the kernel maps into. Two interleaved class regions are separated cleanly without computing the high-dimensional features explicitly.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Hard margin SVM</h3>
+
+  <p>Start with two linearly separable classes, labels $y_i \in \{-1, +1\}$. A separating hyperplane has the form $w \cdot x + b = 0$, and a point $x_i$ is classified as $\operatorname{sign}(w \cdot x_i + b)$. The signed distance from a point to the hyperplane is $(w \cdot x_i + b) / \|w\|$. By choosing the scale of $(w, b)$ appropriately, the closest points on each side can be made to satisfy $w \cdot x_i + b = +1$ and $w \cdot x_i + b = -1$ respectively; this is the <strong>canonical form</strong>. The two margin lines are then at distance $1/\|w\|$ from the boundary, the margin width is $2/\|w\|$, and the requirement that every point sits on the correct side of its margin becomes $y_i(w \cdot x_i + b) \ge 1$ for all $i$. The optimisation problem is</p>
+
+  $$\min_{w, b} \tfrac{1}{2} \|w\|^2 \quad \text{subject to} \quad y_i(w \cdot x_i + b) \ge 1, \quad i = 1, \dots, n.$$
+
+  <p>The objective is convex and quadratic, the constraints are linear, and the problem has a unique global minimum. This is the <strong>hard margin</strong> SVM, and it works only when the classes are actually linearly separable. The Lagrangian formulation introduces a multiplier $\alpha_i \ge 0$ for each constraint, and the dual problem (after eliminating $w$ and $b$ from the stationarity conditions) becomes</p>
+
+  $$\max_{\alpha} \sum_{i=1}^{n} \alpha_i - \tfrac{1}{2} \sum_{i,j} \alpha_i \alpha_j y_i y_j (x_i \cdot x_j) \quad \text{subject to} \quad \alpha_i \ge 0, \ \sum_i \alpha_i y_i = 0.$$
+
+  <p>Two structural facts fall out. First, the solution depends on the training data only through the inner products $x_i \cdot x_j$, which is the opening the kernel trick will exploit. Second, the Karush-Kuhn-Tucker conditions imply $\alpha_i = 0$ for points strictly outside the margin and $\alpha_i > 0$ only for points exactly on the margin. The latter are the support vectors. The optimal weight vector is $w^* = \sum_i \alpha_i^* y_i x_i$, a sparse combination of the support vectors alone.</p>
+
+  <h3>Soft margin SVM</h3>
+
+  <p>Real data is almost never linearly separable, either because the boundary is genuinely non-linear or because of noise and label error in the training set. The <strong>soft margin</strong> SVM introduces a non-negative <strong>slack variable</strong> $\xi_i$ for each training point, measuring how far that point is on the wrong side of its margin:</p>
+
+  $$\min_{w, b, \xi} \tfrac{1}{2}\|w\|^2 + C \sum_{i=1}^{n} \xi_i \quad \text{subject to} \quad y_i(w \cdot x_i + b) \ge 1 - \xi_i, \ \xi_i \ge 0.$$
+
+  <p>A point with $\xi_i = 0$ is correctly classified and outside the margin. A point with $0 < \xi_i \le 1$ is correctly classified but inside the margin. A point with $\xi_i > 1$ is on the wrong side of the decision boundary entirely. The objective penalises both the inverse margin width (through $\|w\|^2$) and the total slack (through $\sum \xi_i$), with the trade-off controlled by the hyperparameter $C$.</p>
+
+  <p>The geometric reading of $C$ is the most useful intuition the SVM offers. Large $C$ makes margin violations expensive, so the optimiser will accept a narrow margin in exchange for fitting every training point closely; the result is low bias, high variance, and the boundary follows local noise. Small $C$ makes violations cheap, so the optimiser tolerates many points sitting inside or across the margin in exchange for a wide buffer; the result is high bias, low variance, and the boundary smooths over local clusters of mislabelled points. The limit $C \to \infty$ recovers the hard margin SVM; the limit $C \to 0$ produces a degenerate classifier that ignores the data. Tuning $C$ on a validation fold is the standard SVM hyperparameter problem; cross-validation over a logarithmic grid (typically $10^{-3}$ to $10^3$) finds the sweet spot.</p>
+
+  <div class="callout insight">
+    <span class="tag">Slack variables and outliers</span>
+    The soft margin is what makes the SVM usable in practice and is also what makes it robust to outliers in a controlled way. A single mislabelled point will increase $\xi_i$ for that point but, because $\xi_i$ enters the objective linearly rather than quadratically (this is the L1-like hinge loss), one extreme violation costs the same as a linear amount of moderate ones. Compare logistic regression with squared-error loss, where a single extreme outlier dominates the loss and pulls the boundary towards it. The SVM hinge loss limits the damage any single point can do, provided $C$ is not so large that the optimiser tries to drive its $\xi_i$ down to zero regardless.
+  </div>
+
+  <h3>The kernel trick</h3>
+
+  <p>The dual problem depends on the data only through inner products. This is the structural fact the <strong>kernel trick</strong> exploits. Suppose there is a (possibly very high or infinite-dimensional) feature map $\phi: \mathbb{R}^d \to \mathcal{H}$ and a function $K(x, x') = \phi(x) \cdot \phi(x')$ that computes the inner product in $\mathcal{H}$ directly, without forming $\phi(x)$ or $\phi(x')$ explicitly. Then everywhere the dual writes $x_i \cdot x_j$, write $K(x_i, x_j)$ instead, and the SVM solves the maximum-margin problem in $\mathcal{H}$ at the cost of evaluating $K$ pairwise on the training set. The decision function becomes</p>
+
+  $$f(x) = \operatorname{sign}\!\left( \sum_{i \in \mathrm{SV}} \alpha_i^* y_i K(x_i, x) + b^* \right),$$
+
+  <p>summing only over the support vectors. The crucial point is that $\mathcal{H}$ may be infinite-dimensional and explicitly intractable, but $K$ is a single scalar function evaluated on pairs of input vectors. Mercer's condition characterises which $K$ are valid kernels (they must be symmetric positive semi-definite), and the standard kernels are all known to satisfy it.</p>
+
+  <h3>The kernel zoo</h3>
+
+  <p>Three kernels cover almost every practical SVM. The <strong>linear kernel</strong> is the trivial case,</p>
+
+  $$K(x, x') = x \cdot x',$$
+
+  <p>which reduces the SVM to a linear classifier in the original space. The <strong>polynomial kernel</strong> of degree $d$ is</p>
+
+  $$K(x, x') = (\gamma \, x \cdot x' + r)^d,$$
+
+  <p>which implicitly maps to the space of all monomials of degree up to $d$ in the original features. Degree 2 captures pairwise interactions; higher degrees rapidly become numerically unstable and overfit. The <strong>radial basis function</strong> (Gaussian) kernel is</p>
+
+  $$K(x, x') = \exp\!\left( -\gamma \|x - x'\|^2 \right),$$
+
+  <p>which maps to an infinite-dimensional Hilbert space. The RBF kernel is the default first choice when nothing is known about the data's structure: it can approximate any reasonable decision boundary given enough support vectors, and it has just two hyperparameters ($C$ and $\gamma$) to tune.</p>
+
+  <p>The geometric reading of $\gamma$ in the RBF kernel mirrors the reading of $C$. The kernel $\exp(-\gamma \|x - x'\|^2)$ is a Gaussian bump centred on $x'$ with width $1/\sqrt{\gamma}$. Small $\gamma$ means a wide bump: the kernel value falls off slowly with distance, every support vector influences a large region, and the decision boundary is smooth and near-linear. Large $\gamma$ means a narrow bump: each support vector influences only its immediate neighbourhood, and the boundary is highly localised and wiggly. The bias-variance reading is identical to $C$ in direction: small $\gamma$ is high bias, low variance; large $\gamma$ is low bias, high variance. The two interact, and the standard approach is to grid-search $C$ and $\gamma$ jointly on a log-log grid using cross-validation.</p>
+
+  <div class="callout insight">
+    <span class="tag">RBF gamma and the curse of locality</span>
+    Large $\gamma$ is the SVM's overfitting mode. As $\gamma \to \infty$, each training point becomes its own isolated support vector and the boundary degenerates into a Voronoi cell pattern around the training set: perfect training accuracy, useless on new data. The diagnostic is the number of support vectors after fitting: if it approaches the training set size, $\gamma$ is too large. A healthy RBF-SVM on a clean problem will have between five and twenty per cent of training points as support vectors; much more than that and the model is memorising rather than generalising.
+  </div>
+
+  <h3>SVM regression</h3>
+
+  <p>The same machinery applies to regression. <strong>Support vector regression</strong> replaces the classification margin with an $\epsilon$-tube around the regression line: points inside the tube ($|y_i - f(x_i)| \le \epsilon$) incur no loss, points outside incur a loss linear in the distance from the tube. The optimisation is</p>
+
+  $$\min_{w, b, \xi, \xi^*} \tfrac{1}{2}\|w\|^2 + C \sum_i (\xi_i + \xi_i^*) \quad \text{subject to constraints that pin } y_i \text{ within } \epsilon \text{ of } f(x_i),$$
+
+  <p>with slack variables $\xi_i, \xi_i^*$ for violations above and below the tube. The same kernel trick applies, so SVR with an RBF kernel is a flexible non-linear regression method. The $\epsilon$-insensitive loss makes SVR robust to small Gaussian noise (points within $\epsilon$ contribute nothing) and to outliers (the loss is linear in distance, not squared). The extra hyperparameter $\epsilon$ is usually set to the noise scale of the target.</p>
+
+  <h3>Sklearn usage</h3>
+
+  <p>The scikit-learn implementation is in <code>sklearn.svm</code>. The classification class is <code>SVC</code> and the regression class is <code>SVR</code>; both wrap libsvm and share the same kernel and hyperparameter API. The three parameters that matter in nearly every use case are <code>C</code>, <code>kernel</code>, and (for non-linear kernels) <code>gamma</code>. The defaults are <code>C=1.0</code>, <code>kernel='rbf'</code>, and <code>gamma='scale'</code>, where <code>'scale'</code> sets $\gamma = 1 / (d \cdot \operatorname{Var}(X))$, an automatic heuristic that adapts to feature variance and is the right default for standardised inputs. The standard pattern is</p>
+
+  <pre><code>from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
+
+pipe = Pipeline([
+    ('scaler', StandardScaler()),
+    ('svm', SVC(kernel='rbf')),
+])
+
+grid = {
+    'svm__C': [0.1, 1, 10, 100],
+    'svm__gamma': [0.001, 0.01, 0.1, 1],
+}
+
+search = GridSearchCV(pipe, grid, cv=5, scoring='roc_auc')
+search.fit(X_train, y_train)</code></pre>
+
+  <p>Three operational notes. First, <strong>always scale features before an SVM</strong>: an RBF kernel computes Euclidean distances and is dominated by any feature with a larger scale, exactly as k-nearest neighbours is in <a href="../01_feature_engineering/02-feature_transformation.html">lecture 2</a>. A StandardScaler in a pipeline is the canonical fix and a leakage-safe one. Second, <strong>linear SVMs on large datasets should use <code>LinearSVC</code> rather than <code>SVC(kernel='linear')</code></strong>: the former uses liblinear's coordinate descent and scales to millions of rows; the latter uses libsvm's quadratic programming and is roughly $O(n^2)$ to $O(n^3)$ in training time. Third, <strong>SVC does not produce calibrated probabilities by default</strong>: the <code>predict_proba</code> method uses Platt scaling (a logistic regression fit to the decision function), which adds another cross-validation loop to training and can be poorly calibrated if the underlying model is heavily overfit. For probability outputs of any consequence, prefer logistic regression or a calibrated classifier wrapper.</p>
+
+  <h3>When SVMs win and when they lose</h3>
+
+  <p>The SVM wins on small to medium tabular problems (thousands to low tens of thousands of rows) with clear margin structure, on $p \gg n$ problems (text classification, gene expression, biomedical signals) where the margin-based generalisation bound is most useful, and as a strong baseline whenever the relationship between features and target is suspected to be smoothly non-linear. The SVM loses when the dataset is large (training is roughly $O(n^2)$ to $O(n^3)$ and quickly becomes infeasible above a hundred thousand rows), when the input is unstructured at scale (images, audio, long text, where deep networks dominate), when interpretability is a hard constraint (the kernel SVM's coefficients live in an implicit feature space and cannot be inspected), and when calibrated probabilities are needed downstream. In credit risk specifically, SVMs are rarely chosen over logistic regression with WoE encoding because the former cannot be opened up and explained on a per-feature basis. In text classification on TF-IDF features they are still routinely the best non-deep choice.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for most SVM problems. Each has a fix that takes one line in a pipeline; each is fatal when the line is missing.</p>
+
+  <div class="callout warn">
+    <span class="tag">Skipping feature scaling</span>
+    The RBF kernel computes $\|x_i - x_j\|^2$, a Euclidean distance. A feature in pounds (range $0$ to $100{,}000$) and a feature in years (range $0$ to $80$) contribute distances that differ by six orders of magnitude squared. The kernel is dominated by the high-scale feature and the low-scale feature might as well not exist. The fix is StandardScaler before the SVM in a pipeline. Forgetting this is the most common cause of an SVM that mysteriously underperforms a logistic regression on the same data.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Default gamma on unscaled data</span>
+    The <code>gamma='scale'</code> default adapts to feature variance, which means that on unscaled mixed-unit data it picks a sensible $\gamma$ in expectation but produces a kernel that still inherits the scale imbalance described above. Either scale the data (preferred) or set <code>gamma</code> explicitly via cross-validation. The <code>gamma='auto'</code> alternative ignores variance entirely and is almost never what you want.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Tuning C without log scale</span>
+    The effect of $C$ on the loss is multiplicative across $\sum \xi_i$, so the meaningful grid is logarithmic, not linear. A grid of $[1, 2, 3, 4, 5]$ scans a single order of magnitude; a grid of $[0.01, 0.1, 1, 10, 100]$ scans five. The same applies to $\gamma$. Almost every published example uses log-spaced grids for exactly this reason; tuning on a linear grid silently restricts the search to a tiny part of the meaningful space. See <a href="../06_hyperparameter_tuning/01-tuning_principles.html">lecture 35 on tuning principles</a> for the general rule.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating SVC.predict_proba as calibrated</span>
+    The probabilities returned by <code>SVC(probability=True).predict_proba</code> come from a logistic regression fitted to the decision function via Platt scaling, with an extra five-fold cross-validation under the hood. They are not the SVM's native output and can be miscalibrated, especially with small datasets or extreme class imbalance. If decisions downstream depend on calibrated probabilities (for instance for risk-based pricing or expected-loss calculations), either fit a separate calibrated model or use a different algorithm whose probability output is native. In credit risk practice this is one of the reasons SVMs are seldom the production choice even when they win on AUC.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The SVM is the canonical margin-based learner. The hard margin formulation $\min \tfrac{1}{2}\|w\|^2$ subject to $y_i(w \cdot x_i + b) \ge 1$ asks for the widest separating strip between two linearly separable classes; the support vectors are the points sitting on the strip's edges, and they alone determine the boundary. The soft margin adds slack variables and a hyperparameter $C$ that trades margin width against violation severity, making the method usable on overlapping data and controlling the bias-variance position geometrically. The kernel trick replaces inner products with kernel evaluations, lifting the same construction into implicit high-dimensional feature spaces and producing curved decision boundaries in the original input space; the RBF kernel is the default non-linear choice, with $\gamma$ as the inverse length scale governing how local the boundary becomes. In scikit-learn, <code>SVC</code> and <code>SVR</code> wrap libsvm with sensible defaults; <code>LinearSVC</code> is the large-data alternative for the linear case. The three operational requirements are feature scaling, log-spaced hyperparameter grids, and care about probability calibration.</p>
+
+  <p>What this lecture deliberately did not do. It did not present the full Lagrangian derivation of the dual; the structural fact that the dual depends only on inner products is what matters for understanding the kernel trick, and the detailed derivation belongs in an optimisation course. It did not cover one-class SVMs (anomaly detection) or multi-class extensions (one-vs-one and one-vs-rest); both are mechanical extensions of the binary case. It did not discuss the structural risk minimisation framework or VC dimension, which give the formal generalisation bounds that motivate margin maximisation in the first place.</p>
+
+  <p>Lecture 10, <a href="04-naive_bayes.html">naive Bayes</a>, takes the opposite approach to the same binary classification problem. Where the SVM is a discriminative geometric method that draws a boundary, naive Bayes is a generative probabilistic method that models the joint distribution of features and label under a strong conditional-independence assumption. The contrast is informative: the SVM is non-parametric in its decision boundary but storage-heavy at inference (one kernel evaluation per support vector); naive Bayes is heavily parametric (one parameter per feature per class) but stores nothing beyond a few summary statistics and predicts in constant time. The choice between them is a worked example of the general bias-variance trade-off the SVM and the rest of this sub-module are circling.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the hard margin SVM optimisation problem (objective and constraints) for labels $y_i \in \{-1, +1\}$, and explain why minimising $\|w\|^2$ is equivalent to maximising the margin.</li>
+      <li>What is a support vector, and what happens to the trained SVM if a non-support-vector training point is deleted? Conversely, what happens if a support vector is deleted?</li>
+      <li>Explain in geometric terms what the soft margin hyperparameter $C$ does. State the limit cases $C \to \infty$ and $C \to 0$, and the direction of the bias-variance trade-off as $C$ increases.</li>
+      <li>Write down the RBF kernel and state, with a one-line justification each, what happens to the decision boundary as $\gamma$ becomes very small and as $\gamma$ becomes very large.</li>
+      <li>You fit an <code>SVC(kernel='rbf')</code> on a credit dataset with features ranging from age (0 to 80) to balance (0 to one million pounds). Test accuracy is materially worse than a logistic regression baseline on the same features. Name the most likely cause and the one-line fix.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 10 (<a href="04-naive_bayes.html">naive Bayes</a>) solves binary classification from the generative side. The contrast with the SVM's discriminative margin approach is the cleanest in the sub-module.</li>
+      <li><strong>Previous:</strong> Lecture 8 (<a href="02-decision_trees.html">decision trees</a>) introduced a non-parametric classifier with a built-in feature-importance story; the SVM is the opposite design choice (parametric in $w$, sensitive to scale, opaque in input-feature space when kernelised).</li>
+      <li><strong>Prerequisite:</strong> Lecture 2 (<a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a>) is non-negotiable for SVMs. Without StandardScaler the RBF kernel is dominated by whichever feature has the largest variance and the model is broken before it sees the data.</li>
+      <li><strong>Prerequisite:</strong> Lecture 1 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the machine learning landscape</a>) introduced the bias-variance trade-off; the SVM's $C$ and $\gamma$ are the same trade-off made geometrically explicit.</li>
+      <li><strong>Forward link:</strong> Lecture 35 (<a href="../06_hyperparameter_tuning/01-tuning_principles.html">tuning principles</a>) develops the cross-validation, log-spaced grid, and nested CV machinery that every SVM in practice depends on.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Supervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 9 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

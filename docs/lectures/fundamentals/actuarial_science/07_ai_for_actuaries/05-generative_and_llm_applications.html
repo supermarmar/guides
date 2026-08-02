@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: generative and LLM applications</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="index.html">AI for actuaries</a></div>
+  <h1>Generative and LLM applications</h1>
+  <p class="subtitle">The generative-modelling and large-language-model sub-modules developed VAEs, GANs, diffusion, decoder transformers, foundation models, and RLHF as general-purpose technology. This lecture surveys where that technology genuinely helps an actuary, synthetic portfolios, unfair-discrimination detection, claims-text extraction, tabular foundation models, and where the analogies to familiar actuarial concepts (in-context learning as credibility, RLHF as a shape constraint) illuminate real structure rather than merely sounding clever.</p>
+  <div class="meta">
+    <span>Lecture 5 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Source: <em>AI Tools for Actuaries</em> (SSRN 5162304), ch. 4</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Five genuine actuarial applications of the generative-AI and large-language-model toolkit recur across current practice. <strong>Synthetic portfolio generation</strong>, using a VAE or a diffusion model trained on a real book of business, produces synthetic policies preserving genuine joint statistical structure for model development or stress testing without exposing real policyholder data, and <strong>telematics anonymisation</strong> applies the identical logic to individual driving traces, a genuinely sensitive data type. A GAN's <strong>discriminator</strong>, repurposed away from its usual generative role, can be trained directly as an <strong>unfair-discrimination detector</strong>, distinguishing whether a pricing outcome could plausibly have depended on a protected characteristic even after that characteristic has been formally excluded from the model's inputs. A decoder-transformer-based large language model can perform direct <strong>extraction from unstructured claims texts</strong> (accident reports, medical notes), converting free text into structured fields a conventional model can then consume, provided its output is forced into a checkable, structured form rather than accepted as free prose. <strong>TabPFN</strong> and other tabular foundation models offer a genuine, if imperfect, answer to thin reserving triangles and newly launched lines of business, at the cost of inheriting a synthetic pretraining distribution's assumptions rather than the specific portfolio's own tail experience. Finally, two direct conceptual parallels connect this course's newest material back to its oldest: <strong>in-context learning</strong> is structurally a credibility update, blending a foundation model's broad prior "experience" with a handful of specific examples supplied at inference time, and <strong>RLHF</strong> is structurally analogous to imposing a <strong>shape constraint</strong> on a fitted rate, both are a further, deliberate training stage layered on top of a raw, unconstrained model specifically to enforce a property (helpfulness, monotonicity) the raw model does not reliably have on its own.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    An actuary asked to price a genuinely new product with almost no direct experience often reaches for the wider market's collective experience, adjusted a little by whatever thin, specific evidence is actually available, exactly a credibility calculation. A foundation-model-based large language model, asked to perform a new task with only a handful of examples supplied in its prompt, is doing something structurally similar: it draws on an enormous, generic "prior experience" (its pretraining) and adjusts its behaviour a little based on the specific examples just shown to it, with no further training. Seen this way, in-context learning is not an alien capability unique to language models; it is the identical credibility instinct an actuary already has, applied by a machine to a linguistic rather than a numerical prior.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What is beyond the source</span>
+    The source surveys these five applications individually. This lecture draws the two explicit conceptual parallels, in-context learning as a credibility update and RLHF as a shape constraint, that connect the newest material in this course back to techniques already covered in this track's own risk-modelling and pricing material, a synthesis the source leaves implicit.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons a working actuary needs this survey rather than treating generative AI and LLMs as tools for an unrelated engineering discipline.</p>
+
+  <p>First, <strong>synthetic portfolios and telematics anonymisation solve a genuine, recurring data-governance problem</strong>: model development, stress testing, and third-party vendor evaluation all routinely need realistic data without exposing real policyholder records, and a properly validated generative model (checked, as the generative-modelling sub-module insists, against genuine hold-out diagnostics rather than visual plausibility alone) is a direct, principled answer, not merely a convenience.</p>
+
+  <p>Second, <strong>a GAN discriminator repurposed as a fairness detector is a genuinely different, and in some respects stronger, tool than a conventional post-hoc fairness audit</strong>: rather than checking after the fact whether a model's outputs correlate with a protected characteristic across a fixed set of pre-specified statistical tests, a trained discriminator can, in principle, detect a more general, harder-to-anticipate pattern of indirect discrimination that a narrower, pre-specified audit might miss.</p>
+
+  <p>Third, <strong>the two conceptual parallels, in-context learning as credibility and RLHF as a shape constraint, are not decorative analogies, they change how an actuary should evaluate these tools</strong>: recognising RLHF as functionally a shape constraint means asking the identical validation question already asked of any constrained pricing model, does the constraint actually hold reliably, not merely does the model's output look reasonable in a demonstration.</p>
+
+  <div class="callout insight">
+    <span class="tag">A worked comparison</span>
+    A model-validation team evaluating a vendor's LLM-based claims-text extraction tool initially accepted the tool's free-text summary of each accident report as sufficient documentation of its output. Applying this lecture's numeric-score discipline (developed properly in lecture 7, but flagged here directly), the team instead required the tool to output structured, discrete fields (an injury-severity code from a fixed list, a liability-fault percentage) rather than free prose, and ran those structured outputs through the identical calibration and accuracy checks the team already applied to its conventional claims-triage models. This surfaced a specific, previously invisible failure: the tool's injury-severity coding was well calibrated for common injury types but systematically miscalibrated for a rare, specific injury category under-represented in the tool's own pretraining corpus, a finding the free-text summary alone, however fluent, would never have surfaced.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Picture five genuine actuarial applications arranged around the generative-AI and LLM toolkit's core capabilities, each drawing on a specific piece of machinery from the generative-modelling or large-language-model sub-modules and mapping it onto a specific, recognisable actuarial task.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 780 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Five actuarial applications of the generative-AI and LLM toolkit arranged around a central hub">
+      <text x="390" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Five applications, one shared toolkit</text>
+
+      <circle cx="390" cy="180" r="55" fill="#7c3aed"/>
+      <text x="390" y="175" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#ffffff">Generative AI</text>
+      <text x="390" y="190" text-anchor="middle" font-family="Inter" font-size="9" fill="#ede9fe">and LLM toolkit</text>
+
+      <g font-family="Inter" font-size="9">
+        <rect x="30" y="60" width="170" height="55" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="115" y="82" text-anchor="middle" fill="#115e59" font-weight="700">Synthetic portfolios</text>
+        <text x="115" y="98" text-anchor="middle" fill="#115e59">VAE / diffusion, telematics</text>
+
+        <rect x="580" y="60" width="170" height="55" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="665" y="82" text-anchor="middle" fill="#92400e" font-weight="700">Fairness detection</text>
+        <text x="665" y="98" text-anchor="middle" fill="#92400e">GAN discriminator, repurposed</text>
+
+        <rect x="30" y="245" width="170" height="55" rx="8" fill="#FEE2E2" stroke="#dc2626" stroke-width="1.5"/>
+        <text x="115" y="267" text-anchor="middle" fill="#7f1d1d" font-weight="700">Claims-text extraction</text>
+        <text x="115" y="283" text-anchor="middle" fill="#7f1d1d">decoder LLM, forced structure</text>
+
+        <rect x="580" y="245" width="170" height="55" rx="8" fill="#DEEAFB" stroke="#2A3A78" stroke-width="1.5"/>
+        <text x="665" y="267" text-anchor="middle" fill="#2A3A78" font-weight="700">Thin-data reserving</text>
+        <text x="665" y="283" text-anchor="middle" fill="#2A3A78">TabPFN foundation model</text>
+
+        <rect x="270" y="260" width="240" height="55" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="390" y="282" text-anchor="middle" fill="#5b21b6" font-weight="700">Credibility and shape-constraint parallels</text>
+        <text x="390" y="298" text-anchor="middle" fill="#5b21b6">in-context learning, RLHF</text>
+      </g>
+
+      <line x1="200" y1="88" x2="340" y2="150" stroke="#71717a" stroke-width="1"/>
+      <line x1="580" y1="88" x2="440" y2="150" stroke="#71717a" stroke-width="1"/>
+      <line x1="200" y1="272" x2="340" y2="210" stroke="#71717a" stroke-width="1"/>
+      <line x1="580" y1="272" x2="440" y2="210" stroke="#71717a" stroke-width="1"/>
+      <line x1="390" y1="260" x2="390" y2="235" stroke="#71717a" stroke-width="1"/>
+    </svg>
+    <figcaption>Five genuine actuarial applications draw on the identical underlying generative-AI and LLM toolkit developed in the machine-learning course. Each application is a specific, deliberate mapping of general-purpose technology onto a concrete actuarial need, not a generic demonstration of the technology for its own sake.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A generative model earns its place by solving a governance problem a conventional model cannot.</strong> Synthetic data and anonymisation are not novelty features; they are direct answers to a genuine data-protection constraint. <strong>An analogy is only useful if it changes how you validate the tool.</strong> Recognising RLHF as a shape constraint, or in-context learning as credibility, is only valuable insofar as it tells you to ask the same hard validation question you would ask of the familiar actuarial technique, not merely a pleasing rhetorical device.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Synthetic portfolios and telematics anonymisation</h3>
+
+  <p>A VAE or diffusion model, developed in the generative-modelling sub-module, trained on a real portfolio can generate synthetic policies preserving the real joint dependence structure between covariates, a genuinely different and stronger privacy posture than simple field-level anonymisation, which remains vulnerable to re-identification via linkage attacks across fields. <strong>Telematics anonymisation</strong> applies the identical logic to individual driving traces, a particularly sensitive data type given its potential to reveal an individual's specific movements and habits; a generative model trained on real telematics data can produce synthetic traces useful for model development while structurally breaking the link back to any real individual driver.</p>
+
+  <h3>GAN discriminators as unfair-discrimination detectors</h3>
+
+  <p>A GAN's discriminator, ordinarily trained to distinguish real from generated samples, can be repurposed to distinguish whether a specific model output could plausibly have been produced without dependence on a protected characteristic: train the discriminator to tell apart outputs from a version of the model with the protected characteristic (and its correlated proxies) included versus a version with it excluded, and a discriminator that can still reliably tell the two apart is direct, quantitative evidence that the excluded characteristic's information is still being indirectly used, exactly the fairness-audit application flagged in "why this matters" above.</p>
+
+  <h3>LLM extraction from claims texts</h3>
+
+  <p>A decoder-transformer-based large language model can read an unstructured accident report or medical note and extract structured information, an injury type, a fault percentage, a specific policy clause reference, converting free text into fields a conventional downstream model can consume directly. The critical discipline, developed properly in lecture 7 but essential to flag here, is <strong>forcing the extraction into a structured, checkable form</strong> (a fixed set of categorical codes, a bounded numeric field) rather than accepting a free-text summary as the final deliverable, exactly the fix in this lecture's model-validation vignette; a structured output can be run through ordinary calibration and accuracy diagnostics, while a free-text summary cannot.</p>
+
+  <h3>TabPFN on reserving triangles</h3>
+
+  <p>Developed already in the large-language-models sub-module, a tabular foundation model such as TabPFN can be applied directly to a thin, newly available reserving triangle with no further training, a genuine answer to precisely the small-sample problem lecture 1 of this course flagged as a defining feature of actuarial data. The caveat, developed there and worth restating in this actuarial context specifically, is that the model's implicit assumptions come from its synthetic pretraining distribution, not the specific line of business's own long-run tail experience, and any output should be validated against known industry experience before being trusted as a stand-alone reserving figure.</p>
+
+  <h3>In-context learning as a credibility update</h3>
+
+  <p>The large-language-models sub-module developed in-context learning as adapting a foundation model's behaviour to a new task purely via examples supplied in the prompt, with no weight update at all. Read through an actuarial lens, this is structurally a credibility update: the foundation model's pretrained behaviour plays the role of the collateral, population-level prior, and the specific examples supplied in the prompt play the role of the sparse, individual-level evidence, blended together (by a mechanism the three competing in-context-learning explanations from the large-language-models sub-module are still working out precisely) into a task-specific behaviour, exactly as a credibility formula blends a collateral mean with sparse individual data into a single premium.</p>
+
+  <h3>RLHF as a shape constraint</h3>
+
+  <p>RLHF, developed in full in the large-language-models sub-module, is a deliberate, further training stage applied on top of a raw, pretrained foundation model specifically to enforce a property (helpfulness, safety, instruction-following) the raw model does not reliably have on its own. This is structurally analogous to imposing a <strong>shape constraint</strong> on a fitted rating factor, monotonicity in age, say, developed in lecture 3's ICEnet architecture: both are a deliberate further step, applied after an initial, more flexible fit, specifically to guarantee a property the unconstrained model does not reliably exhibit. The parallel is genuinely useful precisely because it transfers a validation instinct: an ICEnet's monotonicity constraint is checked, not assumed, and RLHF's "helpfulness" constraint deserves the identical scepticism, developed fully in lecture 7's governance treatment.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>A synthetic portfolio's validity is only as good as its own hold-out diagnostics</h3>
+  <p>A synthetic portfolio that looks visually plausible is not the same claim as one that has been validated against genuine hold-out diagnostics (the correlation and tail-behaviour checks developed in the generative-modelling sub-module); a team that skips this step and trusts a synthetic portfolio purely because it "looks realistic" has not actually completed the validation the technique requires.</p>
+
+  <h3>An analogy that does not change your validation checklist is not doing real work</h3>
+  <p>The two conceptual parallels developed in this lecture, in-context learning as credibility and RLHF as a shape constraint, earn their place only because they point directly at a specific, existing validation discipline (checking a credibility weight's behaviour at the extremes, checking a shape constraint holds reliably rather than merely looking reasonable on a demonstration). An analogy that is merely rhetorically pleasing, without pointing at a concrete validation question, is decoration, not analysis.</p>
+
+  <h3>Structured extraction is non-negotiable for any consequential decision built on LLM output</h3>
+  <p>The model-validation vignette's finding, a specific, rare injury category's systematic miscalibration, was only discoverable because the team insisted on structured, checkable output; a free-text summary, however fluent and plausible, would have hidden this exact failure indefinitely. This is not a stylistic preference for tidiness; it is the specific technique that makes an LLM-based tool auditable at all, developed in full in lecture 7.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Explain why synthetic portfolio generation is described as a stronger privacy posture than field-level anonymisation.</li>
+      <li>Describe how a GAN discriminator can be repurposed as an unfair-discrimination detector.</li>
+      <li>Explain why forcing structured output from an LLM-based claims-extraction tool is essential, using this lecture's model-validation vignette.</li>
+      <li>State the caveat that applies to using TabPFN on a thin reserving triangle.</li>
+      <li>Explain the structural parallel between in-context learning and a credibility update, naming which element plays the role of the collateral prior.</li>
+      <li>Explain the structural parallel between RLHF and a shape constraint such as ICEnet's monotonicity, and state the shared validation question both raise.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next in this course</h4>
+    <ul>
+      <li><a href="06-reinforcement_learning_for_pricing.html">Lecture 6: reinforcement learning for pricing</a>, developing the premium-control framing properly, using this lecture's RLHF parallel as one point of reference.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li>Wüthrich, Richman, Avanzi, Lindholm, Maggi, Mayer, Schelldorfer and Scognamiglio, <em>AI Tools for Actuaries</em>, chapter 4 (version 20 January 2026, <a href="https://ssrn.com/abstract=5162304">https://ssrn.com/abstract=5162304</a>, CC BY-NC).</li>
+    </ul>
+    <h4>Cross-references</h4>
+    <ul>
+      <li>The <a href="../../machine_learning/10_generative_models/index.html">deep generative modelling</a> sub-module develops VAEs, GANs, and diffusion models in full.</li>
+      <li>The <a href="../../machine_learning/11_large_language_models/index.html">large language models</a> sub-module develops in-context learning, foundation models, TabPFN, and RLHF in full.</li>
+      <li><a href="03-actuarial_network_architectures.html">Lecture 3</a>'s ICEnet is the direct actuarial precedent for this lecture's shape-constraint parallel.</li>
+    </ul>
+    <h4>Further reading</h4>
+    <ul>
+      <li>Hollmann, Müller, Eggensperger and Hutter (2023), "TabPFN: a transformer that solves small tabular classification problems in a second". The original TabPFN reference.</li>
+      <li>Barocas, Hardt and Narayanan, <em>Fairness and Machine Learning</em>. The broader fairness-auditing literature this lecture's discriminator application draws on.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All AI for actuaries lectures</a></span>
+  <span>Lecture 5 of 7: generative and LLM applications</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+
+</body>
+</html>

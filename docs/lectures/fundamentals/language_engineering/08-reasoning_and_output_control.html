@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 8: reasoning and output control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Reasoning and output control</h1>
+  <p class="subtitle">Two problems close out Part II. A model that answers immediately gets multi-step questions wrong, and the fix is to make it produce the intermediate steps, which works for a reason that has nothing to do with introspection and everything to do with lecture 4. Separately, every generative example since lecture 5 has ended with fragile string parsing, and that problem has a real solution: because something outside the model chooses each token, you can forbid the choices that would break your format, and get output that is valid by construction rather than by hope.</p>
+  <div class="meta">
+    <span>Lecture 8 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part II: using pretrained models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Chain-of-thought</strong> prompting makes the model write its working before its answer, either by demonstrating worked reasoning in the examples or, in the <strong>zero-shot</strong> variant, by appending a phrase such as "let's think step by step". It helps because each generated token is another forward pass conditioned on everything already written, so a model that states an intermediate result can then condition on it, whereas one that answers immediately has to reach the conclusion in a single pass. <strong>Self-consistency</strong> runs the same prompt several times with sampling on and takes the majority answer, trading <em>n</em> times the cost for robustness against an unlucky sample. <strong>Tree-of-thought</strong> generates several candidate steps at each stage, scores them and prunes, which is powerful and expensive; a cheap approximation asks a single prompt to simulate several experts debating. On output, four things can go wrong, so there are three ways to control it: show the exact format as an example, which usually works; <strong>constrain the sampling</strong> with a grammar, which cannot fail because invalid tokens are removed from the distribution before a token is chosen; or fine-tune, which is Part V. Only the second gives a guarantee, and the guarantee is syntactic, never semantic.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Ask someone for the answer to a three-step arithmetic problem and they'll often get it wrong; ask them to say each step out loud and they usually get it right, because having said "twenty-three minus twenty is three" they no longer have to hold it in their head. A model gains the same thing for a mechanical reason: what it has already written is part of its input for the next word. Now the other half. Suppose you need the answer on a form with specific boxes. You could show them a filled-in form and ask them to copy the layout, which works most of the time. Or you could hand them a form where the only thing they can physically write in the "amount" box is a digit, because the box only accepts digits. The second approach cannot produce a malformed answer. It can still produce the wrong number.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the track</span>
+    This closes Part II. The constrained-sampling section is where lecture 4's framing pays off: because the model emits a distribution and a separate decoding step picks from it, you can intervene between the two. It also removes the fragile parsing that lectures 5, 6 and 7 all had to live with, which is a precondition for Part III, since a chain or an agent that parses an intermediate result badly fails silently and expensively.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons.</p>
+
+  <p>First, <strong>chain-of-thought is nearly free and the gains on multi-step tasks are large</strong>. Appending one sentence to a prompt costs a few tokens and turns a class of consistently wrong answers into consistently right ones. It has a real cost in output length, and therefore latency and money, but as an intervention-to-benefit ratio nothing else in this lecture comes close.</p>
+
+  <p>Second, <strong>reasoning output is auditable in a way a bare answer is not</strong>. A model that returns "9" gives you nothing to check. A model that returns "23 minus 20 is 3, plus 6 is 9" gives you a chain you can inspect, and in a regulated setting that difference matters more than the accuracy gain. The caveat is important and comes up again below: the stated reasoning is not a transcript of a hidden process, it's generated text that happens to correlate with the answer, and it can be plausible and wrong.</p>
+
+  <p>Third, <strong>unconstrained output is the most common cause of production failures in generative pipelines</strong>. Every generative example so far has ended in a line like <code>0 if text == "negative" else 1</code>, and every one of those lines is a defect waiting for the model to reply "Negative." with a capital and a full stop. At the scale of one interactive query this is invisible. At the scale of a batch job it's a silent corruption of your results. Grammar-constrained sampling removes the failure mode rather than mitigating it.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    An extraction pipeline pulling structured fields out of policy documents was specified to return JSON, and the prompt said so clearly, with an example. In testing over a few hundred documents it returned valid JSON every time. In production it failed roughly one document in four hundred, and the failures had no pattern anyone could see: the same document would sometimes parse and sometimes not. Two things were happening. Sampling had been left on, so the output was not deterministic, and on the rare occasions the model wrapped its JSON in a markdown code fence or prefixed it with "Here is the JSON:", the parser threw. The team's first fix was a regular expression to strip fences and preambles, which reduced the failure rate without eliminating it and added a second thing to maintain. The eventual fix was to turn sampling off and switch on the model server's JSON mode, after which the failure rate was zero by construction rather than by defensive coding. The lesson is that "the prompt says to return JSON" is a request, and a request is not a constraint.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold two pictures. The first is a ladder of reasoning techniques, each buying accuracy with model calls.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four reasoning approaches ordered by cost: direct answer, chain-of-thought, self-consistency, tree-of-thought">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Four approaches, each buying reliability with compute</text>
+
+      <!-- direct -->
+      <rect x="15" y="38" width="200" height="180" rx="10" fill="#FFFFFF" stroke="#a1a1aa" stroke-width="1.5"/>
+      <text x="115" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#3f3f46">DIRECT ANSWER</text>
+      <rect x="45" y="72" width="140" height="24" rx="4" fill="#F4F4F2" stroke="#a1a1aa"/>
+      <text x="115" y="88" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#52525b">question</text>
+      <line x1="115" y1="96" x2="115" y2="116" stroke="#a1a1aa" stroke-width="1.5"/>
+      <rect x="45" y="116" width="140" height="24" rx="4" fill="#F8E0DE" stroke="#dc2855"/>
+      <text x="115" y="132" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#9f1239">"9"  (or "3", or "29")</text>
+      <text x="115" y="164" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#3f3f46">1 call</text>
+      <text x="115" y="182" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">the whole calculation must</text>
+      <text x="115" y="194" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">happen in one shot</text>
+      <text x="115" y="210" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#9f1239">nothing to audit</text>
+
+      <!-- CoT -->
+      <rect x="230" y="38" width="200" height="180" rx="10" fill="#FFFFFF" stroke="#0d9488" stroke-width="2"/>
+      <text x="330" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">CHAIN-OF-THOUGHT</text>
+      <rect x="260" y="72" width="140" height="20" rx="4" fill="#F4F4F2" stroke="#a1a1aa"/>
+      <text x="330" y="86" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#52525b">question + "step by step"</text>
+      <line x1="330" y1="92" x2="330" y2="102" stroke="#0d9488" stroke-width="1.5"/>
+      <rect x="260" y="102" width="140" height="17" rx="3" fill="#ECFEF6" stroke="#0d9488"/>
+      <text x="330" y="114" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#115e59">23 - 20 = 3</text>
+      <line x1="330" y1="119" x2="330" y2="126" stroke="#0d9488" stroke-width="1.5"/>
+      <rect x="260" y="126" width="140" height="17" rx="3" fill="#ECFEF6" stroke="#0d9488"/>
+      <text x="330" y="138" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#115e59">3 + 6 = 9</text>
+      <line x1="330" y1="143" x2="330" y2="150" stroke="#0d9488" stroke-width="1.5"/>
+      <rect x="260" y="150" width="140" height="17" rx="3" fill="#DDF1E5" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="330" y="162" text-anchor="middle" font-family="JetBrains Mono" font-size="8" font-weight="600" fill="#115e59">answer: 9</text>
+      <text x="330" y="184" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">1 call, longer output</text>
+      <text x="330" y="200" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">each step conditions the next</text>
+      <text x="330" y="212" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#115e59">best value on this chart</text>
+
+      <!-- self-consistency -->
+      <rect x="445" y="38" width="200" height="180" rx="10" fill="#FFFFFF" stroke="#b45309" stroke-width="2"/>
+      <text x="545" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">SELF-CONSISTENCY</text>
+      <g>
+        <rect x="465" y="76" width="52" height="34" rx="4" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="491" y="90" text-anchor="middle" font-family="Inter" font-size="7.5" fill="#92400e">path A</text>
+        <text x="491" y="103" text-anchor="middle" font-family="JetBrains Mono" font-size="8" font-weight="600" fill="#92400e">9</text>
+        <rect x="521" y="76" width="52" height="34" rx="4" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="547" y="90" text-anchor="middle" font-family="Inter" font-size="7.5" fill="#92400e">path B</text>
+        <text x="547" y="103" text-anchor="middle" font-family="JetBrains Mono" font-size="8" font-weight="600" fill="#92400e">9</text>
+        <rect x="577" y="76" width="52" height="34" rx="4" fill="#F8E0DE" stroke="#dc2855"/>
+        <text x="603" y="90" text-anchor="middle" font-family="Inter" font-size="7.5" fill="#9f1239">path C</text>
+        <text x="603" y="103" text-anchor="middle" font-family="JetBrains Mono" font-size="8" font-weight="600" fill="#9f1239">3</text>
+      </g>
+      <path d="M 491 110 L 545 128 M 547 110 L 545 128 M 603 110 L 545 128" stroke="#b45309" stroke-width="1.2" fill="none"/>
+      <rect x="475" y="128" width="140" height="24" rx="4" fill="#FEF3C7" stroke="#a16207" stroke-width="1.5"/>
+      <text x="545" y="144" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#713f12">majority vote &#8594; 9</text>
+      <text x="545" y="176" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#92400e">n calls, n&#215; cost</text>
+      <text x="545" y="192" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">survives one unlucky sample</text>
+      <text x="545" y="208" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">needs sampling switched ON</text>
+
+      <!-- tree -->
+      <rect x="660" y="38" width="205" height="180" rx="10" fill="#FFFFFF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="762" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">TREE-OF-THOUGHT</text>
+      <circle cx="762" cy="78" r="6" fill="#7c3aed"/>
+      <line x1="762" y1="84" x2="712" y2="102" stroke="#7c3aed" stroke-width="1.2"/>
+      <line x1="762" y1="84" x2="762" y2="102" stroke="#7c3aed" stroke-width="1.2"/>
+      <line x1="762" y1="84" x2="812" y2="102" stroke="#7c3aed" stroke-width="1.2"/>
+      <circle cx="712" cy="108" r="6" fill="#C8BFFF"/>
+      <circle cx="762" cy="108" r="6" fill="#7c3aed"/>
+      <circle cx="812" cy="108" r="6" fill="#C8BFFF"/>
+      <text x="700" y="126" font-family="Inter" font-size="7" fill="#9f1239">pruned</text>
+      <text x="800" y="126" font-family="Inter" font-size="7" fill="#9f1239">pruned</text>
+      <line x1="762" y1="114" x2="737" y2="134" stroke="#7c3aed" stroke-width="1.2"/>
+      <line x1="762" y1="114" x2="787" y2="134" stroke="#7c3aed" stroke-width="1.2"/>
+      <circle cx="737" cy="140" r="6" fill="#C8BFFF"/>
+      <circle cx="787" cy="140" r="6" fill="#7c3aed"/>
+      <line x1="787" y1="146" x2="787" y2="158" stroke="#7c3aed" stroke-width="1.2"/>
+      <rect x="737" y="158" width="100" height="18" rx="3" fill="#F5F3FF" stroke="#7c3aed"/>
+      <text x="787" y="171" text-anchor="middle" font-family="JetBrains Mono" font-size="8" font-weight="600" fill="#5b21b6">answer</text>
+      <text x="762" y="192" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#5b21b6">many calls, generate + score</text>
+      <text x="762" y="208" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">for problems with real branching</text>
+
+      <text x="440" y="248" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">Why writing the steps helps at all</text>
+      <text x="440" y="268" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">Every generated token is a separate forward pass whose input includes all preceding tokens (lecture 4). Writing "23 - 20 = 3" puts that</text>
+      <text x="440" y="284" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">result into the input for the next pass. A direct answer must reach the conclusion in a single pass with nothing intermediate to lean on.</text>
+    </svg>
+    <figcaption>Going right along the chart buys reliability with model calls. Chain-of-thought is the outlier in value: it costs one call and some extra output tokens, while the other two cost multiples. The explanation at the bottom is the important part, because it is mechanical rather than psychological: the intermediate steps help because they physically enter the model's input, not because the model is introspecting.</figcaption>
+  </figure>
+
+  <p>The second picture is the difference between asking for a format and enforcing one, which is developed properly below. Two slogans hold both. <strong>Thinking out loud is thinking with more forward passes.</strong> And <strong>a request is not a constraint</strong>: only intervening in the token selection makes a format guaranteed.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>A framing worth holding loosely</h3>
+
+  <p>The usual framing for this material borrows the psychological distinction between fast, automatic, intuitive thinking and slow, deliberate, self-reflective thinking. A model generating tokens straight out looks like the first; the techniques below are attempts to induce something resembling the second.</p>
+
+  <p>Take the analogy as a mnemonic and not as a claim. What these models do is generally understood to be pattern completion over an enormous training corpus rather than reasoning in any strong sense, and the field calls the output "reasoning" because of what it resembles, not because of what is established about the mechanism. That distinction matters practically: it is why a chain of thought can be internally consistent, fluent, and wrong, and why it should be read as evidence rather than as proof.</p>
+
+  <h3>Chain-of-thought</h3>
+
+  <p>The original form supplies examples that include the working, so the model continues the pattern of working-then-answer.</p>
+
+  <pre><code>cot_prompt = [
+    {"role": "user", "content": "Roger has 5 tennis balls. He buys 2 more cans of "
+        "tennis balls. Each can has 3 tennis balls. How many does he have now?"},
+    {"role": "assistant", "content": "Roger started with 5 balls. 2 cans of 3 tennis "
+        "balls each is 6 tennis balls. 5 + 6 = 11. The answer is 11."},
+    {"role": "user", "content": "The cafeteria had 23 apples. If they used 20 to make "
+        "lunch and bought 6 more, how many apples do they have?"},
+]
+
+# "The cafeteria started with 23 apples. They used 20 apples, so they had
+#  23 - 20 = 3 apples left. Then they bought 6 more, so they now have
+#  3 + 6 = 9 apples. The answer is 9."</code></pre>
+
+  <p>Note the structure: this is the few-shot pattern from lecture 7, with the demonstrated <em>reasoning</em> rather than just the demonstrated answer attributed to the assistant. What's being taught by example is the shape of the response, not the arithmetic.</p>
+
+  <p>The mechanism is worth restating because it demystifies the whole family of techniques. From lecture 4: one forward pass produces one token, and that token is appended to the input before the next pass. So a model that writes "23 - 20 = 3" has, on the following pass, the number 3 sitting in its input, and can condition on it. A model asked to produce the final answer directly has to get from the question to the conclusion within a single pass, with no intermediate state to rely on. Chain-of-thought is, quite literally, giving the model more computation and somewhere to put its working.</p>
+
+  <p>Supplying reasoning examples requires having reasoning examples. The zero-shot variant does not.</p>
+
+  <pre><code>zeroshot_cot_prompt = [
+    {"role": "user", "content": "The cafeteria had 23 apples. If they used 20 to make "
+        "lunch and bought 6 more, how many apples do they have? Let's think step-by-step."},
+]
+
+# Step 1: Start with the initial number of apples, which is 23.
+# Step 2: Subtract the apples used for lunch: 23 - 20 = 3 remaining.
+# Step 3: Add the apples bought: 3 + 6 = 9.
+# The cafeteria now has 9 apples.</code></pre>
+
+  <p>One appended sentence produces the same behaviour. The exact wording isn't sacred; "let's work through this step by step" and various other phrasings do the same job, and the literature contains a certain amount of enjoyable folklore about which incantation performs best. Treat the specific phrase as a hyperparameter worth one afternoon of testing on your own task, not as a magic formula.</p>
+
+  <div class="callout warn">
+    <span class="tag">Do not confuse the stated reasoning with the actual computation</span>
+    A chain of thought is generated text. It is produced by the same next-token process as everything else, and there is no guarantee it faithfully describes whatever the network did internally. Models can produce correct answers with faulty stated reasoning, and confident, well-formed reasoning that leads to a wrong answer. The output is genuinely useful as an audit artefact, because a human can spot a bad step, but it is not a proof and should never be presented to a regulator as one. The machine learning track's <a href="../machine_learning/11_large_language_models/04-responsible_use.html">responsible use</a> lecture develops this point.
+  </div>
+
+  <h3>Self-consistency</h3>
+
+  <p>With sampling switched on, the same prompt gives different answers on different runs, and some of that variation is simply luck. Self-consistency exploits it: ask the same question <em>n</em> times, each with chain-of-thought and sampling enabled, then discard the reasoning and take a majority vote over the final answers.</p>
+
+  <p>The argument is that there are many valid reasoning paths to a correct answer and comparatively few paths that converge on the same wrong one, so agreement across independently sampled paths is evidence. It works, and it costs exactly <em>n</em> times as much and takes <em>n</em> times as long unless you parallelise the calls.</p>
+
+  <p>Two practical notes. Sampling must be on, since with greedy decoding all <em>n</em> runs are identical and you have paid <em>n</em> times for one answer. And it needs an extractable final answer to vote over, which is a good motivation for the output control in the second half of this lecture: majority voting over free text requires you to first decide whether "9 apples" and "The answer is 9" are the same vote.</p>
+
+  <h3>Tree-of-thought</h3>
+
+  <p>Chain-of-thought commits to one line of reasoning. Tree-of-thought does not: at each step it generates several candidate next steps, scores them, keeps the promising ones and prunes the rest, then continues from the survivors. It's a search over reasoning paths rather than a single walk down one.</p>
+
+  <p>This suits problems with genuine branching, where an early choice determines what's reachable later: planning, creative work with structural decisions, puzzles with backtracking. It is expensive, needing many calls to generate candidates and more to evaluate them, and the orchestration is real code rather than a prompt.</p>
+
+  <p>There's a much cheaper approximation that captures some of the benefit in a single call: ask the model to simulate the search itself.</p>
+
+  <pre><code>zeroshot_tot_prompt = [{"role": "user", "content":
+    "Imagine three different experts are answering this question. All experts will "
+    "write down 1 step of their thinking, then share it with the group. Then all "
+    "experts will go on to the next step, etc. If any expert realises they're wrong "
+    "at any point then they leave. The question is '...'. Make sure to discuss the results."}]</code></pre>
+
+  <p>The model produces a transcript of three experts working through the steps and checking each other, arriving at a cross-checked answer. Be clear about what this is: no actual search is happening and no branch is actually pruned, because it is one generation of a document that resembles a debate. It works better than a bare question mainly because it induces more intermediate tokens and some self-checking language, which is chain-of-thought with extra structure. That's still worth having, and it costs one call.</p>
+
+  <h3>Output verification: what can go wrong</h3>
+
+  <p>Now the second half. Four distinct things can be wrong with generated output, and conflating them leads to applying the wrong fix.</p>
+
+  <div class="defcard">
+    <span class="term">Not structured</span>
+    <span class="def">You need JSON and got prose, or JSON wrapped in a markdown fence, or JSON with a friendly preamble. A parsing failure, and the one most likely to take down a pipeline.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">Structured but invalid</span>
+    <span class="def">Valid JSON, but the <code>sentiment</code> field says "mixed" when your schema allows only three values. Nothing throws; a bad value flows downstream and appears in a report.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">Unsafe</span>
+    <span class="def">Open models frequently ship without guardrails. If the output is customer-facing or logged, profanity, personal data reproduced from the input, or stereotyped content are live risks that no amount of formatting control addresses.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">Inaccurate</span>
+    <span class="def">Well-formed, valid, safe and false. The hardest of the four, and not solvable by output control at all: the answers are grounding the model in retrieved sources (lecture 11), verification against an external check, and honest evaluation (lecture 18).</span>
+  </div>
+
+  <p>Three mechanisms address the first two. Show the format as an example. Constrain the sampling with a grammar. Or fine-tune the model on data in your format, which is Part V. They are not equivalent, and the difference is whether you get a guarantee.</p>
+
+  <h3>Control by example</h3>
+
+  <p>Ask for JSON with no example and you get something JSON-shaped, at whatever length and with whatever fields the model fancies. Asked to "create a character profile for an RPG game in JSON format", a small model produces a deeply nested object with a dozen fields and runs into the token limit part-way through the attributes, leaving output that is not parseable because it's truncated.</p>
+
+  <p>Supplying the exact skeleton fixes both problems at once.</p>
+
+  <pre><code>one_shot_template = """Create a short character profile for an RPG game.
+Make sure to only use this format:
+{
+  "description": "A SHORT DESCRIPTION",
+  "name": "THE CHARACTER'S NAME",
+  "armor": "ONE PIECE OF ARMOR",
+  "weapon": "ONE OR MORE WEAPONS"
+}
+"""
+# {"description": "A cunning rogue with a mysterious past, skilled in stealth
+#   and deception.", "name": "Lysandra Shadowstep",
+#   "armor": "Leather Cloak of the Night", "weapon": "Dagger of Whispers, Throwing Knives"}</code></pre>
+
+  <p>Exactly the four requested fields, short enough to complete, and parseable. This is the few-shot technique of lecture 7 applied to structure rather than content, and it's cheap, portable across providers, and effective most of the time.</p>
+
+  <p>Most of the time is the problem. The model is still choosing every token freely; you have made the desired format overwhelmingly probable, not mandatory. At a few hundred documents you will not notice. At a few hundred thousand you will.</p>
+
+  <h3>Control by grammar: constrained sampling</h3>
+
+  <p>The real fix follows directly from lecture 4. The model does not choose a token; it produces a score for every token in the vocabulary, and a decoding step chooses. That decoding step is code you control, so it can be made to ignore tokens that would produce invalid output.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Grammar-constrained decoding masking invalid tokens out of the distribution at each generation step">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The grammar removes illegal tokens before the choice is made</text>
+
+      <!-- state -->
+      <rect x="15" y="38" width="230" height="94" rx="10" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="130" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">GRAMMAR STATE MACHINE</text>
+      <text x="130" y="76" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#a16207">tracks what has been emitted:</text>
+      <text x="130" y="93" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#713f12">{"sentiment":</text>
+      <text x="130" y="112" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#713f12">&#8594; a string value must come next</text>
+      <text x="130" y="126" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">so the next token must open a quote</text>
+
+      <!-- raw dist -->
+      <rect x="285" y="38" width="250" height="180" rx="10" fill="#FFFFFF" stroke="#be185d" stroke-width="2"/>
+      <text x="410" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#831843">THE MODEL'S DISTRIBUTION</text>
+      <g font-family="JetBrains Mono" font-size="9">
+        <text x="300" y="82" fill="#831843">'"'</text>
+        <rect x="360" y="74" width="66" height="10" rx="2" fill="#be185d"/>
+        <text x="440" y="82" fill="#831843">0.44</text>
+        <text x="475" y="82" font-family="Inter" font-size="8" fill="#115e59">legal</text>
+
+        <text x="300" y="104" fill="#831843">' '</text>
+        <rect x="360" y="96" width="42" height="10" rx="2" fill="#e879b9"/>
+        <text x="440" y="104" fill="#831843">0.28</text>
+        <text x="475" y="104" font-family="Inter" font-size="8" fill="#115e59">legal</text>
+
+        <text x="300" y="126" fill="#9f1239">'Here'</text>
+        <rect x="360" y="118" width="24" height="10" rx="2" fill="#e4e4e7"/>
+        <text x="440" y="126" fill="#9f1239">0.14</text>
+        <text x="475" y="126" font-family="Inter" font-size="8" font-weight="600" fill="#9f1239">ILLEGAL &#8594; masked</text>
+
+        <text x="300" y="148" fill="#9f1239">'```'</text>
+        <rect x="360" y="140" width="14" height="10" rx="2" fill="#e4e4e7"/>
+        <text x="440" y="148" fill="#9f1239">0.09</text>
+        <text x="475" y="148" font-family="Inter" font-size="8" font-weight="600" fill="#9f1239">ILLEGAL &#8594; masked</text>
+
+        <text x="300" y="170" fill="#9f1239">'&#10;&#10;'</text>
+        <rect x="360" y="162" width="8" height="10" rx="2" fill="#e4e4e7"/>
+        <text x="440" y="170" fill="#9f1239">0.05</text>
+        <text x="475" y="170" font-family="Inter" font-size="8" font-weight="600" fill="#9f1239">ILLEGAL &#8594; masked</text>
+      </g>
+      <text x="410" y="198" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">masked tokens get a score of negative infinity,</text>
+      <text x="410" y="210" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">so after the softmax their probability is exactly zero</text>
+
+      <line x1="245" y1="85" x2="285" y2="85" stroke="#a16207" stroke-width="2"/>
+
+      <!-- result -->
+      <rect x="575" y="38" width="290" height="94" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="720" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">RENORMALISED, THEN SAMPLED</text>
+      <g font-family="JetBrains Mono" font-size="9">
+        <text x="592" y="80" fill="#115e59">'"'</text>
+        <rect x="640" y="72" width="100" height="10" rx="2" fill="#0d9488"/>
+        <text x="756" y="80" fill="#115e59">0.61</text>
+        <text x="592" y="100" fill="#115e59">' '</text>
+        <rect x="640" y="92" width="64" height="10" rx="2" fill="#3aa89c"/>
+        <text x="756" y="100" fill="#115e59">0.39</text>
+      </g>
+      <text x="720" y="122" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#115e59">a malformed continuation is now impossible</text>
+      <line x1="535" y1="85" x2="575" y2="85" stroke="#71717a" stroke-width="2"/>
+
+      <rect x="575" y="146" width="290" height="72" rx="10" fill="#F8E0DE" stroke="#dc2855" stroke-width="1.5"/>
+      <text x="720" y="166" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#9f1239">WHAT THIS DOES NOT GUARANTEE</text>
+      <text x="720" y="184" text-anchor="middle" font-family="Inter" font-size="9" fill="#9f1239">The syntax is now correct by construction.</text>
+      <text x="720" y="198" text-anchor="middle" font-family="Inter" font-size="9" fill="#9f1239">The <tspan font-weight="600">content</tspan> is exactly as reliable as before.</text>
+      <text x="720" y="212" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#9f1239">Valid JSON containing a wrong figure is still wrong.</text>
+
+      <text x="440" y="250" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">This is only possible because the model emits a distribution rather than a token (lecture 4). Repeat at every step and the</text>
+      <text x="440" y="266" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">whole generation is forced to stay inside the grammar: after "sentiment": the allowed tokens can be narrowed to exactly</text>
+      <text x="440" y="282" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">"positive", "negative" and "neutral", making a fourth category unrepresentable rather than merely discouraged.</text>
+    </svg>
+    <figcaption>A state machine tracks how much of the required structure has been emitted and, at each step, computes which tokens could legally come next. Those that could not have their scores set to negative infinity before the softmax, so their probability becomes exactly zero and no sampling procedure can select them. The remaining probabilities renormalise among the legal options. Syntactic validity is then a property of the mechanism rather than of the model's cooperation, which is why this is qualitatively different from asking nicely.</figcaption>
+  </figure>
+
+  <p>In practice you rarely write the mask yourself. Local inference through <code>llama-cpp-python</code> exposes a grammar interface with a JSON mode built in, and hosted providers offer equivalents, typically a JSON mode and a stricter schema-constrained mode.</p>
+
+  <pre><code>from llama_cpp.llama import Llama
+
+llm = Llama.from_pretrained(
+    repo_id="microsoft/Phi-3-mini-4k-instruct-gguf",
+    filename="*fp16.gguf",
+    n_gpu_layers=-1,     # all layers on the GPU
+    n_ctx=2048,          # context size
+)
+
+output = llm.create_chat_completion(
+    messages=[{"role": "user", "content": "Create a warrior for an RPG in JSON format."}],
+    response_format={"type": "json_object"},   # applies a JSON grammar internally
+    temperature=0,
+)["choices"][0]["message"]["content"]
+
+json.loads(output)   # parses, every time, by construction</code></pre>
+
+  <p>Note the model format: GGUF, which is the quantised format <code>llama.cpp</code> consumes, and the entry point to the local-model tooling that lecture 9 uses throughout. If you're switching between <code>transformers</code> and <code>llama-cpp-python</code> in one session, free the first model's VRAM before loading the second, since both will happily try to occupy the whole card.</p>
+
+  <div class="callout insight">
+    <span class="tag">Choosing among the three controls</span>
+    Use examples when you're prototyping, when portability across providers matters more than a guarantee, or when the structure is loose. Use grammar constraints whenever the output feeds a parser in a pipeline that runs unattended: the cost is one configuration line and the benefit is the removal of an entire class of failure. Use fine-tuning when the format is elaborate and constant and you're generating enough volume for the training cost to amortise, which is lecture 17. And in every case remember what the grammar buys you. Constraining the tokens guarantees the shape of the answer. It says nothing about whether the answer is right, and a pipeline that treats successful parsing as successful extraction has simply relocated its blind spot.
+  </div>
+
+  <p>A related pattern worth knowing, since it needs no special tooling: generate only the parts you don't know. If the structure is fixed, write the scaffolding yourself in code and call the model once per field with a narrow prompt. You get correct structure by construction because you built it, each call is small and focused, and each field can be validated independently. It costs more calls and it is often the most robust option for a small, fixed schema.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Making a model write its working improves multi-step answers for a mechanical reason: each token it generates enters its input for the next pass, so stated intermediate results become something to condition on. Chain-of-thought does this by demonstration or by a single appended instruction, and it's the best value in the lecture. Self-consistency samples several reasoning paths and votes, buying robustness at <em>n</em> times the cost. Tree-of-thought searches over paths and prunes, which suits genuinely branching problems, and its single-prompt imitation is chain-of-thought with a debate structure rather than an actual search. Treat all stated reasoning as an audit artefact rather than as a faithful account of the computation. On output, distinguish unstructured from invalid from unsafe from inaccurate, because only the first two are format problems. Examples make the right format very likely; a grammar makes the wrong format impossible, by zeroing illegal tokens before selection; fine-tuning is the third route and belongs to Part V. Nothing here makes the content true.</p>
+
+  <p>Part II is complete: you can classify, cluster, prompt, reason, and get output a parser can trust. Part III makes systems out of these pieces. Lecture 9 takes the chain prompting sketched at the end of lecture 7 and turns it into a proper construct with templates, then confronts the fact that a model has no memory at all, so any conversation that appears to remember something is a program that re-sends it.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Explain, in terms of the forward pass, why writing intermediate steps improves a model's final answer.</li>
+      <li>State the difference between chain-of-thought and zero-shot chain-of-thought, and when you would need the first.</li>
+      <li>Explain why self-consistency requires sampling to be enabled, and state its cost.</li>
+      <li>Describe what tree-of-thought does at each step, and explain what the single-prompt "three experts" version actually is and is not.</li>
+      <li>Give the reason a chain of thought should not be treated as a faithful record of the model's computation.</li>
+      <li>Name the four ways output can be wrong, and identify which two are not solvable by output control.</li>
+      <li>Explain the mechanism of grammar-constrained decoding, and say precisely why it cannot produce malformed output.</li>
+      <li>State what constrained decoding guarantees and what it does not.</li>
+      <li>In the extraction vignette, name the two independent causes of the intermittent failures.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 7 (<a href="07-prompt_engineering.html">prompt engineering</a>) supplied the few-shot structure that chain-of-thought extends and the sampling parameters self-consistency depends on. Lecture 4 (<a href="04-inside_the_forward_pass.html">inside the forward pass</a>) supplied the distribution that constrained decoding masks.</li>
+      <li><strong>Fixes:</strong> The brittle output parsing in lecture 5 (<a href="05-text_classification.html">text classification</a>) and the label generation in lecture 6 (<a href="06-clustering_and_topic_modelling.html">clustering and topic modelling</a>) are both cases for the grammar constraint described here.</li>
+      <li><strong>Next:</strong> Lecture 9 (<a href="09-chains_memory_and_state.html">chains, memory and state</a>) opens Part III and uses the same GGUF and <code>llama-cpp-python</code> tooling introduced here.</li>
+      <li><strong>Theory companion:</strong> The machine learning track's <a href="../machine_learning/11_large_language_models/03-prompting_and_reasoning.html">prompting and reasoning</a> lecture covers chain-of-thought alongside RLHF and the training recipes behind models that reason by default rather than on request.</li>
+      <li><strong>Forward:</strong> Inaccuracy, the one failure this lecture cannot fix, is addressed by grounding in lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>), measured in lecture 12 (<a href="12-retrieval_quality_and_evaluation.html">retrieval quality and evaluation</a>), and evaluated in lecture 18 (<a href="18-preference_tuning_and_evaluation.html">preference tuning and evaluation</a>). Fine-tuning as the third output control is lecture 17 (<a href="17-supervised_fine_tuning_with_qlora.html">supervised fine-tuning with QLoRA</a>).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 8 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

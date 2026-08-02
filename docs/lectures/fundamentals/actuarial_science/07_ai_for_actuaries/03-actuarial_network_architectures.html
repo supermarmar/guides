@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 3: actuarial network architectures</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="index.html">AI for actuaries</a></div>
+  <h1>Actuarial network architectures</h1>
+  <p class="subtitle">The deep-learning sub-module's feed-forward network is a general-purpose tool. This lecture develops three architectures the actuarial literature has built by deliberately fusing that general tool with a GLM's structure and an actuary's own judgement about smoothness and monotonicity: CANN, LocalGLMnet, and ICEnet, each occupying a specific, more favourable point on lecture 1's interpretability-flexibility spectrum than either a pure GLM or a pure black-box network reaches alone.</p>
+  <div class="meta">
+    <span>Lecture 3 of 7</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Source: <em>AI Tools for Actuaries</em> (SSRN 5162304), ch. 3</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>combined actuarial neural network (CANN)</strong> takes an existing, already-fitted GLM and adds a neural network correction on top, $\hat{\mu}(X) = \hat{\mu}_{\text{GLM}}(X) \cdot \exp(\hat{r}_{\text{network}}(X))$ in a multiplicative (log-link) formulation, so the network only ever has to learn the residual structure the GLM missed, not the whole relationship from scratch; this is directly readable as a residual, or "ResNet", connection, exactly the skip-connection idea from the deep-learning sub-module's convolutional and residual architectures, applied here to an entire GLM rather than a single network layer. A <strong>LocalGLMnet</strong> keeps a GLM's linear structure intact, $\hat{\mu}(X) = \beta_0 + \sum_j \beta_j(X) X_j$, but lets every coefficient $\beta_j(X)$ vary as a learned function of the full covariate vector rather than being a single fixed number, a genuinely interpretable varying-coefficient model whose learned coefficients can be inspected directly as a function of the inputs, with a built-in <strong>sparsity test</strong> (comparing a covariate's learned attention weight against an injected random "noise" covariate's) diagnosing which covariates the network judges genuinely relevant. <strong>ICEnet</strong> imposes explicit smoothness and monotonicity constraints directly inside the network architecture, guaranteeing a fitted curve behaves the way an actuary's own domain judgement (mortality is smooth in age, claim frequency is monotone in a specific rating factor) demands, rather than checking these properties only after the fact. <strong>Nagging</strong>, developed generically in the deep-learning sub-module, and <strong>balance correction</strong>, developed in the calibration sub-module, both apply directly and without modification to every architecture in this lecture.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine a junior underwriter who has learned the standard rating manual thoroughly (the GLM) but is also given a small notebook to jot down specific exceptions and corrections they have noticed in practice that the manual does not quite capture (the network correction). CANN is exactly this: the manual keeps doing almost all of the work, fully interpretable and already trusted, and the notebook only ever has to record the residual, specific pattern the manual missed, never having to relearn the whole rating structure from scratch. This is why a CANN, correctly fitted, so rarely performs worse than the GLM it started from: the network's job is strictly easier than fitting the whole relationship unaided.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What is beyond the source</span>
+    The source develops CANN, LocalGLMnet, and ICEnet as three separate architectures. This lecture makes explicit the direct structural parallel between CANN's residual correction and the ResNet skip-connection already covered in the deep-learning sub-module's convolutional-networks lecture, a connection the source does not draw, and places all three architectures on the single interpretability-flexibility spectrum introduced in lecture 1 of this course.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons these three architectures, specifically, earn a place in an actuary's own working toolkit rather than being left as generic machine-learning curiosities.</p>
+
+  <p>First, <strong>CANN gives a genuinely low-risk route to improving an already-approved, already-validated GLM</strong>: because the network only ever has to learn a residual correction on top of a model already in production, a CANN can rarely perform materially worse than the baseline GLM it started from, a much easier case to make to a validation committee than proposing to replace an approved GLM outright with an unconstrained black-box network.</p>
+
+  <p>First and second, <strong>LocalGLMnet's varying coefficients and sparsity test give a direct, quantitative answer to the question every validator eventually asks a network-based pricing model</strong>, "which covariates does this model actually rely on, and does that match actuarial judgement", a question a pure black-box network cannot answer directly and a LocalGLMnet answers by construction.</p>
+
+  <p>Third, <strong>ICEnet's built-in monotonicity guarantee closes a genuine, recurring validation gap</strong>: a model that happens to be monotone in age on the specific validation sample tested is not the same claim as a model structurally guaranteed to remain monotone on data not yet observed, and ICEnet is the direct, architectural answer to that distinction, rather than a post-hoc check applied after an unconstrained model has already been fitted.</p>
+
+  <div class="callout insight">
+    <span class="tag">A worked comparison</span>
+    A motor-pricing team fitted a LocalGLMnet to a claim-frequency dataset that included, deliberately, one entirely uninformative random noise covariate alongside the genuine rating factors, exactly the sparsity-test diagnostic this lecture develops. The learned attention weights for two genuine rating factors, a rarely-used discount code and a legacy vehicle-classification field the team suspected was now redundant, both came out statistically indistinguishable from the injected noise covariate's weight, while every other genuine rating factor's weight was clearly, substantially larger. This gave the team a direct, quantitative basis for removing both suspect covariates from the production model, a conclusion the team could report to their validation committee with a specific, reproducible diagnostic rather than an unsupported claim that "the covariates did not seem to matter".
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Picture three architectures as three different ways of letting a network touch a GLM: CANN lets the network correct the GLM's output multiplicatively after the fact; LocalGLMnet lets the network directly parameterise the GLM's own coefficients; ICEnet constrains the network itself to obey the GLM's expected shape (smooth, monotone) from the inside, rather than correcting or reparameterising an existing GLM at all.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 780 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three ways an actuarial architecture lets a network touch a GLM: correcting, reparameterising, or constraining">
+      <text x="390" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three ways to fuse a GLM with a network</text>
+
+      <rect x="20" y="55" width="230" height="250" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="135" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">CANN</text>
+      <rect x="45" y="100" width="180" height="40" rx="6" fill="#fed7aa"/>
+      <text x="135" y="125" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c2d12">GLM baseline $\hat{\mu}_{\text{GLM}}$</text>
+      <text x="135" y="155" text-anchor="middle" font-family="Inter" font-size="14" fill="#92400e">&times; exp(&middot;)</text>
+      <rect x="45" y="170" width="180" height="40" rx="6" fill="#fdba74"/>
+      <text x="135" y="195" text-anchor="middle" font-family="Inter" font-size="10" fill="#7c2d12">network residual $\hat{r}$</text>
+      <text x="135" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">network corrects the GLM's</text>
+      <text x="135" y="253" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">output after the fact</text>
+
+      <rect x="270" y="55" width="230" height="250" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="385" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">LocalGLMnet</text>
+      <text x="385" y="115" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">$\hat{\mu} = \beta_0 + \sum_j \beta_j(X) X_j$</text>
+      <rect x="295" y="135" width="180" height="40" rx="6" fill="#99f6e4"/>
+      <text x="385" y="160" text-anchor="middle" font-family="Inter" font-size="10" fill="#134e4a">network learns $\beta_j(X)$</text>
+      <text x="385" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">network directly parameterises</text>
+      <text x="385" y="253" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">the GLM's own coefficients</text>
+
+      <rect x="520" y="55" width="230" height="250" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="635" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">ICEnet</text>
+      <rect x="545" y="100" width="180" height="90" rx="6" fill="#ddd6fe"/>
+      <text x="635" y="130" text-anchor="middle" font-family="Inter" font-size="10" fill="#4c1d95">network architecture</text>
+      <text x="635" y="150" text-anchor="middle" font-family="Inter" font-size="10" fill="#4c1d95">constrained: smooth,</text>
+      <text x="635" y="170" text-anchor="middle" font-family="Inter" font-size="10" fill="#4c1d95">monotone by construction</text>
+      <text x="635" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">no separate GLM; the network</text>
+      <text x="635" y="253" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">itself obeys actuarial shape rules</text>
+    </svg>
+    <figcaption>CANN corrects an existing GLM's output multiplicatively after the fact, directly analogous to a ResNet skip connection. LocalGLMnet keeps the GLM's linear structure but lets a network learn every coefficient as a function of the covariates. ICEnet builds smoothness and monotonicity directly into the network's own architecture, guaranteeing the shape actuarial judgement expects without a separate GLM baseline at all.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A residual correction only has to learn what the baseline missed.</strong> This is precisely why CANN so rarely underperforms the GLM it starts from, and precisely the ResNet parallel this lecture draws explicitly. <strong>A constraint imposed by architecture is a guarantee; a pattern observed in validation data is not.</strong> ICEnet's monotonicity holds by construction, on any future data; a GLM or unconstrained network that happens to look monotone on today's validation sample carries no such guarantee.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>CANN: the ResNet reading</h3>
+
+  <p>A <strong>combined actuarial neural network</strong> starts from an existing, already-fitted GLM, $\hat{\mu}_{\text{GLM}}(X)$, and adds a neural network's output as a multiplicative correction (for a log-link model), $\hat{\mu}_{\text{CANN}}(X) = \hat{\mu}_{\text{GLM}}(X) \cdot \exp(\hat{r}_{\text{network}}(X))$, or an additive correction for an identity-link model. Because the GLM component is held fixed (or lightly refit alongside the network), the network's own task reduces to learning the residual structure the GLM's linear form could not capture, a strictly easier learning problem than fitting the entire relationship unaided, and one with a natural, appealing failure mode: if the network learns nothing useful at all, $\hat{r} \to 0$ and the CANN simply reduces back to the original, already-validated GLM. This is directly analogous to the <strong>residual (ResNet) connection</strong> from the deep-learning sub-module's convolutional-networks lecture, where a layer's output is added to its input rather than replacing it outright, letting a very deep network default to the identity function wherever a given layer has nothing useful to contribute; a CANN is, in effect, a two-layer residual network where the first "layer" happens to be an entire, independently interpretable GLM.</p>
+
+  <h3>LocalGLMnet: varying coefficients and the sparsity test</h3>
+
+  <p>A <strong>LocalGLMnet</strong> keeps a GLM's linear structural form, $\hat{\mu}(X) = \beta_0 + \sum_j \beta_j(X) X_j$, but replaces each fixed coefficient $\beta_j$ with a function $\beta_j(X)$ learned by a network, taking the entire covariate vector $X$ as input, exactly a <strong>varying-coefficient model</strong> in the statistical sense, generalised via a network's flexibility rather than a pre-specified parametric form. Because the model retains the GLM's linear structure at the point of prediction, the learned $\beta_j(X)$ values can be inspected directly for any given observation, plotted against each covariate, and compared across observations, a genuine, structural interpretability advantage over an unconstrained black-box network, sometimes described as the network's learned <strong>attention weights</strong> on each covariate. The <strong>sparsity test</strong> exploits this directly: injecting an artificial, entirely uninformative random noise covariate into the model and comparing every genuine covariate's learned $\beta_j(X)$ magnitude against the noise covariate's gives a direct, quantitative diagnostic for which covariates the network judges genuinely relevant, exactly the diagnostic used in this lecture's motor-pricing vignette. A genuine limitation worth flagging directly: because $\beta_j(X)$ depends on the full covariate vector rather than on $X_j$ alone, the model's identifiability (whether a given set of learned coefficient functions is the unique explanation of the data, or one of several equally good alternatives) is not automatically guaranteed, and this caveat should be checked, not assumed, before over-interpreting a specific learned coefficient's shape.</p>
+
+  <h3>ICEnet: smoothness and monotonicity by construction</h3>
+
+  <p><strong>ICEnet</strong> builds smoothness and monotonicity constraints directly into the network's architecture, rather than checking these properties only after an unconstrained model has already been fitted. Smoothness is enforced via architectural choices that guarantee a gradually varying output as a continuous covariate varies gradually (directly generalising the classical mortality-graduation discipline from lecture 2 into a network's own structure); monotonicity, where an actuary's domain judgement expects it (claim frequency non-decreasing in a specific risk indicator, say), is enforced via a constrained architecture (commonly built from monotone-preserving building blocks, a direct generalisation of the ReLU hinge function's own monotonicity in its input) that structurally cannot produce a non-monotone relationship in the constrained covariate, regardless of what the raw training data might otherwise have suggested. This is a genuinely different, and stronger, guarantee than a monotonicity constraint checked only post-hoc on a specific validation sample; ICEnet's monotonicity holds on any future input, not merely the inputs actually tested.</p>
+
+  <h3>Nagging and balance correction, applied here directly</h3>
+
+  <p>The deep-learning sub-module's <strong>nagging</strong> (network-aggregating) predictor, averaging many independently-initialised networks' predictions to reduce variance, applies directly and without modification to CANN, LocalGLMnet, or ICEnet: fitting several independently-seeded instances of any of these architectures and averaging their outputs reduces the noise any single fit inherits from its random initialisation, exactly as it does for an unconstrained feed-forward network. The calibration sub-module's <strong>balance correction</strong> (adjusting a fitted model's overall level so its aggregate prediction matches the aggregate observed outcome exactly) likewise applies directly to any of these architectures' final output, a cheap, standard final step that should be applied as a matter of course before any of these models is deployed, regardless of which of the three specific architectures was used to build it.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>CANN is the lowest-risk entry point for a validation committee sceptical of "replacing the GLM"</h3>
+  <p>A proposal to replace an approved, well-understood GLM outright with an unconstrained network is a much harder case to make to a validation committee than a proposal to add a CANN-style residual correction on top of the identical, already-approved GLM. Practitioners new to this literature sometimes reach straight for the most flexible architecture available; the grandmaster default, particularly for a first production deployment in a genuinely regulated setting, is to start with CANN specifically because its worst-case behaviour (the network learns nothing useful) degrades gracefully back to the status quo.</p>
+
+  <h3>LocalGLMnet's interpretability is real but conditional on checking identifiability</h3>
+  <p>It is tempting to treat a LocalGLMnet's learned $\beta_j(X)$ curves as a directly trustworthy, causal-sounding story about how each covariate affects the outcome. The genuine caveat, flagged in the detail above, is that these varying coefficients are not automatically the unique explanation of the fitted relationship; a careful practitioner checks stability of the learned coefficient shapes across independent refits (nagging, again, is directly useful here) before presenting any single fitted curve as a confident, standalone finding to a pricing committee.</p>
+
+  <h3>ICEnet's guarantee is only as good as the constraint actually specified</h3>
+  <p>ICEnet enforces whatever monotonicity or smoothness constraint the modeller actually specifies; it offers no protection at all against a constraint that is itself wrong (enforcing monotonicity in a covariate whose true relationship is genuinely non-monotone, a U-shaped age effect being a classic actuarial example). The architectural guarantee is a guarantee that the model will obey the stated constraint, not a guarantee that the stated constraint itself reflects reality; getting the constraint right remains squarely an actuarial judgement call, not something the architecture can verify on its own.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the CANN formula for a log-link model, and explain what happens if the network component learns nothing useful.</li>
+      <li>Explain the parallel drawn between CANN and a ResNet skip connection.</li>
+      <li>State the LocalGLMnet formula, and explain what the sparsity test diagnoses and how it is constructed.</li>
+      <li>Explain what ICEnet guarantees, and why this guarantee is stronger than a monotonicity property checked only on a validation sample.</li>
+      <li>Explain why LocalGLMnet's identifiability is flagged as a caveat rather than an automatic guarantee.</li>
+      <li>In the motor-pricing vignette, explain precisely how the sparsity test gave the team a reproducible basis for removing two covariates.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next in this course</h4>
+    <ul>
+      <li><a href="04-credibility_transformer.html">Lecture 4: the credibility transformer</a>, the deepest architecture in this course, extending the varying-coefficient idea developed here into a full attention-based mechanism.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li>Wüthrich, Richman, Avanzi, Lindholm, Maggi, Mayer, Schelldorfer and Scognamiglio, <em>AI Tools for Actuaries</em>, chapter 3 (version 20 January 2026, <a href="https://ssrn.com/abstract=5162304">https://ssrn.com/abstract=5162304</a>, CC BY-NC).</li>
+    </ul>
+    <h4>Cross-references</h4>
+    <ul>
+      <li>The <a href="../../machine_learning/05_deep_learning/06-convolutional_networks.html">convolutional networks</a> lecture develops the residual (ResNet) connection this lecture reads CANN through directly.</li>
+      <li>The <a href="../../machine_learning/05_deep_learning/03-ensembling_and_nagging.html">ensembling and nagging</a> lecture develops the nagging predictor applied here to all three architectures.</li>
+      <li>The <a href="../../machine_learning/09_forecast_evaluation/01-statistical_bias_and_balance.html">statistical bias and balance</a> lecture develops balance correction in full.</li>
+    </ul>
+    <h4>Further reading</h4>
+    <ul>
+      <li>Wüthrich and Merz, <em>Statistical Foundations of Actuarial Learning and its Applications</em>, chapters on CANN and LocalGLMnet. The full technical derivation.</li>
+      <li>Richman and Wüthrich (2023), "LocalGLMnet: interpretable deep learning for tabular data". The original LocalGLMnet reference.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All AI for actuaries lectures</a></span>
+  <span>Lecture 3 of 7: actuarial network architectures</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+
+</body>
+</html>

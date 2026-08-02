@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 19: headless and scheduled runs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Headless and scheduled: CI, cron, and background agents</h1>
+  <p class="subtitle">Every technique so far has assumed someone was there to answer a prompt. Remove that assumption and two things must be settled in advance instead of in the moment: what the agent is allowed to do, and what counts as done. Neither can be improvised at three in the morning.</p>
+  <div class="meta">
+    <span>Lecture 19 of 22</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part IV: the wider stack</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Non-interactive mode is <code>claude -p "your prompt"</code>. It runs once, prints a result, and exits, with output available as plain text, a single JSON object, or a stream of JSON lines for programmatic consumption. That one flag is what turns an interactive tool into something you can put in a CI pipeline, a pre-commit hook, a shell loop, or a cron entry.</p>
+
+  <p>What changes is not the model but the failure handling. Interactively, an unexpected permission request becomes a prompt and you resolve it. Headless, there is nobody to ask, so the permission strategy has to be declared up front. <code>--allowedTools</code> scopes a run to specific tools; <code>dontAsk</code> mode auto-denies anything not already pre-approved, which is the right posture for CI because the session never waits for input. Auto mode is available too, but with a documented caveat that matters: in non-interactive runs it aborts when the classifier repeatedly blocks, because there is no user to fall back to.</p>
+
+  <p>The second thing that has to move upstream is verification. Lecture 6's hierarchy ended with a hook that refuses to let a turn end until a check passes, and that is not a refinement here, it is the load-bearing element. An unattended run with no gate produces output nobody watched, checked by nobody, reported by the thing that produced it. Getting that right is the difference between automation and a machine that generates work for you to audit.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Ask what happens when the run goes wrong at step four of nine. Interactively you notice and interrupt. Headless, the answer must already exist: a check that blocks, a permission that denies, a budget that expires, or a human who reads the evidence afterwards. If your answer is "it would probably be fine", you have not automated anything, you have removed the supervision and kept the risk.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    This is the automation irony, described by Lisanne Bainbridge in 1983 and never bettered. Automating a process removes the easy cases and leaves the human responsible for the hard ones, while simultaneously destroying the practice that would let them handle those cases. Worse, the operator now monitors rather than acts, and humans are extremely poor at sustained monitoring of reliable systems. Every conclusion in this lecture follows from taking that seriously: prefer narrow scopes over broad ones, prefer a machine gate over a human reviewer for anything that runs often, and design the output so a person can check the result without reconstructing the process.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that a large class of work is genuinely better done without you. Triaging overnight failures, sweeping a codebase for a pattern, keeping documentation in step with code, running a migration across two thousand files: each is mechanical, bounded, and verifiable, and each is a poor use of an hour of attention. This is the shape of task the whole practice has been building towards.</p>
+
+  <p>The second reason is that unattended runs are where the earlier disciplines stop being optional. An instruction that is usually followed is fine when you are watching and dangerous when you are not. A test that usually runs is not a gate. A permission model that mostly prompts is not a boundary if nobody is there to answer. Headless operation takes every advisory mechanism in this course and exposes exactly how much you were relying on being present.</p>
+
+  <p>The third reason is that this is where cost and blast radius stop being bounded by your patience. An interactive session ends when you close it. A loop over two thousand files does not, and a scheduled job that fails badly fails repeatedly on a timetable. Budgets, caps, and scopes are not bureaucracy in this setting; they are the only thing standing between a bug and an invoice.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Four things to settle before the run</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Four preconditions for an unattended run">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">What the absent human was doing, and what replaces it</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <rect x="70" y="42" width="620" height="40" rx="9" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="92" y="60" font-weight="600" fill="#2A3A78">Scope</text>
+        <text x="250" y="60" fill="#2A3A78">answering permission prompts</text>
+        <text x="470" y="60" fill="#2A3A78">→ <code>--allowedTools</code>, deny rules, sandbox</text>
+
+        <rect x="70" y="92" width="620" height="40" rx="9" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="92" y="110" font-weight="600" fill="#3D2EB5">Stop condition</text>
+        <text x="250" y="110" fill="#3D2EB5">judging when it is finished</text>
+        <text x="470" y="110" fill="#3D2EB5">→ a Stop hook or a goal condition</text>
+
+        <rect x="70" y="142" width="620" height="40" rx="9" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="92" y="160" font-weight="600" fill="#C76B2A">Budget</text>
+        <text x="250" y="160" fill="#C76B2A">getting bored and stopping it</text>
+        <text x="470" y="160" fill="#C76B2A">→ token caps, iteration caps, timeouts</text>
+
+        <rect x="70" y="192" width="620" height="40" rx="9" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="92" y="210" font-weight="600" fill="#1E9D54">Evidence</text>
+        <text x="250" y="210" fill="#1E9D54">watching what happened</text>
+        <text x="470" y="210" fill="#1E9D54">→ structured output, logs, a diff to review</text>
+      </g>
+    </svg>
+    <figcaption>Each row is a job the present human was doing implicitly. Automation does not remove the job, it relocates it into configuration, and a row you skip is a job nobody is doing.</figcaption>
+  </figure>
+
+  <h3>Output formats and what each is for</h3>
+
+  <pre><code class="language-bash"># Human-readable, for a quick one-off
+claude -p "Explain what this project does"
+
+# One JSON object with a result field — for scripts
+claude -p "List all API endpoints" --output-format json
+
+# One JSON object per line, starting with an init event — for live processing
+claude -p "Analyse this log file" --output-format stream-json --verbose</code></pre>
+
+  <p>The JSON forms are what make this composable. A run whose output is parsed rather than read can feed a dashboard, open a ticket, or gate a deploy, and the choice between the two is about whether you need the answer when it arrives or as it arrives. Use <code>--verbose</code> while developing the pipeline and turn it off in production, which is the documented advice and holds for the same reason it does everywhere else.</p>
+
+  <h3>Permission posture, chosen deliberately</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Posture</th><th>Behaviour with no human present</th><th>Fits</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>--allowedTools</code> list</td><td>Only the named tools run; everything else is refused</td><td>Fan-out loops and pipelines with a known tool set</td></tr>
+      <tr><td><code>dontAsk</code></td><td>Auto-denies anything not pre-approved; never waits</td><td>CI and locked-down automation</td></tr>
+      <tr><td><code>auto</code></td><td>Classifier vets each action; aborts on repeated blocks</td><td>Longer exploratory runs where the tool set is not known upfront</td></tr>
+      <tr><td><code>bypassPermissions</code></td><td>Everything runs</td><td>Isolated containers with nothing in them you would miss</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The first two are the workhorses and the difference between them is whether you can enumerate the tools in advance. If you can, enumerate them: an explicit list is the tightest scope available and it documents the run's intent in its own invocation.</p>
+
+  <div class="defcard">
+    <strong>Headless run.</strong> A non-interactive invocation that completes without any opportunity for a human to answer a prompt. Defined by what it cannot do rather than by where it runs.
+  </div>
+
+  <div class="defcard">
+    <strong>Evidence output.</strong> A result formatted so a person can verify the outcome without re-running the work: the command and what it returned, the test output, the diff. Distinguished from an assertion of success, which is what an unverified run produces by default.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Fan-out, done carefully</h3>
+
+  <p>The migration pattern is a loop over a work list, and the documented sequence has a step people skip. Generate the list of targets. Write the loop. <strong>Run it on two or three items and read the results.</strong> Then run the full set. That third step is the difference between a migration and two thousand identically wrong edits, and it costs a minute.</p>
+
+  <pre><code class="language-bash">for file in $(cat files.txt); do
+  claude -p "Migrate $file from React to Vue. Return OK or FAIL." \
+    --allowedTools "Edit,Bash(git commit *)"
+done</code></pre>
+
+  <p>Three properties of that command are worth naming. The prompt demands a short, parseable answer, so the loop's output is checkable at a glance rather than being two thousand paragraphs. The tool list is minimal and includes a scoped Bash pattern rather than blanket shell access. And each item is its own invocation, which means one failure does not poison the rest, unlike a single session attempting all of them with an increasingly polluted context.</p>
+
+  <h3>Scheduling, and what recurring changes</h3>
+
+  <p>A scheduled run adds one property to a headless one: it happens again. That turns a tolerable failure into a recurring one and a small cost into a standing charge. Three consequences follow.</p>
+
+  <p><strong>Idempotence matters.</strong> A job that opens a ticket should not open the same ticket every night. Either the action is naturally idempotent or the job checks state first, and "check whether this already exists" is a clause worth putting in every scheduled prompt.</p>
+
+  <p><strong>Failure needs a route to a human.</strong> A job that fails silently every night for three weeks is worse than no job, because the thing it was supposed to be doing is not being done and nobody knows. Notification on failure is not optional for anything recurring.</p>
+
+  <p><strong>Drift is the real risk.</strong> The repository changes, the branch changes, the API changes, and a prompt written against last quarter's assumptions keeps running confidently. Scheduled jobs should be reviewed on a cadence, and the honest default is that any job nobody has looked at in three months should be turned off rather than trusted.</p>
+
+  <h3>Getting evidence rather than assertions</h3>
+
+  <p>For a run you did not watch, "done" is not information. The documented instruction is to have the agent show evidence rather than assert success: the test output, the command it ran and what that returned, a screenshot of the result. Reviewing evidence is faster than re-running the verification yourself, and it is the only thing that distinguishes a run that worked from a run that reported working.</p>
+
+  <p>Build that into the prompt. "Return the number of files changed, the test command you ran, and its exit code" produces something checkable. "Migrate these files" produces a claim.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Reaching for <code>bypassPermissions</code> because a headless run kept stopping on prompts. The stopping was the system telling you the scope was wrong, and the correct response is to widen the allowlist by one specific entry, not to remove the boundary. On an unattended run this matters more than interactively, because there is nobody to notice the consequence: the mode offers no protection against prompt injection, and an unattended session reading untrusted content with every permission granted is the worst configuration in this course. If you genuinely need everything permitted, the venue is a container with nothing valuable in it.
+  </div>
+
+  <h3>Worked example: this course was written in an unattended loop</h3>
+
+  <div class="worked">
+    <strong>Worked example: a self-paced loop with self-administered verification</strong>
+    <p>Lectures 5 through 19 were written under a recurring instruction to continue with the remaining lectures, self-paced, with a wakeup scheduled between turns. That is a scheduled agentic loop in exactly the sense of this lecture, and it is worth auditing against the four rows of the diagram.</p>
+    <p><strong>Scope: fine, by accident.</strong> The run stayed within one directory and wrote only HTML files, and no permission was needed that was not already granted. But nothing enforced that. No <code>--allowedTools</code> list bounded it, no deny rule protected anything, and a prompt that had drifted towards editing source code or configuration would have been able to. The scope held because the task was well-behaved, which is not the same as the scope being configured.</p>
+    <p><strong>Stop condition: absent.</strong> There is no Stop hook, no goal condition, and no gate of any kind. The loop's continuation is decided each turn by the same process doing the writing. That is the exact configuration Lecture 12 identified as failing: the grader is the generator. If a lecture had been poor, nothing in the loop would have caught it, and the turn would have ended with a report saying it was done.</p>
+    <p><strong>Budget: only the human's patience.</strong> No token cap, no iteration cap, no timeout. The bound on this run is that someone is reading the output and would say stop. That is the interactive safeguard surviving into a nominally unattended setting, and it means the run is not really unattended, which is fortunate given the other two rows.</p>
+    <p><strong>Evidence: strong on one layer, absent on another.</strong> Each turn ran the mechanical checks and reported them, which is genuine evidence in the sense this lecture means. But as Lecture 12 already conceded, no check verifies that the factual claims match the documentation they were drawn from, and the loop's self-report cannot supply that, because the same process wrote both the claims and the report.</p>
+    <p><strong>What the configured version looks like.</strong> A <code>--allowedTools</code> list permitting writes only under the course directory. A Stop hook running the four checks and blocking the turn while any fails, so verification is enforced rather than remembered. A claim-checking subagent per lecture, which is the fresh-context reviewer this loop conspicuously lacks. And a cap, so the loop terminates on its own rather than on somebody noticing. None of that is expensive; all of it was skipped because the run was going well, which is precisely when these things get skipped and precisely why the automation irony has a name.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Headless mode is one flag, and everything difficult about it follows from the absent human. Four jobs they were doing implicitly, scoping, judging completion, bounding cost, and watching, must move into configuration: an explicit tool list or <code>dontAsk</code>, a Stop hook or goal condition, caps and timeouts, and output that carries evidence rather than assertions. Fan out over a list only after testing the prompt on two or three items. For scheduled work, add idempotence, a failure route to a human, and a review cadence, because a job nobody has checked in three months is a liability rather than an asset.</p>
+
+  <p>That closes Part IV and, with it, everything about capability. The course has covered what an agent is, how to steer it, how to check it, and how to connect it to the systems where your work actually lives. What remains is judgement: the threats this capability creates, whether any of it is paying for itself, and when the right answer is to close the laptop. Part V is three lectures, and the first is the one that everything in Part IV has been quietly deferring to.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the four jobs the absent human was doing and the configuration that replaces each.</li>
+      <li>When should you use an explicit <code>--allowedTools</code> list rather than <code>dontAsk</code>?</li>
+      <li>Why does auto mode abort in non-interactive runs rather than continuing?</li>
+      <li>What is the step people skip in the fan-out pattern, and what does skipping it cost?</li>
+      <li>Give the three properties a scheduled job needs that a one-off headless run does not.</li>
+      <li>Distinguish evidence from an assertion. Write a prompt clause that produces the first.</li>
+      <li>A headless run keeps stopping on permission prompts. Why is <code>bypassPermissions</code> the wrong fix, and what is the right one?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="18-office_surface.html">Lecture 18 (Microsoft 365)</a> assumed you were present to approve; this lecture removes that assumption.</li>
+      <li><strong>Next:</strong> Lecture 20 opens Part V with the threat model everything in Part IV has been deferring to.</li>
+      <li><strong>Cross-link:</strong> <a href="09-hooks_and_settings.html">Lecture 9 (hooks and settings)</a> supplies the Stop hook that becomes load-bearing here.</li>
+      <li><strong>Cross-link:</strong> <a href="06-prompting_for_code.html">Lecture 6 (prompting for code)</a> introduced evidence over assertion, which matters most for runs nobody watched.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/15-ci_cd.html">Software engineering, Lecture 15 (CI/CD)</a> covers the pipeline this mode plugs into.</li>
+      <li><strong>Outside this course:</strong> Lisanne Bainbridge, "Ironies of Automation" (<em>Automatica</em>, 1983); Anthropic, "Best practices for Claude Code" and "Non-interactive mode", code.claude.com/docs (output formats, <code>--allowedTools</code>, the fan-out pattern, and the auto-mode fallback).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 19 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

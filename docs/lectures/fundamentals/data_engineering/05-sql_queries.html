@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: SQL II, querying</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>SQL II: querying</h1>
+  <p class="subtitle">A query is a request to a librarian. You say it in one order and the librarian executes it in another: fetch the shelf, discard what does not qualify, sort into piles, discard whole piles, then compute the answer, then order it, then hand over the first ten. Almost every confusing SQL error dissolves once you know the order the librarian works in.</p>
+  <div class="meta">
+    <span>Lecture 5 of 20</span>
+    <span>Reading time, 60 minutes</span>
+    <span>Part II: SQL and data modelling</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Data query language is one statement, <code>SELECT</code>, surrounded by clauses that filter, group, combine, and order. It reads in one sequence and evaluates in another, and the gap between the two is the source of most beginner confusion and a fair amount of expert confusion too.</p>
+
+  <p>The written order is <code>SELECT</code>, <code>FROM</code>, <code>JOIN</code>, <code>WHERE</code>, <code>GROUP BY</code>, <code>HAVING</code>, <code>ORDER BY</code>, <code>LIMIT</code>. The <strong>logical evaluation order</strong> is <code>FROM</code> and <code>JOIN</code> first, then <code>WHERE</code>, then <code>GROUP BY</code>, then <code>HAVING</code>, then <code>SELECT</code>, then <code>ORDER BY</code>, then <code>LIMIT</code>. Two consequences follow immediately and explain questions people ask for years. A column alias defined in <code>SELECT</code> cannot be used in <code>WHERE</code>, because <code>WHERE</code> ran first. And filtering on an aggregate needs <code>HAVING</code> rather than <code>WHERE</code>, because the aggregate does not exist until after grouping.</p>
+
+  <p>Beyond that skeleton, three capabilities carry most of the analytical weight: <strong>joins</strong> combine tables and are where quiet duplication enters; <strong>common table expressions</strong> make a long query readable by naming its steps; and <strong>window functions</strong> compute across related rows without collapsing them, which replaces whole categories of procedural loop.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You hand a librarian a request: "the average balance by product for mortgages originated this year, only products with more than fifty accounts, best first, top ten". The librarian cannot start with the average. They go to the loan shelf (FROM), pull out the mortgages originated this year and put the rest back (WHERE), sort the remainder into piles by product (GROUP BY), push aside every pile with fifty or fewer (HAVING), compute one average per surviving pile (SELECT), arrange the averages (ORDER BY), and hand you ten (LIMIT). You spoke the sentence backwards. The librarian works forwards.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Why this matters more than it sounds</span>
+    The logical order is also the performance story. Anything you can push into <code>WHERE</code> shrinks the data before grouping and joining, which is the single largest lever in most queries. Filtering after the fact, in <code>HAVING</code> or in a wrapping query, means the engine did work it could have avoided. The optimiser will often rewrite your query to push filters down for you, and it can only do so when the filter is expressible against the raw rows. Writing the filter where it belongs is both clearer and faster.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Joins duplicate silently.</strong> A join between a loan table and a collateral table where one loan has three charges registered against it returns three rows for that loan. Sum the balance and the exposure is overstated by two whole mortgages. Nothing errors, no null appears, and the total is merely wrong. This <em>fan-out</em> is the most common serious defect in analytical SQL, and the discipline that prevents it is knowing the cardinality of every join before you write it: one to one, one to many, or many to many, with the last always deserving suspicion.</p>
+
+  <p><strong>Nulls do not behave like values.</strong> SQL uses three-valued logic: a comparison against null yields unknown, not false, and <code>WHERE</code> keeps only rows where the condition is true. So <code>WHERE arrears_months != 0</code> silently drops every account whose arrears count is null, and <code>WHERE x NOT IN (subquery)</code> returns nothing at all if the subquery yields a single null. Both defects present as a row count that looks plausible.</p>
+
+  <p><strong>Window functions turn loops into one statement.</strong> An arrears streak, a prior-month comparison, a twelve-month forward outcome, a rank within a segment, a deduplication keeping the latest record: each of these is a loop in procedural code and a single window expression in SQL. The practical effect for a risk analyst is that the construction of an observation dataset, which was once several hundred lines of scripted iteration, becomes a query that the engine parallelises. This is the highest-return material in the lecture.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Written order against logical evaluation order of a SELECT statement">
+      <defs>
+        <marker id="ar-ord" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">You write it top to bottom; the engine evaluates it in a different order</text>
+
+      <!-- written -->
+      <text x="140" y="52" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">AS WRITTEN</text>
+      <g font-family="JetBrains Mono" font-size="10.5" fill="#5b21b6">
+        <rect x="40" y="62" width="200" height="24" rx="4" fill="#F5F3FF" stroke="#7c3aed"/><text x="52" y="78">SELECT   product, AVG(bal)</text>
+        <rect x="40" y="90" width="200" height="24" rx="4" fill="#F5F3FF" stroke="#7c3aed"/><text x="52" y="106">FROM     loans</text>
+        <rect x="40" y="118" width="200" height="24" rx="4" fill="#F5F3FF" stroke="#7c3aed"/><text x="52" y="134">JOIN     customers USING(cid)</text>
+        <rect x="40" y="146" width="200" height="24" rx="4" fill="#F5F3FF" stroke="#7c3aed"/><text x="52" y="162">WHERE    orig_year = 2026</text>
+        <rect x="40" y="174" width="200" height="24" rx="4" fill="#F5F3FF" stroke="#7c3aed"/><text x="52" y="190">GROUP BY product</text>
+        <rect x="40" y="202" width="200" height="24" rx="4" fill="#F5F3FF" stroke="#7c3aed"/><text x="52" y="218">HAVING   COUNT(*) &gt; 50</text>
+        <rect x="40" y="230" width="200" height="24" rx="4" fill="#F5F3FF" stroke="#7c3aed"/><text x="52" y="246">ORDER BY 2 DESC</text>
+        <rect x="40" y="258" width="200" height="24" rx="4" fill="#F5F3FF" stroke="#7c3aed"/><text x="52" y="274">LIMIT    10</text>
+      </g>
+
+      <!-- evaluated -->
+      <text x="600" y="52" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">AS EVALUATED</text>
+      <g font-family="JetBrains Mono" font-size="10.5" fill="#115e59">
+        <rect x="500" y="62" width="200" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="512" y="78">1  FROM + JOIN</text>
+        <rect x="500" y="90" width="200" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="512" y="106">2  WHERE</text>
+        <rect x="500" y="118" width="200" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="512" y="134">3  GROUP BY</text>
+        <rect x="500" y="146" width="200" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="512" y="162">4  HAVING</text>
+        <rect x="500" y="174" width="200" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="512" y="190">5  SELECT (+ window fns)</text>
+        <rect x="500" y="202" width="200" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="512" y="218">6  QUALIFY</text>
+        <rect x="500" y="230" width="200" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="512" y="246">7  ORDER BY</text>
+        <rect x="500" y="258" width="200" height="24" rx="4" fill="#ECFEF6" stroke="#0d9488"/><text x="512" y="274">8  LIMIT</text>
+      </g>
+
+      <!-- mapping arrows -->
+      <g stroke="#a1a1aa" stroke-width="1.2" fill="none" stroke-dasharray="3 3">
+        <line x1="244" y1="74" x2="496" y2="186" marker-end="url(#ar-ord)"/>
+        <line x1="244" y1="102" x2="496" y2="74" marker-end="url(#ar-ord)"/>
+        <line x1="244" y1="158" x2="496" y2="102" marker-end="url(#ar-ord)"/>
+        <line x1="244" y1="186" x2="496" y2="130" marker-end="url(#ar-ord)"/>
+        <line x1="244" y1="214" x2="496" y2="158" marker-end="url(#ar-ord)"/>
+      </g>
+
+      <rect x="40" y="300" width="660" height="66" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="370" y="322" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">TWO CONSEQUENCES YOU WILL MEET WEEKLY</text>
+      <text x="370" y="340" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#7c2d12">A SELECT alias is unavailable in WHERE (step 2 precedes step 5), but usable in ORDER BY (step 7 follows it).</text>
+      <text x="370" y="356" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#7c2d12">Filtering an aggregate needs HAVING, and filtering a window function needs QUALIFY or a wrapping query.</text>
+    </svg>
+    <figcaption>The written order against the logical order. This is a statement about semantics, not about physical execution: the optimiser is free to reorder anything that does not change the result, and usually does. But every question of the form "why can't I reference that here?" is answered by the right-hand column.</figcaption>
+  </figure>
+
+  <h3>The joins, and the cardinality question</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Join</th><th>Keeps</th><th>Use it to</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>INNER JOIN</code></td><td>Rows matching in both tables</td><td>Combine where the relationship is mandatory; note that it silently drops unmatched rows, which is a filter in disguise</td></tr>
+      <tr><td><code>LEFT JOIN</code></td><td>All left rows, matched right rows, nulls where unmatched</td><td>Enrich a spine of records without losing any; the default choice when the left table defines the population</td></tr>
+      <tr><td><code>RIGHT JOIN</code></td><td>The mirror image</td><td>Rarely; write it as a left join with the tables swapped, which reads better</td></tr>
+      <tr><td><code>FULL OUTER JOIN</code></td><td>Everything from both sides</td><td>Reconciliation: find rows present on one side only, in both directions at once</td></tr>
+      <tr><td><code>CROSS JOIN</code></td><td>Every combination</td><td>Deliberately building a spine, such as every account crossed with every month end</td></tr>
+      <tr><td>Anti-join (<code>NOT EXISTS</code>)</td><td>Left rows with no match at all</td><td>"Which accounts have no collateral record?" without a join and a null test</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Before writing any join, answer one question: how many rows of the right table can match one row of the left? If the answer is "one", the row count cannot change. If it is "several", the left table's rows multiply and any subsequent sum is inflated unless you intended the multiplication. If it is "several on both sides", stop and reconsider, because a many-to-many join is almost always a missing intermediate table or a missing filter. Checking the row count before and after a join is a five-second habit that catches most of these.</p>
+
+  <h3>Three-valued logic</h3>
+
+  <p>Every comparison in SQL returns true, false, or unknown, and null comparisons return unknown. <code>WHERE</code> admits only true.</p>
+
+  <pre><code>NULL = NULL        -- unknown, not true
+NULL != 5          -- unknown, so the row is dropped
+NULL IS NULL       -- true; this is the only way to test for null
+5 IN (1, 2, NULL)  -- unknown, behaves as not matched
+5 NOT IN (1, NULL) -- unknown, so NOT IN with any null returns nothing
+
+COUNT(*)           -- counts rows
+COUNT(column)      -- counts non-null values, which is often the real question
+SUM(column)        -- ignores nulls; SUM of all nulls is NULL, not zero
+AVG(column)        -- divides by the non-null count, not the row count</code></pre>
+
+  <p>The <code>AVG</code> line deserves emphasis in a risk context. The mean of a column where forty per cent of values are null is the mean of the sixty per cent that are populated, which is rarely what a report intends when it says "average loan to value". Use <code>COALESCE</code> to make the treatment explicit, or count the nulls and state the population. Never let the engine's default choice stand in for a decision about missing data.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Selecting, shaping, and conditional logic</h3>
+
+  <pre><code>SELECT DISTINCT product                          -- deduplicate the result
+FROM   account_snapshots;
+
+SELECT account_id           AS account,           -- aliases rename output
+       balance / 100000     AS balance_hundred_k,
+       CAST(arrears_months AS DOUBLE) AS arrears_num,
+       arrears_months::VARCHAR        AS arrears_text,   -- shorthand cast
+       surname || ', ' || forename    AS full_name       -- concatenation
+FROM   account_snapshots;
+
+SELECT account_id,
+       CASE WHEN arrears_months = 0            THEN 'performing'
+            WHEN arrears_months BETWEEN 1 AND 2 THEN 'early arrears'
+            WHEN arrears_months &gt;= 3            THEN 'defaulted'
+            ELSE 'unknown'
+       END AS credit_state
+FROM   account_snapshots;</code></pre>
+
+  <p><code>CASE</code> is SQL's if-then, and it is worth writing carefully. Conditions are evaluated in order and the first match wins, so overlapping conditions are resolved by position rather than by specificity. Always supply an <code>ELSE</code>: without one, unmatched rows get null, and a null credit state propagates into a group by as its own silent category.</p>
+
+  <h3>Dates, which is where most bugs live</h3>
+
+  <pre><code>SELECT reporting_date,
+       DATE_TRUNC('month', reporting_date)                    AS month_start,
+       DATE_TRUNC('quarter', reporting_date)                  AS quarter_start,
+       EXTRACT(YEAR FROM reporting_date)                      AS year,
+       DATE_PART('month', reporting_date)                     AS month_number,
+       reporting_date - INTERVAL '12 months'                  AS one_year_earlier,
+       LAST_DAY(reporting_date)                               AS month_end,
+       DATE_DIFF('month', origination_date, reporting_date)   AS months_on_book
+FROM   account_snapshots;</code></pre>
+
+  <p>Two habits prevent most date defects. Write literals as unambiguous ISO strings with an explicit type, <code>DATE '2026-03-31'</code>, never <code>'31/03/2026'</code>. And never compare a timestamp to a date with equality: <code>WHERE ts = DATE '2026-03-31'</code> matches only the instant at midnight, so use a half-open range, <code>ts &gt;= DATE '2026-03-31' AND ts &lt; DATE '2026-04-01'</code>. Half-open ranges also compose correctly when you chain months, with no risk of double counting a boundary.</p>
+
+  <h3>Filtering</h3>
+
+  <pre><code>SELECT * FROM account_snapshots
+WHERE  product IN ('mortgage', 'buy_to_let')      -- set membership
+  AND  balance BETWEEN 50000 AND 500000            -- inclusive both ends
+  AND  surname LIKE 'A%'                           -- % is any number of chars
+  AND  sort_code LIKE '20-__-__'                   -- _ is exactly one char
+  AND  default_date IS NULL                        -- the only null test
+  AND  NOT (forbearance_flag AND arrears_months = 0);</code></pre>
+
+  <p><code>LIKE</code> is case-sensitive in some engines and not in others; <code>ILIKE</code> where available is the explicit case-insensitive form. Pattern matching beyond this belongs in a regular expression function, and the <a href="../software_engineering/04-regular_expressions.html">software engineering track</a> covers the syntax.</p>
+
+  <h3>Aggregating and filtering groups</h3>
+
+  <pre><code>SELECT product,
+       COUNT(*)                                     AS accounts,
+       COUNT(default_date)                          AS defaulted_accounts,
+       SUM(balance)                                 AS total_exposure,
+       AVG(arrears_months)                          AS mean_arrears,
+       MEDIAN(balance)                              AS median_balance,
+       SUM(CASE WHEN arrears_months &gt;= 3 THEN balance ELSE 0 END) AS defaulted_exposure
+FROM   account_snapshots
+WHERE  reporting_date = DATE '2026-03-31'
+GROUP BY product
+HAVING COUNT(*) &gt; 50
+ORDER BY total_exposure DESC;</code></pre>
+
+  <p>The conditional sum on the penultimate line is worth memorising. Putting a <code>CASE</code> inside an aggregate computes a subtotal for a subset without a second query or a second pass, and stacking several of them produces a small cross-tabulation in one statement. This is the SQL equivalent of the pivot in the <a href="../data_analysis/02-aggregation_pivoting_joining.html">data analysis track</a>.</p>
+
+  <h3>Combining tables: joins, unions, anti-joins</h3>
+
+  <pre><code>-- enrich a spine without losing rows
+SELECT s.account_id, s.balance, c.segment, col.valuation
+FROM       account_snapshots s
+LEFT JOIN  customers  c   ON c.customer_id = s.customer_id
+LEFT JOIN  collateral col ON col.account_id = s.account_id;
+
+-- stack results: UNION deduplicates, UNION ALL does not and is faster
+SELECT account_id FROM mortgages
+UNION ALL
+SELECT account_id FROM personal_loans;
+
+-- anti-join: accounts with no collateral at all
+SELECT s.account_id
+FROM   account_snapshots s
+WHERE  NOT EXISTS (SELECT 1 FROM collateral col
+                   WHERE col.account_id = s.account_id);</code></pre>
+
+  <p>Note the collateral join in the first query. If an account can have several charges, this query fans out and <code>SUM(s.balance)</code> over its result is wrong. The fix is to aggregate collateral to one row per account first, in a common table expression, and join that. Aggregate before joining whenever the right side is one-to-many; it is both correct and usually faster.</p>
+
+  <p>Prefer <code>NOT EXISTS</code> to <code>NOT IN</code> for anti-joins. It is immune to the null trap described earlier, and it can stop as soon as it finds one matching row rather than materialising the whole subquery result.</p>
+
+  <h3>Common table expressions</h3>
+
+  <pre><code>WITH latest_collateral AS (
+    SELECT account_id,
+           SUM(valuation) AS total_valuation,
+           COUNT(*)       AS charge_count
+    FROM   collateral
+    WHERE  valuation_date &lt;= DATE '2026-03-31'
+    GROUP BY account_id
+),
+book AS (
+    SELECT *
+    FROM   account_snapshots
+    WHERE  reporting_date = DATE '2026-03-31'
+)
+SELECT b.product,
+       COUNT(*)                                   AS accounts,
+       SUM(b.balance)                             AS exposure,
+       SUM(b.balance) / NULLIF(SUM(lc.total_valuation), 0) AS ltv
+FROM   book b
+LEFT JOIN latest_collateral lc USING (account_id)
+GROUP BY b.product;</code></pre>
+
+  <p>A <strong>common table expression</strong>, introduced by <code>WITH</code>, names a query so the rest of the statement can refer to it. Its value is readability: a long analytical query becomes a sequence of named steps that a reviewer can check one at a time, which matters enormously when the query encodes a regulatory definition somebody will audit. Note <code>NULLIF</code> in the final expression, which turns a zero denominator into a null rather than an error, and is the standard defence in any ratio.</p>
+
+  <p>Recursive common table expressions, written <code>WITH RECURSIVE</code>, walk a hierarchy: an ownership structure, a group of connected counterparties, a chain of refinanced accounts. They are the right tool when the depth of the traversal is not known in advance, and they are the SQL answer to the graph problem raised in Lecture 03.</p>
+
+  <h3>Window functions</h3>
+
+  <p>An aggregate collapses rows. A <strong>window function</strong> computes across a set of related rows and keeps every row, which is why it can add context to a record rather than replacing the record with a summary. The syntax is any function followed by <code>OVER</code>, and the <code>OVER</code> clause has three parts: <code>PARTITION BY</code> divides the rows into groups, <code>ORDER BY</code> sequences them within a group, and the frame specifies which rows around the current one participate.</p>
+
+  <pre><code>SELECT account_id,
+       reporting_date,
+       balance,
+
+       -- running total within an account, ordered in time
+       SUM(balance) OVER (PARTITION BY account_id ORDER BY reporting_date)
+           AS cumulative_balance,
+
+       -- the previous and next month's arrears for the same account
+       LAG(arrears_months)  OVER (PARTITION BY account_id ORDER BY reporting_date)
+           AS arrears_prior_month,
+       LEAD(arrears_months) OVER (PARTITION BY account_id ORDER BY reporting_date)
+           AS arrears_next_month,
+
+       -- twelve-month trailing mean, an explicit row frame
+       AVG(balance) OVER (PARTITION BY account_id ORDER BY reporting_date
+                          ROWS BETWEEN 11 PRECEDING AND CURRENT ROW)
+           AS mean_balance_12m,
+
+       -- first and last value across the whole partition
+       FIRST_VALUE(balance) OVER (PARTITION BY account_id ORDER BY reporting_date
+                                  ROWS BETWEEN UNBOUNDED PRECEDING
+                                           AND UNBOUNDED FOLLOWING) AS opening_balance,
+
+       -- ranking within a reporting date
+       ROW_NUMBER() OVER (PARTITION BY reporting_date ORDER BY balance DESC) AS row_num,
+       RANK()       OVER (PARTITION BY reporting_date ORDER BY balance DESC) AS rank_with_ties,
+       DENSE_RANK() OVER (PARTITION BY reporting_date ORDER BY balance DESC) AS dense_rank,
+       NTILE(10)    OVER (PARTITION BY reporting_date ORDER BY balance DESC) AS balance_decile
+FROM   account_snapshots;</code></pre>
+
+  <p>Four points that cause real defects.</p>
+
+  <p><em>The default frame is not what most people assume.</em> When you supply <code>ORDER BY</code> inside <code>OVER</code> and no frame, the frame runs from the start of the partition to the current row, which is what makes the running total work. When you supply no <code>ORDER BY</code> at all, the frame is the whole partition, so the function behaves like an aggregate broadcast across every row. This is why <code>LAST_VALUE</code> without an explicit frame returns the current row rather than the last one, which surprises everybody exactly once.</p>
+
+  <p><em>ROWS and RANGE differ.</em> <code>ROWS</code> counts physical rows; <code>RANGE</code> counts by value of the ordering column, so ties are included together. For monthly data with one row per account per month they coincide; for data with duplicate ordering values they do not, and <code>ROWS</code> is usually what you meant.</p>
+
+  <p><em>Ranking functions differ on ties.</em> <code>ROW_NUMBER</code> is arbitrary but unique, <code>RANK</code> gives ties the same rank and leaves gaps, <code>DENSE_RANK</code> gives ties the same rank without gaps. For deduplication you want <code>ROW_NUMBER</code> with a deterministic tiebreaker in the <code>ORDER BY</code>, otherwise two runs of the same pipeline can keep different rows, and a non-reproducible pipeline is a validation finding.</p>
+
+  <p><em>Windows are computed after grouping and before ordering.</em> You therefore cannot filter on a window result in <code>WHERE</code> or <code>HAVING</code>. Wrap the query, or use <code>QUALIFY</code> where the engine supports it, which DuckDB and Snowflake both do.</p>
+
+  <pre><code>-- keep only the latest record per account: the deduplication idiom
+SELECT *
+FROM   account_snapshots
+QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id
+                           ORDER BY reporting_date DESC, loaded_at DESC) = 1;</code></pre>
+
+  <div class="callout insight">
+    <span class="tag">Introspecting the database</span>
+    The <code>information_schema</code> views are part of the SQL standard and let you query the database's own structure: <code>information_schema.tables</code> for what exists, <code>.columns</code> for types, nullability, and defaults, <code>.key_column_usage</code> for which columns participate in keys. This is how you check that the DDL you believe is in place actually is, and it is the mechanism behind automated schema documentation and schema drift detection. A pipeline that asserts its expected schema by querying <code>information_schema</code> before it runs catches a source change on the first day rather than the first quarter end.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: constructing a twelve-month PD observation dataset in one query</strong>
+    <p>The requirement, familiar to anyone who has built a PD model: for each account and each monthly observation date, record the state of the account at that date and whether it defaulted within the following twelve months. Traditionally this is a script with nested loops. It is one query.</p>
+    <pre><code>WITH monthly AS (
+    -- one row per account per month end, deduplicated deterministically
+    SELECT account_id,
+           reporting_date,
+           balance,
+           arrears_months,
+           default_date,
+           product,
+           DATE_DIFF('month', origination_date, reporting_date) AS months_on_book
+    FROM   account_snapshots
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY account_id, reporting_date
+                               ORDER BY loaded_at DESC) = 1
+),
+flagged AS (
+    SELECT *,
+           -- was the account already in default at the observation date?
+           (arrears_months &gt;= 3 OR default_date IS NOT NULL) AS in_default_now,
+
+           -- arrears one and twelve months ago, for the behavioural features
+           LAG(arrears_months, 1)  OVER w AS arrears_lag_1,
+           LAG(arrears_months, 12) OVER w AS arrears_lag_12,
+
+           -- the worst arrears position reached in the next 12 months
+           MAX(arrears_months) OVER (PARTITION BY account_id
+                                     ORDER BY reporting_date
+                                     ROWS BETWEEN 1 FOLLOWING AND 12 FOLLOWING)
+               AS max_arrears_next_12m,
+
+           -- how many future months we actually observe, for censoring
+           COUNT(*) OVER (PARTITION BY account_id
+                          ORDER BY reporting_date
+                          ROWS BETWEEN 1 FOLLOWING AND 12 FOLLOWING)
+               AS months_observed_ahead
+    FROM   monthly
+    WINDOW w AS (PARTITION BY account_id ORDER BY reporting_date)
+)
+SELECT account_id,
+       reporting_date                       AS observation_date,
+       product,
+       months_on_book,
+       balance,
+       arrears_months,
+       arrears_lag_1,
+       arrears_lag_12,
+       CASE WHEN max_arrears_next_12m &gt;= 3 THEN 1 ELSE 0 END AS default_flag_12m,
+       months_observed_ahead
+FROM   flagged
+WHERE  NOT in_default_now                    -- performing at observation
+  AND  months_observed_ahead = 12            -- full outcome window observed
+ORDER BY account_id, observation_date;</code></pre>
+    <p><em>What each piece is doing, and why it is the correct construction.</em> The first expression deduplicates to one row per account-month with a deterministic tiebreaker, so two runs produce identical datasets. The <code>LAG</code> terms build behavioural features from the account's own past, which is legitimate because that information was available at the observation date. The forward <code>MAX</code> over the frame one to twelve months ahead is the outcome, and it deliberately excludes the current row, because a default at the observation date is a filter, not an outcome.</p>
+    <p><em>The two filters are the part that separates a correct dataset from a subtly wrong one.</em> Excluding accounts already in default at observation is required by the definition of a PD: it is a probability of transitioning into default, conditional on being performing. Requiring twelve observed future months handles right-censoring: the final twelve months of your history cannot yet have a twelve-month outcome, and including them with a zero flag would understate the default rate by counting unresolved cases as good. Both mistakes are common, and both produce a model that validates well in development and underpredicts in production.</p>
+    <p><em>What the query does not do.</em> It does not resolve the definition of default beyond arrears months, so unlikely-to-pay and forbearance treatment must be folded into the <code>in_default_now</code> and outcome expressions using the shared definition from Lecture 04, ideally by reading a view rather than restating the logic here. It also assumes a complete monthly spine per account; if months can be missing, cross join the account list against a calendar of month ends first, because <code>LAG(arrears_months, 12)</code> counts rows rather than months and silently reaches the wrong month when a row is absent. That distinction between row offset and time offset is the single most dangerous assumption in window-function code.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Querying is one statement with a written order and a different logical order, and knowing the second explains the errors the first produces. Joins are the main source of quiet arithmetic damage, and the defence is knowing the cardinality before you write and checking the row count after. Nulls follow three-valued logic, which drops rows you did not intend to drop and breaks <code>NOT IN</code> outright. Common table expressions turn a long query into reviewable steps, which is what makes a regulatory definition auditable. Window functions are the highest-leverage feature in the language for risk work, because observation datasets, behavioural features, deduplication, and ranking are all one expression each.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the logical evaluation order of a <code>SELECT</code> and use it to explain why a <code>SELECT</code> alias works in <code>ORDER BY</code> but not in <code>WHERE</code>.</li>
+      <li>You join loans to collateral and the total exposure rises by eighteen per cent. Explain what happened and give two fixes.</li>
+      <li>Why does <code>WHERE arrears_months != 0</code> drop accounts you probably wanted, and why does <code>NOT IN</code> with a nullable subquery return nothing?</li>
+      <li>Distinguish <code>COUNT(*)</code>, <code>COUNT(column)</code>, and <code>AVG(column)</code> in the presence of nulls, and say which one a report on average loan to value should use.</li>
+      <li>Give the default window frame when <code>ORDER BY</code> is present inside <code>OVER</code>, and when it is absent. Which behaviour surprises people about <code>LAST_VALUE</code>?</li>
+      <li>Distinguish <code>ROW_NUMBER</code>, <code>RANK</code>, and <code>DENSE_RANK</code>, and say which you would use for deduplication and why the <code>ORDER BY</code> must be deterministic.</li>
+      <li>In the PD observation query, why are accounts already in default excluded, and why is a full twelve-month forward window required? What does each mistake do to the estimated default rate?</li>
+      <li>Why is <code>LAG(x, 12)</code> dangerous on a table with missing months, and what is the fix?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="04-sql_definitions.html">Lecture 04</a> declared the schema and constraints these queries run against.</li>
+      <li><strong>Next:</strong> <a href="06-sql_manipulation.html">Lecture 06 (SQL III, manipulation)</a> writes to those tables: insert, update, delete, merge, and the transaction semantics that make a reload safe.</li>
+      <li><strong>Then:</strong> <a href="07-normalisation.html">Lecture 07</a> explains why the tables are split the way they are, which is what makes joins necessary in the first place.</li>
+      <li><strong>Cross-link:</strong> <a href="09-duckdb.html">Lecture 09</a> runs all of this against Parquet files with no load step; <a href="15-dbt_analytics_engineering.html">Lecture 15</a> puts queries like the worked example under version control with tests.</li>
+      <li><strong>Outside this course:</strong> the same operations in a dataframe idiom are the <a href="../data_analysis/02-aggregation_pivoting_joining.html">aggregation, pivoting and joining</a> lecture of the data analysis track; comparing the two is the fastest way to become fluent in both.</li>
+      <li><strong>Banking link:</strong> the observation-window and censoring decisions in the worked example are the practical core of PD dataset construction in the <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">credit risk track</a>.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 5 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

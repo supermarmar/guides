@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 6: clustering and topic modelling</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Clustering and topic modelling</h1>
+  <p class="subtitle">The previous lecture assumed you knew your categories. Remove that assumption and the problem changes shape: not "which of these labels applies" but "what is in here at all". Clustering answers the first half of that, and the answer arrives as a hundred and fifty-six unnamed groups of documents, which is progress and not yet insight. Naming them is the second and harder half, and the technique that solves it does so by combining a 2013 embedding model, a 1970s weighting scheme, and a generative model used exactly once per group rather than once per document.</p>
+  <div class="meta">
+    <span>Lecture 6 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part II: using pretrained models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Text clustering groups documents by meaning with no labels, and the standard pipeline is three steps. <strong>Embed</strong> every document with a model chosen for semantic similarity. <strong>Reduce</strong> the resulting vectors to five or so dimensions with <strong>UMAP</strong>, because clustering algorithms degrade badly in high-dimensional space. <strong>Cluster</strong> the reduced vectors with <strong>HDBSCAN</strong>, a density-based method that decides for itself how many clusters exist and refuses to assign documents that don't belong anywhere, marking them <strong>outliers</strong> instead. That produces groups but not names. <strong>Topic modelling</strong> supplies the names, and <strong>BERTopic</strong> does it by bolting a second, entirely independent stage onto the clustering pipeline: build a bag-of-words per <em>cluster</em> rather than per document, weight it with <strong>c-TF-IDF</strong> so that words distinctive to a cluster outrank words common to all of them, and read off the top-ranked terms. Because the two stages are independent, every block is swappable, and the topic representation can be improved by reranking those keywords with an embedding model, diversifying them with <strong>maximal marginal relevance</strong>, or handing them to a generative model for a human-readable label. That last step is the economically interesting one: the expensive model runs once per topic, not once per document.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You inherit forty-five thousand unfiled papers. First you sort them into piles by what they seem to be about, putting anything that fits nowhere into a box labelled "odd", which is what clustering does. Now every pile needs a label. The cheap way is to notice which words appear far more often in this pile than in the others, so a pile where "reinsurance" appears constantly and hardly appears elsewhere gets those words on its tab. That's c-TF-IDF, and it's fast because it's just counting. The expensive way is to read a few papers from a pile and write a proper title. You cannot afford to do that for forty-five thousand papers. You can easily afford it for a hundred and fifty-six piles, and that's exactly the trick: apply the costly reader to the piles, never to the papers.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the track</span>
+    Lecture 5 used frozen embeddings to feed a supervised classifier. This lecture uses the same frozen embeddings to feed an unsupervised pipeline, so the pattern from lecture 5 repeats with the head swapped. Beyond that, this is the lecture where the track's separate threads first braid: bag-of-words from lecture 1, embeddings from lecture 3, generative models from lecture 5, and prompt templates that lecture 7 is about to formalise all appear in one working system. The reranking idea introduced here is the same one that lecture 12 applies to search.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons, and the first is the one people underrate.</p>
+
+  <p>First, <strong>clustering is the fastest way to find out what is actually in a corpus, and that usually precedes any sensible supervised project</strong>. Before you can classify complaints into categories, somebody has to decide what the categories are, and that decision is normally made in a meeting by people recalling the complaints they happen to remember. Clustering forty thousand of them takes an afternoon and produces a category scheme grounded in the data. It also surfaces the categories nobody thought of, which are precisely the ones a hand-built taxonomy misses.</p>
+
+  <p>Second, <strong>the outliers are frequently more valuable than the clusters</strong>. A density-based clusterer refuses to place documents that don't sit in any dense region, and that refusal is information. In the worked example, roughly a third of documents land in the outlier bucket. Some of that is genuine noise; some of it is novel material, mislabelled records, or the early signal of something that will be a category next year. A method that forces every document into a cluster destroys that distinction, which is the main argument against k-means here.</p>
+
+  <p>Third, <strong>the "once per group, not once per item" pattern is worth far more than this lecture</strong>. Running a generative model over forty-five thousand abstracts is slow and, on a hosted model, expensive. Running it over a hundred and fifty-six topic summaries is neither. Any time you're about to apply an expensive model to every row of something, ask whether there's a cheap grouping step that would let you apply it to the groups instead. That reframing is available far more often than it is used.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team asked to build a complaints taxonomy clustered two years of free-text complaints and got twenty-three clean groups plus a large outlier bucket. The groups were presented, agreed, and turned into a labelling exercise. Nobody looked in the outlier bucket, because outliers sound like noise. Six months later a thematic review found a pattern of complaints about a specific fee disclosure that the new taxonomy had no category for, and which had been sitting, perfectly visible, in the outlier bucket the whole time: too few to form a dense cluster at the chosen minimum cluster size, too distinctive to belong to any existing group. Nothing had gone wrong technically. The team had treated a parameter, <code>min_cluster_size</code>, as a technicality rather than as the thing deciding what counted as a theme, and had treated "unclustered" as a synonym for "unimportant".
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: two stages that meet only at the cluster assignments, which is what makes every part of both swappable.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The BERTopic pipeline: an embed-reduce-cluster stage and an independent c-TF-IDF representation stage, connected only by cluster assignments">
+      <defs>
+        <marker id="clArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two independent stages, joined by one thin interface</text>
+
+      <!-- Stage 1 -->
+      <rect x="15" y="36" width="500" height="150" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="35" y="58" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">STAGE 1: FIND THE GROUPS</text>
+
+      <rect x="35" y="70" width="140" height="66" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="105" y="90" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">1. EMBED</text>
+      <text x="105" y="106" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">44,949 abstracts</text>
+      <text x="105" y="119" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">&#8594; 384 dimensions</text>
+      <text x="105" y="132" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#71717a">gte-small</text>
+
+      <rect x="192" y="70" width="140" height="66" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="262" y="90" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">2. REDUCE</text>
+      <text x="262" y="106" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">384 &#8594; 5 dimensions</text>
+      <text x="262" y="119" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">clustering needs it</text>
+      <text x="262" y="132" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#71717a">UMAP</text>
+
+      <rect x="349" y="70" width="150" height="66" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="424" y="90" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">3. CLUSTER</text>
+      <text x="424" y="106" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">156 groups + outliers</text>
+      <text x="424" y="119" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">count not specified</text>
+      <text x="424" y="132" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#71717a">HDBSCAN</text>
+
+      <line x1="175" y1="103" x2="192" y2="103" stroke="#71717a" stroke-width="1.6" marker-end="url(#clArrow)"/>
+      <line x1="332" y1="103" x2="349" y2="103" stroke="#71717a" stroke-width="1.6" marker-end="url(#clArrow)"/>
+
+      <text x="265" y="163" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#0d9488">This is the whole of plain text clustering. It gives you groups, and no names for them.</text>
+      <text x="265" y="177" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#0d9488">Every block here is swappable: PCA for UMAP, k-means for HDBSCAN.</text>
+
+      <!-- interface -->
+      <rect x="545" y="86" width="130" height="50" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="610" y="106" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">CLUSTER LABELS</text>
+      <text x="610" y="122" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#a16207">one integer per document</text>
+      <line x1="515" y1="111" x2="545" y2="111" stroke="#71717a" stroke-width="1.8" marker-end="url(#clArrow)"/>
+      <text x="610" y="150" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">the only thing stage 2</text>
+      <text x="610" y="162" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">needs from stage 1</text>
+
+      <!-- Stage 2 -->
+      <rect x="15" y="206" width="850" height="130" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="35" y="228" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">STAGE 2: NAME THEM</text>
+
+      <rect x="35" y="240" width="175" height="76" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="122" y="260" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">4. c-TF-IDF</text>
+      <text x="122" y="276" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">bag-of-words per cluster,</text>
+      <text x="122" y="288" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">weighted by distinctiveness</text>
+      <text x="122" y="306" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#71717a">speech | asr | recognition</text>
+
+      <rect x="230" y="240" width="175" height="76" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="317" y="260" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">5. RERANK (optional)</text>
+      <text x="317" y="276" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">reorder the keywords with</text>
+      <text x="317" y="288" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">embeddings, or diversify</text>
+      <text x="317" y="306" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#71717a">KeyBERTInspired, MMR</text>
+
+      <rect x="425" y="240" width="175" height="76" rx="8" fill="#FCE7F3" stroke="#be185d" stroke-width="1.5"/>
+      <text x="512" y="260" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#831843">6. LABEL (optional)</text>
+      <text x="512" y="276" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#be185d">a generative model writes</text>
+      <text x="512" y="288" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#be185d">a human-readable title</text>
+      <text x="512" y="306" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#71717a">"Speech recognition"</text>
+
+      <line x1="210" y1="278" x2="230" y2="278" stroke="#71717a" stroke-width="1.6" marker-end="url(#clArrow)"/>
+      <line x1="405" y1="278" x2="425" y2="278" stroke="#71717a" stroke-width="1.6" marker-end="url(#clArrow)"/>
+
+      <rect x="620" y="240" width="230" height="76" rx="8" fill="#FBF7F0" stroke="#8C6A47" stroke-width="1.5"/>
+      <text x="735" y="260" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#8C6A47">THE ECONOMICS</text>
+      <text x="735" y="277" text-anchor="middle" font-family="Inter" font-size="9" fill="#8C6A47">Steps 5 and 6 run <tspan font-weight="600">once per topic</tspan>,</text>
+      <text x="735" y="290" text-anchor="middle" font-family="Inter" font-size="9" fill="#8C6A47">not once per document.</text>
+      <text x="735" y="307" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#8C6A47">156 model calls, not 44,949.</text>
+      <line x1="600" y1="278" x2="620" y2="278" stroke="#71717a" stroke-width="1.6" stroke-dasharray="3 2"/>
+    </svg>
+    <figcaption>The clustering stage hands the representation stage nothing but an integer per document. That thin interface is what makes the whole thing modular: swap UMAP for PCA, HDBSCAN for k-means, or the embedding model for a newer one, and the naming stage is unaffected. It also makes the naming stage cheap, because it operates on aggregated clusters rather than individual documents, so the expensive optional steps scale with the number of topics rather than the size of the corpus.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Clustering finds structure; topic modelling gives it a name, and they are separate problems.</strong> Most confusion in this area comes from treating them as one. <strong>Aggregate before you spend.</strong> The reason a generative model is affordable here is that something cheap ran first and reduced forty-five thousand things to a hundred and fifty-six.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The corpus</h3>
+
+  <p>The worked example runs on 44,949 abstracts from arXiv's Computation and Language section, published between 1991 and 2024. It's a good test case because the field genuinely has structure, that structure changed a great deal over thirty years, and nobody has a definitive list of what its subfields are.</p>
+
+  <h3>Step 1: embed</h3>
+
+  <pre><code>from sentence_transformers import SentenceTransformer
+
+embedding_model = SentenceTransformer("thenlper/gte-small")
+embeddings = embedding_model.encode(abstracts)
+embeddings.shape   # (44949, 384)</code></pre>
+
+  <p>Model choice matters more here than in classification, because clustering has nothing else to work with: there's no trainable head downstream to compensate for a mediocre representation. Pick a model that scores well specifically on <em>clustering</em> tasks on the MTEB leaderboard rather than on retrieval or on the overall average, and weigh speed heavily, since you're encoding the entire corpus. <code>gte-small</code> is chosen here over the <code>all-mpnet-base-v2</code> of lecture 5 precisely on those grounds: better at clustering and faster, at 384 dimensions instead of 768.</p>
+
+  <h3>Step 2: reduce, and why it isn't optional</h3>
+
+  <pre><code>from umap import UMAP
+
+umap_model = UMAP(n_components=5, min_dist=0.0, metric="cosine", random_state=42)
+reduced_embeddings = umap_model.fit_transform(embeddings)</code></pre>
+
+  <p>Clustering in 384 dimensions works badly, and the reason is geometric rather than computational. As dimensionality grows, the volume of the space grows exponentially while your document count doesn't, so points spread out and the distances between them converge towards each other. Density, which is what a density-based clusterer looks for, stops being meaningful when every point is roughly equidistant from every other. Reducing to five dimensions restores enough contrast for density to mean something again.</p>
+
+  <p>The parameters each do a specific job. <code>n_components=5</code> is the target dimensionality, and five to ten is the usual working range: enough to preserve the global structure, few enough for density to be meaningful. <code>min_dist=0.0</code> allows points to pack arbitrarily tightly, which produces the tight, well-separated clumps a clusterer wants, and is the opposite of what you'd choose for a visualisation. <code>metric="cosine"</code> matches how embeddings carry meaning, in their direction, as lecture 3 established. Setting <code>random_state</code> makes results reproducible at the cost of disabling parallelism, which is a real slowdown on a large corpus and a trade worth making while you're still tuning.</p>
+
+  <p>Reduction is compression, and compression loses information. The trade is that you lose some fidelity and gain the ability to find clusters at all.</p>
+
+  <h3>Step 3: cluster, and the choice that defines the output</h3>
+
+  <pre><code>from hdbscan import HDBSCAN
+
+hdbscan_model = HDBSCAN(min_cluster_size=50, metric="euclidean",
+                        cluster_selection_method="eom").fit(reduced_embeddings)
+clusters = hdbscan_model.labels_
+len(set(clusters))   # 156</code></pre>
+
+  <p>The obvious choice, k-means, requires you to state the number of clusters in advance, which is exactly the thing you're trying to discover, and it assigns every document to a cluster whether or not it belongs in one. HDBSCAN, a hierarchical density-based method, does neither. It finds dense regions at whatever count they occur, and it labels points in sparse regions as outliers with the cluster ID -1.</p>
+
+  <p>Both properties matter. Not specifying the count means the data decides, and 156 is not a number anyone would have guessed. Not forcing assignment means the outlier bucket exists, and on this corpus it holds 14,520 documents, roughly a third. That is not a failure. Those are the niche and interdisciplinary papers that genuinely don't sit in any dense region of the field, and treating them as a residue to be ignored is the error in the vignette above.</p>
+
+  <p><code>min_cluster_size=50</code> is the parameter that decides everything downstream: it's the smallest group that counts as a cluster. Lower it and you get more, finer topics and fewer outliers; raise it and you get a coarser picture. It is not a technical default to be left alone, it's the operational definition of "a theme", and it deserves a sensitivity check rather than a single run.</p>
+
+  <div class="callout insight">
+    <span class="tag">What this track assumes and does not re-derive</span>
+    UMAP, PCA, HDBSCAN, DBSCAN and k-means are all derived properly in the machine learning track's <a href="../machine_learning/04_unsupervised_learning/index.html">unsupervised learning</a> sub-module: <a href="../machine_learning/04_unsupervised_learning/06-density_based_clustering.html">density-based clustering</a> covers how HDBSCAN builds its hierarchy and selects clusters from it, and <a href="../machine_learning/04_unsupervised_learning/07-low_dimensional_visualisation.html">low-dimensional visualisation</a> covers UMAP and t-SNE. This lecture treats them as components and concentrates on what is specific to text.
+  </div>
+
+  <h3>Inspecting what you got</h3>
+
+  <p>The output is an integer per document, which is not yet an answer. The first move is to read some.</p>
+
+  <pre><code>for index in np.where(clusters == 0)[0][:3]:
+    print(abstracts[index][:300])</code></pre>
+
+  <p>On this corpus, cluster 0's first three abstracts turn out to be about statistical machine translation into American Sign Language, the phonology of signed languages, and animation quality in sign language synthesis. The cluster is about sign language, and nobody told the pipeline that sign language was a subfield.</p>
+
+  <p>The second move is to plot, which means a <em>separate</em> UMAP reduction to two dimensions purely for display. Do not reuse the five-dimensional reduction; it wasn't built for viewing, and do not cluster on the two-dimensional one, because it destroys too much.</p>
+
+  <pre><code>reduced_2d = UMAP(n_components=2, min_dist=0.0, metric="cosine",
+                  random_state=42).fit_transform(embeddings)</code></pre>
+
+  <p>Treat the resulting picture with suspicion. Projecting 384 dimensions onto two loses a great deal, and it can push genuinely distinct clusters together or pull related ones apart. It is a navigational aid, not evidence. Reading actual documents remains the only way to know what a cluster contains, and it stays necessary no matter how good the visualisation looks.</p>
+
+  <h3>From clusters to topics</h3>
+
+  <p>You now have 156 groups and no names. The classical answer to naming is <strong>topic modelling</strong>, historically <strong>latent Dirichlet allocation</strong>, which models each topic as a probability distribution over the vocabulary and describes it by its highest-probability words. LDA works on bag-of-words counts, so it inherits exactly the limitation lecture 1 identified: no notion that two different words can mean the same thing, and no sensitivity to context.</p>
+
+  <p>BERTopic's move is to take the topic-as-word-distribution output that people find useful and produce it from clusters formed by embeddings rather than by word counts. Meaning does the grouping; counting only does the naming. And crucially, the two halves communicate through nothing but the cluster assignments.</p>
+
+  <h3>c-TF-IDF: counting per cluster instead of per document</h3>
+
+  <p>The naming stage starts from a bag-of-words, with two modifications.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="c-TF-IDF: concatenating documents within a cluster to count per cluster, then weighting words down if they appear in every cluster">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two changes turn a bag-of-words into a topic description</text>
+
+      <!-- change 1 -->
+      <text x="20" y="48" font-family="Inter" font-size="10" font-weight="700" fill="#3f3f46">CHANGE 1: count per cluster, not per document</text>
+
+      <g>
+        <rect x="30" y="60" width="52" height="30" rx="4" fill="#FFFFFF" stroke="#a1a1aa"/>
+        <text x="56" y="79" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">doc</text>
+        <rect x="88" y="60" width="52" height="30" rx="4" fill="#FFFFFF" stroke="#a1a1aa"/>
+        <text x="114" y="79" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">doc</text>
+        <rect x="146" y="60" width="52" height="30" rx="4" fill="#FFFFFF" stroke="#a1a1aa"/>
+        <text x="172" y="79" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">doc</text>
+        <text x="212" y="79" font-family="Inter" font-size="9" fill="#71717a">&#8230; 2,290 documents in cluster 0</text>
+      </g>
+      <path d="M 350 75 L 385 75" stroke="#71717a" stroke-width="1.8" marker-end="url(#clArrow)"/>
+      <rect x="392" y="58" width="200" height="34" rx="5" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="492" y="79" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">treated as ONE long document</text>
+      <text x="620" y="72" font-family="Inter" font-size="9" fill="#52525b">Now the counts describe the</text>
+      <text x="620" y="85" font-family="Inter" font-size="9" fill="#52525b">topic, not any single paper.</text>
+
+      <line x1="20" y1="108" x2="860" y2="108" stroke="#d4d4d8" stroke-width="1"/>
+
+      <!-- change 2 -->
+      <text x="20" y="130" font-family="Inter" font-size="10" font-weight="700" fill="#3f3f46">CHANGE 2: weight down anything that appears in every cluster</text>
+
+      <g font-family="JetBrains Mono" font-size="9">
+        <text x="30" y="156" font-family="Inter" font-size="9" font-weight="600" fill="#52525b">raw count in cluster 0</text>
+        <text x="230" y="156" font-family="Inter" font-size="9" font-weight="600" fill="#52525b">&#215; IDF weight</text>
+        <text x="380" y="156" font-family="Inter" font-size="9" font-weight="600" fill="#52525b">= c-TF-IDF, and the ranking that results</text>
+
+        <text x="30" y="176" fill="#71717a">"the"&#160;&#160;&#160;&#160;&#160;&#160;&#160;very high</text>
+        <text x="230" y="176" fill="#9f1239">&#215; almost 0</text>
+        <text x="380" y="176" fill="#71717a">&#8594; disappears. No stop-word list needed.</text>
+
+        <text x="30" y="196" fill="#71717a">"model"&#160;&#160;&#160;&#160;&#160;high</text>
+        <text x="230" y="196" fill="#b45309">&#215; low</text>
+        <text x="380" y="196" fill="#71717a">&#8594; suppressed: every cluster says "model".</text>
+
+        <text x="30" y="216" fill="#115e59">"speech"&#160;&#160;&#160;&#160;high</text>
+        <text x="230" y="216" fill="#115e59">&#215; high</text>
+        <text x="380" y="216" font-weight="600" fill="#115e59">&#8594; survives: frequent HERE, rare elsewhere.</text>
+
+        <text x="30" y="236" fill="#115e59">"asr"&#160;&#160;&#160;&#160;&#160;&#160;&#160;medium</text>
+        <text x="230" y="236" fill="#115e59">&#215; very high</text>
+        <text x="380" y="236" font-weight="600" fill="#115e59">&#8594; survives: almost unique to this cluster.</text>
+      </g>
+
+      <rect x="30" y="252" width="560" height="34" rx="6" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="310" y="266" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#5b21b6">topic 0 &#8594; speech | asr | recognition | end | acoustic | speaker | audio</text>
+      <text x="310" y="280" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#7c3aed">produced by counting. No model was run in this step.</text>
+
+      <text x="620" y="264" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">The IDF term is a logarithm of</text>
+      <text x="620" y="277" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">average word frequency across all</text>
+      <text x="620" y="290" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">clusters over this word's frequency.</text>
+    </svg>
+    <figcaption>The first change is that documents inside a cluster are pooled and counted together, so the frequencies describe the topic rather than any individual document. The second is the class-based inverse document frequency term, which divides out how common a word is across all clusters, so words that are frequent everywhere get suppressed and words that are frequent here and rare elsewhere rise to the top. A useful side effect is that stop words fall out automatically, because "the" appears in every cluster and so scores near zero without anyone maintaining a stop-word list.</figcaption>
+  </figure>
+
+  <pre><code>from bertopic import BERTopic
+
+topic_model = BERTopic(
+    embedding_model=embedding_model,
+    umap_model=umap_model,
+    hdbscan_model=hdbscan_model,
+).fit(abstracts, embeddings)
+
+topic_model.get_topic_info()</code></pre>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Topic</th><th>Count</th><th>Top keywords</th></tr></thead>
+      <tbody>
+        <tr><td>-1</td><td>14,520</td><td>the, of, and, to, in, we &#183; <em>the outlier bucket, not a topic</em></td></tr>
+        <tr><td>0</td><td>2,290</td><td>speech, asr, recognition, end, acoustic, speaker</td></tr>
+        <tr><td>1</td><td>1,403</td><td>medical, clinical, biomedical, patient, health</td></tr>
+        <tr><td>2</td><td>1,156</td><td>sentiment, aspect, analysis, reviews, opinion</td></tr>
+        <tr><td>3</td><td>986</td><td>translation, nmt, machine, neural, bleu</td></tr>
+        <tr><td>&#8230;</td><td>&#8230;</td><td>&#8230;</td></tr>
+        <tr><td>151</td><td>54</td><td>prompt, prompts, optimization, prompting, llm</td></tr>
+        <tr><td>153</td><td>53</td><td>counseling, mental, health, therapy, psychotherapy</td></tr>
+        <tr><td>154</td><td>50</td><td>backdoor, attacks, attack, triggers, poisoned</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Topic -1 is the outlier bucket, and note that its keywords are stop words, which is what you'd expect from a group with no shared subject. If you need every document assigned, either use k-means instead of HDBSCAN or call BERTopic's <code>reduce_outliers()</code> to reassign them afterwards, but do so as a deliberate decision, having first looked at what's in there.</p>
+
+  <p>You can also search the topics semantically, which is more useful than scrolling 156 rows: <code>topic_model.find_topics("topic modeling")</code> returns topic 22 with similarity 0.95, and topic 22's keywords are topic, topics, lda, latent, dirichlet, allocation.</p>
+
+  <h3>Improving the representation: rerankers</h3>
+
+  <p>c-TF-IDF is fast and blind. It counts words, so it has no idea that "summary" and "summaries" are the same thing, and no idea which of its top terms best captures the topic's meaning. The fix follows a pattern that recurs throughout this track: let something cheap produce a candidate list, then let something expensive reorder it. In BERTopic these reorderers are called representation models, and because they operate on topics rather than documents, running them costs almost nothing.</p>
+
+  <p><strong>KeyBERTInspired</strong> embeds the candidate keywords and the average document of each topic, then reranks the keywords by cosine similarity to that average. The results read noticeably better, and the change is one line, since the clustering does not have to be rerun.</p>
+
+  <pre><code>from bertopic.representation import KeyBERTInspired
+
+topic_model.update_topics(abstracts, representation_model=KeyBERTInspired())</code></pre>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Topic</th><th>c-TF-IDF</th><th>After KeyBERTInspired</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>speech, asr, recognition, end, acoustic</td><td>speech, encoder, phonetic, language, transcription</td></tr>
+        <tr><td>1</td><td>medical, clinical, biomedical, patient, health</td><td>nlp, ehr, clinical, biomedical, language</td></tr>
+        <tr><td>3</td><td>translation, nmt, machine, neural, bleu</td><td>translation, translating, translate, translations</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Read topic 3 carefully, because it shows the cost. The original list contained "nmt" and "bleu", which are the standard abbreviation for neural machine translation and the standard evaluation metric for it. Both are gone, replaced by morphological variants of "translate". To a general reader that's cleaner; to anyone in the field it's strictly less informative, because the abbreviations carried the most precise information in the list. Semantic reranking systematically favours words the embedding model represents well, and it represents domain jargon and abbreviations poorly. Check the effect on your own vocabulary before adopting it.</p>
+
+  <p><strong>Maximal marginal relevance</strong> attacks a different defect: redundancy. A list reading summarization, summaries, summary, summarisers wastes four of its slots on one idea. MMR starts from a longer candidate list, say thirty keywords, and builds a shorter one by iteratively adding whichever remaining candidate best balances relevance to the topic against dissimilarity from what's already been chosen, governed by a diversity parameter.</p>
+
+  <pre><code>from bertopic.representation import MaximalMarginalRelevance
+
+topic_model.update_topics(abstracts,
+    representation_model=MaximalMarginalRelevance(diversity=0.2))
+# topic 4:  summarization | document | extractive | rouge
+# rather than: summarization | summaries | summary | abstractive</code></pre>
+
+  <h3>The generative block: from keywords to a name</h3>
+
+  <p>Keywords still require the reader to synthesise a topic from a list. A generative model can do that synthesis, and this is where the economics of the pipeline pay off: it runs once per topic. For each topic, BERTopic assembles a prompt containing the four most representative documents and the current keyword list, and asks for a label.</p>
+
+  <pre><code>from bertopic.representation import TextGeneration
+
+prompt = """I have a topic that contains the following documents:
+[DOCUMENTS]
+The topic is described by the following keywords: '[KEYWORDS]'.
+Based on the documents and keywords, what is this topic about?"""
+
+generator = pipeline("text2text-generation", model="google/flan-t5-small")
+topic_model.update_topics(abstracts,
+    representation_model=TextGeneration(generator, prompt=prompt))</code></pre>
+
+  <p>The <code>[DOCUMENTS]</code> and <code>[KEYWORDS]</code> placeholders are filled per topic, and the documents chosen are the four whose c-TF-IDF profile is closest to the topic's own. This placeholder-substitution pattern is the same one lecture 5 used for classification, and lecture 9 formalises it as a prompt template.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Topic</th><th>c-TF-IDF keywords</th><th>Flan-T5-small label</th><th>Hosted model label</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>speech, asr, recognition, end, acoustic</td><td>Speech-to-description</td><td>Leveraging External Data for Improving Low-Resource Speech Recognition</td></tr>
+        <tr><td>1</td><td>medical, clinical, biomedical, patient</td><td>Science/Tech</td><td>Improved Representation Learning for Biomedical Text</td></tr>
+        <tr><td>3</td><td>translation, nmt, machine, neural, bleu</td><td>Attention-based neural machine translation</td><td>Neural Machine Translation Enhancements</td></tr>
+        <tr><td>4</td><td>summarization, summaries, summary</td><td>Summarization</td><td>Document Summarization Techniques</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The smallest Flan-T5 manages some good labels and some useless ones: "Science/Tech" for a clinical NLP cluster is a real failure, not a stylistic quibble. A larger hosted model produces labels that are genuinely publishable. This is the one place in the pipeline where model capability shows through clearly, and also the cheapest place to buy it, because you're paying for 156 calls.</p>
+
+  <div class="callout warn">
+    <span class="tag">Keep the keywords even after you have labels</span>
+    A generated label is one model's compression of a cluster, and it can be confidently wrong in a way a keyword list cannot: keywords are counted from the actual documents, whereas a label is generated. Keep both. BERTopic supports multiple simultaneous representations per topic for exactly this reason, so you can hold c-TF-IDF, an MMR-diversified list and a generated label side by side and notice when they disagree. When they disagree, the documents are the arbiter.
+  </div>
+
+  <h3>Modularity, and what it buys</h3>
+
+  <p>Every block named here is replaceable. Swap the embedding model when a better one is released. Swap UMAP for PCA if you need a linear, faster reduction. Swap HDBSCAN for k-means if you need every document assigned and you know your cluster count. Stack representation models. The same skeleton also supports guided topic modelling, where you seed known topics; hierarchical topic modelling, which merges topics into a tree; dynamic topic modelling, which tracks how a topic's vocabulary changes over time and would be the natural way to analyse thirty years of arXiv; and online variants that update as documents arrive. All of it follows from the interface between the two stages being one integer per document.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Clustering text is three steps: embed with a model chosen for semantic similarity, reduce to about five dimensions so that density means something again, and cluster with a density-based method that determines its own cluster count and declines to assign documents that belong nowhere. The result is groups without names. BERTopic supplies the names with a second stage joined to the first only by the cluster assignments: pool the documents in each cluster, count the words, and weight by the class-based inverse document frequency so that terms distinctive to a cluster rise and terms common to all of them fall. That produces keywords by counting alone. Keywords can then be reranked by an embedding model, diversified with maximal marginal relevance, or turned into a readable label by a generative model, and all three are affordable because they run once per topic rather than once per document. Two parameters deserve more respect than they usually get: <code>min_cluster_size</code>, which is the operational definition of a theme, and the outlier bucket, which is not noise.</p>
+
+  <p>Both lectures in Part II so far have used generative models with short, hand-written instructions and hoped for the best. Lecture 7 stops hoping. It covers what a prompt is actually made of, what the chat template does that you cannot see, and what <code>temperature</code> and <code>top_p</code> do to the distribution that lecture 4 described.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the three steps of the text clustering pipeline and state what each one produces.</li>
+      <li>Explain why dimensionality reduction is necessary before clustering, in terms of what happens to density in high dimensions.</li>
+      <li>Give two reasons HDBSCAN is preferred to k-means here, and one situation where k-means would be the right choice.</li>
+      <li>Explain what <code>min_cluster_size</code> controls and why it should not be treated as a default.</li>
+      <li>Describe the two modifications that turn an ordinary bag-of-words into c-TF-IDF, and state what each one fixes.</li>
+      <li>Explain why c-TF-IDF removes stop words without a stop-word list.</li>
+      <li>State what a representation model does in BERTopic, and explain why applying one is cheap.</li>
+      <li>Give the specific cost of KeyBERTInspired's reranking observed on the translation topic, and say who bears it.</li>
+      <li>In the complaints vignette, identify the two mistakes and say which parameter connects them.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Assumed:</strong> The machine learning track's <a href="../machine_learning/04_unsupervised_learning/06-density_based_clustering.html">density-based clustering</a> lecture derives DBSCAN and HDBSCAN; <a href="../machine_learning/04_unsupervised_learning/07-low_dimensional_visualisation.html">low-dimensional visualisation</a> derives UMAP; <a href="../machine_learning/04_unsupervised_learning/01-k_means_clustering.html">k-means</a> covers the centroid alternative.</li>
+      <li><strong>Previous:</strong> Lecture 5 (<a href="05-text_classification.html">text classification</a>) established the frozen-encoder pattern this lecture reuses, and introduced Flan-T5 and the hosted model used here for labelling.</li>
+      <li><strong>Next:</strong> Lecture 7 (<a href="07-prompt_engineering.html">prompt engineering</a>) formalises the hand-written instructions used in the labelling step.</li>
+      <li><strong>Forward:</strong> The rerank-a-cheap-candidate-list pattern returns as cross-encoder reranking in lecture 12 (<a href="12-retrieval_quality_and_evaluation.html">retrieval quality and evaluation</a>); the placeholder-substitution prompt becomes a formal template in lecture 9 (<a href="09-chains_memory_and_state.html">chains, memory and state</a>).</li>
+      <li><strong>Origins:</strong> Bag-of-words and its limitations were introduced in lecture 1 (<a href="01-the_language_ai_landscape.html">the language AI landscape</a>); the embeddings clustered here are the text embeddings of lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 6 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

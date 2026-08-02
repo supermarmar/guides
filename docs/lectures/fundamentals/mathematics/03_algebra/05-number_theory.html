@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: number theory</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Mathematics</a> / <a href="index.html">Algebra</a></div>
+  <h1>Number theory</h1>
+  <p class="subtitle">The oldest branch of mathematics, and the one where the gap between how easy a question is to ask and how hard it is to answer is widest. This lecture stays on the side that is settled: divisibility, primes, and modular arithmetic, developed far enough to build RSA from scratch and to understand why it is secure. The security rests on a computational asymmetry that the pure theory does not explain and cannot guarantee, which is itself worth understanding, because it means the guarantee is empirical rather than proved.</p>
+  <div class="meta">
+    <span>Lecture 5 of 6</span>
+    <span>Reading time, 65 minutes</span>
+    <span>Source: extension beyond the UP curriculum</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Division with remainder generates everything. Iterating it is the <strong>Euclidean algorithm</strong>, which computes greatest common divisors in a few steps, and running it backwards gives <strong>Bezout's identity</strong>: $\gcd(a,b) = ax + by$ for some integers <code>x</code> and <code>y</code>. That identity is what makes modular inverses computable, and modular inverses are what make cryptography possible.</p>
+
+  <p>From Bezout follow Euclid's lemma, unique factorisation into primes, and the structure of arithmetic modulo <code>n</code>. The units modulo <code>n</code> form a group of order $\varphi(n)$, so Lagrange's theorem from <a href="03-abstract_algebra.html">lecture 3</a> gives <strong>Euler's theorem</strong>: $a^{\varphi(n)} \equiv 1$ whenever <code>a</code> and <code>n</code> are coprime. RSA is that congruence used twice, once to encrypt and once to decrypt. The <strong>Chinese remainder theorem</strong> splits arithmetic modulo a composite into independent pieces, which is both a theoretical decomposition and the standard speed-up in RSA implementations.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Multiplying two large primes is easy: a computer does it instantly, and so could you with enough patience, because the work grows with the square of the number of digits. Recovering those two primes from the product is, as far as anyone knows, extremely hard: the best published methods take time growing faster than any polynomial in the number of digits, so adding digits raises the cost far faster than it raises the cost of multiplying. That gap between doing something and undoing it is the entire basis of public key cryptography. Notice what is missing: nobody has proved factoring is hard. The security of most encrypted traffic rests on a problem that is empirically difficult and not known to be difficult.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond a first course</span>
+    A first course proves unique factorisation and stops. This lecture builds RSA end to end with small enough numbers to verify by hand, so that Euler's theorem is seen doing the work rather than cited. It also shows unique factorisation failing, in the ring $\mathbb{Z}[\sqrt{-5}]$ where 6 factors two genuinely different ways, because that failure is what launched algebraic number theory and it explains why the fundamental theorem of arithmetic is a theorem rather than an obvious fact.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Cryptography is the direct application, and it is not remote from a bank. Every TLS session, every signed message, every certificate chain, and every hardware security module rests on modular arithmetic of the kind built here. RSA is the clearest instance and is worked below; elliptic curve methods, now more common, replace the group of units modulo <code>n</code> with the group of points on a curve over a finite field, but the structure of the argument is identical, with a group whose order is known and a computational problem believed hard.</p>
+
+  <p>The asymmetry deserves attention from anyone assessing model or system risk, because it is a genuine assumption rather than a theorem. Primality testing is easy: deterministic polynomial-time algorithms exist, and probabilistic ones are used in practice. Factoring is believed hard on classical machines and is provably easy on a large enough quantum computer, by Shor's algorithm. The migration to post-quantum cryptography now underway is a direct consequence, and the timeline for it is a live operational question rather than a theoretical one.</p>
+
+  <p>Smaller uses recur throughout computing. Hash table sizes are chosen prime so that clustering patterns do not align with the modulus. Linear congruential random number generators have periods determined by number-theoretic conditions on their parameters, and the classic failures of old generators were violations of those conditions. Check digits on account numbers and identifiers are modular residues designed so that the common transcription errors change the residue. None of these is deep, and all of them go wrong when the arithmetic is treated casually.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Picture one: the Euclidean algorithm tiles a rectangle</h3>
+
+  <figure>
+    <svg viewBox="0 0 840 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A rectangle repeatedly tiled with the largest possible squares, illustrating the Euclidean algorithm">
+      <text x="420" y="24" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">gcd(84, 30): fill the rectangle with the biggest squares that fit</text>
+
+      <!-- 84 x 30 rectangle, scale 6px per unit -->
+      <g stroke="#18181b" stroke-width="2" fill="none">
+        <rect x="80" y="70" width="504" height="180"/>
+      </g>
+
+      <!-- two 30x30 squares -->
+      <rect x="80" y="70" width="180" height="180" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <rect x="260" y="70" width="180" height="180" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="170" y="166" text-anchor="middle" font-family="Inter" font-size="12" fill="#115e59">30</text>
+      <text x="350" y="166" text-anchor="middle" font-family="Inter" font-size="12" fill="#115e59">30</text>
+
+      <!-- remainder 24 x 30 -> one 24 square -->
+      <rect x="440" y="70" width="144" height="144" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="512" y="146" text-anchor="middle" font-family="Inter" font-size="12" fill="#5b21b6">24</text>
+
+      <!-- remainder 24 x 6 -> four 6 squares -->
+      <g fill="#FFF7ED" stroke="#b45309" stroke-width="1.5">
+        <rect x="440" y="214" width="36" height="36"/>
+        <rect x="476" y="214" width="36" height="36"/>
+        <rect x="512" y="214" width="36" height="36"/>
+        <rect x="548" y="214" width="36" height="36"/>
+      </g>
+      <text x="512" y="272" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e">four 6 &#215; 6 squares fill the rest exactly</text>
+
+      <text x="332" y="60" text-anchor="middle" font-family="Inter" font-size="11.5" fill="#3f3f46">84</text>
+      <text x="62" y="166" text-anchor="middle" font-family="Inter" font-size="11.5" fill="#3f3f46">30</text>
+
+      <text x="660" y="100" font-family="JetBrains Mono" font-size="11.5" fill="#115e59">84 = 2&#215;30 + 24</text>
+      <text x="660" y="124" font-family="JetBrains Mono" font-size="11.5" fill="#5b21b6">30 = 1&#215;24 +  6</text>
+      <text x="660" y="148" font-family="JetBrains Mono" font-size="11.5" fill="#92400e">24 = 4&#215; 6 +  0</text>
+      <text x="660" y="180" font-family="Inter" font-weight="700" font-size="12" fill="#18181b">gcd = 6</text>
+      <text x="660" y="204" font-family="Inter" font-size="10.5" fill="#71717a">the last non-zero</text>
+      <text x="660" y="220" font-family="Inter" font-size="10.5" fill="#71717a">remainder</text>
+
+      <text x="420" y="312" text-anchor="middle" font-family="Inter" font-style="italic" font-size="11.5" fill="#52525b">The side of the smallest square is the gcd, and the process terminates because remainders strictly decrease.</text>
+      <text x="420" y="332" text-anchor="middle" font-family="Inter" font-size="11" fill="#71717a">Three steps for numbers near 100; the worst case is consecutive Fibonacci numbers, and even then the count grows only logarithmically.</text>
+    </svg>
+    <figcaption>Euclid's algorithm, drawn. Each step replaces the rectangle by the leftover strip, which is why remainders shrink and the process ends. The efficiency is the point: computing $\gcd$ of two thousand-digit numbers takes a few thousand steps, not the astronomically many that factoring both and comparing would need. This gap between what is easy and what is hard, present already in the oldest algorithm in mathematics, is the theme of the lecture.</figcaption>
+  </figure>
+
+  <h3>Picture two: RSA is one congruence, used twice</h3>
+
+  <figure>
+    <svg viewBox="0 0 840 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The RSA round trip showing encryption by public exponent and decryption by private exponent returning the original message">
+      <defs>
+        <marker id="rsaArr5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#3f3f46"/>
+        </marker>
+      </defs>
+      <text x="420" y="24" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Encrypt with e, decrypt with d, and Euler's theorem closes the loop</text>
+
+      <rect x="40" y="112" width="170" height="70" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="125" y="142" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#115e59">message m</text>
+      <text x="125" y="164" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#0d9488">a number below n</text>
+
+      <rect x="335" y="112" width="170" height="70" rx="12" fill="#FEF2F2" stroke="#b91c1c" stroke-width="2"/>
+      <text x="420" y="142" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#7f1d1d">ciphertext c</text>
+      <text x="420" y="164" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#b91c1c">c = m&#7497; mod n</text>
+
+      <rect x="630" y="112" width="170" height="70" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="715" y="142" text-anchor="middle" font-family="Inter" font-weight="700" font-size="13" fill="#115e59">message m</text>
+      <text x="715" y="164" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#0d9488">recovered exactly</text>
+
+      <line x1="215" y1="147" x2="329" y2="147" stroke="#3f3f46" stroke-width="2.5" marker-end="url(#rsaArr5)"/>
+      <text x="272" y="136" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#3f3f46">public (n, e)</text>
+      <line x1="510" y1="147" x2="624" y2="147" stroke="#3f3f46" stroke-width="2.5" marker-end="url(#rsaArr5)"/>
+      <text x="567" y="136" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#3f3f46">private d</text>
+      <text x="567" y="170" text-anchor="middle" font-family="JetBrains Mono" font-size="10.5" fill="#3f3f46">c&#7496; mod n</text>
+
+      <rect x="200" y="218" width="440" height="86" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="420" y="242" text-anchor="middle" font-family="Inter" font-weight="700" font-size="11.5" fill="#5b21b6">WHY IT CLOSES</text>
+      <text x="420" y="264" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#7c3aed">ed &#8801; 1 (mod &#966;(n)),  so  ed = 1 + k&#966;(n)</text>
+      <text x="420" y="286" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#7c3aed">m&#7497;&#7496; = m &#183; (m&#966;&#8317;&#8319;&#8318;)&#7503; &#8801; m &#183; 1&#7503; = m  (mod n)</text>
+
+      <text x="90" y="290" font-family="Inter" font-size="10.5" fill="#b91c1c">An attacker knows n and e.</text>
+      <text x="90" y="306" font-family="Inter" font-size="10.5" fill="#b91c1c">Finding d needs &#966;(n), which needs the factors.</text>
+    </svg>
+    <figcaption>RSA in one diagram. The public exponent <code>e</code> and the private exponent <code>d</code> are inverses modulo $\varphi(n)$, so raising to <code>e</code> and then to <code>d</code> raises to a power one more than a multiple of $\varphi(n)$, and Euler's theorem collapses that to the original message. Computing $\varphi(n) = (p-1)(q-1)$ requires the factorisation of <code>n</code>, which is the hard step, so publishing <code>n</code> and <code>e</code> reveals nothing usable about <code>d</code>.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Divisibility, Euclid, and Bezout</h3>
+
+  <p>The <strong>division algorithm</strong> states that for integers <code>a</code> and $b > 0$ there are unique <code>q</code> and <code>r</code> with $a = qb + r$ and $0 \le r &lt; b$. Its proof is the well-ordering principle from <a href="../01_foundations/01-logic_sets_and_proof.html">foundations lecture 1</a>: take the least non-negative element of $\{a - qb\}$. Everything below is built on iterating it.</p>
+
+  <div class="worked">The extended Euclidean algorithm: gcd and Bezout coefficients together.
+
+Compute gcd(240, 46) and express it as 240x + 46y.
+
+Forward pass (divisions):
+    240 = 5 x 46 + 10
+     46 = 4 x 10 +  6
+     10 = 1 x  6 +  4
+      6 = 1 x  4 +  2
+      4 = 2 x  2 +  0        gcd = 2
+
+Backward pass (substitute remainders upward):
+      2 = 6 - 1 x 4
+        = 6 - 1 x (10 - 1 x 6)          = 2 x 6 - 1 x 10
+        = 2 x (46 - 4 x 10) - 1 x 10    = 2 x 46 - 9 x 10
+        = 2 x 46 - 9 x (240 - 5 x 46)   = 47 x 46 - 9 x 240
+
+Check:  47 x 46 = 2162,  9 x 240 = 2160,  difference 2.   Correct.
+
+So gcd(240,46) = 2 = 240(-9) + 46(47).
+
+WHY THIS IS THE WORKHORSE. Bezout gives modular inverses directly. To invert
+a modulo n, run the algorithm on a and n; if the gcd is 1 then
+    ax + ny = 1,  so  ax = 1 (mod n),
+and x is the inverse. This is how the RSA private exponent is computed, and
+it costs only a logarithmic number of steps, which is why key generation is
+fast while breaking the key is not.</div>
+
+  <p>Bezout gives <strong>Euclid's lemma</strong>: if a prime <code>p</code> divides $ab$ then it divides <code>a</code> or <code>b</code>. Suppose <code>p</code> does not divide <code>a</code>; then $\gcd(p,a) = 1$, so $px + ay = 1$, and multiplying by <code>b</code> gives $pbx + aby = b$, with <code>p</code> dividing both terms on the left, hence dividing <code>b</code>. Induction on that lemma yields the <strong>fundamental theorem of arithmetic</strong>: every integer above 1 factors into primes uniquely up to order. Existence is strong induction; uniqueness is Euclid's lemma applied repeatedly.</p>
+
+  <p>Euclid's proof that primes are infinite still reads cleanly: given any finite list, form the product plus one, which leaves remainder 1 on division by each listed prime, so its prime factors are all new. The proof is often misremembered as producing a prime; it produces a number whose factors are not on the list, which is enough.</p>
+
+  <h3>Congruences and the structure modulo n</h3>
+
+  <p>Write $a \equiv b \pmod n$ when <code>n</code> divides $a - b$. This is an equivalence relation compatible with addition and multiplication, so the classes form the ring $\mathbb{Z}/n\mathbb{Z}$ of <a href="03-abstract_algebra.html">lecture 3</a>. A class is a <strong>unit</strong>, meaning invertible, exactly when its representative is coprime to <code>n</code>, by Bezout. The number of units is <strong>Euler's totient</strong> $\varphi(n)$, multiplicative over coprime factors, with $\varphi(p) = p-1$ for a prime and $\varphi(p^k) = p^k - p^{k-1}$.</p>
+
+  <p><strong>Fermat's little theorem</strong> and <strong>Euler's theorem</strong> follow immediately from Lagrange, as shown in lecture 3: the units form a group of order $\varphi(n)$, so $a^{\varphi(n)} \equiv 1 \pmod n$ for every unit <code>a</code>. No separate number-theoretic argument is needed, which is a good advertisement for the abstract approach.</p>
+
+  <div class="worked">The Chinese remainder theorem, stated and used.
+
+THEOREM. If n1, ..., nk are pairwise coprime, the system
+    x = a1 (mod n1),  ...,  x = ak (mod nk)
+has a unique solution modulo the product N = n1...nk. Equivalently the ring
+Z/NZ is isomorphic to the product of the Z/niZ.
+
+WORKED. Solve  x = 2 (mod 3),  x = 3 (mod 5),  x = 2 (mod 7).
+
+N = 105.  For each modulus, form N_i = N/n_i and invert it mod n_i:
+    N1 = 35,  35 mod 3 = 2,  inverse of 2 mod 3 is 2   (2x2=4=1 mod 3)
+    N2 = 21,  21 mod 5 = 1,  inverse of 1 mod 5 is 1
+    N3 = 15,  15 mod 7 = 1,  inverse of 1 mod 7 is 1
+
+    x = a1 N1 y1 + a2 N2 y2 + a3 N3 y3
+      = 2(35)(2) + 3(21)(1) + 2(15)(1)
+      = 140 + 63 + 30 = 233
+    233 mod 105 = 23.
+
+Check: 23 = 3(7) + 2, so 2 mod 3.  23 = 5(4) + 3, so 3 mod 5.
+       23 = 7(3) + 2, so 2 mod 7.   All three hold.
+
+WHY IT MATTERS OPERATIONALLY. RSA decryption is normally done via the
+remainder theorem: instead of one exponentiation modulo n, do two modulo p
+and q separately and recombine. Since the moduli are half the size and
+modular exponentiation cost grows with the cube of the modulus size, each
+half costs about an eighth, so the pair costs a quarter: a fourfold
+speed-up, used in essentially every implementation.</div>
+
+  <p>The multiplicative group modulo a prime is cyclic, and a generator is a <strong>primitive root</strong>. Its existence means every non-zero residue is a power of one element, which is what makes discrete logarithms definable and Diffie-Hellman key exchange possible. <strong>Quadratic reciprocity</strong>, the deepest elementary result in the subject, relates whether <code>p</code> is a square modulo <code>q</code> to whether <code>q</code> is a square modulo <code>p</code>, and it makes the Legendre symbol computable quickly. It is stated here rather than proved, as its proofs are long and the applications in this track are limited to primality testing.</p>
+
+  <h3>RSA, end to end</h3>
+
+  <div class="worked">RSA with numbers small enough to check by hand.
+
+KEY GENERATION.
+  Choose primes  p = 61,  q = 53.
+  Modulus        n = 61 x 53 = 3233.
+  Totient        phi(n) = 60 x 52 = 3120.
+  Public exponent e = 17   (coprime to 3120: 3120 = 2^4 x 3 x 5 x 13).
+  Private exponent d = inverse of 17 mod 3120, by extended Euclid:
+
+      3120 = 183 x 17 + 9
+        17 =   1 x  9 + 8
+         9 =   1 x  8 + 1
+      back-substitute:
+         1 = 9 - 8
+           = 9 - (17 - 9)          = 2 x 9 - 17
+           = 2 x (3120 - 183 x 17) - 17
+           = 2 x 3120 - 367 x 17
+      so  -367 x 17 = 1 (mod 3120),  d = 3120 - 367 = 2753.
+
+  Check:  17 x 2753 = 46801 = 15 x 3120 + 1.   Correct.
+
+  PUBLIC KEY  (n, e) = (3233, 17).      PRIVATE KEY  d = 2753.
+
+ENCRYPT the message m = 65.
+  c = 65^17 mod 3233.
+  By repeated squaring:
+      65^2  = 4225 = 992      (mod 3233)
+      65^4  = 992^2 = 984064 = 1650   (mod 3233; 984064 - 304x3233 = 1650)
+      65^8  = 1650^2 = 2722500 = 2589 (mod 3233)
+      65^16 = 2589^2 = 6702921 = 1442 (mod 3233)
+      65^17 = 65^16 x 65 = 1442 x 65 = 93730 = 2790  (mod 3233)
+  Ciphertext c = 2790.
+
+DECRYPT.
+  m = 2790^2753 mod 3233 = 65.
+  (Repeated squaring again; the arithmetic is longer but identical in kind.)
+
+WHY IT WORKS. ed = 46801 = 15 x 3120 + 1, so ed = 1 + 15 phi(n). Then
+    m^(ed) = m^(1 + 15 phi(n)) = m x (m^phi(n))^15 = m x 1^15 = m  (mod n)
+by Euler's theorem. The full statement needs care when m shares a factor
+with n, and the Chinese remainder theorem handles that case, giving the
+result for every m below n.
+
+WHY IT IS SECURE. An attacker sees n = 3233 and e = 17 and wants d, which
+requires phi(n) = (p-1)(q-1), which requires p and q. For 3233 that takes a
+moment. For a 2048-bit n it is, on present knowledge, out of reach: the best
+general algorithm is the number field sieve, whose cost grows
+sub-exponentially but far faster than any polynomial.
+
+THE HONEST CAVEAT. No proof exists that factoring is hard. RSA's security is
+a conjecture supported by decades of failed attacks, and Shor's algorithm
+factors in polynomial time on a sufficiently large quantum computer. The
+migration to post-quantum schemes is underway for exactly this reason.</div>
+
+  <h3>When unique factorisation fails</h3>
+
+  <div class="worked">The ring Z[sqrt(-5)] = { a + b sqrt(-5) : a, b integers }.
+
+Use the norm  N(a + b sqrt(-5)) = a^2 + 5b^2,  which is multiplicative:
+N(xy) = N(x)N(y). Norms are non-negative integers, so they constrain
+factorisations tightly.
+
+Two factorisations of 6:
+    6 = 2 x 3
+    6 = (1 + sqrt(-5)) (1 - sqrt(-5))        since 1 + 5 = 6.
+
+Are these genuinely different? Check that all four factors are irreducible.
+    N(2) = 4,  N(3) = 9,  N(1 +/- sqrt(-5)) = 6.
+If 2 factored as xy with neither a unit, then N(x)N(y) = 4 with both above 1,
+so N(x) = 2, requiring a^2 + 5b^2 = 2, which has no integer solution.
+So 2 is irreducible. Likewise N(x) = 3 is impossible, so 3 is irreducible.
+And N(x) = 2 or 3 being impossible makes both 1 +/- sqrt(-5) irreducible too.
+
+The units are only +/-1 (norm 1 forces b = 0, a = +/-1), so the two
+factorisations cannot be matched up by unit multiples. Factorisation into
+irreducibles is NOT unique in this ring.
+
+WHY THIS MATTERS HISTORICALLY. Several nineteenth-century attempts at
+Fermat's Last Theorem assumed unique factorisation in rings like this one,
+and were wrong for exactly this reason. Kummer's response was to introduce
+"ideal numbers", which became the theory of ideals used in lecture 3: in
+Z[sqrt(-5)], unique factorisation is restored at the level of ideals even
+though it fails for elements. That repair is the origin of algebraic number
+theory, and it is why ideals are a central concept in ring theory rather
+than a technical convenience.</div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The asymmetry that security rests on is unproved</h3>
+
+  <p>Three computational facts sit side by side. Testing whether a number is prime is easy, and has been known to be in polynomial time since the AKS algorithm of 2002, with fast probabilistic tests used in practice. Multiplying is easy. Factoring is hard, so far as anyone can demonstrate, with the number field sieve the best general method. The security of RSA is precisely the gap between the second and the third, and no theorem establishes it: a proof that factoring is hard would resolve major open questions in complexity theory, and none exists. What exists is decades of concentrated failure to do better, which is evidence of a serious kind and not a proof.</p>
+
+  <p>Two consequences follow for anyone assessing systems. First, cryptographic security is an empirical assumption with a shelf life, which is why key lengths have been revised upward repeatedly and why deprecation schedules exist. Second, the quantum threat is qualitatively different from incremental improvement: Shor's algorithm factors in polynomial time, so a sufficiently large quantum computer breaks RSA and elliptic curve cryptography outright rather than merely faster. Data encrypted today and stored by an adversary can be decrypted later, which is why migration to post-quantum algorithms is being planned now rather than when the machines arrive.</p>
+
+  <h3>Simple questions with no known answers</h3>
+
+  <p>Number theory is unusual in how easily its open problems can be stated. Every even number above 2 appears to be a sum of two primes, verified past $4 \times 10^{18}$ and unproved since 1742. There appear to be infinitely many primes differing by 2, and the best current result, following a breakthrough in 2013, is that infinitely many pairs differ by at most 246. Whether infinitely many primes have the form $n^2 + 1$ is unknown. These are not exotic constructions but the most natural questions one could ask about the objects the lecture began with, and their difficulty is a useful corrective to the impression that elementary means easy.</p>
+
+  <h3>Where the analytic side goes</h3>
+
+  <p>Counting primes rather than characterising them opens a second subject. The prime number theorem states that the number of primes below <code>x</code> is asymptotically $x/\ln x$, and its proof runs through the complex analysis of the Riemann zeta function: the key step is showing the zeta function has no zeros on a particular line, which is a statement about a holomorphic function in the sense of <a href="../02_analysis/06-complex_analysis.html">lecture 6</a>. The Riemann hypothesis, which asserts all non-trivial zeros lie on the critical line, would sharpen the error term in that count and remains the most consequential open problem in mathematics. It is worth knowing that the connection exists, since it is the clearest example in the subject of a question about integers being answered by a technique from a wholly different branch.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Two practical traps. Textbook RSA as presented above is not secure as an encryption scheme: it is deterministic, so identical messages give identical ciphertexts, and it is malleable, so an attacker can multiply ciphertexts to relate the underlying messages. Real implementations use padding schemes such as OAEP for exactly these reasons, and never encrypt raw message blocks. And the security argument assumes the primes are chosen well: primes too close together are recoverable by Fermat's method, and repeated or predictable primes from a weak random source have compromised real systems, which is a failure of implementation rather than of the mathematics.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>Run the extended Euclidean algorithm on 1071 and 462, giving the gcd and Bezout coefficients, and verify the identity numerically.</li>
+      <li>Use Bezout to prove Euclid's lemma, then explain how unique factorisation follows by induction.</li>
+      <li>Compute the inverse of 23 modulo 100, and state the general condition under which a modular inverse exists.</li>
+      <li>Solve $x \equiv 1 \pmod 4$, $x \equiv 2 \pmod 5$, $x \equiv 3 \pmod 7$ by the Chinese remainder theorem and check all three congruences.</li>
+      <li>Derive Euler's theorem from Lagrange's theorem, stating the group and its order explicitly.</li>
+      <li>Generate an RSA key pair with $p = 11$ and $q = 13$, choosing a valid public exponent and computing the private one by extended Euclid.</li>
+      <li>Using your key pair, encrypt and decrypt the message $m = 7$, showing the repeated-squaring steps.</li>
+      <li>Explain precisely why knowing <code>n</code> and <code>e</code> does not give <code>d</code>, and which quantity an attacker actually needs.</li>
+      <li>Show that 6 has two genuinely different factorisations in $\mathbb{Z}[\sqrt{-5}]$, using the norm to prove each factor is irreducible.</li>
+      <li>State what is and is not proved about the difficulty of factoring, and explain why Shor's algorithm changes the situation qualitatively rather than quantitatively.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li><a href="03-abstract_algebra.html">Lecture 3: groups, rings and fields</a>, which supplied Lagrange's theorem, from which Fermat and Euler follow in a line, and the ideals that repair unique factorisation.</li>
+      <li><a href="04-galois_theory.html">Lecture 4: Galois theory</a>, whose Frobenius automorphism explains why finite field arithmetic is tractable enough for cryptographic use.</li>
+      <li><a href="06-category_theory.html">Lecture 6: category theory</a>, which closes the course.</li>
+    </ul>
+    <h4>Where this is used later</h4>
+    <ul>
+      <li>Cryptography and secure systems, directly: RSA, Diffie-Hellman, and elliptic curve schemes are all modular arithmetic in a group whose order is known and whose discrete logarithm is believed hard.</li>
+      <li><a href="../02_analysis/06-complex_analysis.html">Complex analysis</a>, in reverse: the prime number theorem is proved by contour methods, which is the clearest case of one branch settling another's questions.</li>
+      <li>Computing generally: prime moduli for hash tables, period conditions for congruential generators, and modular check digits.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li>Hardy and Wright, <em>An Introduction to the Theory of Numbers</em>, the classical reference.</li>
+      <li>Silverman, <em>A Friendly Introduction to Number Theory</em>, for the elementary material with the cryptographic applications drawn out.</li>
+      <li>Rivest, Shamir and Adleman (1978), for the original construction worked above.</li>
+      <li>No UP module corresponds to this lecture; it is included for the cryptographic application and as the concrete face of lecture 3.</li>
+    </ul>
+    <h4>What this lecture adds beyond a first course</h4>
+    <ul>
+      <li>RSA is built end to end with numbers small enough to verify by hand, so Euler's theorem is seen doing the work rather than cited.</li>
+      <li>The failure of unique factorisation in $\mathbb{Z}[\sqrt{-5}]$ is proved with the norm argument, and connected to why ideals exist as a concept.</li>
+      <li>The security assumption is stated honestly as unproved, with the quantum threat distinguished from incremental cryptanalysis.</li>
+      <li>The Chinese remainder theorem is presented both as a structure theorem and as the fourfold implementation speed-up it supplies in practice.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All algebra lectures</a></span>
+  <span>Lecture 5: number theory</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+
+</body>
+</html>

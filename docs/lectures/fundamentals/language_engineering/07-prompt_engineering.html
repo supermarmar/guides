@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 7: prompt engineering</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Prompt engineering</h1>
+  <p class="subtitle">The previous two lectures wrote instructions to generative models and hoped for the best, which is how most people use them. This lecture replaces the hoping. Three things are worth knowing before you write another prompt: what the model actually receives, which is not what you typed; what the two sampling parameters everybody sets do to the distribution, which is not what their names suggest; and which components a prompt is made of, so that improving one is an experiment rather than a rewrite.</p>
+  <div class="meta">
+    <span>Lecture 7 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part II: using pretrained models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Instruction-tuned models expect a <strong>chat template</strong>, a specific arrangement of special tokens marking who is speaking and where each turn ends, and your library silently applies it; the model was trained on that exact format and departing from it degrades output in ways that look like model failure. Two parameters then govern how a token is chosen from the distribution lecture 4 described. <strong>Temperature</strong> reshapes the distribution before sampling, flattening it so unlikely tokens become plausible or sharpening it so the top token dominates. <strong>top_p</strong>, or nucleus sampling, instead truncates it, keeping only the smallest set of tokens whose probabilities sum to <em>p</em> and discarding the rest. Neither does anything unless sampling is switched on at all. On the prompt itself, the minimum useful structure is an instruction plus the data it applies to, plus an <strong>output indicator</strong> that constrains the shape of the reply; beyond that, a prompt decomposes into persona, instruction, context, format, audience, tone and data, and treating those as separable components is what turns prompt writing into something you can iterate on. Two techniques do the heavy lifting. <strong>In-context learning</strong> shows the model worked examples rather than describing the task, in <strong>zero-shot</strong>, <strong>one-shot</strong> and <strong>few-shot</strong> variants. <strong>Chain prompting</strong> splits a hard task across several calls, so the model does one thing at a time and you can set different parameters for each.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Think of a very well-read assistant who has one peculiarity: they only respond properly to notes written on a particular printed form, with boxes marked "from" and "to" and a line ruled at the end of each message. Hand them the same words on plain paper and the quality drops, for no reason they could explain. Your software fills in the form for you, which is why you have never seen it. Separately, the assistant has a dial marked "how adventurous", and a second control that says "only consider your top few ideas, discard the rest". The first changes how seriously they weigh their unlikely thoughts; the second decides how many thoughts are on the table at all. Turning the first up while turning the second down gives you someone imaginative but still on-topic, which is a genuinely different setting from turning both up.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the track</span>
+    Lecture 4 explained that the model returns a distribution and something else chooses from it. This is that something else. Lectures 5 and 6 both wrote instruction prompts and both hit the same wall, that the reply is free text you must parse; this lecture builds the prompt properly and lecture 8 fixes the parsing. Chain prompting, introduced at the end here, becomes a formal construct in lecture 9 and grows into an agent in lecture 10.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons, and the first is invisible until it bites.</p>
+
+  <p>First, <strong>the chat template is a hard requirement dressed up as a convenience</strong>. An instruction-tuned model was fine-tuned on text in one exact format, and the special tokens in that format are how it knows a turn has ended and a reply is expected. Use a high-level helper and it's applied for you. Drop to raw string concatenation, which people do the moment they need something the helper doesn't support, and you get a model that rambles, answers its own questions, or fails to stop. The symptom looks like a bad model and the cause is a missing token.</p>
+
+  <p>Second, <strong>temperature and <code>top_p</code> are set carelessly more often than any other parameter in this field</strong>. They're commonly described as "creativity", which is close enough to be misleading. They do different things to the distribution, they compose, and the right values depend entirely on the task: a classification prompt wants no sampling at all, whereas a brainstorming prompt wants both turned up. Setting a nonzero temperature on an extraction task is a common and expensive mistake, because it makes your pipeline non-reproducible for no benefit.</p>
+
+  <p>Third, <strong>treating a prompt as a single blob makes it impossible to improve systematically</strong>. If your prompt is one paragraph, every change is a rewrite and every comparison is confounded. If it's seven named components assembled by concatenation, you can add, remove and reorder them one at a time and actually attribute the effect. That's the difference between prompt engineering and prompt fiddling.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A summarisation service produced good output in testing and inconsistent output in production, with occasional summaries that contradicted the source document. The team suspected the model and started evaluating alternatives. The actual cause was two settings nobody had revisited. The prototype had been built interactively while exploring what the model could do, so <code>temperature</code> had been left at a value chosen to make the demo outputs feel less robotic, and it had been carried into production unchanged. A summariser has no use for creativity: it should say what the document says, the same way, every time. Setting temperature to zero removed the contradictions and, incidentally, made the output cacheable, which cut the bill. The broader point is that generation parameters are part of the specification of the task, not a presentation preference, and a value that improves a demo can be actively wrong in production.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: the gap between the prompt you write and the token sequence the model receives.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="What you write as a messages list versus the templated token string the model actually receives, and where the sampling parameters act">
+      <defs>
+        <marker id="pmpArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Everything between what you type and what comes back</text>
+
+      <!-- what you write -->
+      <rect x="15" y="38" width="250" height="112" rx="10" fill="#FFFFFF" stroke="#a1a1aa" stroke-width="1.5"/>
+      <text x="140" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#3f3f46">WHAT YOU WRITE</text>
+      <g font-family="JetBrains Mono" font-size="8.5" fill="#52525b">
+        <text x="28" y="78">messages = [</text>
+        <text x="40" y="92">{"role": "user",</text>
+        <text x="52" y="106">"content": "Create a funny</text>
+        <text x="52" y="120">joke about chickens."}</text>
+        <text x="28" y="134">]</text>
+      </g>
+
+      <!-- template -->
+      <rect x="305" y="38" width="270" height="112" rx="10" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="440" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">WHAT THE MODEL RECEIVES</text>
+      <g font-family="JetBrains Mono" font-size="8.5">
+        <text x="318" y="78" fill="#9f1239" font-weight="600">&lt;s&gt;&lt;|user|&gt;</text>
+        <text x="318" y="94" fill="#713f12">Create a funny joke about chickens.</text>
+        <text x="318" y="110" fill="#9f1239" font-weight="600">&lt;|end|&gt;</text>
+        <text x="318" y="126" fill="#9f1239" font-weight="600">&lt;|assistant|&gt;</text>
+      </g>
+      <text x="440" y="144" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#a16207">the red tokens are the format it was trained on</text>
+
+      <line x1="265" y1="94" x2="305" y2="94" stroke="#71717a" stroke-width="1.8" marker-end="url(#pmpArrow)"/>
+      <text x="285" y="86" text-anchor="middle" font-family="Inter" font-size="7.5" fill="#71717a">apply_chat</text>
+      <text x="285" y="112" text-anchor="middle" font-family="Inter" font-size="7.5" fill="#71717a">_template()</text>
+
+      <!-- model -->
+      <rect x="615" y="38" width="250" height="112" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="740" y="58" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">THE MODEL</text>
+      <text x="740" y="76" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">one forward pass per token,</text>
+      <text x="740" y="90" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">returning a distribution over</text>
+      <text x="740" y="104" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">the whole vocabulary</text>
+      <text x="740" y="126" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#71717a">lecture 4</text>
+      <text x="740" y="140" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#5b21b6">it stops when it emits &lt;|end|&gt;</text>
+      <line x1="575" y1="94" x2="615" y2="94" stroke="#71717a" stroke-width="1.8" marker-end="url(#pmpArrow)"/>
+
+      <!-- sampling -->
+      <line x1="15" y1="172" x2="865" y2="172" stroke="#d4d4d8" stroke-width="1"/>
+      <text x="440" y="194" text-anchor="middle" font-family="Inter" font-size="12" font-weight="600" fill="#18181b">Then two parameters act on that distribution, in different ways</text>
+
+      <!-- temperature -->
+      <rect x="60" y="208" width="340" height="104" rx="10" fill="#FFFFFF" stroke="#be185d" stroke-width="2"/>
+      <text x="230" y="228" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#831843">TEMPERATURE reshapes it</text>
+      <g>
+        <text x="90" y="246" font-family="Inter" font-size="8" fill="#71717a">low (0.2)</text>
+        <rect x="90" y="252" width="58" height="10" fill="#be185d"/>
+        <rect x="90" y="264" width="9" height="10" fill="#e879b9"/>
+        <rect x="90" y="276" width="4" height="10" fill="#f3b6d8"/>
+        <rect x="90" y="288" width="2" height="10" fill="#f8d5e8"/>
+        <text x="90" y="308" font-family="Inter" font-size="7.5" font-style="italic" fill="#71717a">sharpened: top token dominates</text>
+
+        <text x="250" y="246" font-family="Inter" font-size="8" fill="#71717a">high (1.2)</text>
+        <rect x="250" y="252" width="34" height="10" fill="#be185d"/>
+        <rect x="250" y="264" width="28" height="10" fill="#e879b9"/>
+        <rect x="250" y="276" width="22" height="10" fill="#f3b6d8"/>
+        <rect x="250" y="288" width="17" height="10" fill="#f8d5e8"/>
+        <text x="250" y="308" font-family="Inter" font-size="7.5" font-style="italic" fill="#71717a">flattened: long shots become live</text>
+      </g>
+      <text x="230" y="240" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#831843">every token keeps a chance</text>
+
+      <!-- top_p -->
+      <rect x="480" y="208" width="340" height="104" rx="10" fill="#FFFFFF" stroke="#0d9488" stroke-width="2"/>
+      <text x="650" y="228" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">top_p truncates it</text>
+      <g>
+        <text x="510" y="246" font-family="Inter" font-size="8" fill="#71717a">top_p = 0.9</text>
+        <rect x="510" y="252" width="50" height="10" fill="#0d9488"/><text x="566" y="261" font-family="Inter" font-size="7" fill="#115e59">0.50 &#8594; cum. 0.50</text>
+        <rect x="510" y="264" width="26" height="10" fill="#3aa89c"/><text x="566" y="273" font-family="Inter" font-size="7" fill="#115e59">0.26 &#8594; cum. 0.76</text>
+        <rect x="510" y="276" width="16" height="10" fill="#7cc7bd"/><text x="566" y="285" font-family="Inter" font-size="7" fill="#115e59">0.16 &#8594; cum. 0.92 &#10003; stop</text>
+        <rect x="510" y="288" width="8" height="10" fill="#e4e4e7"/><text x="566" y="297" font-family="Inter" font-size="7" fill="#9f1239">discarded entirely</text>
+      </g>
+      <text x="650" y="240" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#115e59">the tail is removed, not reweighted</text>
+
+      <text x="440" y="326" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">Neither has any effect unless sampling is enabled. With do_sample=False the model takes the maximum and both parameters are ignored.</text>
+    </svg>
+    <figcaption>The messages list you write is expanded into a token string containing the exact role and end-of-turn markers the model was fine-tuned on, and the end-of-turn token is also how the model signals it has finished. Downstream, temperature and nucleus sampling act on the output distribution in genuinely different ways: temperature rescales every probability, leaving even the long tail reachable, while <code>top_p</code> cuts the tail off entirely and renormalises what remains. That difference is why the two compose usefully rather than redundantly.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>You are not writing the prompt; you are writing part of the prompt.</strong> The template, and in a conversation the accumulated history, are the rest of it, and both count against the context window. <strong>Reshaping and truncating are different operations.</strong> Temperature changes how much the model's preferences matter; <code>top_p</code> changes how many options exist at all.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Choosing a model, briefly</h3>
+
+  <p>Start small. A 3.8-billion-parameter instruction-tuned model such as Phi-3-mini runs on 8 GB of VRAM, responds fast enough to iterate on, and fails often enough to teach you what your prompt is actually doing. Scaling a working prompt up to a larger model is usually pleasant; scaling one down, having tuned it against a model that forgave your ambiguity, usually is not. Build against the small model and treat the large one as headroom.</p>
+
+  <h3>The chat template</h3>
+
+  <p>Here's the thing nobody sees. Load an instruction-tuned model, pass a messages list, and the library converts it before the model gets anywhere near it.</p>
+
+  <pre><code>messages = [{"role": "user", "content": "Create a funny joke about chickens."}]
+
+# what actually reaches the model:
+print(tokenizer.apply_chat_template(messages, tokenize=False))
+# &lt;s&gt;&lt;|user|&gt;
+# Create a funny joke about chickens.&lt;|end|&gt;
+# &lt;|assistant|&gt;</code></pre>
+
+  <p>Those markers are vocabulary entries, the chat special tokens catalogued in lecture 2, and they are doing three jobs. They tell the model who is speaking, which is what makes multi-turn conversation possible at all. They mark where each turn ends, which is what the model emits when it has finished, so the software knows to stop generating. And the trailing <code>&lt;|assistant|&gt;</code> puts the model in the position of having to continue as the assistant, which is what converts a text completer into something that answers.</p>
+
+  <p>Every model family has its own template. Phi-3's is not Llama's is not Mistral's. Call <code>apply_chat_template</code> and you get the right one automatically, because the template ships with the tokenizer. Concatenate strings yourself and you will get it wrong, and the failure will present as poor model quality rather than as a formatting error.</p>
+
+  <div class="callout warn">
+    <span class="tag">Two consequences worth internalising</span>
+    A base model has no chat template because it was never instruction-tuned; feeding it a chat-formatted prompt is meaningless and it will simply carry on completing the text, which is what it does. Check whether the model you have loaded is the base or the instruct variant before blaming the prompt. And in a conversation, every previous turn is re-sent with its markers on every request, so a long chat consumes context and, on a hosted model, is re-billed each turn. That is the problem lecture 9 addresses with memory strategies.
+  </div>
+
+  <h3>Controlling the output: sampling</h3>
+
+  <p>Lecture 4 established that the model returns a distribution over the whole vocabulary and a decoding strategy picks from it. Three settings control that pick.</p>
+
+  <div class="defcard">
+    <span class="term">do_sample</span>
+    <span class="def">The master switch. With <code>False</code>, the model takes the highest-probability token every time: greedy decoding, fully deterministic, and <code>temperature</code> and <code>top_p</code> are ignored entirely. This is the correct setting for classification, extraction, and anything you need to be reproducible. Setting <code>temperature=0</code> on a hosted API achieves the same thing.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">temperature</span>
+    <span class="def">Rescales the model's scores before they're turned into probabilities, so it changes the <em>shape</em> of the distribution. Below 1 it sharpens: the leading token takes even more of the mass and the output becomes focused and repetitive. Above 1 it flattens: unlikely tokens become genuinely reachable and the output becomes varied and, eventually, incoherent. Around 0.2 is conservative, around 0.8 is lively. Nothing is ever excluded, so at high enough temperature the model can pick anything at all.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">top_p</span>
+    <span class="def">Nucleus sampling. Sort the tokens by probability and keep adding them to the candidate set until their cumulative probability reaches <em>p</em>; discard everything else and renormalise. At 0.9 the improbable tail is simply gone. At 1.0 nothing is excluded. Unlike temperature, this adapts to the model's confidence: where the model is certain the nucleus might hold two tokens, and where it is uncertain the same setting might admit fifty. A related parameter, <code>top_k</code>, fixes the candidate count instead, keeping the <em>k</em> most probable tokens regardless of how the probability is distributed.</span>
+  </div>
+
+  <pre><code>output = pipe(messages, do_sample=True, temperature=0.8, top_p=0.9)</code></pre>
+
+  <p>Because they act differently, the combinations are meaningfully distinct rather than redundant.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Use case</th><th>temperature</th><th>top_p</th><th>Why that combination</th></tr></thead>
+      <tbody>
+        <tr><td>Brainstorming</td><td>high</td><td>high</td><td>A flattened distribution over a large candidate pool. Maximum diversity, including genuinely unexpected suggestions, at the cost of some nonsense.</td></tr>
+        <tr><td>Email drafting</td><td>low</td><td>low</td><td>A sharpened distribution over a small pool. Predictable, conservative, safe. What you want when the output goes to a client.</td></tr>
+        <tr><td>Creative writing</td><td>high</td><td>low</td><td>The interesting one. Temperature makes the model willing to depart from its favourite continuation, while a tight nucleus stops it departing into gibberish. Inventive but coherent.</td></tr>
+        <tr><td>Translation</td><td>low</td><td>high</td><td>Sharpened, so the model commits to the reading it believes in, but with a wide pool so it can reach for an unusual word when that is the right word.</td></tr>
+        <tr><td>Classification, extraction, anything parsed</td><td colspan="2"><code>do_sample=False</code></td><td>Sampling buys nothing here and costs reproducibility. Not on the original table, and the most important row.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>What a prompt is made of</h3>
+
+  <p>At its most minimal a prompt is a few words and the model completes them, which is all a base model can do. Useful prompts have more structure, and the structure is worth naming because it's what you iterate on.</p>
+
+  <p>The smallest useful unit is an <strong>instruction</strong> plus the <strong>data</strong> it applies to: "Classify the sentiment of the following review" and then the review. Add an <strong>output indicator</strong> and the reply becomes usable: prefixing the review with <code>Text:</code> and ending the prompt with <code>Sentiment:</code> signals that a single word is expected, rather than a paragraph of discussion. That trick is worth more than it looks, because it's the cheapest form of the output control lecture 8 develops properly.</p>
+
+  <p>Beyond that, seven components recur often enough to be worth keeping as a checklist.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Seven prompt components stacked in order, with what each one controls">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A prompt as seven separable components, assembled by concatenation</text>
+
+      <g font-family="Inter">
+        <rect x="60" y="34" width="500" height="30" rx="5" fill="#FCE7F3" stroke="#be185d" stroke-width="1.5"/>
+        <text x="75" y="53" font-size="10" font-weight="700" fill="#831843">PERSONA</text>
+        <text x="175" y="53" font-size="9" font-family="JetBrains Mono" fill="#831843">"You are an expert in large language models&#8230;"</text>
+        <text x="580" y="53" font-size="9" font-style="italic" fill="#71717a">selects the register and vocabulary</text>
+
+        <rect x="60" y="68" width="500" height="30" rx="5" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="75" y="87" font-size="10" font-weight="700" fill="#5b21b6">INSTRUCTION</text>
+        <text x="175" y="87" font-size="9" font-family="JetBrains Mono" fill="#5b21b6">"Summarise the key findings of the paper."</text>
+        <text x="580" y="87" font-size="9" font-weight="600" font-style="italic" fill="#5b21b6">the only mandatory component</text>
+
+        <rect x="60" y="102" width="500" height="30" rx="5" fill="#DEEAFB" stroke="#2A3A78" stroke-width="1.5"/>
+        <text x="75" y="121" font-size="10" font-weight="700" fill="#2A3A78">CONTEXT</text>
+        <text x="175" y="121" font-size="9" font-family="JetBrains Mono" fill="#2A3A78">"&#8230;so researchers can grasp it quickly."</text>
+        <text x="580" y="121" font-size="9" font-style="italic" fill="#71717a">why, which disambiguates how</text>
+
+        <rect x="60" y="136" width="500" height="30" rx="5" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="75" y="155" font-size="10" font-weight="700" fill="#115e59">FORMAT</text>
+        <text x="175" y="155" font-size="9" font-family="JetBrains Mono" fill="#115e59">"Bullet points, then one paragraph."</text>
+        <text x="580" y="155" font-size="9" font-weight="600" font-style="italic" fill="#115e59">omit this and the model invents one</text>
+
+        <rect x="60" y="170" width="500" height="30" rx="5" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="75" y="189" font-size="10" font-weight="700" fill="#92400e">AUDIENCE</text>
+        <text x="175" y="189" font-size="9" font-family="JetBrains Mono" fill="#92400e">"&#8230;for busy researchers."</text>
+        <text x="580" y="189" font-size="9" font-style="italic" fill="#71717a">sets the assumed level</text>
+
+        <rect x="60" y="204" width="500" height="30" rx="5" fill="#FBF1D4" stroke="#a16207" stroke-width="1.5"/>
+        <text x="75" y="223" font-size="10" font-weight="700" fill="#713f12">TONE</text>
+        <text x="175" y="223" font-size="9" font-family="JetBrains Mono" fill="#713f12">"Professional and clear."</text>
+        <text x="580" y="223" font-size="9" font-style="italic" fill="#71717a">cheapest component to get right</text>
+
+        <rect x="60" y="238" width="500" height="30" rx="5" fill="#F4F4F2" stroke="#71717a" stroke-width="1.5"/>
+        <text x="75" y="257" font-size="10" font-weight="700" fill="#3f3f46">DATA</text>
+        <text x="175" y="257" font-size="9" font-family="JetBrains Mono" fill="#52525b">"Text to summarise: &lt;the actual text&gt;"</text>
+        <text x="580" y="257" font-size="9" font-style="italic" fill="#71717a">usually the longest by far</text>
+      </g>
+
+      <text x="440" y="288" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">Order matters as much as content: models attend most to the start and the end, so bury the instruction in the middle of a long prompt at your peril.</text>
+    </svg>
+    <figcaption>Assembling a prompt from named parts rather than writing a paragraph makes each part independently testable. Remove the persona and see whether anything changes; move the instruction from the top to the bottom and measure. Format is the component most often omitted and most often needed, because a model with no stated format will choose one, and it will not choose the same one every time.</figcaption>
+  </figure>
+
+  <pre><code>persona     = "You are an expert in large language models. You excel at breaking down complex papers.\n"
+instruction = "Summarise the key findings of the paper provided.\n"
+context     = "Your summary should extract the points a researcher needs to understand it quickly.\n"
+data_format = "Create a bullet-point summary of the method, then one paragraph on the results.\n"
+audience    = "The summary is for busy researchers tracking new trends.\n"
+tone        = "The tone should be professional and clear.\n"
+data        = f"Text to summarise: {text}"
+
+query = persona + instruction + context + data_format + audience + tone + data</code></pre>
+
+  <p>Written this way, improving the prompt is an experiment rather than a rewrite: drop one variable from the concatenation, rerun, compare. That is the entire methodology, and it's why the decomposition is worth the slight awkwardness of the code.</p>
+
+  <h3>Three techniques that reliably help</h3>
+
+  <p><strong>Specificity</strong> is the one that matters most. "Write a description for a product" leaves everything open; "write a description for a product in under two sentences using a formal tone" leaves almost nothing. Every unspecified dimension is one the model fills in itself, differently each time. Most disappointing output is under-specified rather than beyond the model.</p>
+
+  <p><strong>Give it an exit.</strong> Models produce fluent, confident, wrong answers, and they do it because a confident answer is the most probable continuation of a question, whatever the truth. Explicitly permitting "I don't know" makes that a licensed continuation and measurably reduces invention. It doesn't eliminate it, and the real fix for factual questions is supplying the facts, which is lecture 11.</p>
+
+  <p><strong>Put the instruction at an end, not in the middle.</strong> Models attend disproportionately to the beginning and the end of their input, and material in the middle of a long prompt is measurably more likely to be ignored, a documented effect sometimes called "lost in the middle". If your prompt has a long document in it, the instruction belongs before or after that document, not embedded in it. This one is easy to violate accidentally, because inserting the data in the middle of a nicely-structured prompt feels tidy.</p>
+
+  <h3>In-context learning: show rather than tell</h3>
+
+  <p>Everything so far describes the task. The alternative is to demonstrate it, which is <strong>in-context learning</strong>, and it comes in three sizes: <strong>zero-shot</strong> with no examples, <strong>one-shot</strong> with one, and <strong>few-shot</strong> with several.</p>
+
+  <p>The mechanically important part is that the examples must be formatted as a conversation, with the demonstrated answers attributed to the assistant. Put them all in one user message and you are showing the model a user who talks to themselves.</p>
+
+  <pre><code>one_shot_prompt = [
+    {"role": "user",
+     "content": "A 'Gigamuru' is a type of Japanese musical instrument. "
+                "An example of a sentence that uses the word Gigamuru is:"},
+    {"role": "assistant",
+     "content": "I have a Gigamuru that my uncle gave me as a gift. "
+                "I love to play it at home."},
+    {"role": "user",
+     "content": "To 'screeg' something is to swing a sword at it. "
+                "An example of a sentence that uses the word screeg is:"},
+]
+
+pipe(one_shot_prompt)
+# "During the intense duel, the knight skillfully screeged his opponent's shield,
+#  forcing him to defend himself."</code></pre>
+
+  <p>Two invented words, one demonstration, and the model produces a correct usage of the second. Applying the chat template to this reveals alternating <code>&lt;|user|&gt;</code> and <code>&lt;|assistant|&gt;</code> blocks, which is exactly the structure of a real conversation, and that is the point: you're fabricating a history in which the model has already done this task well, so continuing that history means doing it well again.</p>
+
+  <p>Examples are worth more than description when the task has a shape that's easier to show than to state, which covers most formatting requirements and most edge-case handling. They cost context, they can bias the model toward the specific examples you chose, and they do not bind: the model can still ignore them, especially with sampling on. The machine learning track's <a href="../machine_learning/11_large_language_models/03-prompting_and_reasoning.html">prompting and reasoning</a> lecture covers the competing theories of why in-context learning works at all, which remains genuinely unsettled.</p>
+
+  <h3>Chain prompting: split the problem across calls</h3>
+
+  <p>The components above break a prompt up internally. Chain prompting breaks the <em>task</em> up externally, running several calls where the output of one becomes input to the next.</p>
+
+  <pre><code># call 1: name and slogan
+product_prompt = [{"role": "user",
+    "content": "Create a name and slogan for a chatbot that leverages LLMs."}]
+product_description = pipe(product_prompt)[0]["generated_text"]
+# "Name: 'MindMeld Messenger'  Slogan: 'Unleashing Intelligent Conversations...'"
+
+# call 2: the pitch, using call 1's output
+sales_prompt = [{"role": "user",
+    "content": f"Generate a very short sales pitch for: '{product_description}'"}]
+sales_pitch = pipe(sales_prompt)[0]["generated_text"]</code></pre>
+
+  <p>Three benefits, in increasing order of importance. Each call gets the model's full attention on one subproblem instead of a compound one. Each call gets its own parameters, so the name generation can be short and creative while the pitch is longer and more conservative. And, decisively, each intermediate result is a thing you can inspect, validate, cache, or replace with something that isn't a model at all. A one-shot prompt that does three jobs is a black box; a chain of three is a pipeline with test points.</p>
+
+  <p>The same structure supports several patterns worth knowing by name. <strong>Response validation</strong> feeds a generated answer back for checking. <strong>Parallel prompts</strong> run several independent calls and merge the results, for instance generating several recipes and then producing one shopping list. <strong>Progressive construction</strong> builds a long artefact in stages, writing a summary, then characters, then beats, then dialogue.</p>
+
+  <p>The costs are real and worth stating. Latency is additive, since each call waits for the last. Errors compound, because a poor intermediate result is faithfully built upon. And the whole thing costs more, since you're paying for several generations. Lecture 9 turns this pattern into a named construct with proper templating, and lecture 10 removes the fixed sequence altogether by letting the model decide what to do next.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>What reaches an instruction-tuned model is not your text but your text wrapped in a chat template of role and end-of-turn tokens, which is the format it was trained on and the mechanism by which it knows to stop. Downstream, sampling is off by default and should stay off for anything you parse; when it's on, temperature reshapes the distribution so that unlikely tokens become reachable, while <code>top_p</code> truncates the tail so they cannot be reached at all, and the two compose into genuinely different behaviours. A prompt is best built as named components, persona, instruction, context, format, audience, tone and data, because that makes improvement an experiment rather than a rewrite; and the three techniques with the best return are being specific, licensing "I don't know", and keeping the instruction out of the middle. Showing examples often beats describing the task, provided the demonstrated answers are attributed to the assistant. And when one prompt is doing too much, splitting it across several calls buys attention, per-call parameters, and inspectable intermediate results.</p>
+
+  <p>Two problems remain open, and lecture 8 closes both. The reasoning problem: a model that answers immediately gets multi-step questions wrong, and there are prompting techniques that fix this by making it work through the steps. And the output problem, visible since lecture 5, that a generative model returns free text your pipeline has to parse and might get anything at all.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the three jobs the chat template's special tokens perform, and describe what goes wrong if you concatenate strings yourself.</li>
+      <li>Explain the difference between what temperature does to the distribution and what <code>top_p</code> does.</li>
+      <li>State when both parameters have no effect at all, and name the tasks for which that is the correct setting.</li>
+      <li>Explain why high temperature with low <code>top_p</code> produces creative but coherent text, referring to the mechanism of each.</li>
+      <li>Name the seven prompt components, and say which is mandatory and which is most often wrongly omitted.</li>
+      <li>Explain why the instruction should not sit in the middle of a long prompt.</li>
+      <li>Explain why a one-shot prompt must attribute the example answer to the assistant role.</li>
+      <li>Give three advantages of chain prompting over a single compound prompt, and two costs.</li>
+      <li>In the summarisation vignette, explain why a parameter that improved a demonstration was wrong in production.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 4 (<a href="04-inside_the_forward_pass.html">inside the forward pass</a>) established the distribution these parameters act on; lecture 2 (<a href="02-tokenisation.html">tokenisation</a>) catalogued the chat special tokens; lectures 5 and 6 used unstructured versions of these prompts.</li>
+      <li><strong>Next:</strong> Lecture 8 (<a href="08-reasoning_and_output_control.html">reasoning and output control</a>) covers multi-step reasoning and closes the output-parsing problem.</li>
+      <li><strong>Theory companion:</strong> The machine learning track's <a href="../machine_learning/11_large_language_models/03-prompting_and_reasoning.html">prompting and reasoning</a> lecture formalises a prompt as a conditioning event and reviews the competing explanations for why in-context learning works.</li>
+      <li><strong>Forward:</strong> Chain prompting becomes a formal construct in lecture 9 (<a href="09-chains_memory_and_state.html">chains, memory and state</a>), which also addresses the growing-conversation cost noted above; lecture 10 (<a href="10-agents_and_react.html">agents and ReAct</a>) lets the model choose the chain; lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>) is the real answer to invented facts.</li>
+      <li><strong>Agentic practice:</strong> The <a href="../claude_engineering/index.html">Claude engineering</a> track applies these ideas to directing a coding agent, where the prompt is a repository configuration file rather than a string.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 7 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

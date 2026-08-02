@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 24: tensors and entity embedding</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Deep learning</a></div>
+  <h1>Tensors and entity embedding</h1>
+  <p class="subtitle">Lecture 1 introduced the tensor as the data structure deep learning operates on: scalars, vectors, matrices, and their higher-order generalisations. This lecture picks up specifically where actuarial and credit tabular data is hardest on that data structure: high-cardinality categorical covariates, vehicle brand, occupation, postcode, that one-hot encoding turns into thousands of near-empty columns. Entity embedding is the answer, learned during training rather than designed by hand, and it is the single idea that makes deep learning on tabular data workable at all.</p>
+  <div class="meta">
+    <span>Lecture 24 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part IV: deep learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A categorical covariate with $K$ levels, one-hot or dummy encoded (feature-engineering sub-module), produces a $K$-dimensional sparse vector per observation; for a vehicle-brand or occupation column with hundreds of levels, this is both wasteful and statistically fragile, because most levels appear too rarely for their coefficients to be estimated with any credibility. <strong>Entity embedding</strong> replaces the sparse one-hot vector with a dense, low-dimensional vector $e^{\text{EE}}(a_k) \in \mathbb{R}^b$ for each level $a_k$, with $b \ll K$ chosen by the modeller, and, critically, the $b \times K$ embedding weights are learned <em>during network training</em> from the supervised target, exactly like any other network weight, rather than designed by hand. Nearby points in the resulting $b$-dimensional space correspond to levels with similar effects on the response, an entirely emergent property of training rather than something imposed in advance. Because the embedding is fitted using the target, changing the target (claim frequency versus liability severity) changes the learned embedding, a point worth remembering before reusing an embedding across two different modelling tasks. High-cardinality categorical covariates additionally need their own regularisation, exposure-scaled toward the global mean in the spirit of Bühlmann credibility, because gradient descent trained in mini-batches sees only a fraction of a rare level's occurrences at each step and tends to stop early on those levels' embedding weights.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine trying to describe someone's job in a single number rather than a category label, in a way that two similar jobs end up close together and two very different jobs end up far apart. You could hand-design this (actuary and statistician are similar, actuary and lorry driver are not) or you could let a model figure it out on its own by asking it to predict something (claims frequency, say) and letting the numbers it assigns to each job settle wherever makes that prediction work best. Entity embedding is the second approach, applied to every categorical column in a dataset at once, with the model choosing the numbers rather than a human choosing them.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture revisits the feature-engineering sub-module's categorical-encoding material (one-hot, dummy, target encoding) specifically for the case where the encoding itself is learned inside a network rather than computed beforehand, and it prepares the ground for the next lecture, unsupervised word embedding, which learns an analogous dense representation for words without any labelled target at all.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons entity embedding earns its own lecture rather than a footnote to feature engineering.</p>
+
+  <p>First, <strong>high-cardinality categorical covariates are the rule, not the exception, in actuarial and credit data</strong>. Vehicle make and model, occupation code, postcode sector, merchant category: every one of these routinely carries hundreds to tens of thousands of levels, and one-hot encoding every one of them produces a design matrix that is mostly zeros, ill-conditioned for a GLM and wasteful for a network, exactly the sparse-design-matrix problem the feature-engineering sub-module flagged without a full solution.</p>
+
+  <p>Second, <strong>a learned embedding captures similarity a human encoding scheme would have to guess at</strong>. An actuary designing an ordinal or manually grouped encoding for vehicle brand has to decide, by domain judgement, which brands behave similarly; an entity embedding discovers this from the data itself, and frequently recovers groupings (sports car brands clustering together, family-car brands clustering separately) that match domain intuition without anyone having specified it.</p>
+
+  <p>Third, <strong>the credibility-style regularisation this lecture develops is a direct, quantitative answer to a real production risk</strong>: an unregularised embedding for a rare level is fitted on almost no data and can take an extreme, unstable value; the exposure-scaled shrinkage developed below shrinks exactly the levels that need it, proportional to how little is known about them, without touching well-populated levels at all.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A motor insurer's claims-frequency network used a 12-dimensional entity embedding for a 340-level vehicle-model column, trained with no additional regularisation on the embedding weights. Out-of-sample deviance was competitive with the incumbent GLM on average, but a validation deep-dive on the 40 rarest vehicle models (fewer than 50 policy-years each) found embedding-driven predictions swinging by a factor of three between otherwise near-identical models, purely because each rare model's embedding vector had been fitted on a handful of mini-batches and had not converged to anything stable. Adding exposure-scaled ridge regularisation on the embedding weights, developed in this lecture, brought the rare-model predictions back into a plausible range without materially changing the well-populated models' predictions or the model's overall discrimination.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a categorical column with six levels, mapped from a sparse six-dimensional one-hot space into a dense, two-dimensional embedding space where proximity reflects learned similarity in risk behaviour.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="From one-hot encoding to a learned, low-dimensional entity embedding">
+      <defs>
+        <marker id="embArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">One-hot (sparse, K = 6) to entity embedding (dense, b = 2)</text>
+
+      <g transform="translate(40, 55)">
+        <rect x="0" y="0" width="330" height="245" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="165" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">One-hot: K = 6 sparse columns</text>
+        <g font-family="JetBrains Mono" font-size="10" fill="#92400e">
+          <text x="30" y="60">accountant   1 0 0 0 0 0</text>
+          <text x="30" y="82">actuary      0 1 0 0 0 0</text>
+          <text x="30" y="104">economist    0 0 1 0 0 0</text>
+          <text x="30" y="126">quant        0 0 0 1 0 0</text>
+          <text x="30" y="148">statistician 0 0 0 0 1 0</text>
+          <text x="30" y="170">underwriter  0 0 0 0 0 1</text>
+        </g>
+        <text x="165" y="210" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#92400e">no notion of similarity between levels</text>
+      </g>
+
+      <line x1="380" y1="175" x2="440" y2="175" stroke="#71717a" stroke-width="2" marker-end="url(#embArrow)"/>
+      <text x="410" y="165" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">learned</text>
+
+      <g transform="translate(450, 55)">
+        <rect x="0" y="0" width="370" height="245" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="185" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Entity embedding: b = 2 dense dimensions</text>
+        <line x1="30" y1="220" x2="330" y2="220" stroke="#115e59" stroke-width="1"/>
+        <line x1="30" y1="220" x2="30" y2="40" stroke="#115e59" stroke-width="1"/>
+
+        <circle cx="70" cy="80" r="4" fill="#0d9488"/><text x="78" y="76" font-family="Inter" font-size="9" fill="#115e59">actuary</text>
+        <circle cx="90" cy="95" r="4" fill="#0d9488"/><text x="98" y="98" font-family="Inter" font-size="9" fill="#115e59">statistician</text>
+        <circle cx="60" cy="110" r="4" fill="#0d9488"/><text x="10" y="125" font-family="Inter" font-size="9" fill="#115e59">quant</text>
+
+        <circle cx="260" cy="180" r="4" fill="#b45309"/><text x="268" y="184" font-family="Inter" font-size="9" fill="#115e59">accountant</text>
+        <circle cx="280" cy="195" r="4" fill="#b45309"/><text x="288" y="198" font-family="Inter" font-size="9" fill="#115e59">underwriter</text>
+        <circle cx="240" cy="200" r="4" fill="#b45309"/><text x="150" y="210" font-family="Inter" font-size="9" fill="#115e59">economist</text>
+
+        <text x="185" y="238" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">quantitative roles cluster; finance roles cluster separately</text>
+      </g>
+    </svg>
+    <figcaption>The one-hot encoding on the left treats every level as equally, maximally different from every other; there is no way to express that an actuary and a statistician are more alike, for risk purposes, than an actuary and an accountant. The entity embedding on the right, learned by the network during training on the actual response, places levels close together when the network has found their effect on the target to be similar, an emergent clustering rather than a designed one.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>The embedding is learned, not designed.</strong> No modeller specifies which levels are similar; the training procedure discovers it by asking which embedding vectors make the downstream prediction task easiest. <strong>The embedding is target-specific.</strong> The same categorical column, embedded against claims frequency and against claims severity, will generally learn two different geometries, because "similar for predicting how often" and "similar for predicting how much" are different questions.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Tensors as input format: a quick recap</h3>
+
+  <p>Lecture 1 established the tensor hierarchy: a scalar is a zero-order tensor, a vector a first-order tensor, a matrix a second-order tensor, and a colour image a third-order tensor (height, width, colour channel). For a single tabular instance, the input is a first-order tensor (a feature vector); stacking $n$ instances gives a second-order design tensor (a matrix), exactly the design matrix $\mathbf{X}$ familiar from the statistics track's GLM lecture. Where tabular data departs from this simple picture is in how a categorical column is represented within that vector before it reaches the network, and that is this lecture's subject.</p>
+
+  <h3>Entity embedding, formally</h3>
+
+  <p>Let $X$ be a categorical covariate taking values in a finite set of levels $A = \{a_1, \ldots, a_K\}$. Select an embedding dimension $b \in \mathbb{N}$, a hyperparameter chosen by the modeller, typically $b \ll K$. An <strong>entity embedding</strong> is a mapping</p>
+  $$e^{\text{EE}}: A \to \mathbb{R}^b, \qquad a_k \mapsto e^{\text{EE}}(a_k),$$
+  <p>assigning each level a $b$-dimensional embedding vector. In total, this involves $b \times K$ parameters, the <strong>embedding weights</strong>, which are learned during network training exactly like any other layer's weights, by gradient descent on the identical strictly consistent loss function (statistics track, lecture 14) the rest of the network is trained to minimise:</p>
+  $$\mathcal{L}(\theta; L) = \frac{1}{n}\sum_{i=1}^n \frac{v_i}{\phi} L\big(Y_i, \hat\mu(X_i)\big),$$
+  <p>where $\theta$ now includes the embedding weights alongside every other network weight. Because the embedding is fitted using the supervised target $Y$, two categorical levels end up with similar embedding vectors precisely when the network has found they have a similar effect on $Y$; changing $Y$ (fitting an embedding for claims frequency versus fitting one for claims severity) generally produces two different embeddings for the identical categorical column, a point worth restating because it is easy to assume, wrongly, that an embedding is a property of the covariate alone rather than of the covariate-and-target pair.</p>
+
+  <h3>Regularising high-cardinality embeddings: exposure-scaled shrinkage</h3>
+
+  <p>High-cardinality categorical covariates are precisely where gradient descent, trained in mini-batches, runs into trouble. A mini-batch sees only a fraction of the training rows at each step, and a rare level might appear in only a handful of mini-batches over an entire training run; its embedding vector effectively stops updating well before it has converged, because gradient descent's early-stopping rule (lecture 1) triggers on the model's overall validation loss, not on whether every individual level's embedding has been seen enough times to be trustworthy.</p>
+
+  <p>The standard remedy is a ridge-style penalty on the embedding weights, but scaled by exposure so that well-populated levels are barely shrunk while rare levels are pulled firmly toward zero (equivalently, toward whatever the rest of the network already predicts without that level's contribution). Let $v_k^+ = \sum_i v_i \, \mathbb{1}\{X_i = a_k\}$ denote the total exposure on level $a_k$. The exposure-scaled regularised loss for instance $i$, with $k[i]$ denoting the level of $X_i$, is</p>
+  $$\frac{1}{n}\sum_{i=1}^n \left[v_i \, L(Y_i, \hat\mu(X_i)) + \frac{\lambda}{v_{k[i]}^+} \left\|e^{\text{EE}}(a_{k[i]})\right\|_2^2\right],$$
+  <p>for a regularisation parameter $\lambda > 0$. Because the penalty on any given instance's embedding contribution is divided by that level's total exposure $v_{k[i]}^+$, a rare level (small $v_{k[i]}^+$) receives a much stronger effective shrinkage per occurrence than a common level (large $v_{k[i]}^+$), exactly the behaviour a Bühlmann-credibility-style shrinkage exhibits in a classical GLM context: rare levels are pulled toward the population default, well-populated levels are trusted close to their own estimate. Writing the penalty this way, rather than as an unweighted sum over the $K$ levels, is also what makes it usable inside mini-batch stochastic gradient descent: the penalty term factors cleanly across instances, so each mini-batch can compute its own share of the penalty using only the levels present in that batch, without needing to see the whole dataset at every step.</p>
+
+  <div class="defcard tint-sky">
+    <div class="term">Hierarchical categorical structure</div>
+    <div class="def">Some categorical covariates are naturally hierarchical: vehicle brand, model, and detailed trim form a nested structure, where a specific Toyota model cannot appear under a Volkswagen brand. Regularising each level of the hierarchy independently ignores this structure; the standard extension penalises deviations of a fine-grained level's embedding from its parent's embedding (analogous to the fused-LASSO idea from the feature-selection lecture, applied to a tree-structured rather than an ordered set of levels), so that a rare specific trim borrows strength from its model, and a rare model borrows strength from its brand, a direct embedding-space analogue of nested credibility.</div>
+  </div>
+
+  <h3>Target encoding versus entity embedding</h3>
+
+  <p>The feature-engineering sub-module's target encoding (replacing a categorical level with the credibility-weighted mean response for that level, shrunk toward the global mean) and entity embedding solve a related problem with a different amount of information retained. Target encoding compresses each level to a single number; entity embedding compresses each level to a $b$-dimensional vector, retaining $b$ separate learned dimensions of variation rather than collapsing to one. For $b = 1$, an entity embedding and a (properly regularised, credibility-shrunk) target encoding become close cousins; for $b > 1$, the embedding retains richer structure, at the cost of losing target encoding's direct, one-number interpretability. Neither dominates the other unconditionally: target encoding is simpler to audit and explain, entity embedding is more flexible and is the natural choice when the categorical covariate feeds into a network rather than a GLM or a tree.</p>
+
+  <h3>Bag-of-words as the crude limiting case</h3>
+
+  <p>Where a categorical covariate is replaced by a small set of tokens rather than a single level (a list of add-on covers on a policy, say, or, at the extreme, every distinct word in a short free-text field), the crudest way to make this numerical is the <strong>bag-of-words</strong> mapping,</p>
+  $$\psi: \mathcal{W}_0^T \to \mathbb{N}_0^{W}, \qquad \text{text} \mapsto \left(\sum_{t=1}^T \mathbb{1}\{w_t = w\}\right)_{w \in \mathcal{W}},$$
+  <p>counting how often each vocabulary word $w$ appears in the text and discarding word order entirely. Bag-of-words is high-dimensional (one column per vocabulary word), sparse (most words absent from most short texts), and blind to order, meaning "the car is red" and "is the car red" produce the identical representation despite differing in meaning. It is a reasonable baseline and nothing more; the next lecture develops the far richer alternative, learned word embeddings, that entity embedding's core idea (a dense, learned vector per discrete token) generalises to naturally.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Reusing an embedding fitted for a different target</span>
+    An entity embedding fitted for claims frequency encodes which vehicle models behave similarly for frequency purposes; feeding that same, frozen embedding into a severity model without refitting assumes frequency-similarity and severity-similarity coincide, an assumption that frequently fails for exactly the vehicle categories (high-performance models, say) where frequency and severity diverge most. Refit the embedding for each target, or, at minimum, verify the assumption before reusing one.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Skipping exposure-scaled regularisation on high-cardinality columns</span>
+    An unregularised embedding for a column with hundreds of levels will, almost always, produce wildly unstable predictions for the rarest handful of levels, exactly the vignette's finding. This is not a hyperparameter nicety; for genuinely high-cardinality categorical data it is close to a prerequisite for a deployable model.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing embedding dimension $b$ without justification</span>
+    A larger $b$ gives the embedding more room to express genuine structure but also more room to overfit rare levels even under regularisation; a common, defensible starting rule is $b$ on the order of $K^{1/2}$ to $K^{1/4}$ for a column with $K$ levels, checked by cross-validated loss rather than assumed. Documenting the choice, and showing the loss curve across a small grid of candidate $b$ values, is standard due diligence for a model validator.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Ignoring hierarchy in nested categorical structures</span>
+    Treating vehicle brand and vehicle model as two independent, separately embedded columns discards the genuine nesting between them and forfeits the credibility-style strength-borrowing the hierarchical extension in this lecture provides; a rare model then has no route to borrow stability from its (likely well-populated) brand.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Entity embedding replaces a sparse, high-dimensional one-hot representation of a categorical covariate with a dense, low-dimensional vector per level, learned during training against the actual supervised target rather than designed in advance. The resulting geometry, proximity between levels with similar learned effects on the response, is an emergent property of training, and it is specific to the target the embedding was fitted against. High-cardinality columns need exposure-scaled regularisation, a direct network-training analogue of Bühlmann credibility, to prevent rare levels' embeddings from taking unstable values on the strength of a handful of mini-batch observations, and hierarchical categorical structures benefit from a further extension that lets fine-grained levels borrow stability from their parents.</p>
+
+  <p>The next lecture extends the identical idea, a dense, learned vector per discrete token, from categorical levels to the words of a natural language, where the target is not a supervised label at all but the surrounding words themselves: unsupervised word embedding, word2vec, and GloVe.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Define entity embedding and state the total number of learnable parameters it introduces for a column with $K$ levels and embedding dimension $b$.</li>
+      <li>Explain why the same categorical column, embedded against two different targets, generally learns two different embedding geometries.</li>
+      <li>Write the exposure-scaled regularised loss for entity embedding and explain, in words, why the penalty divides by $v_k^+$ rather than applying a flat penalty to every level.</li>
+      <li>Compare target encoding and entity embedding: what does each retain, and when would you prefer one over the other?</li>
+      <li>Describe the bag-of-words representation and name its two main weaknesses.</li>
+      <li>A vehicle-model column has a natural brand-model-trim hierarchy. Explain how regularising each level independently loses information the hierarchical extension would otherwise retain.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 3 (<a href="03-ensembling_and_nagging.html">ensembling and nagging</a>) closed the training-stability arc; this lecture opens the data-representation arc that runs through the rest of this sub-module.</li>
+      <li><strong>Next:</strong> Lecture 5 (<a href="05-word_embeddings.html">word embeddings</a>) extends the dense-vector-per-token idea to unsupervised text representation.</li>
+      <li><strong>Built on:</strong> The feature-engineering sub-module's <a href="../01_feature_engineering/02-feature_transformation.html">categorical encoding lecture</a> (one-hot, dummy, target encoding) is the classical-statistics precursor to entity embedding developed here.</li>
+      <li><strong>Prerequisite:</strong> The credibility shrinkage this lecture's exposure-scaled regularisation echoes is developed formally in the actuarial-science track's credibility theory material.</li>
+      <li><strong>Outside this course:</strong> Entity embedding for high-cardinality categoricals is standard practice in production claims-frequency and claims-severity networks; the actuarial-applications module later in this course develops the credibility transformer, an architecture that generalises the exposure-scaled shrinkage idea in this lecture to a full attention mechanism.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Deep learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 24 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

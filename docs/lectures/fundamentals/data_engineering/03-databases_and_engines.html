@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 3: databases and query engines</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Databases and query engines</h1>
+  <p class="subtitle">A shop has a till and a set of annual accounts. Both concern the same money, and nobody would dream of producing the accounts by interrogating the till mid-transaction. The till answers what is owed right now, to the penny, for one customer at a time. The accounts answer what happened over a year, across every customer, and they need a memory the till does not have. Every analytical architecture is a version of that separation.</p>
+  <div class="meta">
+    <span>Lecture 3 of 20</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>database</strong> is a system for managing records rather than files. The file system underneath is technically a database of a crude kind, but the term means a dedicated system that knows the shape of what it stores, enforces rules about it, and answers questions in a query language. The first question to ask about any database is not which vendor built it but which of two jobs it is doing.</p>
+
+  <p><strong>Online transaction processing</strong>, or OLTP, is the till. Many small operations per second, each touching one or a few records, each of which must be correct and durable the instant it completes: create a payment, update a balance, retrieve an account. <strong>Online analytical processing</strong>, or OLAP, is the annual accounts. Few large operations, each scanning millions of records across a handful of columns, tolerant of being a day out of date and intolerant of being wrong in aggregate.</p>
+
+  <p>The two jobs pull the design in opposite directions on every axis: storage layout, normalisation, indexing, concurrency, and above all history. The transactional system holds current state, because that is what a till needs. The analytical system holds the past, because that is what a question about a year needs. Building that history is data engineering's most consequential job, and no source system will do it for you.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The till and the accounts. The till must never lose a penny, must serve the next customer in under a second, and does not care what happened last March. The accounts must reconstruct last March exactly, across every till in every branch, and do not care about the next customer. Ask the till what the arrears position was on 31 March 2019 and it will tell you what the arrears position is today, because that is the only thing it stores. This is not a defect in the till. It is the reason the accounts exist.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Never point analytics at the production ledger</span>
+    Three reasons, in order of how quickly they will end your career. Your scan takes locks or consumes the read capacity that customer transactions need, so the bank's payments slow down. Your query sees the table mutating underneath it, so the total you compute reconciles to nothing. And the ledger holds current state only, so the answer you get is not the answer to the question you asked. Every one of these is solved by copying the data out, which is what ingestion in Lecture 10 is for.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Current state has no memory, and risk modelling is entirely about memory.</strong> A PD model needs the state of an account at a series of past observation dates, with the outcome observed twelve months after each. An IFRS 9 staging assessment needs the credit quality at origination compared with the credit quality now. A through-the-cycle calibration needs a decade. None of these questions can be answered from a system that overwrites the arrears counter every month, and almost every core banking system does exactly that. If nobody snapshotted the book in 2019, the 2019 observation window does not exist, and no amount of modelling skill recovers it. The single most valuable thing a data platform does for a risk function is accumulate history that the source systems discard.</p>
+
+  <p><strong>The choice of engine sets the cost of curiosity.</strong> The same aggregation over five years of loan history might take two hours on a row-oriented transactional database, four minutes on a columnar warehouse, and twenty seconds on a well-partitioned Parquet dataset scanned locally. The difference is not merely convenience. At two hours, the query is a request submitted to a queue; at twenty seconds, it is a thought. Analytical capability is bounded by how many questions per day a person can afford to ask.</p>
+
+  <p><strong>Getting the layering wrong is expensive to reverse.</strong> Storage decisions outlive engine decisions. Data written into a proprietary warehouse's internal format is reachable only through that warehouse, and moving a decade of history out of one is a project. Data written as Parquet in object storage under an open table format can be read by whichever engine is best in 2030. This is the substantive argument for the lakehouse, and it is an argument about optionality rather than performance.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The two workloads, side by side</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="OLTP compared with OLAP">
+      <defs>
+        <marker id="ar-ola" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two workloads, two designs, one copy operation between them</text>
+
+      <!-- OLTP box -->
+      <rect x="30" y="45" width="300" height="200" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="180" y="70" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#92400e">OLTP: the till</text>
+      <g font-family="Inter" font-size="10.5" fill="#7c2d12">
+        <text x="48" y="94">many small transactions per second</text>
+        <text x="48" y="112">reads and writes single records</text>
+        <text x="48" y="130">row-oriented storage, heavily indexed</text>
+        <text x="48" y="148">normalised, so each fact is stored once</text>
+        <text x="48" y="166">ACID transactions, strict isolation</text>
+        <text x="48" y="184">holds current state; overwrites the past</text>
+        <text x="48" y="202">downtime is a customer incident</text>
+        <text x="48" y="228" font-weight="600" fill="#92400e">core banking, collections, card switch</text>
+      </g>
+
+      <!-- OLAP box -->
+      <rect x="430" y="45" width="300" height="200" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="580" y="70" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#5b21b6">OLAP: the accounts</text>
+      <g font-family="Inter" font-size="10.5" fill="#5b21b6">
+        <text x="448" y="94">few large queries, scanning millions of rows</text>
+        <text x="448" y="112">reads many rows, few columns; writes in bulk</text>
+        <text x="448" y="130">columnar storage, statistics instead of indexes</text>
+        <text x="448" y="148">denormalised, so joins are pre-resolved</text>
+        <text x="448" y="166">snapshot reads; bulk atomic publishes</text>
+        <text x="448" y="184">holds history; never overwrites the past</text>
+        <text x="448" y="202">downtime delays a report</text>
+        <text x="448" y="228" font-weight="600" fill="#5b21b6">risk data mart, warehouse, lakehouse</text>
+      </g>
+
+      <!-- arrow between -->
+      <line x1="334" y1="145" x2="424" y2="145" stroke="#71717a" stroke-width="2" marker-end="url(#ar-ola)"/>
+      <text x="379" y="132" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#3f3f46">ingestion</text>
+      <text x="379" y="162" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">Lectures 10-12</text>
+
+      <!-- history band -->
+      <rect x="30" y="270" width="700" height="120" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="380" y="294" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">THE ASYMMETRY THAT MATTERS MOST</text>
+      <g font-family="Inter" font-size="11" fill="#115e59">
+        <text x="380" y="318" text-anchor="middle">The till stores one row per account: arrears_months = 2, as of now.</text>
+        <text x="380" y="336" text-anchor="middle">The accounts store one row per account per month: 60 rows, one of which says March 2019.</text>
+        <text x="380" y="360" text-anchor="middle" font-weight="600">If nobody wrote the March 2019 row in March 2019, it does not exist and cannot be recovered.</text>
+        <text x="380" y="378" text-anchor="middle" font-style="italic" fill="#0d9488">Accumulating history the source discards is the platform's highest-value function.</text>
+      </g>
+    </svg>
+    <figcaption>The two workloads differ on every design axis, but the asymmetry in the green band is the one that decides whether a risk function can build models at all. Snapshotting is cheap to do prospectively and impossible to do retrospectively, which makes it the first thing to get right and the most common thing to regret.</figcaption>
+  </figure>
+
+  <h3>ACID, and what the analytical side keeps of it</h3>
+
+  <p>Transactional systems enforce <strong>ACID</strong> semantics, and the four letters are worth stating precisely because the lakehouse of Lecture 14 exists to recover them.</p>
+
+  <div class="defcard tint-mint"><span class="term">Atomicity</span><span class="def">Each transaction is a single unit that either completes entirely or not at all. A transfer that debits one account must credit the other; if the credit cannot be applied, the debit must not persist.</span></div>
+  <div class="defcard tint-peach"><span class="term">Consistency</span><span class="def">A transaction moves the database from one valid state to another, where valid means every declared constraint still holds. The constraints of Lecture 04 are what makes this checkable.</span></div>
+  <div class="defcard tint-lavender"><span class="term">Isolation</span><span class="def">Concurrent transactions do not observe each other's partial work. A balance enquiry running during a transfer sees the state either before or after, never a half-applied transfer with money in neither account.</span></div>
+  <div class="defcard tint-sky"><span class="term">Durability</span><span class="def">Once committed, a transaction survives. Pull the power cable and the committed transfer is still there when the machine restarts.</span></div>
+
+  <p>Analytical systems need a weaker but still essential version. They do not need to isolate thousands of concurrent writers, because there is usually one writer, the pipeline. They very much need atomicity and isolation at the level of a whole publish: a reader querying a table halfway through the monthly load must see either last month's complete data or this month's, never a partially written table. A great deal of pain in early data lakes came from having no such guarantee, so a consumer reading during a load got half a month. This is precisely the gap Delta Lake and Iceberg were built to close.</p>
+
+  <h3>Relational and the four NoSQL families</h3>
+
+  <p>The <strong>relational</strong> model, from Codd in 1970, stores data in tables of rows and columns, identifies each row by a primary key, references rows in other tables by foreign key, and queries the result with SQL. Its power is that the query language is declarative, so you state what you want and the engine decides how to get it, and that referential integrity is enforced by the system rather than by the application. It remains the correct default for structured data, which is most banking data.</p>
+
+  <p><strong>Non-relational</strong> systems, loosely called NoSQL, drop the relational schema in exchange for something else, usually horizontal scalability or a better fit to a particular access pattern. Four families are worth knowing.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Family</th><th>Shape</th><th>Good at</th><th>Banking example</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Key-value</strong></td><td>A unique key mapped to an opaque value</td><td>Extremely fast lookup by exact key; caching; session state</td><td>Serving a model's precomputed features by account identifier</td></tr>
+      <tr><td><strong>Document</strong></td><td>Key-value where the value is a JSON document the engine can query</td><td>Variable structure per instance without schema migrations</td><td>Application forms, know-your-customer document metadata</td></tr>
+      <tr><td><strong>Column family</strong></td><td>Rows with columns grouped into related families, sparse and very wide</td><td>Huge tables with predictable key access and high write rates</td><td>Time-series event capture at market data volumes</td></tr>
+      <tr><td><strong>Graph</strong></td><td>Nodes with typed edges between them</td><td>Traversal questions: paths, cycles, connected components</td><td>Beneficial ownership networks, fraud rings, group exposure</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Note what NoSQL does not mean. It does not mean faster, and for analytical aggregation it is usually much slower than a columnar SQL engine. It does not mean schemaless, because the schema moves into the application code rather than disappearing. Choose it when the access pattern genuinely does not fit tables, and be suspicious of any argument that starts from scale you do not have. A graph problem is the clearest case: computing group exposure across a beneficial ownership network is a recursive traversal, and expressing it in SQL is possible but painful.</p>
+
+  <h3>Warehouse, lake, lakehouse</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Warehouse, lake, and lakehouse compared">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three architectures, and what each swing of the pendulum kept</text>
+
+      <!-- warehouse -->
+      <rect x="30" y="45" width="215" height="180" rx="12" fill="#DEEAFB" stroke="#4A6BD1" stroke-width="2"/>
+      <text x="137" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#2A3A78">WAREHOUSE</text>
+      <text x="137" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#4A6BD1">1990s onward</text>
+      <g font-family="Inter" font-size="10" fill="#2A3A78">
+        <text x="44" y="112">schema on write</text>
+        <text x="44" y="128">modelled, governed, trusted</text>
+        <text x="44" y="144">SQL, ACID, fast</text>
+        <text x="44" y="166" font-weight="600" fill="#DC2855">structured data only</text>
+        <text x="44" y="182" font-weight="600" fill="#DC2855">storage tied to the engine</text>
+        <text x="44" y="198" font-weight="600" fill="#DC2855">a source change is a project</text>
+      </g>
+
+      <!-- lake -->
+      <rect x="272" y="45" width="215" height="180" rx="12" fill="#FEF3C7" stroke="#a16207" stroke-width="2"/>
+      <text x="379" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#713f12">DATA LAKE</text>
+      <text x="379" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#a16207">2010s</text>
+      <g font-family="Inter" font-size="10" fill="#713f12">
+        <text x="286" y="112">schema on read</text>
+        <text x="286" y="128">any format, land it all</text>
+        <text x="286" y="144">cheap open storage</text>
+        <text x="286" y="166" font-weight="600" fill="#DC2855">no transactions</text>
+        <text x="286" y="182" font-weight="600" fill="#DC2855">no schema enforcement</text>
+        <text x="286" y="198" font-weight="600" fill="#DC2855">becomes a swamp without care</text>
+      </g>
+
+      <!-- lakehouse -->
+      <rect x="514" y="45" width="215" height="180" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="621" y="70" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">LAKEHOUSE</text>
+      <text x="621" y="86" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">2019 onward</text>
+      <g font-family="Inter" font-size="10" fill="#115e59">
+        <text x="528" y="112">open files, plus a table layer</text>
+        <text x="528" y="128">ACID on object storage</text>
+        <text x="528" y="144">schema evolution, time travel</text>
+        <text x="528" y="166">many engines, one copy</text>
+        <text x="528" y="182" font-weight="600" fill="#a16207">more moving parts</text>
+        <text x="528" y="198" font-weight="600" fill="#a16207">younger tooling</text>
+      </g>
+
+      <text x="380" y="256" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">The lakehouse keeps the lake's storage economics and openness, and adds back the warehouse's</text>
+      <text x="380" y="272" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">guarantees. Read the sequence as a pendulum where each swing retains what the last one proved necessary.</text>
+      <text x="380" y="292" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#52525b">Lecture 14 builds the third box; Lecture 08 models what goes inside any of them.</text>
+    </svg>
+    <figcaption>Warehouse, lake, and lakehouse. The red items are the defects that motivated the next architecture. Note that the lake's failures were governance failures rather than technical ones, which is why the lakehouse answer is a metadata layer rather than a new storage medium.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Storage, engine, and catalogue are three separate things</h3>
+
+  <p>The most useful mental shift when reading modern architecture diagrams is to stop thinking of "a database" as one thing. Four layers are now separately purchasable, and vendors bundle different subsets of them.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Job</th><th>Examples</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Storage</strong></td><td>Hold the bytes durably and cheaply</td><td>S3, Azure Data Lake Storage, Google Cloud Storage, a local disk</td></tr>
+      <tr><td><strong>File format</strong></td><td>Lay out one file's bytes so a scan is cheap</td><td>Parquet, ORC, Avro (Lecture 02)</td></tr>
+      <tr><td><strong>Table format</strong></td><td>Make many files behave as one transactional table</td><td>Delta Lake, Apache Iceberg, Apache Hudi (Lecture 14)</td></tr>
+      <tr><td><strong>Query engine</strong></td><td>Parse SQL, plan it, execute it over the table</td><td>DuckDB, Spark, Trino, Snowflake, BigQuery, Databricks SQL</td></tr>
+      <tr><td><strong>Catalogue</strong></td><td>Record which tables exist, their schemas, and who may read them</td><td>Unity Catalog, AWS Glue, Hive Metastore, Polaris</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>A classical database fuses storage, format, and engine into one product, which is why it is fast and why leaving it is hard. Snowflake and BigQuery separate storage from compute internally but historically kept the format proprietary. The lakehouse separates all five, and the price of that flexibility is that you now own five choices instead of one. For a small risk function the sane answer is to keep the layering conceptually while buying it bundled: open file format, open table format, whatever engine is convenient.</p>
+
+  <h3>How an analytical engine actually goes fast</h3>
+
+  <p>Four techniques account for most of the difference between a transactional engine and an analytical one, and none of them is exotic.</p>
+
+  <p><strong>Columnar layout with compression</strong>, as Lecture 02 established, so a query reads the columns it needs and those columns compress well. <strong>Vectorised execution</strong>, meaning the engine processes batches of a few thousand values at a time through tight loops rather than one row at a time through a function call per row, which turns interpretation overhead from dominant into negligible. <strong>Statistics-based pruning</strong>, where per-block minimum and maximum values let the engine skip whole blocks that cannot match the filter, which is the reason analytical engines mostly do not need indexes. And <strong>parallelism</strong>, splitting the scan across cores or across machines and combining partial aggregates, which works because analytical aggregation is largely associative.</p>
+
+  <p>Massively parallel processing, or MPP, is the name for the distributed version: the query is planned once and executed by many workers over disjoint slices of the data. The hard part is not the scan but the join, because a join between two large tables requires matching rows to meet on the same machine, which means moving data across the network. That movement is the <em>shuffle</em>, it dominates the cost of most large distributed queries, and Lecture 13 is largely about controlling it.</p>
+
+  <div class="callout insight">
+    <span class="tag">The rise of the single node, again</span>
+    In 2015 the assumption was that analytical work needed a cluster. Two things changed. Machines got much bigger, so a laptop now has the memory a modest 2012 cluster node had and a cloud instance can have a terabyte of RAM. And engines got much better at not reading what they do not need. DuckDB, covered in Lecture 09, exploits both: it is an in-process columnar engine with no server, and on datasets up to tens or low hundreds of gigabytes it frequently beats a distributed engine outright, because it avoids the network entirely. The practical lesson is to reach for Spark when the data genuinely does not fit, not by default. Most banking risk datasets, at portfolio level, fit.
+  </div>
+
+  <h3>Snapshots, slowly changing dimensions, and bitemporality</h3>
+
+  <p>Since the source will not keep history, the platform must decide how to build it. Three patterns cover almost every case.</p>
+
+  <p>A <strong>full snapshot</strong> copies the entire table at a point in time and stores it with a reporting date. It is simple, robust, and easy to reason about, and it is the standard approach for monthly risk data: sixty monthly snapshots of the loan book, each complete. The cost is storage proportional to snapshots times rows, which columnar compression makes tolerable for anything but the largest tables.</p>
+
+  <p>A <strong>change history</strong> records only what changed, with a validity period per version of each record. This is the slowly changing dimension of Lecture 08, and it is far more storage-efficient for slow-moving attributes such as customer address or product terms. The cost is that every query needs a date-range join rather than an equality filter, which is easy to get wrong.</p>
+
+  <p><strong>Bitemporality</strong> is the pattern that separates two different times: when something was true in the world, and when the platform learned about it. A default that occurred on 12 March but was recorded on 3 April has a business date of March and a system date of April. The distinction is not academic in a bank. A model calibrated on business dates uses information that was not available at the time, which biases it optimistically, while a model calibrated on system dates reproduces what the bank actually knew. Regulatory reporting generally wants business date; backtesting a decision generally wants system date. A platform that stores only one of the two cannot produce the other later.</p>
+
+  <div class="worked">
+    <strong>Worked example: why last month's number changed, and which architecture answers it</strong>
+    <p>A risk report shows the March default rate as 1.42 per cent. Rerun in June, the same report shows 1.51 per cent for March. Someone must explain the difference by Friday. Work through what each architecture can tell you.</p>
+    <p><em>Querying the source system directly.</em> Nothing. The core banking system shows current arrears, not March arrears, and the March report was produced from a query nobody kept. There is no way to reproduce either number. This is the situation that ends with a spreadsheet and an apology.</p>
+    <p><em>A warehouse with monthly full snapshots, no history of corrections.</em> You can reproduce March as it stands today, which gives 1.51 per cent, but the March snapshot has been rebuilt since, so the original 1.42 is gone. You can say the number changed but not why. Better, and still not sufficient.</p>
+    <p><em>A warehouse with immutable snapshots.</em> The March snapshot written in March still exists and gives 1.42 per cent; a later reprocessing wrote a separate row set. Comparing them shows 214 accounts newly flagged as defaulted in March, all with a system date in May. Now you can explain it: backdated collections data arrived late.</p>
+    <p><em>A lakehouse with time travel.</em> You additionally query the table as of the exact commit the March report read, without having planned to keep that version separately, and produce a row-level difference in one statement. The 214 accounts are identified, their arrival date is visible in the commit history, and the explanation is a query rather than an investigation.</p>
+    <p>The lesson generalises past this example. The question "why did a number change?" is asked constantly in regulated reporting, and the ability to answer it is an architectural property decided long before the question is asked. Immutability and bitemporality are what make it answerable; both cost storage, and storage is the cheapest thing in the stack.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The primary axis is transactional against analytical, and it drives storage layout, normalisation, indexing, concurrency, and history. The secondary axis is relational against the four non-relational families, and the relational default is correct for structured banking data unless the access pattern is genuinely a traversal or a key lookup. The modern architecture separates storage, file format, table format, engine, and catalogue into five choices, and the lakehouse is the attempt to keep the lake's economics with the warehouse's guarantees. Above all, the analytical side exists to hold the history the transactional side overwrites, and that history cannot be created retrospectively.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Give four design differences between an OLTP and an OLAP system, and for each say what workload characteristic drives it.</li>
+      <li>State the four ACID properties. Which two matter most to an analytical platform with a single writer, and why?</li>
+      <li>Name the four non-relational families and give a banking access pattern that genuinely suits each.</li>
+      <li>Why did data lakes need a table format layer? Name the specific failure a consumer experienced without one.</li>
+      <li>Distinguish a business date from a system date, and give a case where calibrating on the wrong one biases a model.</li>
+      <li>Explain why analytical engines can usually manage without indexes, referring to the Parquet structure from Lecture 02.</li>
+      <li>Your data is 40 GB and the team wants to stand up a Spark cluster. Argue the opposing case.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="02-data_and_file_formats.html">Lecture 02</a> supplied the file-level facts (columnar layout, footer statistics) that this lecture's engine behaviour rests on.</li>
+      <li><strong>Next:</strong> <a href="04-sql_definitions.html">Lecture 04 (SQL I, definition)</a> starts the long spine of the course by declaring schemas, types, and constraints in a real database.</li>
+      <li><strong>Then:</strong> <a href="08-dimensional_modelling.html">Lecture 08</a> designs what goes inside the analytical store, including the slowly changing dimensions mentioned here; <a href="09-duckdb.html">Lecture 09</a> is the single-node engine argument in full.</li>
+      <li><strong>Cross-link:</strong> <a href="14-lakehouse_table_formats.html">Lecture 14</a> builds the table format layer and the time travel used in the worked example; <a href="13-spark.html">Lecture 13</a> covers the shuffle.</li>
+      <li><strong>Banking link:</strong> the snapshot history problem is the practical constraint behind every observation-window decision in <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">A-IRB and IFRS 9 model development</a>.</li>
+      <li><strong>Further reading:</strong> Codd's 1970 paper for the relational model; Kleppmann's <em>Designing Data-Intensive Applications</em> (2017) chapters 2 and 3 for storage engines and models; the Databricks lakehouse paper (Armbrust and colleagues, 2021) for the third architecture.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 3 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PD target and data: the 12-month default flag and its inputs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Target and data: the 12-month default flag and its inputs</h1>
+  <p class="subtitle">The first step of the ML pipeline. Define y (the worst-ever 12-month default flag), define X (the features the model is allowed to see at the snapshot date), and define the data history the development sample must cover. Each of the three choices is anchored in a specific CRR / SS3/24 paragraph.</p>
+  <div class="meta">
+    <span>A-IRB 10 of n &mdash; PD 2 of 7</span>
+    <span>Reading time, 25 minutes</span>
+    <span>Sources: <code>04_feature_engineering/pd/01-target_variable.md</code>, <code>02-data_requirements.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The PD target variable is a binary indicator: 1 if the obligor experiences a CRR Article 178 default event at any point during the 12 months after the snapshot date, 0 otherwise. The "at any point" matters. A worst-ever indicator captures the obligor that defaults in month 4 and cures by month 10; an end-of-window indicator misses them. CRR Article 180(2)(a) mandates the 12-month horizon; the at-any-point convention is the practitioner standard and the one the MRD already encodes as <code>12m_default_outcome</code>.</p>
+
+  <p>The independent variables are everything the model is allowed to see at the snapshot date. Three families dominate: <strong>static obligor characteristics</strong> (segment, product, age-on-book, geography), <strong>behavioural features</strong> from the bank's internal data (delinquency history, utilisation, transactor flag, payment regularity, balance trajectory) and <strong>bureau features</strong> (external score, recent enquiries, exposures with other lenders, public records). Macroeconomic variables are legally permitted as features under CRR Article 180(2)(c) but are usually avoided in IRB scorecards because the cycle is anchored separately via LRA calibration; the IFRS 9 model uses macro features explicitly and is covered in the IFRS 9 track.</p>
+
+  <p>The data history requirement is at least 5 years for retail and at least 7 years for corporate, sovereign and bank exposures (CRR Article 180(1)(h)) and must include a representative mix of good and bad economic conditions. The 5-year minimum is rarely sufficient on its own to cover a full credit cycle; banks routinely target 10 years or more of history where available. Low-default portfolios (specialised lending, sovereign, large corporate) require additional treatment: pooling, qualitative overlays, expert judgement, or in extreme cases reliance on external pooled data.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The target variable answers "did this obligor default in the next year?" and is a column in the MRD. The features are everything the model is allowed to use to predict that column. The data history is how many years of (target, features) pairs are in the development sample. The combination of the three decisions (what y is, what X may contain, how much history) determines the ceiling on what any modelling approach can achieve. The next four lectures are about extracting the maximum value below that ceiling; this lecture is about setting the ceiling correctly.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The choice of target is structural. A worst-ever 12-month default flag includes obligors that defaulted briefly and recovered; an end-of-window flag does not. The two are not equivalent and lead to different default-rate series, different model coefficients, and different calibrated PDs. The worst-ever convention is the supervisory expectation under CRR Article 178 (default is recognised the moment any trigger fires; the obligor is then treated as defaulted until probation completes). A model trained on end-of-window targets would systematically under-predict default in cyclical portfolios where temporary defaults are common.</p>
+
+  <p>The choice of features is governance-heavy. Each feature has to be justifiable, available at the snapshot date in production, replicable in supervisory inspection, and free from data leakage (the feature must not encode the target). The use-test (CRR Article 144) further requires that the features used for capital are the same ones used for credit decisioning. Banks that try to use bureau features the credit-officer team cannot see in real-time fail the use test, regardless of how predictive those features are.</p>
+
+  <p>The data history requirement is the binding constraint on the development of new IRB models. A new retail product launched in 2023 cannot reach IRB status until at least 2028 because the 5-year history requirement is not met. This is why the lifecycle in lecture 04 talks about the three-year operating history as the minimum for approval, and why low-default portfolios are treated separately by the supervisor.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Picture the modelling problem as a tabular dataset: one row per (obligor, snapshot_month) where the obligor is non-defaulted at the snapshot, one column for the target (the 12-month-ahead default flag), and many columns for the features (everything visible at the snapshot). The development sample is the union of these rows across a representative historical window. The diagram below traces the temporal structure.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The temporal structure of a PD modelling sample">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The temporal structure of a PD development sample</text>
+
+      <!-- Timeline -->
+      <line x1="60" y1="160" x2="840" y2="160" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="840,160 832,156 832,164" fill="#475569"/>
+      <text x="845" y="164" font-family="Inter" font-size="10" fill="#64748b">time</text>
+
+      <!-- Window labels -->
+      <g font-family="Inter" font-size="10" fill="#475569">
+        <text x="60" y="155" text-anchor="start">t = today (snapshot)</text>
+      </g>
+
+      <!-- Feature window (left) -->
+      <rect x="60" y="170" width="280" height="50" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.2"/>
+      <text x="200" y="190" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Feature window</text>
+      <text x="200" y="205" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">everything visible at t (obligor + behavioural + bureau)</text>
+      <text x="200" y="216" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">conditioning set for the model</text>
+
+      <!-- Snapshot marker -->
+      <line x1="340" y1="150" x2="340" y2="170" stroke="#7f1d1d" stroke-width="2"/>
+      <circle cx="340" cy="160" r="5" fill="#7f1d1d"/>
+      <text x="340" y="140" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">snapshot</text>
+
+      <!-- Outcome window (right) -->
+      <rect x="340" y="170" width="280" height="50" fill="#fee2e2" stroke="#991b1b" stroke-width="1.2"/>
+      <text x="480" y="190" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">Outcome window (12 months)</text>
+      <text x="480" y="205" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">y = 1 if any CRR 178 trigger fires at any point in (t, t+12m]</text>
+      <text x="480" y="216" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">y = 0 otherwise; worst-ever convention</text>
+
+      <!-- Outcome boundary -->
+      <line x1="620" y1="150" x2="620" y2="170" stroke="#7f1d1d" stroke-width="2" stroke-dasharray="3,2"/>
+      <text x="620" y="140" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">t + 12m</text>
+
+      <!-- Three example obligor outcomes -->
+      <g font-family="Inter" font-size="9" fill="#475569">
+        <!-- Obligor 1: y=0 throughout -->
+        <line x1="340" y1="245" x2="620" y2="245" stroke="#0f766e" stroke-width="2"/>
+        <text x="630" y="248" font-family="Inter" font-size="9" fill="#134e4a">y = 0 (no default in window)</text>
+
+        <!-- Obligor 2: 90 DPD in month 5, never cures -->
+        <line x1="340" y1="270" x2="455" y2="270" stroke="#0f766e" stroke-width="2"/>
+        <line x1="455" y1="270" x2="620" y2="270" stroke="#7f1d1d" stroke-width="2"/>
+        <circle cx="455" cy="270" r="3" fill="#7f1d1d"/>
+        <text x="630" y="273" font-family="Inter" font-size="9" fill="#7f1d1d">y = 1 (default in month 5; no cure by 12m)</text>
+
+        <!-- Obligor 3: 90 DPD in month 3, cures in month 9 -->
+        <line x1="340" y1="295" x2="385" y2="295" stroke="#0f766e" stroke-width="2"/>
+        <line x1="385" y1="295" x2="540" y2="295" stroke="#7f1d1d" stroke-width="2"/>
+        <line x1="540" y1="295" x2="620" y2="295" stroke="#0f766e" stroke-width="2" stroke-dasharray="2,2"/>
+        <circle cx="385" cy="295" r="3" fill="#7f1d1d"/>
+        <text x="630" y="298" font-family="Inter" font-size="9" fill="#7f1d1d">y = 1 (default in month 3; cures by month 9 &mdash; still flagged)</text>
+      </g>
+
+      <!-- Bottom note -->
+      <text x="450" y="345" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">Operationally: <code>12m_default_outcome</code> column in the MRD (lecture 06), constructed as LEAD(default_indicator, 12) with worst-ever logic over the 12-month leading window.</text>
+
+      <!-- Window note: pre-defaulted obligors excluded -->
+      <text x="340" y="345" text-anchor="end" font-family="Inter" font-size="9" fill="#0f766e">opening population: only obligors non-defaulted at t</text>
+    </svg>
+    <figcaption>The temporal structure of a PD development sample. Features are read at the snapshot t; the target is the worst-ever default flag over the 12-month outcome window. Three example obligors illustrate: the first survives the window; the second defaults mid-window and remains defaulted; the third defaults and cures within the window but is still flagged as y = 1 under the worst-ever convention. Pre-defaulted obligors at t are excluded from the modelling population (their PD is structurally 1).</figcaption>
+  </figure>
+
+  <p>The development sample is then the union of these rows across many snapshot dates: each obligor contributes one row per snapshot at which they are non-defaulted. The choice of snapshot frequency (monthly is standard) and the choice of which snapshots to include (the historical window) is the subject of lecture 11 on sampling. This lecture's job is to fix the shape of one row: target column, feature columns, and the rules that define them.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The target variable: 12-month worst-ever default indicator</h3>
+
+  <p>Formally:</p>
+
+  <pre><code>y_{i,t} = 1   if any CRR Article 178 trigger fires for obligor i
+              at any month in (t, t+12]
+        = 0   otherwise
+</code></pre>
+
+  <p>In the notation of lecture 01, this is <span class="katex-pseudo">D*<sub>i,t</sub>(12, p)</span>: the worst-ever indicator across the next 12 months. The CRR Article 178 triggers are the two limbs covered in lecture 03 (90 DPD on a material credit obligation OR any of the UTP indicators). The 12-month horizon is mandated by CRR Article 180(2)(a) and aligns with the K formula's one-year capital cycle.</p>
+
+  <p>Operationally the target is the <code>12m_default_outcome</code> column constructed in the MRD-assembly notebook from lecture 06. The construction is a forward-looking window function: for each row in the MRD, the column reads the maximum of <code>default_indicator</code> over the next 12 rows for the same (obligor_id, facility_id). The Pandas / SQL pseudocode is portable:</p>
+
+  <pre><code>SELECT
+    obligor_id,
+    facility_id,
+    snapshot_month,
+    LAG(default_indicator, 12) OVER (
+        PARTITION BY obligor_id, facility_id
+        ORDER BY loan_term DESC
+    ) AS y_12m_default_outcome
+FROM mrd</code></pre>
+
+  <p>The LAG-over-descending-loan-term pattern produces a lead-12 outcome (the indicator 12 rows in the future). Wrap this in a worst-ever max-over-window function and you get the binary flag in the diagram above.</p>
+
+  <p>Three population-construction rules apply.</p>
+
+  <ol>
+    <li><strong>Exclude pre-defaulted obligors at t</strong>. An obligor already in default at the snapshot date has a structural PD of 1 and contributes no information to the model. Excluding them from the development sample is the standard convention; the LGD model picks them up via ELBE.</li>
+    <li><strong>Exclude obligors that close before t+12</strong> only if the closure is clean (paid in full or matured normally). Closures associated with default are not exclusions, they are y = 1 events.</li>
+    <li><strong>Include obligors that default and cure within the window</strong> as y = 1 under the worst-ever convention. The obligor was in default at some point in the window, which is what the model is trying to predict.</li>
+  </ol>
+
+  <h3>The independent variables: what X is allowed to contain</h3>
+
+  <p>CRR Article 180(2)(c) requires that PD estimates "incorporate all relevant data, information and methods" available at the time of estimation. The standard breakdown is four families:</p>
+
+  <table>
+    <thead>
+      <tr><th>Family</th><th>Examples</th><th>Operational consideration</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Static obligor characteristics</strong></td><td>Segment, product, geography, age-on-book, channel of origination, application-form attributes</td><td>Available at every snapshot by construction; first to enter the model build because they are robust to data quality issues</td></tr>
+      <tr><td><strong>Behavioural features</strong></td><td>Days past due, months in arrears, utilisation, transactor flag, inactive flag, balance trajectory, payment regularity, drawing-pattern features</td><td>Computed from the MRD's snapshot tables; require careful look-back logic to avoid leakage; the workhorse of any retail PD model</td></tr>
+      <tr><td><strong>External (bureau) features</strong></td><td>External credit score, total exposure across the system, number of credit enquiries in the last N months, presence of public-record adverse events, age of oldest credit account</td><td>Subject to bureau-supplier contractual terms; require monitoring for data-quality breaks; carry the highest single-feature predictive power for most retail portfolios</td></tr>
+      <tr><td><strong>Macroeconomic variables</strong></td><td>Unemployment rate, interest rate, GDP growth, regional house-price index</td><td>Legally permitted for IRB under CRR Article 180(2)(c); operationally avoided in most retail IRB scorecards because the cycle is captured separately via LRA calibration; the IFRS 9 model uses these explicitly (forward pointer)</td></tr>
+    </tbody>
+  </table>
+
+  <p>The macro-features question is the one most likely to come up in supervisory dialogue. The technical answer: macro features are permitted, but adding them creates double-counting with the LRA anchor and introduces capital procyclicality (a downturn in unemployment drives the PiT PD up, which drives RWA up, exactly when the bank can least afford it). Most retail IRB banks therefore keep their PiT PD model intrinsic-only and apply the cycle through the SysPiT mapping or, more commonly, leave the cycle effect to LRA calibration. The IFRS 9 model takes the opposite choice (macro-driven by design) and is covered separately.</p>
+
+  <h3>Data leakage rules</h3>
+
+  <p>Feature engineering for PD has a specific failure mode: <strong>look-ahead bias</strong>. The model is supposed to predict the next 12 months using only what is known at the snapshot. Three checks catch the most common leakage errors:</p>
+
+  <ul>
+    <li><strong>No outcome-window features</strong>. Any feature computed from data inside the 12-month outcome window is invalid. Features that look like behavioural variables (utilisation, DPD) are valid only if computed at or before the snapshot date.</li>
+    <li><strong>No future-snapshot features</strong>. A "12-month moving average" that includes months t+1 through t+12 is leakage; one that includes t-11 through t is fine. The look-back direction matters.</li>
+    <li><strong>No future-information bureau pulls</strong>. The bureau snapshot used must be the one available at t in production, not the one available at t+6 with backfill. Bureau data infrastructure often has retroactive corrections; the development sample must use the version of bureau data that was actually available at the time, not the cleaned version.</li>
+  </ul>
+
+  <p>Each of these is a routine validation check; each has caused real banks to retire and rebuild scorecards after the leakage was discovered in supervisory review.</p>
+
+  <h3>Data history requirement</h3>
+
+  <p>CRR Article 180(1)(h) sets the minimum data history. For PD, EAD and LGD models:</p>
+
+  <ul>
+    <li><strong>Retail exposures</strong>: minimum 5 years of data, must include a representative mix of good and bad economic conditions.</li>
+    <li><strong>Corporate, sovereign and bank exposures</strong>: minimum 7 years.</li>
+    <li><strong>The window must cover a full credit cycle</strong> or be supplemented (via MoC or external benchmarking) to reflect what a full cycle would look like.</li>
+  </ul>
+
+  <p>The 5-year minimum is rarely sufficient in practice. The 2008 to 2009 global financial crisis was a once-per-15-years event; a development window starting in 2018 would not see it. Most banks therefore target 10 years or more of history where the data is available, and use formal cycle-coverage analysis (the descriptive statistics from lecture 08 are the natural input) to demonstrate that the window contains both expansion and contraction periods. Where the history is shorter, the limitations register (lecture 07) records the gap and an MoC category-A uplift compensates.</p>
+
+  <h3>Low-default portfolios</h3>
+
+  <p>Some portfolios have so few historical defaults that conventional statistical estimation breaks down: specialised lending, large corporate, sovereign, bank-on-bank, low-default niche retail products. The supervisor recognises this category (CRR Article 180(2)(d) and SS3/24 §13) and permits four adjustments:</p>
+
+  <ol>
+    <li><strong>Pooling</strong>. Defaults from similar exposures across multiple banks (via industry pools) are used to supplement internal data. Subject to representativeness validation.</li>
+    <li><strong>External benchmarks</strong>. Rating-agency-derived default rates by grade and industry are used as priors. Common for sovereign and bank exposures.</li>
+    <li><strong>Qualitative overlays</strong>. Expert judgement applied through a structured scorecard. CRR Article 175(4) permits "judgemental adjustments" provided they are documented and reviewed.</li>
+    <li><strong>Conservative calibration</strong>. Where data is insufficient for a credible LRA, a deliberately conservative PD is assigned at the rating-grade level and an MoC category-A uplift is added.</li>
+  </ol>
+
+  <p>The low-default-portfolio question is exam-classic but operationally important: banks have lost IRB approval for portfolios they thought were standard but that the supervisor declared low-default after inspection.</p>
+
+  <h3>Worked example: target variable on a generic MRD</h3>
+
+  <p>The MRD-assembly notebook from lecture 06 produces the target variable as part of the standard column set. The construction pattern:</p>
+
+  <pre><code># Pseudo-SQL: construct the 12-month worst-ever default outcome
+WITH lead_window AS (
+    SELECT
+        obligor_id,
+        facility_id,
+        snapshot_month,
+        default_indicator,
+        -- max of default_indicator over the next 12 snapshots
+        MAX(default_indicator) OVER (
+            PARTITION BY obligor_id, facility_id
+            ORDER BY snapshot_month
+            ROWS BETWEEN 1 FOLLOWING AND 12 FOLLOWING
+        ) AS twelve_m_default_outcome
+    FROM mrd
+)
+SELECT *
+FROM lead_window
+WHERE default_indicator = 0   -- exclude pre-defaulted at snapshot
+  AND twelve_m_default_outcome IS NOT NULL   -- need full 12-month observation
+</code></pre>
+
+  <p>The two filters at the bottom are the standard population-construction rules: only non-defaulted at t (otherwise PD is structurally 1) and only obligors with a full 12-month outcome window observable (otherwise the target is censored). Banks that include censored observations need to either treat them with survival-analysis machinery or accept biased estimates; the convention is to exclude.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The most common error practitioners make on target definition is treating the outcome window as "the next 12 months from this row" without verifying that all 12 months are observable. If the development window ends in December 2024, every row with a snapshot date after December 2023 has a partially-observed outcome and must be excluded or treated with explicit censoring. Banks that include partially-observed rows under-count defaults in the most recent year, which biases the model toward underestimating risk in the period immediately before deployment, which is the worst place for bias. The fix is mechanical: <code>WHERE snapshot_month &lt;= max(snapshot_month) - 12</code> in the population-construction query.</p>
+
+  <p>The second error is on macro features. The argument for including them in the PiT scorecard goes: "We have historical macro data, it's predictive, ML models would use it, why wouldn't we?" The argument against, and the one supervisors accept, goes: "Capital should not amplify the cycle, and including macro in the conditioning set makes it amplify automatically." The right answer for IRB is to allow macro features to influence the LRA (via SysPiT mapping) but not the PiT scorecard. The right answer for IFRS 9 is the opposite. A practitioner who understands which model uses which condition will avoid building the wrong one.</p>
+
+  <p>The third lesson is about the data-history requirement. The 5-year and 7-year minima are floors, not targets. A model built on exactly 5 years that happens to fall in a benign window is technically compliant but will under-predict in a downturn and the bank will lose money. The supervisory expectation under SS3/24 is that the window covers a full credit cycle even if that exceeds the regulatory minimum. The practical implication: keep data going back as far as it goes, even pre-IRB-permission, even when system migrations cost effort to bridge. The marginal value of an extra year of cycle-relevant data is enormous.</p>
+
+  <p>The fourth point is structural: <strong>the target is the choice that propagates everywhere</strong>. Change the definition of default (say, from 90 DPD plus UTP to 90 DPD only) and the target changes, the LRA changes, the features that look predictive change, the back-test thresholds change. This is why CRR Article 144 use-test consistency is enforced: the same target definition has to be used for capital, ECL, monitoring and origination, or the system tears itself apart at the seams. The single line of SQL that defines y_12m_default_outcome is the single most consequential line in the entire IRB build.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Define the 12-month worst-ever default flag formally. Distinguish it from an end-of-window flag. Why does CRR Article 178 imply the worst-ever convention?</li>
+    <li>An obligor defaults in month 5 of the outcome window and cures in month 11. What is y? Why?</li>
+    <li>Why are pre-defaulted obligors excluded from the development sample? What happens to them in the wider IRB framework?</li>
+    <li>Name the four families of features that can enter a PD scorecard. Which is typically the most predictive for retail, and which is operationally avoided despite being legally permitted?</li>
+    <li>What is data leakage in this context, and what are the three most common forms?</li>
+    <li>State the CRR Article 180(1)(h) data-history minimums for retail and corporate. Why are these minimums rarely sufficient in practice?</li>
+    <li>Define a low-default portfolio and name three regulatory accommodations that apply to it.</li>
+    <li>An IRB scorecard team proposes adding the regional unemployment rate as a feature. The validation team objects. State each side's argument and identify which one the supervisor will side with for IRB and which for IFRS 9.</li>
+    <li>The development data window ends in December 2024. What is the latest snapshot date that can be included in the development sample without target censoring? What goes wrong if censored rows are included?</li>
+    <li>Why is the SQL line that defines <code>12m_default_outcome</code> "the single most consequential line in the entire IRB build"?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/pd/01-target_variable.md</code> &mdash; the 12-month worst-ever default flag and its regulatory anchor.</li>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/pd/02-data_requirements.md</code> &mdash; dependent / independent variables, measurement period, low-default-portfolio handling.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="../01-notation.html">Notation</a> &mdash; the <span class="katex-pseudo">D*<sub>i,t</sub>(12, p)</span> default-outcome symbol and the population-aggregate notation are defined there.</li>
+      <li><a href="03-definitions.html">Definitions</a> &mdash; the CRR Article 178 default triggers that the target variable counts.</li>
+      <li><a href="06-data_engineering.html">Data engineering</a> &mdash; the MRD that the target column lives in, and the LAG / window-function patterns used to construct it.</li>
+      <li><a href="09-pd_concept.html">PD concept</a> &mdash; the 12-month horizon and IRB conditioning-set rationale.</li>
+    </ul>
+
+    <p><strong>Forward references inside the PD sequence:</strong></p>
+    <ul>
+      <li>11-pd_sampling_and_representativeness (planned) &mdash; how to choose which (obligor, snapshot) rows from the MRD enter the development sample.</li>
+      <li>12-pd_feature_engineering (planned) &mdash; how to take the candidate features defined here and reduce / transform them into model inputs.</li>
+      <li>14-pd_risk_quantification (planned) &mdash; the LRA construction that uses the same target definition.</li>
+    </ul>
+
+    <p><strong>Cross-track:</strong></p>
+    <ul>
+      <li>IFRS 9 PD (planned) &mdash; same target definition; macro features used explicitly; horizon extended to lifetime.</li>
+      <li><a href="../../../pricing/03-loan_pricing.html">Loan pricing</a> &mdash; the same PD enters the loan-pricing equation as part of EL.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Article 178, 180(1)(h), 180(2)(a-e). Default definition, data history, and PD estimation requirements.</li>
+      <li>PRA SS3/24, paragraphs 11, 12 and 13. UK supervisory expectations on data requirements and low-default portfolios.</li>
+      <li>EBA/GL/2017/16, paragraphs 35 to 49. The European authority's interpretation of the data and target requirements.</li>
+      <li>BCBS Basel framework CRE36.68, CRE36.80, CRE36.82. International anchors for the target, features and history requirements respectively.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 10 of n &middot; PD 2 of 7.</span>
+  <span><a href="09-pd_concept.html">Previous: PD concept</a> &middot; <a href="11-pd_sampling_and_representativeness.html">Next: sampling and representativeness</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

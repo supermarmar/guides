@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 1: the machine learning landscape</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Feature engineering</a></div>
+  <h1>The machine learning landscape</h1>
+  <p class="subtitle">Before any algorithm, the map. Where each method sits, what it assumes, and where the bias-variance trade-off lives. This is the lecture every later lecture refers back to when it says "trade complexity for generalisation".</p>
+  <div class="meta">
+    <span>Lecture 1 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Machine learning</strong> is the discipline of building functions $\hat{f}$ that approximate an unknown true function $f$ from a finite sample of data, in a way that generalises to data the function has not yet seen. Three paradigms differ in what kind of signal the data carries: <strong>supervised learning</strong> has labelled examples and approximates $\mathbb{E}[Y \mid X]$, <strong>unsupervised learning</strong> has no labels and looks for structure inside $X$ alone, <strong>reinforcement learning</strong> has rewards instead of labels and learns by interaction. Across all three, the work is the same six-stage pipeline: prepare features, split data, fit a model, tune hyperparameters, evaluate honestly, explain what was learned. The single trade-off that runs through every stage is between bias (a simple model misses real structure) and variance (a complex model fits the noise). Everything else in this course is local detail on top of that frame.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Machine learning is curve-fitting that knows it has to work on the next observation, not just the ones in front of it. You have a sample $\{(x_i, y_i)\}$ and you want a function $\hat{f}$ such that, for some new $x^*$ drawn from the same distribution, $\hat{f}(x^*)$ is close to the unknown $y^*$. Every method in this course is a different way to constrain the space of functions you search over so that the one you pick generalises rather than memorises. The constraint is the algorithm; the data is the input; generalisation is the test.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    A standard ML course treats algorithms as the subject and the pipeline as scaffolding. In credit risk practice the order is reversed: the pipeline is the subject, because every modelling decision is auditable end-to-end and a model that scores well in cross-validation but fails a Population Stability Index check at deployment is a failed model regardless of its AUC. The reordering here is deliberate. Stages 1-2 (feature engineering, splitting) are roughly half the work, the modelling stage is a quarter, and tuning, evaluation, and interpretation are the other quarter. Most lecture courses invert those weights.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the world map for the rest of the course. Every later lecture is either "stage $k$ of the pipeline" or "a position on the bias-variance axis". Lecture 2 (<a href="02-feature_transformation.html">feature transformation</a>) is the first concrete stage. Lectures in 03_supervised_learning are all bias-variance trade-offs against different function classes. Lectures in 06_hyperparameter_tuning are explicit moves along the bias-variance axis. Lecture 36 (regression diagnostics) reads off the residuals what stage you got wrong. Holding the map in your head turns the rest of the course from a list into a system.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons to begin with the map rather than with an algorithm. First, <strong>the choice of model is not the most important decision in an ML project; it is the third or fourth.</strong> Picking XGBoost over logistic regression matters less than choosing the right target variable, less than holding out a meaningful test set, and less than treating missingness honestly. Every senior modeller has seen a project where a junior analyst tuned XGBoost for a week on a target that was leaking the answer; every project review where this is caught starts by walking back up the pipeline and pointing at stage 1. If you cannot draw the pipeline from memory before you fit anything, you do not yet have a project.</p>
+
+  <p>Second, <strong>constraints flow backwards.</strong> In a regulated setting the interpretability requirement at stage 6 dictates the model class at stage 3, which dictates the feature engineering at stage 1. A bank that needs to defend every PD model feature to its supervisor cannot use a 200-feature gradient-boosted model with three layers of target encoding, no matter how good its AUC; the loss of explanatory transparency makes the model unsupportable under SREP. The pipeline view exposes this dependency before a week of work is wasted in the middle of it.</p>
+
+  <p>Third, <strong>most production ML failures are pipeline failures, not model failures.</strong> Models drift not because the algorithm degraded but because the input distribution shifted (covariate shift, label shift, or concept drift in the underlying $f$). The pipeline view is the only honest way to spot the failure: a model that suddenly underperforms is almost always being asked questions about a different population than the one it was trained on. Stage 5 (monitoring as part of evaluation) is where this is caught; stage 1 is where it has to be re-engineered.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A PD model on a SME book scored AUC 0.83 on holdout, sailed through validation, and was put into production. Within six months its observed default rate diverged sharply from its expected. The post-mortem found the feature "months since incorporation" had been winsorised at the 99th percentile in training, which silently capped a fast-growing segment of the new portfolio at the training cap and removed all variation in that feature for them. Stage 1 (feature transformation) caused the failure; stage 5 (monitoring) detected it; stage 3 (the model) was blameless. None of this is unusual.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture in your head. A machine learning project is a directed graph of six stages, with three modelling families fanning out at the third node and a feedback edge from monitoring back to feature engineering. Each stage produces an artefact (a feature table, a split index, a fitted model, a tuned model, a metric, an explanation) that is the input to the next. Each stage has its own failure mode; the failure modes do not commute, which is why the order matters.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The ML pipeline as a directed graph">
+      <defs>
+        <marker id="pipeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+        <marker id="pipeArrowDash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#b45309"/>
+        </marker>
+      </defs>
+
+      <!-- Title -->
+      <text x="410" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The ML pipeline as a directed graph</text>
+
+      <!-- Stage nodes (six rounded rects) -->
+      <g>
+        <rect x="20" y="60" width="110" height="60" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="75" y="84" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">1. FEATURES</text>
+        <text x="75" y="101" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">transform, reduce, select</text>
+      </g>
+
+      <g>
+        <rect x="155" y="60" width="110" height="60" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="210" y="84" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">2. SPLIT</text>
+        <text x="210" y="101" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">train, validate, test</text>
+      </g>
+
+      <g>
+        <rect x="290" y="60" width="110" height="60" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="345" y="84" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">3. FIT</text>
+        <text x="345" y="101" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">model family + parameters</text>
+      </g>
+
+      <g>
+        <rect x="425" y="60" width="110" height="60" rx="10" fill="#FCE7F3" stroke="#be185d" stroke-width="1.5"/>
+        <text x="480" y="84" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#831843">4. TUNE</text>
+        <text x="480" y="101" text-anchor="middle" font-family="Inter" font-size="9" fill="#be185d">hyperparameter search</text>
+      </g>
+
+      <g>
+        <rect x="560" y="60" width="110" height="60" rx="10" fill="#FEF3C7" stroke="#a16207" stroke-width="1.5"/>
+        <text x="615" y="84" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#713f12">5. EVALUATE</text>
+        <text x="615" y="101" text-anchor="middle" font-family="Inter" font-size="9" fill="#a16207">test metric, monitoring</text>
+      </g>
+
+      <g>
+        <rect x="695" y="60" width="110" height="60" rx="10" fill="#DEEAFB" stroke="#2A3A78" stroke-width="1.5"/>
+        <text x="750" y="84" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#2A3A78">6. INTERPRET</text>
+        <text x="750" y="101" text-anchor="middle" font-family="Inter" font-size="9" fill="#2A3A78">SHAP, LIME, coefficients</text>
+      </g>
+
+      <!-- Forward arrows between stages -->
+      <line x1="130" y1="90" x2="155" y2="90" stroke="#71717a" stroke-width="1.5" marker-end="url(#pipeArrow)"/>
+      <line x1="265" y1="90" x2="290" y2="90" stroke="#71717a" stroke-width="1.5" marker-end="url(#pipeArrow)"/>
+      <line x1="400" y1="90" x2="425" y2="90" stroke="#71717a" stroke-width="1.5" marker-end="url(#pipeArrow)"/>
+      <line x1="535" y1="90" x2="560" y2="90" stroke="#71717a" stroke-width="1.5" marker-end="url(#pipeArrow)"/>
+      <line x1="670" y1="90" x2="695" y2="90" stroke="#71717a" stroke-width="1.5" marker-end="url(#pipeArrow)"/>
+
+      <!-- Three modelling families branching from stage 3 -->
+      <g>
+        <rect x="240" y="180" width="100" height="42" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="290" y="198" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">SUPERVISED</text>
+        <text x="290" y="213" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">labels: estimate E[Y | X]</text>
+      </g>
+      <g>
+        <rect x="345" y="180" width="100" height="42" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="395" y="198" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">UNSUPERVISED</text>
+        <text x="395" y="213" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">structure in X alone</text>
+      </g>
+      <g>
+        <rect x="450" y="180" width="100" height="42" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="500" y="198" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">REINFORCEMENT</text>
+        <text x="500" y="213" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">rewards from environment</text>
+      </g>
+      <!-- Branches from stage 3 -->
+      <line x1="345" y1="120" x2="290" y2="180" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="345" y1="120" x2="395" y2="180" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="345" y1="120" x2="500" y2="180" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2"/>
+
+      <!-- Feedback edge from stage 5 to stage 1 -->
+      <path d="M 615 60 Q 615 30 75 30 Q 75 60 75 60" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4 3" fill="none" marker-end="url(#pipeArrowDash)"/>
+      <text x="345" y="22" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#b45309">monitoring loop: drift detected at stage 5 forces re-engineering at stage 1</text>
+
+      <!-- Bias-variance axis underneath -->
+      <line x1="40" y1="290" x2="780" y2="290" stroke="#7c3aed" stroke-width="1.5"/>
+      <text x="410" y="278" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">The bias-variance axis: every algorithmic choice is a point on this line</text>
+      <circle cx="120" cy="290" r="4" fill="#7c3aed"/>
+      <text x="120" y="310" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">strong</text>
+      <text x="120" y="322" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">regularisation</text>
+      <text x="120" y="334" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">(high bias)</text>
+
+      <circle cx="290" cy="290" r="4" fill="#7c3aed"/>
+      <text x="290" y="310" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">linear/logistic</text>
+      <text x="290" y="322" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">regression</text>
+
+      <circle cx="460" cy="290" r="4" fill="#7c3aed"/>
+      <text x="460" y="310" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">small tree,</text>
+      <text x="460" y="322" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">few neighbours</text>
+
+      <circle cx="630" cy="290" r="4" fill="#7c3aed"/>
+      <text x="630" y="310" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">gradient-boosted</text>
+      <text x="630" y="322" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">ensemble</text>
+
+      <circle cx="760" cy="290" r="4" fill="#7c3aed"/>
+      <text x="760" y="310" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">deep network,</text>
+      <text x="760" y="322" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">no regularisation</text>
+      <text x="760" y="334" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">(high variance)</text>
+    </svg>
+    <figcaption>Six stages in a directed line, with stage 3 fanning out into three modelling families and a dashed feedback loop from stage 5 back to stage 1. The axis underneath maps where each model family sits on the bias-variance trade-off; the same axis is what every hyperparameter in stage 4 manipulates.</figcaption>
+  </figure>
+
+  <p>Three things are worth pointing to on the diagram. The <strong>monitoring loop</strong> is what turns a one-shot academic exercise into a production system: real data drifts, the population that the model is asked about changes, and stage 5 detects the change before stage 6's explanations become misleading. The <strong>three-family fan</strong> at stage 3 is what people usually mean by "ML": the rest of the diagram is the support structure. The <strong>bias-variance axis</strong> at the bottom is not a separate concept attached to the pipeline; it is the single dimension along which every algorithmic choice in the pipeline trades off. Reading this lecture is reading the axis.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The three paradigms</h3>
+
+  <p>The first axis on the world map is what kind of signal the data provides about the function being learned.</p>
+
+  <p><strong>Supervised learning</strong> has paired observations $(x_i, y_i)$ for $i = 1, \ldots, n$, where $x_i \in \mathcal{X}$ is a feature vector and $y_i \in \mathcal{Y}$ is a label. The objective is to estimate the conditional expectation</p>
+  $$\hat{f}(x) \approx \mathbb{E}[Y \mid X = x]$$
+  <p>for classification with $\mathcal{Y} = \{0, 1, \ldots, K-1\}$ or regression with $\mathcal{Y} = \mathbb{R}$. Almost every model in the credit risk modeller's day-to-day is supervised: PD models (binary classification with $Y$ = default indicator), LGD models (bounded regression with $Y \in [0, 1]$), EAD models (regression with a mass point at the limit). Lecture sub-module 03 covers the seven supervised algorithms.</p>
+
+  <p><strong>Unsupervised learning</strong> has only the feature vectors $x_i$ and no labels. The objective is to find structure inside $X$: low-dimensional manifolds, clusters of similar observations, anomalies relative to a learned density. Two distinct goals share the unsupervised umbrella. <em>Compression</em> reduces the dimension while preserving as much information as possible (principal component analysis, autoencoders); the output is a transformed feature set that feeds back into stage 1. <em>Clustering</em> partitions observations into groups with no labels (k-means, DBSCAN, hierarchical); the output is a discrete cluster index that is itself a feature. Lecture sub-module 04 covers the two canonical methods.</p>
+
+  <p><strong>Reinforcement learning</strong> has no fixed dataset at all. An agent interacts with an environment, takes actions, observes states, and receives scalar rewards; it learns a policy $\pi: \mathcal{S} \to \mathcal{A}$ that maximises expected discounted future reward. This course does not cover reinforcement learning; it is included on the map because excluding it leaves a hole in the taxonomy, and because algorithmic trading and dynamic pricing are reinforcement problems even when they are usually solved with supervised approximations.</p>
+
+  <div class="callout insight">
+    <span class="tag">Two recent additions</span>
+    Two further paradigms have become standard in the last decade and do not fit cleanly into the original three. <strong>Self-supervised learning</strong> generates its own labels from the structure of $X$ (predict the next word, predict a masked patch of an image, predict whether two augmentations of the same image are the same); it is supervised learning with a free label generator. It is the foundation of every modern large language model. <strong>Semi-supervised learning</strong> sits between supervised and unsupervised: a small labelled set plus a much larger unlabelled one, exploited together. Both are practical refinements of the supervised paradigm rather than fundamentally new objects, and the lectures in sub-module 03 build the tools needed to understand either later.
+  </div>
+
+  <h3>The six-stage pipeline, lecture by lecture</h3>
+
+  <p>Each stage corresponds to one or more sub-modules. Reading this list is reading a compressed table of contents for the rest of the course.</p>
+
+  <p><strong>Stage 1, feature engineering</strong>, is the conversion of raw data into a numerical feature table that an algorithm can consume. Lecture 2 of this sub-module covers <a href="02-feature_transformation.html">transformation</a> (scaling, binning, encoding categorical variables, handling outliers); lecture 3 covers <a href="03-dimensionality_reduction.html">dimensionality reduction</a> (PCA, LDA, t-SNE) where compression preserves information; lecture 4 covers <a href="04-feature_selection.html">feature selection</a> (filter, wrapper, embedded methods) where the goal is to drop columns. The output of this stage is a clean, numerical matrix $X \in \mathbb{R}^{n \times p}$ and a target vector $y \in \mathbb{R}^n$ for supervised problems.</p>
+
+  <p><strong>Stage 2, train and test split</strong>, partitions the data into disjoint subsets used at different points in the pipeline. The training set is used to fit parameters; the validation set is used to choose hyperparameters; the test set is used once at the end to estimate generalisation. Sub-module 02 covers <a href="../02_train_test_split/01-train_test_validation.html">basic, stratified, k-fold, and time-series splits</a> and <a href="../02_train_test_split/02-pipelines.html">pipelines</a>, which are the unit of leakage prevention.</p>
+
+  <p><strong>Stage 3, fit a model</strong>, is where the function class is chosen and its parameters estimated by minimising a loss on the training set. Sub-module 03 covers the seven canonical supervised methods (KNN, decision trees, SVM, naive Bayes, ensemble methods, causal models, conformal prediction); sub-module 04 covers the two unsupervised methods (k-means, PCA); sub-module 05 covers neural networks. Each method is a different choice of function class and a different position on the bias-variance axis.</p>
+
+  <p><strong>Stage 4, tune hyperparameters</strong>, is where the knobs that are not directly fitted (number of trees, depth of a tree, regularisation strength, learning rate) are chosen by searching over the validation set. Sub-module 06 covers <a href="../06_hyperparameter_tuning/02-grid_search.html">grid</a>, <a href="../06_hyperparameter_tuning/03-random_search.html">random</a>, <a href="../06_hyperparameter_tuning/04-bayesian_optimisation.html">Bayesian</a>, and <a href="../06_hyperparameter_tuning/05-genetic_algorithms.html">genetic</a> search.</p>
+
+  <p><strong>Stage 5, evaluate</strong>, is where the tuned model is held up against a metric that matches the business question. Sub-module 07 splits this into four lectures: <a href="../07_model_evaluation/01-relative_performance.html">relative model performance</a> (AIC, BIC), <a href="../07_model_evaluation/02-regression_diagnostics.html">regression diagnostics</a> (residual plots, RMSE, MAE, $R^2$), <a href="../07_model_evaluation/03-classification_metrics.html">classification metrics</a> (confusion matrix, ROC, AUC, Gini), and <a href="../07_model_evaluation/04-forecasting_evaluation.html">forecasting</a> (Ljung-Box, backtesting). Monitoring after deployment is a sustained version of stage 5 and is where the feedback loop in the diagram fires.</p>
+
+  <p><strong>Stage 6, interpret</strong>, is where the question shifts from "how well does it score" to "why did it make that prediction". Sub-module 08 covers <a href="../08_model_interpretation/01-explaining_models.html">white-box vs black-box</a> framing, <a href="../08_model_interpretation/02-model_specific_methods.html">model-specific methods</a> (coefficients, odds ratios, tree importance), and <a href="../08_model_interpretation/03-model_agnostic_methods.html">model-agnostic methods</a> (permutation importance, partial dependence plots, SHAP, LIME).</p>
+
+  <h3>The bias-variance decomposition, derived</h3>
+
+  <p>The bias-variance trade-off is the single most important formula in this course because it is the only one that applies to every algorithm. Derive it once and the rest of the course slots into it.</p>
+
+  <p>Suppose the true relationship is $y = f(x) + \varepsilon$ where $\varepsilon$ has zero mean and variance $\sigma^2$, independent of $x$. We fit an estimator $\hat{f}(x)$ from a training sample. The expected squared prediction error at a fixed $x$, averaged over training samples and over the noise, is</p>
+  $$\mathbb{E}\left[(y - \hat{f}(x))^2\right] = \mathbb{E}\left[(f(x) + \varepsilon - \hat{f}(x))^2\right].$$
+  <p>Expanding the square and using $\mathbb{E}[\varepsilon] = 0$ and the independence of $\varepsilon$ from $\hat{f}(x)$,</p>
+  $$\mathbb{E}\left[(y - \hat{f}(x))^2\right] = \mathbb{E}\left[(f(x) - \hat{f}(x))^2\right] + \mathbb{E}\left[\varepsilon^2\right].$$
+  <p>The second term is $\sigma^2$, the irreducible noise. The first term decomposes further by adding and subtracting $\mathbb{E}[\hat{f}(x)]$,</p>
+  $$\mathbb{E}\left[(f(x) - \hat{f}(x))^2\right] = \left(f(x) - \mathbb{E}[\hat{f}(x)]\right)^2 + \mathbb{E}\left[(\hat{f}(x) - \mathbb{E}[\hat{f}(x)])^2\right].$$
+  <p>The first term on the right is the squared <strong>bias</strong>: how far the average prediction is from the truth. The second is the <strong>variance</strong>: how much the prediction wobbles across training samples. Combining,</p>
+  $$\boxed{\mathbb{E}\left[(y - \hat{f}(x))^2\right] = \underbrace{\left(f(x) - \mathbb{E}[\hat{f}(x)]\right)^2}_{\text{Bias}^2} + \underbrace{\mathbb{E}\left[(\hat{f}(x) - \mathbb{E}[\hat{f}(x)])^2\right]}_{\text{Variance}} + \underbrace{\sigma^2}_{\text{Noise}}.}$$
+
+  <p>Three observations. <strong>The noise term is irreducible</strong>: no algorithm can drive it below $\sigma^2$, and chasing it indicates overfitting. <strong>Bias and variance trade against each other</strong>: a constant predictor $\hat{f}(x) \equiv \bar{y}$ has zero variance and large bias; a nearest-neighbour predictor with $k = 1$ has zero bias on the training set and large variance on the test set. <strong>The minimum of total error is interior</strong>: the U-shape of test error against model complexity is a direct consequence of the formula, with the minimum somewhere between the constant predictor and the interpolating one.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bias-variance trade-off: U-shaped test error">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The bias-variance trade-off as a function of model complexity</text>
+
+      <!-- Axes -->
+      <line x1="80" y1="270" x2="680" y2="270" stroke="#37352F" stroke-width="1.5"/>
+      <line x1="80" y1="60" x2="80" y2="270" stroke="#37352F" stroke-width="1.5"/>
+      <text x="380" y="298" text-anchor="middle" font-family="Inter" font-size="12" fill="#37352F">model complexity →</text>
+      <text x="32" y="170" text-anchor="middle" font-family="Inter" font-size="12" fill="#37352F" transform="rotate(-90, 32, 170)">expected error</text>
+
+      <!-- Bias squared curve (decreasing) -->
+      <path d="M 100 90 Q 250 130 380 200 Q 510 250 660 260" stroke="#0d9488" stroke-width="2.5" fill="none"/>
+      <text x="640" y="252" text-anchor="end" font-family="Inter" font-size="11" font-weight="600" fill="#0d9488">Bias²</text>
+
+      <!-- Variance curve (increasing) -->
+      <path d="M 100 260 Q 250 250 380 220 Q 510 160 660 80" stroke="#b45309" stroke-width="2.5" fill="none"/>
+      <text x="640" y="92" text-anchor="end" font-family="Inter" font-size="11" font-weight="600" fill="#b45309">Variance</text>
+
+      <!-- Noise (flat) -->
+      <line x1="100" y1="245" x2="660" y2="245" stroke="#82817d" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <text x="640" y="240" text-anchor="end" font-family="Inter" font-size="11" fill="#82817d">σ² (irreducible)</text>
+
+      <!-- Total (U-shape) -->
+      <path d="M 100 80 Q 250 130 380 130 Q 510 130 660 70" stroke="#7c3aed" stroke-width="3" fill="none"/>
+      <text x="380" y="120" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">Total test error</text>
+
+      <!-- Sweet-spot marker -->
+      <circle cx="380" cy="130" r="6" fill="#5b21b6"/>
+      <text x="380" y="155" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#5b21b6">optimal complexity</text>
+
+      <!-- Annotations -->
+      <text x="120" y="285" text-anchor="middle" font-family="Inter" font-size="10" fill="#82817d" font-style="italic">underfit</text>
+      <text x="640" y="285" text-anchor="middle" font-family="Inter" font-size="10" fill="#82817d" font-style="italic">overfit</text>
+    </svg>
+    <figcaption>The total test error decomposes into squared bias (decreasing with complexity), variance (increasing with complexity), and an irreducible noise floor. The optimal complexity is where the gradient of bias squared equals the negative gradient of variance. Every algorithm in this course has knobs that move you along the horizontal axis; tuning is the search for the dot.</figcaption>
+  </figure>
+
+  <h3>No free lunch</h3>
+
+  <p>Wolpert's <strong>no free lunch theorem</strong> (1996) states, informally, that averaged over all possible data-generating distributions, every algorithm has identical expected performance. There is no universally best classifier; there is only an algorithm well-matched to the problem at hand. Practically this means three things. First, <strong>algorithm choice is data-conditional</strong>: tree ensembles tend to win on tabular data with mixed feature types and modest signal-to-noise, neural networks win on images and language, linear models win when the truth is approximately linear and the sample is small. Second, <strong>benchmarking matters</strong>: the only way to know which algorithm fits your data is to try several with comparable effort spent on each. Third, <strong>inductive bias is the algorithm</strong>: the assumptions an algorithm makes about the shape of $f$ are what gives it an advantage on data that happens to satisfy those assumptions and a disadvantage on data that does not.</p>
+
+  <div class="callout warn">
+    <span class="tag">A common misreading</span>
+    No free lunch is sometimes quoted to argue that all algorithms are equivalent in practice. They are not. The theorem averages over all possible distributions, the vast majority of which are pathological and never occur in real data. On real-world data certain classes of algorithm reliably outperform others (gradient-boosted trees on tabular credit data, transformers on text). The theorem rules out a universal best algorithm; it does not rule out an empirically best algorithm for a given problem domain.
+  </div>
+
+  <h3>Performance, capacity, and the empirical pattern</h3>
+
+  <p>One last piece of vocabulary. The <strong>capacity</strong> of a model class is its ability to fit complex functions; formally, it is measured by Vapnik-Chervonenkis dimension or by Rademacher complexity, but intuitively it is "how many distinct functions can this class express". Low capacity (linear, shallow trees) gives high bias; high capacity (deep networks, very deep trees) gives high variance. The same machine, fit on the same data, lands at different points on the bias-variance axis depending on capacity. Two patterns recur and are worth memorising. <strong>For a fixed sample size, optimal capacity is interior</strong>: increasing capacity past the sweet spot starts overfitting (the bottom-left corner of the U-curve becomes the bottom-right). <strong>For a fixed model, increasing sample size lets you push capacity higher safely</strong>: more data shrinks the variance component of the formula, and you can afford a more expressive model. This is why neural networks won the 2010s: more data plus more compute moved both knobs in the right direction at once.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Three failure modes recur across every project and trip up every modeller eventually. The pipeline view makes each of them visible at the stage where it has to be prevented.</p>
+
+  <div class="callout warn">
+    <span class="tag">Leakage</span>
+    Information from the test set seeps into training, inflating test performance and producing a model that will not generalise. The classic source is feature engineering computed on the full dataset before splitting (target encoding, scaling parameters, missing-value imputation). The fix is to make the feature engineering itself part of the split: fit transformations on the training fold only, apply them to the test fold without re-fitting. This is what scikit-learn pipelines are for, and the reason lecture 2_02 spends a whole session on them.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Overfitting on the validation set</span>
+    The validation set is meant to choose hyperparameters once. In practice, modellers iterate: try a model, look at validation performance, change the model, look again. Each iteration is a Bonferroni-style multiple comparison against the validation set, and validation performance becomes optimistic. The fix is a three-way split (train, validate, test) where the test set is touched exactly once, at the end. Cross-validation makes the trick more efficient but does not change the principle.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting deployment</span>
+    A model that scores AUC 0.85 on a clean test set can score 0.65 on next month's portfolio because the population has shifted. The pipeline view treats monitoring as part of stage 5, not as a separate concern: the model must be evaluated against the population it is asked about, not against the population it was trained on. Population Stability Index (PSI) and characteristic stability are the standard tools; the absence of either in a model document is a red flag.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the world map. Three paradigms (supervised, unsupervised, reinforcement) classify the kind of signal the data carries. Six stages (feature engineering, splitting, fitting, tuning, evaluating, interpreting) shape the workflow. One trade-off (bias-variance) runs through every stage and every algorithmic choice. One impossibility result (no free lunch) explains why algorithm selection is data-conditional. Three failure modes (leakage, validation overfitting, drift) are the failures every production project has to defend against.</p>
+
+  <p>What this lecture deliberately did not do. It did not write a single line of model-fitting code; that begins next lecture. It did not derive any algorithm; algorithms start in sub-module 03. It did not say which algorithm is best for any given problem; that is the no-free-lunch point. It gave you the frame, not the contents. Every following lecture fills in one cell of the frame.</p>
+
+  <p>Lecture 2, <a href="02-feature_transformation.html">feature transformation</a>, is the first concrete stage. Raw data is rarely in a form an algorithm can consume directly: scales differ, categoricals need numerical encoding, outliers distort distance-based methods, and skewed distributions break linear models' assumptions. Transformation is the first place the pipeline view earns its keep, because every transformation has to be fit on the training set alone if leakage is to be avoided.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the bias-variance decomposition from memory. Which term is irreducible, and why does that matter for setting performance expectations on a new project?</li>
+      <li>You build a credit scorecard with AUC 0.82 on a 30 per cent holdout. Six months after deployment the observed default rate diverges sharply from expected. Walk through the six pipeline stages and name three places this failure could have originated.</li>
+      <li>"No free lunch" implies that you cannot pick a best algorithm without trying several. How does this reconcile with the empirical observation that gradient-boosted trees usually win on tabular credit data?</li>
+      <li>A modeller fits a transformation on the full dataset, splits, fits a model, and reports test performance. Identify the leak and describe a fix in one sentence.</li>
+      <li>Why is the U-shape of test error against model complexity a direct consequence of the bias-variance formula rather than an empirical observation?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 2 (<a href="02-feature_transformation.html">feature transformation</a>) is the first concrete stage. Every method there is a particular function applied column-by-column before the data reaches the model.</li>
+      <li><strong>Prerequisite:</strong> Statistics lecture 4 (<a href="../../statistics/04-statistical_modelling_taxonomy.html">statistical modelling taxonomy</a>) covers the underlying view of $\hat{f}(x)$ as a statistical estimator. The bias-variance formula derived here is the same formula that lecture extends to model selection.</li>
+      <li><strong>Used by:</strong> every later lecture in this course. The pipeline diagram is the reference for "where in the workflow does this lecture sit", and the bias-variance axis is the reference for "what does this hyperparameter actually do".</li>
+      <li><strong>Outside this course:</strong> the credit risk track at <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">application/banking/01_internal_environment/risk_measurement/credit_risk/</a> operationalises the pipeline under regulatory constraints. The A-IRB lifecycle (introduction → monitoring) is the same six-stage diagram with regulatory documentation requirements pinned to each stage.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Feature engineering course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 1 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 2: data and file storage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Data and file storage</h1>
+  <p class="subtitle">Two libraries hold the same customer records. In the first, each customer has a folder containing everything about them. In the second, all the surnames are in one ledger, all the balances in another, all the arrears counts in a third. Ask for one customer's complete file and the first library wins easily. Ask for the mean balance across two million customers and the second library wins by two orders of magnitude. That single choice, row against column, explains most of what follows.</p>
+  <div class="meta">
+    <span>Lecture 2 of 20</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Data</strong> is a collection of facts, usually about entities an organisation cares about: customers, accounts, loans, payments. Each entity has attributes. How rigidly those attributes are fixed in advance gives the three-way classification every data platform starts from: <strong>structured</strong> data conforms to a schema declared before the data arrives, <strong>semi-structured</strong> data carries its own structure but permits variation between instances, and <strong>unstructured</strong> data has no schema the machine can read at all.</p>
+
+  <p>That classification determines the file format, and the file format determines what the platform can do cheaply. Three choices matter, and they are independent of each other. First, is the file <em>human-readable text</em> or <em>binary</em>? Text is universally interoperable and expensive; binary is compact, typed, and needs a library. Second, is it laid out <em>by row</em> or <em>by column</em>? Rows suit writing one record and reading it whole; columns suit scanning one attribute across millions of records. Third, does the file <em>carry its own schema</em>? A CSV does not, so every reader guesses; a Parquet or Avro file does, so every reader agrees.</p>
+
+  <p>The practical summary for analytical work is short. Land data as it arrives, keep it, and convert it to Parquet for anything you will read more than once. Use CSV only at boundaries you do not control, and treat every CSV as untyped text until proven otherwise. Reserve JSON for genuinely variable structure, and flatten it as early as you can defend doing so.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Two libraries hold the same records. Library R gives each customer a folder holding everything about them: name, address, balance, arrears. Library C keeps ledgers instead: one ledger of every surname, one of every balance, one of every arrears count, each in the same customer order. Ask for everything about customer 4,182 and library R hands you one folder while library C makes you walk to twelve ledgers. Ask for the average balance of two million customers and library C hands you one thin ledger while library R makes you open two million folders and ignore almost everything in each. Transactional systems are library R. Analytical systems are library C. Nobody is being clever; they are answering different questions.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Why a format choice is an architecture choice</span>
+    It is tempting to treat file format as a detail to be settled late. It is not, because the format decides which operations are cheap, and which operations are cheap decides which questions people actually ask. A team whose history lives in gzipped CSV will not run an ad hoc query across five years of it, because the query takes an hour; so they will not ask the question; so nobody will know the answer. Convert the same data to partitioned Parquet and the query takes seconds, and the question gets asked weekly. Format choices propagate into what an organisation knows about itself.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three consequences follow from getting this wrong, and each is routine rather than exotic.</p>
+
+  <p><strong>Untyped text loses information silently.</strong> A CSV has no types. Every field is a string until some reader decides otherwise, and readers decide differently. An account number of <code>0012345</code> becomes the integer 12,345 and the leading zeros are gone. A date written <code>03/04/2024</code> is the third of April in London and the fourth of March in New York, and neither reader will tell you which it chose. A blank field is an empty string to one reader, a null to another, and the string "NaN" to a third. A field containing a comma inside quotes is fine until a source system stops quoting. None of these produce an error. All of them produce a plausible wrong answer, which is exactly the failure mode Lecture 01 called the expensive one.</p>
+
+  <p><strong>Row layout makes analytical scans cost what they need not cost.</strong> A credit risk dataset with 120 columns, queried for the mean of one of them, reads all 120 columns from a row-oriented file because rows are the unit of storage. Columnar layout reads one. The saving is roughly the ratio of columns you want to columns you have, multiplied again by compression, because a column of values of one type compresses far better than a row of mixed types. On a wide table the combined factor is commonly between ten and a hundred.</p>
+
+  <p><strong>Small files destroy distributed performance.</strong> Every file carries fixed overhead: a listing entry, an open, a footer read, a task scheduled. A directory of fifty thousand two-kilobyte JSON files takes longer to read than a single one-gigabyte Parquet file containing the same data, sometimes by orders of magnitude, because the work is per file rather than per byte. This is the <strong>small files problem</strong>, and it is the most common performance complaint about data lakes. Lecture 14 covers compaction, which is the cure.</p>
+
+  <div class="callout warn">
+    <span class="tag">The one that catches banks</span>
+    Financial amounts must not be stored as binary floating point. A 64-bit float cannot represent 0.1 exactly, so sums of many amounts drift, and a reconciliation to the general ledger fails by a few pence for reasons nobody can locate. Use a fixed-precision decimal type, which Parquet, Avro, and every serious database support, and specify the precision and scale deliberately. If the source hands you amounts inside a CSV, the conversion to decimal is your first transformation, not an afterthought.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The three degrees of structure</h3>
+
+  <div class="defcard tint-mint"><span class="term">Structured data</span><span class="def">Adheres to a fixed schema declared before the data arrives, so every instance has the same fields with the same types. Usually tabular: rows are instances, columns are attributes. A loan book extract with account number, balance, rate, and arrears count is structured. The schema is a contract, and violating it is an error rather than a variation.</span></div>
+  <div class="defcard tint-lavender"><span class="term">Semi-structured data</span><span class="def">Carries its own structure, but permits variation between instances. One customer has two email addresses, another has none, a third has a field nobody has seen before. JSON is the canonical format. The structure is self-describing rather than pre-declared, which buys flexibility at the source and costs work at every consumer.</span></div>
+  <div class="defcard tint-peach"><span class="term">Unstructured data</span><span class="def">No machine-readable schema at all: scanned facility letters, valuation reports, call recordings, photographs of collateral. The bytes are stored as a binary large object and the meaning is extracted by a model or a human. In banking this is a large and mostly untapped share of the estate, and Lecture 11 covers pulling tables out of it.</span></div>
+
+  <p>The boundaries are softer than the definitions suggest. A JSON file whose every instance happens to have identical fields is structured data in a semi-structured format, and should be flattened. A PDF containing a well-formed table is unstructured to the file system and structured to a human, which is exactly why extraction is worth automating. The classification is a statement about guarantees, not about appearance: structured means somebody promised the shape, and that promise is enforceable.</p>
+
+  <h3>Row layout against column layout</h3>
+
+  <p>A file is a one-dimensional sequence of bytes and a table is two-dimensional, so the table must be unrolled in some order. Two orders are useful. <strong>Row-oriented</strong> storage writes all fields of record one, then all fields of record two. <strong>Column-oriented</strong> storage writes all values of field one, then all values of field two.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Row-oriented and column-oriented layouts of the same table">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The same four records, unrolled two ways</text>
+
+      <!-- logical table -->
+      <text x="40" y="52" font-family="Inter" font-size="11" font-weight="700" fill="#3f3f46">LOGICAL TABLE</text>
+      <g font-family="JetBrains Mono" font-size="10" fill="#27272a">
+        <rect x="40" y="60" width="70" height="22" fill="#F4F4F5" stroke="#d4d4d8"/>
+        <rect x="110" y="60" width="80" height="22" fill="#F4F4F5" stroke="#d4d4d8"/>
+        <rect x="190" y="60" width="70" height="22" fill="#F4F4F5" stroke="#d4d4d8"/>
+        <text x="48" y="75" font-weight="700">acct</text>
+        <text x="118" y="75" font-weight="700">balance</text>
+        <text x="198" y="75" font-weight="700">arrears</text>
+
+        <rect x="40" y="82" width="70" height="20" fill="#ECFEF6" stroke="#d4d4d8"/><text x="48" y="96">A001</text>
+        <rect x="110" y="82" width="80" height="20" fill="#FFF7ED" stroke="#d4d4d8"/><text x="118" y="96">142000</text>
+        <rect x="190" y="82" width="70" height="20" fill="#F5F3FF" stroke="#d4d4d8"/><text x="198" y="96">0</text>
+
+        <rect x="40" y="102" width="70" height="20" fill="#ECFEF6" stroke="#d4d4d8"/><text x="48" y="116">A002</text>
+        <rect x="110" y="102" width="80" height="20" fill="#FFF7ED" stroke="#d4d4d8"/><text x="118" y="116">88500</text>
+        <rect x="190" y="102" width="70" height="20" fill="#F5F3FF" stroke="#d4d4d8"/><text x="198" y="116">2</text>
+
+        <rect x="40" y="122" width="70" height="20" fill="#ECFEF6" stroke="#d4d4d8"/><text x="48" y="136">A003</text>
+        <rect x="110" y="122" width="80" height="20" fill="#FFF7ED" stroke="#d4d4d8"/><text x="118" y="136">315000</text>
+        <rect x="190" y="122" width="70" height="20" fill="#F5F3FF" stroke="#d4d4d8"/><text x="198" y="136">0</text>
+
+        <rect x="40" y="142" width="70" height="20" fill="#ECFEF6" stroke="#d4d4d8"/><text x="48" y="156">A004</text>
+        <rect x="110" y="142" width="80" height="20" fill="#FFF7ED" stroke="#d4d4d8"/><text x="118" y="156">47250</text>
+        <rect x="190" y="142" width="70" height="20" fill="#F5F3FF" stroke="#d4d4d8"/><text x="198" y="156">6</text>
+      </g>
+
+      <!-- row layout -->
+      <text x="330" y="52" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">ROW-ORIENTED ON DISK</text>
+      <g font-family="JetBrains Mono" font-size="9">
+        <rect x="330" y="60" width="390" height="26" rx="4" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="338" y="77" fill="#7c2d12">A001 | 142000 | 0 || A002 | 88500 | 2 || A003 | ...</text>
+      </g>
+      <text x="330" y="104" font-family="Inter" font-size="10" fill="#92400e">Read one whole record: one contiguous seek.</text>
+      <text x="330" y="120" font-family="Inter" font-size="10" fill="#92400e">Read one column: touch every record and discard</text>
+      <text x="330" y="134" font-family="Inter" font-size="10" fill="#92400e">the rest. Mixed types compress poorly.</text>
+
+      <!-- column layout -->
+      <text x="330" y="172" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">COLUMN-ORIENTED ON DISK</text>
+      <g font-family="JetBrains Mono" font-size="9">
+        <rect x="330" y="180" width="390" height="22" rx="4" fill="#ECFEF6" stroke="#0d9488"/>
+        <text x="338" y="195" fill="#115e59">A001 | A002 | A003 | A004</text>
+        <rect x="330" y="204" width="390" height="22" rx="4" fill="#FFF7ED" stroke="#b45309"/>
+        <text x="338" y="219" fill="#7c2d12">142000 | 88500 | 315000 | 47250</text>
+        <rect x="330" y="228" width="390" height="22" rx="4" fill="#F5F3FF" stroke="#7c3aed"/>
+        <text x="338" y="243" fill="#5b21b6">0 | 2 | 0 | 6</text>
+      </g>
+      <text x="330" y="268" font-family="Inter" font-size="10" fill="#5b21b6">Read one column: one contiguous seek, nothing wasted.</text>
+      <text x="330" y="282" font-family="Inter" font-size="10" fill="#5b21b6">Read one whole record: one seek per column.</text>
+      <text x="330" y="296" font-family="Inter" font-size="10" fill="#5b21b6">One type per run, so compression is far better.</text>
+
+      <!-- verdict band -->
+      <rect x="40" y="320" width="680" height="60" rx="10" fill="#F4F4F5" stroke="#52525b" stroke-dasharray="6 4"/>
+      <text x="380" y="342" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#27272a">THE RULE</text>
+      <text x="380" y="360" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">Write-heavy, one record at a time, all fields: row (OLTP, Avro, a bank's core ledger).</text>
+      <text x="380" y="374" text-anchor="middle" font-family="Inter" font-size="11" fill="#3f3f46">Read-heavy, millions of records, a few fields: column (OLAP, Parquet, every modelling dataset).</text>
+    </svg>
+    <figcaption>The same four records in both layouts. Notice the second-order effect in the columnar case: each run holds one data type, and often a small number of distinct values, so dictionary and run-length encoding become available in a way they never are for a row of mixed types. The compression advantage is not incidental to columnar storage, it is most of the point.</figcaption>
+  </figure>
+
+  <h3>Self-describing files, and why schema-carrying matters</h3>
+
+  <p>A CSV is a sequence of characters. Nothing in it states that column three is a decimal with two places, that column seven is nullable, or that dates are ISO-8601. Every reader must be told, or must guess, and the guesses differ. A <strong>self-describing</strong> format embeds the schema in the file itself: Parquet writes it into the footer, Avro into the header. Any reader, in any language, then agrees on types, nullability, and column names without a side agreement.</p>
+
+  <p>This is the single most underrated property in the list. It converts a class of silent errors into an impossibility. You cannot accidentally read the account number as an integer from a Parquet file that declares it a string, and you cannot lose the distinction between null and empty. When Lecture 16 talks about schema enforcement, self-describing formats are what make enforcement cheap rather than aspirational.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Delimited text: CSV and its relatives</h3>
+
+  <p>Data is often stored as plain text with a field delimiter and a row terminator. Comma-separated values is the most common, with tab-separated, pipe-delimited, and fixed-width variants all in regular use, the last still arriving from mainframes.</p>
+
+  <pre><code>account_id,origination_date,balance,rate,arrears_months
+A001,2019-04-03,142000.00,0.0429,0
+A002,2021-11-17,88500.50,0.0515,2
+A003,2015-01-29,315000.00,0.0312,0</code></pre>
+
+  <p>The format's one virtue is that everything reads it, including a human with a text editor, which is why it will never die. Its defects are worth listing explicitly, because each one has bitten a production pipeline.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Defect</th><th>How it presents</th><th>Mitigation</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>No types</td><td>Leading zeros stripped, amounts become floats, integers become dates in a spreadsheet</td><td>Declare a full dtype map at read time; never rely on inference</td></tr>
+      <tr><td>No schema</td><td>A source adds a column in the middle and every downstream position shifts</td><td>Read by header name, assert the expected column set, fail on mismatch</td></tr>
+      <tr><td>Ambiguous dates</td><td><code>03/04/2024</code> parsed as March or April depending on locale</td><td>Require ISO-8601 in the contract; parse with an explicit format string</td></tr>
+      <tr><td>Null ambiguity</td><td>Empty, <code>NULL</code>, <code>NA</code>, <code>N/A</code>, <code>-</code>, and <code>NaN</code> all appear in one file</td><td>Specify the null sentinel list explicitly; reconcile counts after load</td></tr>
+      <tr><td>Delimiter collision</td><td>An address containing a comma splits into two fields when quoting is dropped</td><td>Prefer a delimiter absent from the data, validate the field count per row</td></tr>
+      <tr><td>Encoding</td><td>Names with accents arrive as mojibake, or the file starts with a byte-order mark</td><td>Insist on UTF-8 in the contract; handle the BOM explicitly</td></tr>
+      <tr><td>No compression or splitting</td><td>A 40 GB gzipped CSV cannot be read in parallel because gzip is not splittable</td><td>Convert on arrival; if you must compress text, use a splittable codec</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>JSON, and the cost of flexibility</h3>
+
+  <p>JSON expresses hierarchy: objects in braces, arrays in brackets, attributes as name-value pairs. It is the default for application events and web APIs, and it handles the case that defeats a table, which is an attribute that repeats an unpredictable number of times.</p>
+
+  <pre><code>{
+  "customer_id": "C8814",
+  "name": {"first": "Samir", "last": "Nadoy"},
+  "addresses": [
+    {"type": "residential", "postcode": "SW1A 1AA", "since": "2019-04-01"}
+  ],
+  "contacts": [
+    {"type": "email", "value": "samir@example.com"},
+    {"type": "mobile", "value": "+44 7700 900123"}
+  ]
+}</code></pre>
+
+  <p>For pipelines, the important variant is <strong>newline-delimited JSON</strong> (also called JSON Lines), one complete document per line. A single JSON array spanning a whole file cannot be split across workers or read incrementally without parsing the entire structure; newline-delimited JSON can be split at any line break, which makes it usable at scale. If you are offered a choice, take the newline-delimited form.</p>
+
+  <p>The engineering question with JSON is when to flatten. Nested structure is expressive and expensive: every consumer must understand the nesting, every query must traverse it, and any two consumers may traverse it differently. The usual discipline is to land the JSON as it arrived, then flatten to a typed table as the first transformation, promoting the fields you actually use to columns and keeping the original document alongside for the ones you do not. Arrays become separate tables with a foreign key, which is the normalisation of Lecture 07 arriving early.</p>
+
+  <h3>Binary large objects</h3>
+
+  <p>All files are ultimately binary. In text formats the bytes map to printable characters through an encoding such as UTF-8; in other formats they do not, and an application must interpret them. Images, video, audio, and application-specific documents are stored this way, and the term of art is <strong>BLOB</strong>, a binary large object. The engineering pattern is almost always the same: keep the object itself in cheap object storage, keep a row in a table holding its identifier, location, size, checksum, and whatever metadata you can extract, and never put the bytes in the database. Lecture 11 covers extracting structure from the most common banking case, the PDF.</p>
+
+  <h3>The optimised analytical formats</h3>
+
+  <p>Three binary formats dominate. They differ on the row-or-column axis, which drives everything else.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Format</th><th>Layout</th><th>Strength</th><th>Use it when</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Parquet</strong></td><td>Columnar (hybrid: row groups of column chunks)</td><td>Analytical scans, compression, predicate and projection pushdown; the de facto standard, and the substrate of every lakehouse table format</td><td>Almost always, for anything you will read more than once</td></tr>
+      <tr><td><strong>Avro</strong></td><td>Row-oriented</td><td>Compact per-record writes and first-class schema evolution, with the schema in the header; strong in streaming and event pipelines</td><td>Writing many individual records, or moving events through Kafka</td></tr>
+      <tr><td><strong>ORC</strong></td><td>Columnar</td><td>Comparable to Parquet, with lightweight indexes and strong compression; historically tied to the Hive ecosystem</td><td>You are in a Hive or legacy Hadoop estate that already uses it</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Parquet is worth understanding one level deeper, because its structure explains its performance. A Parquet file is divided into <strong>row groups</strong>, each holding a horizontal slice of the rows. Within a row group, each column is stored as a separate <strong>column chunk</strong>, itself divided into pages. The file ends with a footer holding the schema and, for every column chunk, statistics: minimum, maximum, and null count.</p>
+
+  <p>Those statistics deliver the two savings that matter. <strong>Projection pushdown</strong> means a query for three columns of a hundred reads only three column chunks, because the footer says where each one is. <strong>Predicate pushdown</strong> means a query filtered to <code>origination_date &gt;= 2023-01-01</code> reads the footer, sees that a row group's maximum origination date is 2019, and skips the entire row group without decompressing a byte. Add dictionary encoding for low-cardinality columns and run-length encoding for sorted ones, and a Parquet copy of a wide table is routinely five to twenty times smaller than the CSV and scans faster by more than that ratio.</p>
+
+  <div class="callout insight">
+    <span class="tag">Sort order is a free index</span>
+    Predicate pushdown works on the row group statistics, so it works well when the filter column is correlated with the physical order of the file and hardly at all when it is not. Writing a Parquet dataset sorted by the column you filter on most, usually a date, can turn a full scan into a handful of row group reads. This is the cheapest performance work available in a data platform: no index to maintain, no engine to tune, just deciding the write order deliberately. Lecture 14 formalises it as clustering.
+  </div>
+
+  <h3>Compression, and Arrow</h3>
+
+  <p>Compression inside Parquet is chosen per column chunk. <strong>Snappy</strong> is the traditional default, fast to compress and decompress and not especially small. <strong>Zstandard</strong> has largely displaced it for storage, compressing appreciably better at similar decompression speed, which matters when the file lives in object storage and the network is the bottleneck. <strong>Gzip</strong> compresses well and decompresses slowly, and its lack of splittability makes it a poor choice for whole text files even when it is fine inside Parquet. The rule of thumb: zstd for data you keep, snappy for intermediate data you will delete tomorrow.</p>
+
+  <p>One more name belongs here. <strong>Apache Arrow</strong> is not a file format but an in-memory columnar standard, and it is why the modern stack interoperates cheaply. Historically, moving a table from one tool to another meant serialising it to some format and parsing it back, and the conversion often cost more than the computation. Arrow defines one memory layout that pandas, Polars, DuckDB, Spark, and others can all read in place, so handing a table between them approaches free. Parquet is how a table rests; Arrow is how it travels.</p>
+
+  <h3>Partitioning and file size</h3>
+
+  <p>A large dataset is stored as many files in a directory tree, and the tree is part of the design. <strong>Hive-style partitioning</strong> encodes column values in directory names, so a reader can eliminate whole directories before opening anything.</p>
+
+  <pre><code>loans/
+  reporting_date=2026-05-31/
+    part-0000.parquet
+    part-0001.parquet
+  reporting_date=2026-06-30/
+    part-0000.parquet</code></pre>
+
+  <p>A query for June reads one directory. The choice of partition column follows the dominant filter, which for a bank's risk data is almost always the reporting date. Two failure modes bracket the good choice. Partition on something high-cardinality, such as account number, and you get millions of tiny files and the small files problem. Partition on nothing and every query scans everything. Aim for partitions holding files in the region of a hundred megabytes to a gigabyte each, and accept that the ideal depends on the engine.</p>
+
+  <div class="worked">
+    <strong>Worked example: choosing the storage for a monthly IFRS 9 modelling dataset</strong>
+    <p>The requirement: sixty monthly snapshots of a retail mortgage book, roughly two million accounts per snapshot, 140 columns, of which a typical query touches eight. Consumers are the ECL model build, the SICR analysis, and an ad hoc query workload from the risk team. Work through the choices in order.</p>
+    <p><em>Format.</em> Columnar, because every consumer scans few columns over many rows. Parquet rather than ORC, because the surrounding tooling (DuckDB locally, Spark at scale, pandas and Polars in the analysts' notebooks) treats Parquet as native. Indicative arithmetic for a table of this shape: as CSV, on the order of tens of gigabytes per snapshot's raw text; as Parquet with zstd, a small single-digit fraction of that, with an eight-column query reading a small fraction again of the Parquet.</p>
+    <p><em>Types.</em> Amounts as decimal with explicit precision and scale, never float. Dates as date, not string. The account identifier as string, because leading zeros and alphanumeric prefixes both occur and no arithmetic is ever done on it. Categorical fields such as product code and arrears bucket as dictionary-encoded strings, which cost almost nothing and stay readable.</p>
+    <p><em>Partitioning.</em> By <code>reporting_date</code>, one partition per month-end, which gives sixty partitions of a manageable size and matches the dominant filter in every consumer. Not by product, which would multiply the file count for a filter nobody applies first. Within a partition, write sorted by account identifier so that point lookups and joins benefit from row group elimination.</p>
+    <p><em>Raw retention.</em> Keep the source extract exactly as it arrived, compressed, in a separate raw location, with its checksum and arrival timestamp. It will be needed the first time someone asks whether a discrepancy was introduced by the source or by the pipeline, and that question always arrives eventually.</p>
+    <p><em>What this buys.</em> The ECL model build reads sixty partitions of eight columns instead of sixty full snapshots of text. The SICR analysis, which needs a two-year lookback per account, reads twenty-four partitions and nothing else. The ad hoc query workload becomes fast enough that people run queries instead of requesting extracts, which is the real return on the work.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Three independent axes describe any data file: how structured it is, whether it is laid out by row or by column, and whether it carries its own schema. Structured tabular data with a columnar layout and an embedded schema, which is to say Parquet, is the right default for analytical work, and the reasons are projection and predicate pushdown, type safety, and compression that only becomes available once each run of bytes holds one type. Text formats survive at boundaries you do not control, and every one of them should be treated as untrusted until a schema check has passed.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>If the job is</th><th>Use</th><th>Because</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Receiving an extract from a system you do not own</td><td>Whatever they send, kept verbatim</td><td>The raw arrival is your evidence when a number is disputed</td></tr>
+      <tr><td>Storing anything you will read more than once</td><td>Parquet, zstd, partitioned by date</td><td>Pushdown plus compression, and the schema travels with the data</td></tr>
+      <tr><td>Moving events through a stream</td><td>Avro, with a schema registry</td><td>Row layout suits per-record writes; schema evolution is first class</td></tr>
+      <tr><td>Handing a table between Python tools</td><td>Arrow in memory</td><td>No serialisation cost between pandas, Polars, DuckDB, and Spark</td></tr>
+      <tr><td>Publishing a small result to a human</td><td>CSV or a spreadsheet</td><td>Universality beats efficiency below a few megabytes</td></tr>
+      <tr><td>Storing a scanned document or image</td><td>Object storage, with a metadata row</td><td>Bytes belong in cheap storage, not in a database column</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Classify each of the following and say what the classification implies for storage: a nightly loan book extract, an application event log, a scanned facility letter, a JSON API response whose fields never vary.</li>
+      <li>Explain projection pushdown and predicate pushdown, and state which part of a Parquet file makes each possible.</li>
+      <li>Why does columnar layout compress better than row layout? Name two encodings that only become available once the layout is columnar.</li>
+      <li>Give four ways a CSV can silently change the meaning of a value, and the mitigation for each.</li>
+      <li>A colleague partitions a Parquet dataset by account number and reports that queries got slower. Diagnose it.</li>
+      <li>Why must monetary amounts avoid binary floating point, and what should be used instead?</li>
+      <li>Distinguish Parquet from Arrow in one sentence each.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="01-introduction.html">Lecture 01</a> placed this lecture at the generation and storage stages of the lifecycle.</li>
+      <li><strong>Next:</strong> <a href="03-databases_and_engines.html">Lecture 03 (databases and engines)</a> moves from files to systems: OLTP against OLAP, relational against NoSQL, and the warehouse, lake, and lakehouse lineage.</li>
+      <li><strong>Then:</strong> <a href="09-duckdb.html">Lecture 09 (DuckDB)</a> queries the Parquet files of this lecture directly, with no load step at all, and <a href="14-lakehouse_table_formats.html">Lecture 14</a> adds transactions and time travel on top of them.</li>
+      <li><strong>Cross-link:</strong> the small files problem raised here is solved by compaction in <a href="14-lakehouse_table_formats.html">Lecture 14</a>; schema enforcement is <a href="16-data_quality.html">Lecture 16</a>.</li>
+      <li><strong>Outside this course:</strong> the <a href="../data_analysis/01-pandas_core.html">data analysis track</a> covers dtype control on read, which is the consumer-side half of the CSV defect table above.</li>
+      <li><strong>Further reading:</strong> the Apache Parquet and Apache Arrow specifications are short and readable; Abadi, Boncz, and Harizopoulos on column-store architectures is the standard survey of why columnar layout wins for analytics.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 2 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

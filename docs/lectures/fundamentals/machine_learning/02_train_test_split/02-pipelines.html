@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 6: pipelines</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Train and test split</a></div>
+  <h1>Pipelines</h1>
+  <p class="subtitle">A pipeline turns several preprocessing steps and a model into one object that can be fit, predicted, persisted, and cross-validated atomically. It is the only construction that makes the leakage rule automatic, and the same object that ships to production.</p>
+  <div class="meta">
+    <span>Lecture 6 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>pipeline</strong> is a composite scikit-learn estimator that chains a sequence of transformers (and optionally a final model) into a single object exposing the usual <code>fit</code>, <code>transform</code>, and <code>predict</code> interface. The composition is a list of <code>(name, estimator)</code> tuples; calling <code>fit</code> on the pipeline calls <code>fit_transform</code> on each step in turn, threading the output of one into the input of the next, and finally <code>fit</code> on the terminal estimator. Calling <code>predict</code> calls <code>transform</code> on every step (no re-fitting) before <code>predict</code> on the terminal model. This single behavioural rule (fit propagates, transform does not) is what operationalises the leakage rule from <a href="01-train_test_validation.html">lecture 5</a>: the statistics learned during training (means, standard deviations, one-hot vocabularies, target encodings) are captured inside the fitted transformer objects, and applied to test or production data without ever seeing the target. A pipeline also accepts a <code>ColumnTransformer</code> as one of its steps, which lets different columns receive different treatments (scaling on numeric, one-hot on categorical) in parallel. The fitted pipeline can be passed wholesale to <code>GridSearchCV</code>, which re-fits every step inside every fold, and pickled wholesale as the artefact that goes to production. There is no separately maintained preprocessing script.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A model rarely consumes raw database columns directly. Before it sees a feature matrix, several things have to happen: missing values are filled in, numeric columns are put on a common scale, categoricals are turned into numbers, perhaps some columns are dropped. Each of these steps has parameters (the mean used to impute, the standard deviation used to scale, the list of categories used to one-hot) that have to be learned from data and then frozen. A pipeline is the object that holds those frozen parameters together with the model, so that when a new row arrives in production, exactly the same arithmetic is applied to it as was applied to the training rows. Without a pipeline, you are keeping that bookkeeping in your head, which is where leakage hides.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Pipelines are often taught as a tidiness device, a way to write fewer lines of code. The real reason to use them is governance. A regulator does not ask to see your notebook, they ask for the artefact that scores a customer. If preprocessing lives in a separate script and the model in a pickled file, you have two things to version, two things to test, and two places where they can drift apart. A single pipeline pickle collapses that surface area: one object, one hash, one provenance record. The leakage benefit is what wins arguments in the team; the governance benefit is what wins arguments with model risk management.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    The pipeline is the connective tissue between <a href="../01_feature_engineering/02-feature_transformation.html">lecture 2</a> (the individual transformations) and every supervised method in <a href="../03_supervised_learning/index.html">sub-module 03</a> (the models that consume the transformed matrix). It is also the only sensible input to <a href="../06_hyperparameter_tuning/02-grid_search.html">grid search</a>, because the search has to re-fit preprocessing per fold; without the pipeline abstraction, leakage in cross-validation is silent and routine.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the pipeline is not optional in serious work. First, <strong>the leakage rule is structural, not procedural.</strong> Lecture 5 introduced the rule that any transformer with learned parameters must be fit on training data only. In a script that loads the full dataset, imputes the mean, scales, and then splits, that rule is violated and the violation is invisible. The training set's reported performance is inflated by an amount that depends on how much information the leaked statistic carries (very little for a single mean, materially more for a target encoding). A pipeline removes the procedural step that can be skipped. The order of operations inside <code>pipeline.fit(X_train, y_train)</code> is enforced by the library, not by the analyst's memory.</p>
+
+  <p>Second, <strong>cross-validation without pipelines is leaky by default.</strong> If you scale your features once before passing them to <code>cross_val_score</code>, every fold's training portion has already been contaminated by statistics from that fold's validation portion. The bias is small per fold but compounds across folds and across hyperparameter settings, and the model that wins the grid search is often the one that benefits most from the leak. Passing the pipeline to the cross-validator (rather than the model alone) makes the cross-validator re-fit every step on every training fold; preprocessing parameters never see the held-out portion. This is the single most common silent error in applied machine learning.</p>
+
+  <p>Third, <strong>the deployable artefact has to include preprocessing.</strong> The production system receives a raw row from the database, not a preprocessed feature vector. If preprocessing lives outside the model object, the production system has to reproduce it, and any divergence (a different sklearn version, a different default, a missed step) shows up as a serving-time bug. Pickling the entire pipeline captures both the fitted transformers and the fitted model in one file with one signature. Treating that file as the deployable unit removes a whole class of train-serve skew.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A behavioural PD model performed well in validation, with cross-validated AUC stable across folds and bootstrap iterations. In the first month of live scoring, the daily prediction distribution drifted upward by about 0.05 in mean probability. The cause was traced to a numerical feature that had been Yeo-Johnson transformed in the training notebook using a fitted lambda; the production scoring code re-fit the transformer on each daily batch (a default copy-paste from the notebook). The team's fix was not a better deployment script but a structural one: the pipeline pickle was made the only artefact, with the production code reduced to <code>pipeline.predict_proba(row)</code>. Drift then became something to monitor, not something to introduce.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Picture a pipeline as a row of black boxes connected end-to-end, with a single switch at the front marked "fit" or "transform" (or "predict" for the final box). When the switch is set to fit, each box learns its parameters from whatever comes through and passes its output downstream. When the switch is set to transform, the boxes apply their already-learned parameters without changing them. The same row of boxes handles training and inference; only the switch position differs.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pipeline with ColumnTransformer splitting numeric and categorical processing">
+      <defs>
+        <marker id="pipeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A pipeline with a ColumnTransformer and a terminal estimator</text>
+
+      <!-- Raw data -->
+      <g>
+        <rect x="20" y="150" width="120" height="60" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="80" y="175" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">RAW X</text>
+        <text x="80" y="192" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">mixed types,</text>
+        <text x="80" y="203" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">missing values</text>
+      </g>
+
+      <line x1="140" y1="180" x2="200" y2="180" stroke="#71717a" stroke-width="1.5" marker-end="url(#pipeArrow)"/>
+
+      <!-- ColumnTransformer box -->
+      <g>
+        <rect x="200" y="70" width="280" height="220" rx="14" fill="#F8FAFC" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="340" y="92" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">ColumnTransformer</text>
+
+        <!-- Numeric branch -->
+        <g>
+          <rect x="220" y="110" width="110" height="44" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+          <text x="275" y="128" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">numeric</text>
+          <text x="275" y="143" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">impute, scale</text>
+        </g>
+
+        <!-- Categorical branch -->
+        <g>
+          <rect x="350" y="110" width="110" height="44" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+          <text x="405" y="128" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">categorical</text>
+          <text x="405" y="143" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">one-hot encode</text>
+        </g>
+
+        <!-- Concat -->
+        <g>
+          <rect x="260" y="200" width="160" height="40" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+          <text x="340" y="218" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">concatenate</text>
+          <text x="340" y="231" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">transformed matrix</text>
+        </g>
+
+        <line x1="275" y1="154" x2="320" y2="200" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+        <line x1="405" y1="154" x2="360" y2="200" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+
+        <text x="340" y="262" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">one step in the outer pipeline</text>
+        <text x="340" y="275" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">applied to disjoint column groups</text>
+      </g>
+
+      <line x1="480" y1="180" x2="540" y2="180" stroke="#71717a" stroke-width="1.5" marker-end="url(#pipeArrow)"/>
+
+      <!-- Terminal estimator -->
+      <g>
+        <rect x="540" y="150" width="160" height="60" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="620" y="175" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">ESTIMATOR</text>
+        <text x="620" y="192" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">e.g. LogisticRegression</text>
+        <text x="620" y="203" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">fit on X_train, y_train</text>
+      </g>
+
+      <line x1="700" y1="180" x2="760" y2="180" stroke="#71717a" stroke-width="1.5" marker-end="url(#pipeArrow)"/>
+
+      <!-- Output -->
+      <g>
+        <rect x="760" y="150" width="110" height="60" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="815" y="175" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">PREDICTION</text>
+        <text x="815" y="192" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">y_hat or</text>
+        <text x="815" y="203" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">probability</text>
+      </g>
+
+      <!-- Footer rule -->
+      <line x1="40" y1="310" x2="840" y2="310" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="440" y="330" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">fit on training data; transform on everything else</text>
+      <text x="440" y="346" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">the same fitted object is pickled, cross-validated, and deployed</text>
+    </svg>
+    <figcaption>Raw rows enter the pipeline, the ColumnTransformer routes columns to type-specific sub-pipelines, the outputs are concatenated, and the terminal estimator consumes the assembled matrix. During fit, every box learns its parameters from training data only. During predict, the same fitted boxes apply those parameters without re-learning.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The ColumnTransformer is itself a single step within the outer pipeline, which means the whole composition is still one object that takes raw rows in and predictions out. The branches inside the ColumnTransformer operate on disjoint column groups in parallel; they do not share state, but their outputs are concatenated column-wise before the next step. The amber bar at the bottom is the same rule from <a href="../01_feature_engineering/02-feature_transformation.html">lecture 2</a>: the difference is that here the rule is enforced by the architecture rather than by the analyst's discipline.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Pipeline composition</h3>
+
+  <p>A <code>Pipeline</code> is constructed from a list of <code>(name, estimator)</code> tuples. The names are arbitrary strings (used later to address hyperparameters in grid search) and the estimators are any scikit-learn-compatible objects implementing <code>fit</code> and <code>transform</code>, with the final step optionally being a predictor (implementing <code>fit</code> and <code>predict</code>). Every step except the last must be a transformer; the last may be a transformer or a predictor.</p>
+
+  <p>The behavioural rule is simple. Calling <code>pipeline.fit(X, y)</code> iterates through the steps in order, calling <code>fit_transform(X, y)</code> on each transformer and passing the output to the next; on the final step, it calls <code>fit(X, y)</code>. Calling <code>pipeline.predict(X)</code> calls <code>transform(X)</code> on every step (without re-fitting) and <code>predict(X)</code> on the last. Calling <code>pipeline.transform(X)</code> calls <code>transform(X)</code> on every step (only valid if the final step is also a transformer). The composition itself is an estimator, so it has its own <code>fit</code>, <code>predict</code>, <code>score</code>, <code>get_params</code>, and <code>set_params</code>; it can be nested inside another pipeline or a meta-estimator like <code>GridSearchCV</code> without special handling.</p>
+
+  <p>The <code>make_pipeline</code> shortcut constructs a pipeline from a sequence of estimators without explicit names, auto-generating names from the lower-cased class name. It is convenient for short pipelines where the names are not needed later for parameter addressing. For anything that will be tuned or documented, the explicit tuple form is preferable: a name like <code>("scale", StandardScaler())</code> reads clearly in a stack trace, whereas <code>"standardscaler"</code> reads less clearly and changes if you swap the scaler.</p>
+
+  <h3>ColumnTransformer</h3>
+
+  <p>Real feature matrices contain columns of different types. A scaler is appropriate for numeric columns and meaningless for categorical ones; a one-hot encoder is the reverse. The <code>ColumnTransformer</code> applies different transformations to different columns in parallel and concatenates the results column-wise. Its constructor takes a list of <code>(name, transformer, columns)</code> triples, where <code>columns</code> is a list of column names, a list of integer indices, or a selector like <code>make_column_selector(dtype_include="number")</code>.</p>
+
+  <p>The <code>remainder</code> argument controls what happens to columns not mentioned in any triple: <code>"drop"</code> (the default) discards them, <code>"passthrough"</code> appends them unmodified to the output, and a transformer object applies that transformer to all the unmentioned columns. The <code>make_column_transformer</code> shortcut, analogous to <code>make_pipeline</code>, auto-generates names from class names. The result of a fitted <code>ColumnTransformer</code> is a single matrix (numpy array or pandas DataFrame, controlled by <code>set_config(transform_output="pandas")</code>) whose columns are the concatenation of the sub-transformer outputs in the order the triples were listed.</p>
+
+  <p>The ColumnTransformer is itself a single step inside the outer pipeline. A typical structure has a per-type sub-pipeline (imputer then scaler for numeric, imputer then one-hot for categorical) inside each branch of the ColumnTransformer, with the ColumnTransformer itself as the only preprocessing step in the outer pipeline, followed by the final estimator. This three-level nesting (outer pipeline, ColumnTransformer, inner per-type pipelines) is the canonical layout for tabular work and the one to default to.</p>
+
+  <h3>Pipelines and cross-validation</h3>
+
+  <p>The whole point of putting the pipeline together is that it can be passed wholesale to <code>cross_val_score</code>, <code>cross_validate</code>, or <code>GridSearchCV</code> as if it were a single model. The cross-validator splits the data, calls <code>pipeline.fit(X_train_fold, y_train_fold)</code> on each training fold (which re-fits every transformer's learned parameters from scratch), then calls <code>pipeline.predict(X_val_fold)</code> on the held-out fold (which applies the just-fitted transformers without re-fitting). No preprocessing statistic from the validation fold leaks into the training fold. This is the leakage-safe behaviour that is impossible to guarantee without the pipeline abstraction.</p>
+
+  <p>Hyperparameter addressing inside a pipeline uses the double-underscore convention. A parameter called <code>alpha</code> on a step named <code>"model"</code> is referred to as <code>"model__alpha"</code> in the grid search parameter dictionary; a parameter <code>n_neighbors</code> on a step <code>"knn"</code> inside a ColumnTransformer step <code>"prep"</code> is <code>"prep__knn__n_neighbors"</code>. This lets the grid search tune preprocessing choices (number of imputed components, scaler choice, one-hot drop strategy) alongside model hyperparameters, with the cross-validation safety guarantee covering both.</p>
+
+  <h3>Pipelines and persistence</h3>
+
+  <p>A fitted pipeline is a Python object containing fitted transformer state (means, standard deviations, category lists, learned lambdas) and the fitted model. Pickling it with <code>joblib.dump(pipeline, "model.pkl")</code> captures all of that in one file; loading with <code>joblib.load("model.pkl")</code> restores the object ready to score new data. The deployment contract reduces to "load the pickle, call <code>predict</code> or <code>predict_proba</code> on a raw row". There is no separately maintained feature-engineering code.</p>
+
+  <p>Two practical conditions make this safe. First, the production environment must match the training environment closely enough for the pickle to load: same scikit-learn major version, same Python major version, same numpy. A version mismatch is one of the more common production incidents; the standard mitigation is to pin versions in the deployment image and check the loaded pipeline's <code>__sklearn_version__</code> attribute on startup. Second, the input row at scoring time must have the same column names and dtypes as the training matrix; the pipeline raises if a column is missing or named differently. The pipeline's <code>feature_names_in_</code> attribute, set during fit, is the contract that the scoring system has to satisfy.</p>
+
+  <h3>Worked example</h3>
+
+  <p>The following pipeline imputes missing values, scales numeric columns, one-hot encodes categorical ones, and fits a logistic regression as the final step. It is the canonical layout described above (outer pipeline holding a ColumnTransformer holding per-type inner pipelines).</p>
+
+<pre><code class="language-python">import pandas as pd
+from sklearn import set_config
+from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+set_config(transform_output="pandas")
+
+# X is a DataFrame with mixed numeric and categorical columns; y is a binary target
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
+
+numeric_pipeline = Pipeline(steps=[
+    ("impute", SimpleImputer(strategy="median")),
+    ("scale", StandardScaler()),
+])
+
+categorical_pipeline = Pipeline(steps=[
+    ("impute", SimpleImputer(strategy="constant", fill_value="missing")),
+    ("onehot", OneHotEncoder(handle_unknown="infrequent_if_exist", min_frequency=0.01)),
+])
+
+preprocess = ColumnTransformer(transformers=[
+    ("num", numeric_pipeline, make_column_selector(dtype_include="number")),
+    ("cat", categorical_pipeline, make_column_selector(dtype_include="object")),
+])
+
+pipeline = Pipeline(steps=[
+    ("preprocess", preprocess),
+    ("model", LogisticRegression(max_iter=1000, solver="liblinear")),
+])
+
+# Tune both preprocessing and model hyperparameters; preprocessing is re-fit per fold
+param_grid = {
+    "preprocess__num__impute__strategy": ["median", "mean"],
+    "model__C": [0.1, 1.0, 10.0],
+}
+
+search = GridSearchCV(pipeline, param_grid, cv=5, scoring="roc_auc", n_jobs=-1)
+search.fit(X_train, y_train)
+
+# The fitted artefact is one object containing preprocessing and model
+best_pipeline = search.best_estimator_
+test_auc = best_pipeline.score(X_test, y_test)
+
+import joblib
+joblib.dump(best_pipeline, "pd_model.pkl")
+</code></pre>
+
+  <p>Three details earn their inclusion. The <code>handle_unknown="infrequent_if_exist"</code> setting on the one-hot encoder gives a deployment-safe behaviour for unseen categorical levels (see <a href="../01_feature_engineering/02-feature_transformation.html">lecture 2</a> on the dummy variable trap and rare-label encoding). The double-underscore parameter names in the grid let the search tune the numeric imputer strategy and the logistic regression regularisation strength simultaneously, with the cross-validation guaranteeing both are evaluated without leakage. The single <code>joblib.dump</code> call at the end persists the whole composition; the next code that touches it is a one-line load and predict in production.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Three failure modes account for most pipeline-related incidents, and one is a subtle misuse rather than an outright bug.</p>
+
+  <div class="callout warn">
+    <span class="tag">Preprocessing outside the pipeline, then cross-validating the model</span>
+    Fit a scaler on the full dataset, transform once, then pass the transformed matrix and a bare model into <code>cross_val_score</code>. The cross-validation is now leakage-contaminated even though it looks correct: every training fold has been pre-scaled with statistics that included the validation fold. The reported score is optimistic, the bias is fold-dependent, and the model that wins a downstream grid search is often the one that benefits most. The fix is to put the scaler inside the pipeline and pass the pipeline (not the bare model) to the cross-validator.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Fit-then-transform anti-pattern</span>
+    Call <code>pipeline.fit(X_train)</code> and then <code>pipeline.fit_transform(X_test)</code> by mistake. The second call re-fits every transformer's parameters on the test set, replacing the training statistics with test statistics. The test score is then computed against a model that has effectively seen the test inputs. The fix is to remember that after <code>fit</code> the only methods you should call on the pipeline are <code>transform</code>, <code>predict</code>, <code>predict_proba</code>, or <code>score</code>; never <code>fit</code> or <code>fit_transform</code> again until the next training cycle.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Pickle portability across versions</span>
+    A pipeline pickled with scikit-learn 1.3 may fail to load under 1.5, or load with subtly different default behaviour. The failure mode at training time is loud (an import error); at scoring time it is silent (the default value of a parameter changed and the predictions shift). The fix is to pin the scikit-learn version in the deployment image, store the training version as metadata alongside the pickle, and check the version on load. For long-lived production models, prefer ONNX or PMML export over raw pickle, which decouples the artefact from a specific library version at the cost of more complex tooling.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Hidden state in custom transformers</span>
+    A custom transformer that holds state in module-level globals or class attributes rather than instance attributes will not pickle correctly, will not behave correctly under cross-validation (because the state is shared across folds), and will fail in obscure ways inside <code>GridSearchCV</code> with <code>n_jobs > 1</code>. The fix is to follow the scikit-learn convention: all learned parameters are stored on <code>self</code> as attributes with trailing underscores (<code>self.mean_</code>, <code>self.categories_</code>), set during <code>fit</code> and read during <code>transform</code>. A passing call to <code>check_estimator</code> on the custom class catches most of these.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A pipeline is the object that holds preprocessing and modelling together, exposes a single fit-predict interface, and enforces the leakage rule structurally. The composition is a list of named steps where every step except the last is a transformer and the last is optionally a predictor. A ColumnTransformer is the standard pattern for applying different transformations to different column types in parallel, and is itself a single step inside the outer pipeline. Passing the pipeline (not the bare model) to cross-validation makes preprocessing re-fit per fold; passing the pipeline to <code>GridSearchCV</code> with double-underscore parameter names tunes preprocessing and model jointly. Pickling the fitted pipeline produces the artefact that ships to production; the deployment contract is a single load and predict call. Underneath all of this is the same rule from <a href="../01_feature_engineering/02-feature_transformation.html">lecture 2</a> and <a href="01-train_test_validation.html">lecture 5</a>, now enforced by architecture rather than discipline.</p>
+
+  <p>What this lecture deliberately did not do. It did not introduce model selection or hyperparameter tuning beyond the example with <code>GridSearchCV</code>; the search strategies, the choice of scoring metric, and the diagnostic of the resulting CV curve are <a href="../06_hyperparameter_tuning/02-grid_search.html">lecture 21</a>. It did not introduce any specific model; the algorithms start in sub-module 03 with k-nearest neighbours. It did not address monitoring, drift detection, or re-fit triggers; those are stage 6 of the pipeline from lecture 1 and are covered later.</p>
+
+  <p>The next lecture, <a href="../03_supervised_learning/01-k_nearest_neighbours.html">k-nearest neighbours</a>, introduces the first proper supervised model. It is also the first algorithm whose performance materially depends on having the preprocessing right (KNN distance is dominated by whichever feature has the largest scale), which makes it the natural place to see a pipeline used in earnest.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State precisely what happens when you call <code>fit</code> on a pipeline of three steps (two transformers followed by a model). Distinguish what each step does and what data is passed between them.</li>
+      <li>Why does passing a bare model (rather than a pipeline) to <code>cross_val_score</code> leak information across folds when preprocessing has already been applied to the full dataset? Explain the mechanism and the direction of the bias.</li>
+      <li>You want to tune both the imputation strategy of a numeric imputer and the regularisation strength of a logistic regression inside a single pipeline. The imputer is named <code>"impute"</code> within a ColumnTransformer step <code>"prep"</code>, and the model step is <code>"model"</code>. Write the keys for the <code>GridSearchCV</code> parameter dictionary.</li>
+      <li>A categorical column has 200 distinct levels in training and three additional unseen levels at scoring time. What argument to <code>OneHotEncoder</code> makes the pipeline robust to those unseen levels, and what is the alternative pre-processing step that achieves the same goal?</li>
+      <li>You pickle a fitted pipeline trained under scikit-learn 1.3 and the production system loads it under 1.5. The load succeeds but the predicted probabilities differ slightly from the training-time predictions. Name two causes and the standard mitigation for each.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 5 (<a href="01-train_test_validation.html">train, test, validation</a>) established the leakage rule and the held-out test set; this lecture is the structural mechanism that makes the rule automatic in scikit-learn.</li>
+      <li><strong>Next:</strong> Sub-module 03 (<a href="../03_supervised_learning/index.html">supervised learning</a>) starts with <a href="../03_supervised_learning/01-k_nearest_neighbours.html">k-nearest neighbours</a>, the first algorithm whose accuracy critically depends on the preprocessing being inside the pipeline rather than alongside it.</li>
+      <li><strong>Prerequisite:</strong> Lecture 2 (<a href="../01_feature_engineering/02-feature_transformation.html">feature transformation</a>) covered the individual transformations (scaling, encoding, imputation) that this lecture chains together; without that catalogue, the pipeline is an empty container.</li>
+      <li><strong>Forward link:</strong> Lecture 21 (<a href="../06_hyperparameter_tuning/02-grid_search.html">grid search</a>) treats the pipeline as the unit of cross-validated tuning, with the double-underscore parameter syntax addressing every step's hyperparameters jointly.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Train and test split course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 6 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

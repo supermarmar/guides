@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 6: reinforcement learning for pricing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="index.html">AI for actuaries</a></div>
+  <h1>Reinforcement learning for pricing</h1>
+  <p class="subtitle">The reinforcement-learning sub-module opened with the premium-control problem as its motivating actuarial example and closed with the full tabular-to-deep toolkit needed to solve it. This lecture returns to premium control properly, developing the multi-objective reward a genuine pricing application needs and confronting directly why an action that changes the very portfolio being priced breaks the forecasting paradigm every earlier lecture in this course, and every conventional actuarial pricing model, quietly assumes.</p>
+  <div class="meta">
+    <span>Lecture 6 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Source: <em>AI Tools for Actuaries</em> (SSRN 5162304), ch. 5</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Every architecture developed in lectures 2 to 5 of this course, however sophisticated, answers a forecasting question: given this policyholder's covariates, what is the best estimate of their claim cost. <strong>Premium control</strong> is a genuinely different question: given the premium charged today, what happens to tomorrow's exposure, retention, and claims experience, and what premium should be charged tomorrow in response. The reinforcement-learning sub-module's opening lecture flagged this distinction directly: a pricing action taken today changes the very population the pricing model will observe tomorrow, a closed feedback loop no supervised forecasting model, however accurate on today's data, is structurally able to represent. A genuine premium-control reward cannot be a single number; it must be <strong>multi-objective</strong>, balancing retained profit against <strong>solvency constraints</strong> (the pricing policy must not, even under a plausible stress scenario, threaten capital adequacy) and <strong>price elasticity</strong> (a premium increase that looks profitable in isolation can trigger enough lapse that the actual realised profit falls), with the relative weighting of these objectives itself a genuine business and regulatory judgement, not a parameter to be tuned purely for predictive accuracy. Applying the reinforcement-learning sub-module's full toolkit, Markov decision processes, the Bellman equation, SARSA or Q-learning for the tabular case, or the deep-RL architectures (DQN, PPO) for a continuous premium action and a high-dimensional policyholder state, to this problem is the direct, technically honest way to build a genuine pricing-optimisation system, rather than smuggling a decision problem past disguised as an ordinary supervised-learning one.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A pricing actuary who fits a supervised model to historical data on premiums charged and profit realised, then simply recommends whichever candidate premium the model predicts will be most profitable, is quietly assuming the historical data already contains examples of every candidate premium's consequences, an assumption that is false the moment a genuinely new premium level, one nobody has actually charged before, is being considered. A river-lock operator does not predict tomorrow's water level from a model fitted purely on past water levels under the old release policy; they reason explicitly about how today's release decision changes tomorrow's level, and set the release policy accordingly. Premium control needs exactly this second kind of reasoning, and reinforcement learning is the formal machinery for it.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What is beyond the source</span>
+    The source develops the premium-control framing and the multi-objective reward structure directly. This lecture connects the discussion explicitly back to the machine-learning course's own reinforcement-learning sub-module, in particular naming precisely which algorithm (tabular SARSA or Q-learning versus deep RL) fits which scale of pricing problem, a mapping the source leaves at a higher level of generality.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this lecture's honest reframing matters for a working actuary, not merely as a theoretical nicety.</p>
+
+  <p>First, <strong>treating a genuine pricing-optimisation decision as an ordinary supervised-learning problem produces a model that fails exactly when it is asked to do anything genuinely novel</strong>, precisely the failure the reinforcement-learning sub-module's own opening vignette documented: a supervised model trained on historical pricing outcomes has no principled way to extrapolate to a premium level nobody has actually charged, and recommending one anyway is asking the model to answer a question its own training data cannot support.</p>
+
+  <p>Second, <strong>a single-objective reward (maximise profit alone) is a genuine, dangerous oversimplification of the real regulatory and commercial problem</strong>: a reinforcement-learning agent optimising raw profit with no solvency constraint can, in principle, discover a pricing policy that is profitable in expectation but carries an unacceptable tail risk of capital inadequacy, exactly the kind of outcome a genuine actuarial control framework exists to prevent.</p>
+
+  <p>Third, <strong>price elasticity is not a secondary detail, it is the entire reason premium control is a decision problem rather than a forecasting one</strong>: if customers never responded to a price change at all, a supervised forecasting model would in fact be adequate; it is precisely because pricing actions change customer behaviour that the reinforcement-learning framing, and its explicit representation of the action-changes-the-state loop, becomes necessary rather than optional.</p>
+
+  <div class="callout insight">
+    <span class="tag">A worked comparison</span>
+    A pricing team piloting a reinforcement-learning-based premium-adjustment agent initially specified a single-objective reward, maximise expected annual underwriting profit, with no explicit solvency or elasticity term. Backtesting the trained agent's policy against historical stress scenarios revealed that, under a plausible adverse claims year combined with the agent's own historically-recommended aggressive premium increases (which the backtest simulated would have triggered elevated lapse among the exact customers most likely to remain profitable), the simulated capital position would have breached the internal early-warning threshold, an outcome the single-objective reward had no mechanism to penalise during training. Restructuring the reward to include an explicit solvency-constraint penalty term, activated whenever a simulated capital trajectory approached the threshold, and a separate, empirically estimated elasticity term reflecting how retention actually responds to a given premium change, produced a materially more conservative, and materially more defensible, pricing policy in the same backtest.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Picture the closed feedback loop from the reinforcement-learning sub-module's opening lecture, agent and environment locked together, made concrete here specifically as a pricing agent and a policyholder population, with three separate reward components (profit, solvency, elasticity-adjusted retention) all feeding into the single scalar reward the agent is actually trained against.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 780 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A pricing agent in a closed loop with a policyholder population, with a multi-objective reward combining profit, solvency, and elasticity">
+      <defs>
+        <marker id="rlpArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="390" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Premium control: a closed loop, a multi-objective reward</text>
+
+      <rect x="80" y="110" width="140" height="70" rx="8" fill="#ddd6fe"/>
+      <text x="150" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#4c1d95">Pricing agent</text>
+
+      <rect x="330" y="110" width="140" height="70" rx="8" fill="#c4b5fd"/>
+      <text x="400" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#4c1d95">Policyholder population</text>
+
+      <path d="M 222 130 Q 275 100 328 125" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#rlpArrow)"/>
+      <text x="275" y="100" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">premium action</text>
+      <path d="M 328 165 Q 275 195 222 155" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#rlpArrow)"/>
+      <text x="275" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">state (exposure, retention, claims)</text>
+
+      <rect x="540" y="55" width="200" height="45" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="640" y="82" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">Profit component</text>
+
+      <rect x="540" y="115" width="200" height="45" rx="6" fill="#FEE2E2" stroke="#dc2626" stroke-width="1.5"/>
+      <text x="640" y="142" text-anchor="middle" font-family="Inter" font-size="10" fill="#7f1d1d">Solvency-constraint penalty</text>
+
+      <rect x="540" y="175" width="200" height="45" rx="6" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+      <text x="640" y="202" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">Elasticity-adjusted retention</text>
+
+      <path d="M 220 145 L 540 77" stroke="#71717a" stroke-width="1"/>
+      <path d="M 220 145 L 540 137" stroke="#71717a" stroke-width="1"/>
+      <path d="M 220 145 L 540 197" stroke="#71717a" stroke-width="1"/>
+
+      <rect x="560" y="245" width="160" height="45" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="640" y="272" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">Single scalar reward</text>
+      <path d="M 640 220 L 640 243" stroke="#71717a" stroke-width="1.5" marker-end="url(#rlpArrow)"/>
+    </svg>
+    <figcaption>The pricing agent's action (a premium level) changes the policyholder population's state (exposure, retention, claims experience), exactly the closed loop that breaks the forecasting paradigm. Three separate reward components, profit, a solvency-constraint penalty, and elasticity-adjusted retention, combine into the single scalar reward the agent is actually trained against, exactly the multi-objective structure the backtesting vignette's team was forced to add after the single-objective version's failure.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A premium action changes the population you will price next, not just the number you charge today.</strong> This is the entire, specific reason premium control needs the reinforcement-learning framing rather than an ordinary supervised model. <strong>A single number cannot represent three genuinely competing objectives at once.</strong> Profit, solvency, and elasticity-adjusted retention pull in different directions, and collapsing them prematurely into one naive reward, as the vignette's first attempt did, hides exactly the trade-off a genuine pricing decision needs to make explicit.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The premium control problem, properly stated</h3>
+
+  <p>Casting premium setting as a Markov decision process (the reinforcement-learning sub-module's own framework): the <strong>state</strong> is the current position of the book of business (exposure by segment, recent claims experience, competitor pricing intelligence, current capital position); the <strong>action</strong> is the premium (or premium adjustment) charged to a policyholder or segment; the <strong>transition dynamics</strong> describe how the state evolves in response to the action (retention, new business volume, claims experience, each responding to the premium charged); and the <strong>reward</strong> is the multi-objective quantity developed next. This is a direct, literal application of the Markov-decision-process framework from the reinforcement-learning sub-module's fourth lecture, with every element of that framework given a concrete, pricing-specific meaning.</p>
+
+  <h3>The multi-objective reward</h3>
+
+  <p>A genuine pricing reward combines at least three components. The <strong>profit component</strong> is the expected underwriting margin the premium generates, the most obvious term and the one a naive single-objective reward stops at. The <strong>solvency-constraint component</strong> penalises (or, in a harder-constrained formulation, forbids outright) any action whose simulated consequences, under a plausible stress scenario, would threaten capital adequacy, directly analogous to the regulatory capital constraints this track's actuarial-risk-management material develops for conventional pricing. The <strong>price-elasticity component</strong> adjusts the naive profit calculation for the fact that a premium change alters retention and new-business volume, not merely the margin per policy retained; ignoring this component, as the vignette's first attempt did, produces a reward that looks like pure profit maximisation but is, in fact, blind to its own effect on the very population generating that profit.</p>
+
+  <h3>Why an action that changes the portfolio breaks the forecasting paradigm</h3>
+
+  <p>A supervised forecasting model, however accurate, is fitted on historical data generated under whatever pricing policy was actually in force historically. Asking such a model to recommend a genuinely novel premium level is asking it to extrapolate to a region of action-space its training data contains no examples of, precisely because that action was never actually taken historically, exactly the failure this lecture's opening Feynman test and the reinforcement-learning sub-module's own opening vignette both illustrate. Reinforcement learning does not avoid this problem by magic; it addresses it honestly, by explicitly modelling the action-changes-the-state loop and learning (or, where dynamics are known well enough, computing via dynamic programming) a policy that accounts for the consequences of actions genuinely different from the historical status quo, rather than silently assuming those consequences away.</p>
+
+  <h3>Which algorithm fits which scale of problem</h3>
+
+  <p>For a pricing problem with a small number of discrete premium tiers and a manageably small, discretisable state space (a handful of risk segments, say), the reinforcement-learning sub-module's tabular methods, SARSA for a more conservative, on-policy approach or Q-learning for a more aggressively optimal off-policy one, are directly applicable, exactly as developed there. For a genuinely continuous premium action and a high-dimensional policyholder state (individual-level covariates rather than a handful of segments), the deep-RL architectures from that sub-module's closing lecture, DQN for a discretised action space or, more naturally for a continuous premium, an actor-critic method with PPO's trust-region stabilisation, are the appropriate scale of tool, with PPO's specific stability advantage (developed in full in that lecture) particularly valuable given how consequential a large, uncontrolled policy update would be in a live pricing system.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>The solvency constraint should be a hard constraint, not merely a heavily-weighted reward term</h3>
+  <p>A soft, heavily-weighted solvency penalty inside a scalar reward can still, in principle, be outweighed by a sufficiently large profit gain the training process happens to discover; a genuinely regulated pricing system typically warrants a hard constraint (rejecting any action the simulator flags as breaching a solvency threshold outright, regardless of the resulting reward) rather than trusting a heavy reward weighting alone to prevent an unacceptable outcome, exactly the lesson the vignette's team internalised after their initial backtest failure.</p>
+
+  <h3>Elasticity estimates carry their own genuine uncertainty, and a reward built on a point estimate inherits it silently</h3>
+  <p>Price elasticity is itself an estimated quantity, subject to its own sampling uncertainty and its own risk of being estimated from a range of historical premium changes that does not extend to the genuinely novel premium levels a trained agent might recommend, precisely the same extrapolation risk this lecture's central argument raises about forecasting more generally. A defensible premium-control system builds in a margin for elasticity-estimate uncertainty, rather than treating an elasticity model's point estimate as a fixed, known fact inside the reward.</p>
+
+  <h3>A live pricing agent is itself a live feedback loop that needs live monitoring</h3>
+  <p>Once deployed, a premium-control agent's own actions become part of the data future versions of the agent, or future elasticity estimates, will be trained on, precisely the same closed loop this lecture opened with, now operating on the deployed system itself. Ongoing monitoring for drift in the realised reward components, not just a one-off pre-deployment validation, is the standing discipline this genuinely closed-loop system demands, developed fully in the next, closing lecture.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State the premium-control problem's state, action, and reward, mapped onto the Markov-decision-process framework.</li>
+      <li>Explain precisely why a supervised forecasting model cannot safely recommend a genuinely novel premium level.</li>
+      <li>Name the three components of a genuine premium-control reward, and explain what each is meant to prevent.</li>
+      <li>Explain why price elasticity, specifically, is the reason premium control is a decision problem rather than a forecasting one.</li>
+      <li>Explain which reinforcement-learning algorithm fits a small, tabular pricing problem versus a continuous-action, high-dimensional one.</li>
+      <li>In the backtesting vignette, explain precisely what the single-objective reward's backtest revealed, and how the team's revised reward addressed it.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next in this course</h4>
+    <ul>
+      <li><a href="07-governance_and_validation.html">Lecture 7: governance and validation</a>, closing the course with the discipline every technique developed across all seven lectures, this one included, is subject to.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li>Wüthrich, Richman, Avanzi, Lindholm, Maggi, Mayer, Schelldorfer and Scognamiglio, <em>AI Tools for Actuaries</em>, chapter 5 (version 20 January 2026, <a href="https://ssrn.com/abstract=5162304">https://ssrn.com/abstract=5162304</a>, CC BY-NC).</li>
+    </ul>
+    <h4>Cross-references</h4>
+    <ul>
+      <li>The <a href="../../machine_learning/12_reinforcement_learning/01-decision_making_vs_forecasting.html">decision-making versus forecasting</a> lecture develops the conceptual break this lecture returns to in the pricing context.</li>
+      <li>The <a href="../../machine_learning/12_reinforcement_learning/04-markov_decision_processes.html">Markov decision processes</a> and <a href="../../machine_learning/12_reinforcement_learning/07-deep_rl.html">deep reinforcement learning</a> lectures supply the full algorithmic toolkit this lecture applies directly.</li>
+    </ul>
+    <h4>Further reading</h4>
+    <ul>
+      <li>Sutton and Barto, <em>Reinforcement Learning: An Introduction</em>, second edition. The canonical general reference for the algorithms this lecture applies.</li>
+      <li>Krasheninnikova, García, Maestre and Fernández (2019), "Reinforcement learning for pricing strategy optimization in the insurance industry". A direct applied reference for the premium-control setting.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All AI for actuaries lectures</a></span>
+  <span>Lecture 6 of 7: reinforcement learning for pricing</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 8: decision trees</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Supervised learning</a></div>
+  <h1>Decision trees</h1>
+  <p class="subtitle">A tree is a sequence of if-then questions, each chosen to make the leaves as pure as possible. The model is interpretable, fast to fit, and ubiquitous in credit risk: most of stage 3 in the credit risk track is a tree of one kind or another.</p>
+  <div class="meta">
+    <span>Lecture 8 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part II: supervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>decision tree</strong> is a non-parametric model that partitions the feature space into axis-aligned rectangles by repeatedly asking "is feature $X_j$ above threshold $c$?" Each internal node is one such question, each branch is an answer, and each leaf carries a prediction (a class probability for classification, a mean for regression). Training is a greedy recursive routine: at every node, examine every feature and every candidate threshold, score each candidate by how much it reduces an <strong>impurity</strong> measure, and keep the best split. The standard impurity for classification is <strong>Gini</strong>, $\operatorname{Gini} = 1 - \sum_i p_i^2$, with information gain (the entropy variant) as the close substitute. For regression, the impurity is the variance of the target within the node, so a split is scored by how much it reduces total within-node MSE. Trees stop growing when a depth limit, a minimum-samples rule, or a minimum impurity-decrease rule fires; the resulting tree is then usually <strong>pruned</strong> back via cost-complexity pruning to trade fit for generalisation. The model is interpretable, scale-invariant, handles non-linearities and interactions natively, and degrades only gracefully with mixed-type features. The price is high variance: a single tree is unstable across resamples, which is exactly why every modern tabular model in the next lecture is an ensemble of them.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine sorting credit applications into "approve" and "decline" piles by playing twenty questions. Your first question is the one that separates the piles best, say "is the applicant's income above thirty thousand?" Now you have two smaller piles. You repeat the game on each: what is the single best question to ask within this group? You stop when a pile is pure (everyone in it had the same outcome), small enough that further questions would overfit, or you have asked too many questions in a row. The finished sequence of questions is the tree. New applications walk down it from the top, taking the branch dictated by their feature values, and land in a leaf that tells you the predicted outcome.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The decision tree as a standalone classifier is rarely the production model in credit risk, but the tree object is everywhere. Stage allocation in IFRS 9, expert overrides on a logistic scorecard, segmentation for an A-IRB pool, and the base learners of every gradient-boosted PD or LGD model are all trees. Understanding what a tree does and where its variance comes from is the prerequisite for understanding random forests, gradient boosting, and the SHAP-based interpretability tooling that dominates regulated tabular ML.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Second of four single-model lectures in Part II. <a href="01-k_nearest_neighbours.html">Lecture 7 (k-nearest neighbours)</a> was a non-parametric model that stored training data and predicted by similarity; this lecture is a non-parametric model that compresses training data into a partition. <a href="03-support_vector_machines.html">Lecture 9 (support vector machines)</a> returns to a parametric, distance-based view. <a href="05-ensemble_learning.html">Lecture 11 (ensemble learning)</a> takes the tree's high variance as its starting point and builds random forests and gradient-boosted trees on top.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three properties make trees a default choice on tabular data even when they will not be the final model. First, <strong>a tree handles whatever you feed it.</strong> Numeric columns on any scale, ordinal columns, one-hot-encoded categoricals, missing values via surrogate splits, monotonic transformations of any feature, all pass through unchanged in the splits they produce. The scaling and skew problems that dominated <a href="../01_feature_engineering/02-feature_transformation.html">lecture 2 (feature transformation)</a> are simply absent: a split on $X_j > c$ is unchanged by replacing $X_j$ with $\log X_j$ or by multiplying it by a thousand. This is why feature transformation effort on a tree-only pipeline is concentrated entirely on categorical encoding and missingness, with everything else left raw.</p>
+
+  <p>Second, <strong>a tree is auditable.</strong> Every prediction can be traced from the root to a leaf as a chain of human-readable conditions. Regulators in retail credit have spent two decades preferring scorecards over neural networks for exactly this reason, and the gradient-boosted trees that quietly displaced both inherit the same property at the per-learner level. Sub-module 08 of this course (model interpretation) leans heavily on this; the <a href="../08_model_interpretation/02-model_specific_methods.html">model-specific methods lecture</a> exploits tree structure to compute feature importance and decision paths in closed form, with no sampling or surrogate model required.</p>
+
+  <p>Third, <strong>a tree captures non-linearities and interactions without being told to.</strong> A logistic regression can only fit an interaction term that the analyst writes down; a tree finds interactions automatically by virtue of the fact that the second split conditions on the first. The cost is variance: with no functional-form constraint, the tree can chase noise into leaves that hold three observations, and a single resampled training set produces a measurably different tree. The bias-variance reading is the one from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>: depth is the knob. A stump (depth 1) is high-bias, low-variance, almost a univariate threshold rule; a tree grown to pure leaves is low-bias, very-high-variance, and almost guaranteed to overfit. The middle is found by pruning.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail bank built a fraud-detection tree on three months of card transactions, validated at AUC 0.91, and deployed it. Performance fell to AUC 0.73 within four weeks. The root cause was a single high-information-gain split on "merchant category code equals MCC 5967", a fraud-correlated code at the time of training that turned over in the following month as the fraud ring switched merchants. A logistic regression with the same feature would have downweighted that coefficient under regularisation; the tree had committed an entire subtree to the split. The fix was not a different tree, it was an ensemble of trees with bootstrapped features, the topic of <a href="05-ensemble_learning.html">lecture 11</a>. The lesson is structural: a single deep tree's variance is not a hyperparameter to tune away, it is the property that makes ensembling the right next step.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. The feature space is a rectangle. A tree slices it with one axis-aligned cut at a time, then recurses on each half. After $d$ levels of splitting, the space is partitioned into at most $2^d$ rectangles, and each rectangle carries a single prediction. New observations are classified by which rectangle they land in. The model is a piecewise-constant function on an axis-aligned partition. Everything else, the impurity choice, the stopping rule, the pruning, is just how the cuts get chosen.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A decision tree and the axis-aligned partition it induces on a two-dimensional feature space">
+      <defs>
+        <marker id="dtArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A small tree and its partition of the feature space</text>
+
+      <!-- LEFT: the tree -->
+      <g>
+        <!-- Root -->
+        <rect x="140" y="46" width="160" height="44" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="220" y="66" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">income &gt; 30k?</text>
+        <text x="220" y="80" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">root: 1000 obs, Gini 0.48</text>
+
+        <!-- Left child (income <= 30) -->
+        <rect x="40" y="140" width="140" height="44" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="110" y="160" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">age &gt; 40?</text>
+        <text x="110" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">420 obs, Gini 0.36</text>
+
+        <!-- Right child (income > 30) -->
+        <rect x="260" y="140" width="140" height="44" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="330" y="160" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">age &gt; 25?</text>
+        <text x="330" y="174" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">580 obs, Gini 0.31</text>
+
+        <line x1="190" y1="90" x2="130" y2="140" stroke="#71717a" stroke-width="1.5" marker-end="url(#dtArrow)"/>
+        <line x1="250" y1="90" x2="310" y2="140" stroke="#71717a" stroke-width="1.5" marker-end="url(#dtArrow)"/>
+        <text x="155" y="116" font-family="Inter" font-size="9" fill="#71717a">no</text>
+        <text x="280" y="116" font-family="Inter" font-size="9" fill="#71717a">yes</text>
+
+        <!-- Leaves -->
+        <rect x="10" y="230" width="100" height="50" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+        <text x="60" y="250" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">DECLINE</text>
+        <text x="60" y="264" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">p(bad) = 0.74</text>
+        <text x="60" y="275" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">n = 180</text>
+
+        <rect x="120" y="230" width="100" height="50" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+        <text x="170" y="250" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">DECLINE</text>
+        <text x="170" y="264" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">p(bad) = 0.58</text>
+        <text x="170" y="275" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">n = 240</text>
+
+        <rect x="240" y="230" width="100" height="50" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="290" y="250" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">DECLINE</text>
+        <text x="290" y="264" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">p(bad) = 0.52</text>
+        <text x="290" y="275" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">n = 90</text>
+
+        <rect x="350" y="230" width="100" height="50" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="400" y="250" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">APPROVE</text>
+        <text x="400" y="264" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">p(bad) = 0.18</text>
+        <text x="400" y="275" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">n = 490</text>
+
+        <line x1="80" y1="184" x2="55" y2="230" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+        <line x1="140" y1="184" x2="170" y2="230" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+        <line x1="300" y1="184" x2="290" y2="230" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2"/>
+        <line x1="360" y1="184" x2="400" y2="230" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2"/>
+      </g>
+
+      <!-- Divider -->
+      <line x1="490" y1="40" x2="490" y2="300" stroke="#e5e7eb" stroke-width="1"/>
+
+      <!-- RIGHT: the feature-space partition -->
+      <g>
+        <!-- Axes -->
+        <line x1="540" y1="290" x2="780" y2="290" stroke="#37352F" stroke-width="1"/>
+        <line x1="540" y1="290" x2="540" y2="60" stroke="#37352F" stroke-width="1"/>
+        <text x="660" y="312" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">income</text>
+        <text x="528" y="170" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a" transform="rotate(-90 528 170)">age</text>
+        <text x="540" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">0</text>
+        <text x="640" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">30k</text>
+        <text x="780" y="305" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">high</text>
+        <text x="532" y="293" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">0</text>
+        <text x="532" y="200" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">25</text>
+        <text x="532" y="140" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">40</text>
+
+        <!-- Four rectangles -->
+        <rect x="540" y="60" width="100" height="80" fill="#FEE2E2" stroke="#dc2626" stroke-width="0.5"/>
+        <text x="590" y="98" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">DECLINE</text>
+        <text x="590" y="112" text-anchor="middle" font-family="Inter" font-size="9" fill="#991b1b">low inc, &gt;40</text>
+
+        <rect x="540" y="140" width="100" height="150" fill="#FECACA" stroke="#dc2626" stroke-width="0.5"/>
+        <text x="590" y="210" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">DECLINE</text>
+        <text x="590" y="224" text-anchor="middle" font-family="Inter" font-size="9" fill="#991b1b">low inc, &lt;=40</text>
+
+        <rect x="640" y="60" width="140" height="140" fill="#DCFCE7" stroke="#16a34a" stroke-width="0.5"/>
+        <text x="710" y="128" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#14532d">APPROVE</text>
+        <text x="710" y="142" text-anchor="middle" font-family="Inter" font-size="9" fill="#166534">high inc, &gt;25</text>
+
+        <rect x="640" y="200" width="140" height="90" fill="#FECACA" stroke="#dc2626" stroke-width="0.5"/>
+        <text x="710" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">DECLINE</text>
+        <text x="710" y="254" text-anchor="middle" font-family="Inter" font-size="9" fill="#991b1b">high inc, &lt;=25</text>
+      </g>
+
+      <line x1="40" y1="328" x2="780" y2="328" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="348" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">Every leaf of the tree is one rectangle in the partition; the prediction in the rectangle is the leaf's class probability</text>
+    </svg>
+    <figcaption>Left, a depth-2 tree on two features. Right, the same model viewed as an axis-aligned partition of the feature space. The two are equivalent representations: a leaf is a rectangle, a path from root to leaf is the conjunction of inequalities defining that rectangle, and the prediction is the leaf's class probability or mean.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The partition is always axis-aligned, because each split conditions on exactly one feature; a diagonal class boundary in the true data-generating process can only be approximated by a staircase of horizontal and vertical cuts, and the tree pays for this with extra depth. The rectangles are nested: any cut made at the root applies to every descendant rectangle on that side, so the tree's structure constrains what later splits can do. And the prediction inside each rectangle is constant: the model has no concept of "closer to the boundary", which is the structural difference from <a href="01-k_nearest_neighbours.html">k-nearest neighbours</a> and from the linear models still to come.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Splitting criteria for classification</h3>
+
+  <p>Two impurity measures dominate. <strong>Gini impurity</strong> for a node with class proportions $p_1, p_2, \dots, p_C$ is</p>
+  $$\operatorname{Gini} = 1 - \sum_{i=1}^{C} p_i^2.$$
+  <p>For a binary node it simplifies to $1 - p^2 - (1-p)^2 = 2p(1-p)$. It is zero when one class has $p_i = 1$ (pure node) and maximised at $p_i = 1/C$ for all $i$ (uniform mixture); for binary classification the maximum is $\operatorname{Gini} = 0.5$ at $p = 0.5$. Intuitively, Gini is the probability that two observations drawn independently from the node would be assigned different class labels by random sampling from the node's class distribution.</p>
+
+  <p><strong>Entropy</strong>, equivalently the Shannon information,</p>
+  $$H = -\sum_{i=1}^{C} p_i \log_2 p_i,$$
+  <p>is the alternative. It shares the same qualitative profile (zero at pure nodes, maximum at uniform mixture, $H = 1$ bit at $p = 0.5$ for binary) but penalises near-pure nodes slightly more aggressively because the log term diverges as $p_i \to 0$. In practice Gini and entropy produce nearly identical trees, with Gini slightly faster because it avoids the logarithm. Scikit-learn defaults to Gini.</p>
+
+  <p>A split is scored by <strong>information gain</strong>, the impurity of the parent node minus the weighted average impurity of the two child nodes,</p>
+  $$\operatorname{IG} = I(\text{parent}) - \left(\frac{n_L}{n} I(\text{left}) + \frac{n_R}{n} I(\text{right})\right),$$
+  <p>where $I(\cdot)$ is whichever impurity is in use, $n_L$ and $n_R$ are the child sizes, and $n = n_L + n_R$. At each node the algorithm scans every feature, every threshold (in practice every midpoint between consecutive sorted values), computes $\operatorname{IG}$, and chooses the split that maximises it. A node with zero impurity has no gain available and is left as a leaf.</p>
+
+  <h3>Splitting criteria for regression</h3>
+
+  <p>For a continuous target, impurity is the within-node variance,</p>
+  $$\operatorname{MSE}(\text{node}) = \frac{1}{n} \sum_{i \in \text{node}} (y_i - \bar{y}_{\text{node}})^2,$$
+  <p>where $\bar{y}_{\text{node}}$ is the node's mean target. A split is scored by variance reduction, identical in form to information gain above with MSE replacing Gini or entropy. The leaf's prediction is the leaf mean. Two alternative criteria appear in scikit-learn: <strong>Friedman MSE</strong> (an improvement score that weighs splits by child sample size in a way friendlier to boosting) and <strong>mean absolute error</strong>, which uses the median as the leaf prediction and is robust to outliers in $y$ at the cost of slower fitting.</p>
+
+  <h3>The greedy algorithm and its limits</h3>
+
+  <p>Finding the globally optimal decision tree (the one that, for a given depth or leaf count, minimises total impurity) is NP-hard. The greedy algorithm replaces global optimisation with a local one: at each node, choose the split that maximises immediate information gain, then recurse. The resulting tree is sub-optimal in principle and often in practice: a first split that looks weak now might enable two excellent second splits, and the greedy algorithm cannot see that far ahead. The practical cost is usually small because so many candidate splits are close in score, and the cost of a wrong early choice is corrected partly by ensembling (random forests average over many greedy trees grown on different bootstrap samples) and partly by boosting (each new tree compensates for the previous trees' residual errors). The greedy single tree is a working substitute, not an ideal.</p>
+
+  <h3>Stopping criteria</h3>
+
+  <p>An untruncated tree grows until every leaf is pure or contains a single observation, which is the textbook recipe for overfitting. Three hyperparameters control where growth stops. <strong>Maximum depth</strong> caps the number of splits on any root-to-leaf path; depth 3 gives at most 8 leaves, depth 8 gives at most 256. <strong>Minimum samples per leaf</strong> refuses to create a child node with fewer than the threshold; setting it to 50 means every leaf has at least 50 training observations supporting its prediction. <strong>Minimum impurity decrease</strong> refuses any split whose information gain falls below a tolerance; setting it to $10^{-3}$ stops splitting once the marginal improvement is negligible. The three are partly redundant but address slightly different failure modes: depth caps tree complexity overall, minimum-samples controls leaf-level statistical reliability, and minimum impurity decrease controls noise-chasing. A typical credit-risk segmentation tree sets all three.</p>
+
+  <h3>Cost-complexity pruning</h3>
+
+  <p>Stopping criteria are <em>pre-pruning</em>: they refuse splits during growth. <strong>Cost-complexity pruning</strong> (also called weakest-link pruning) is <em>post-pruning</em>: grow the tree to its full depth, then collapse subtrees back to leaves where the collapse improves a penalised objective. For a tree $T$ with $|T|$ leaves and total impurity $R(T)$, define the cost-complexity criterion</p>
+  $$R_\alpha(T) = R(T) + \alpha \cdot |T|,$$
+  <p>where $\alpha \ge 0$ is the complexity penalty. At $\alpha = 0$ the full tree wins; as $\alpha$ rises, subtrees that buy little impurity reduction per leaf get collapsed; at large enough $\alpha$ only the root remains. The pruning algorithm produces a finite sequence of nested subtrees, one per critical value of $\alpha$, and cross-validation selects the $\alpha$ that minimises held-out error. In scikit-learn this is the <code>ccp_alpha</code> argument to <code>DecisionTreeClassifier</code> and <code>DecisionTreeRegressor</code>; <code>cost_complexity_pruning_path</code> returns the full sequence.</p>
+
+  <p>The bias-variance reading is the one from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>. A small $\alpha$ produces a deep, low-bias, high-variance tree that fits training data nearly perfectly and generalises poorly. A large $\alpha$ produces a shallow, high-bias, low-variance tree that misses real structure. The cross-validated optimum is the sweet spot between the two, and it is rarely close to either extreme.</p>
+
+  <h3>Categorical features and missing values</h3>
+
+  <p>A tree handles a categorical feature natively. For an ordered categorical, the threshold split $X_j > c$ works directly on the integer codes. For a nominal categorical with $k$ levels, the optimal split partitions the levels into two groups and exhaustively searching all $2^{k-1} - 1$ partitions is feasible for small $k$ and prohibitive for large $k$; in practice the standard CART implementation handles binary targets in $O(k \log k)$ via a sort on the level-conditional class proportions. Scikit-learn does not implement native categorical splits and requires one-hot or ordinal encoding upstream, which is one of the few places where its tree implementations are weaker than R's <code>rpart</code> or LightGBM's native categorical handling. Missing values are handled at training time by routing missing rows down both branches in proportion to the non-missing distribution, or, in older CART implementations, via <strong>surrogate splits</strong>: an alternative variable and threshold that best mimics the primary split on the non-missing data, used as a fallback when the primary feature is missing at prediction time.</p>
+
+  <h3>Strengths and weaknesses</h3>
+
+  <p>Trees have a distinctive profile. The strengths: they are interpretable end to end, they need no feature scaling, they handle non-linearities and interactions natively, they accommodate mixed numeric and categorical inputs, they tolerate missing values via surrogate splits, they are fast to fit on moderate-sized data, and they produce a model object whose predictions can be reconstructed by hand from a flowchart. The weaknesses: they are high-variance, with a single tree's structure changing substantially under bootstrap resampling; they make axis-aligned splits only, so diagonal class boundaries are approximated by jagged staircases; they extrapolate badly, returning a constant prediction beyond the training range of every feature; and they cannot natively express linear effects (a tree representing $y = 2x$ across a continuous $x$ needs many splits to approximate a relationship a linear regression captures in one coefficient). Almost every weakness on this list is repaired by ensembling, which is the topic of <a href="05-ensemble_learning.html">lecture 11</a>.</p>
+
+  <h3>Scikit-learn implementation</h3>
+
+  <p>The two classes are <code>DecisionTreeClassifier</code> and <code>DecisionTreeRegressor</code> in <code>sklearn.tree</code>. The key arguments are <code>criterion</code> (Gini, entropy, or log-loss for classification; squared error, Friedman MSE, absolute error, or Poisson for regression), <code>max_depth</code>, <code>min_samples_split</code>, <code>min_samples_leaf</code>, <code>min_impurity_decrease</code>, and <code>ccp_alpha</code>. After fitting, <code>feature_importances_</code> returns each feature's total impurity reduction normalised across the tree; <code>tree.plot_tree</code> renders the tree graphically and <code>tree.export_text</code> exports the rules as text. A typical configuration for a credit-risk binary classifier is depth-capped around 4 to 6, minimum samples per leaf at 100 or so, and <code>ccp_alpha</code> chosen by cross-validation on the pruning path. The same hyperparameters carry over to the regressor with MSE replacing Gini.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every tree-related production incident.</p>
+
+  <div class="callout warn">
+    <span class="tag">Unbounded depth, pure leaves</span>
+    Fitting <code>DecisionTreeClassifier()</code> with all defaults grows the tree until every leaf is pure. Training accuracy is 100 per cent, test accuracy is wherever the variance lands, and the model has memorised the training set. The fix is to set <code>max_depth</code>, <code>min_samples_leaf</code>, or <code>ccp_alpha</code> (preferably all three) before fitting and to validate on a held-out fold. Default hyperparameters are not a baseline; they are an overfitting pathology dressed up as one.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Reading feature importance as causation</span>
+    The <code>feature_importances_</code> attribute reports each feature's contribution to impurity reduction within this specific tree. A feature can have high importance because it is genuinely predictive, because it is correlated with a genuinely predictive feature that happened not to be chosen at the root, or because it is leaking the target. None of those readings supports a causal claim. The <a href="../08_model_interpretation/02-model_specific_methods.html">model interpretation lecture in sub-module 08</a> treats tree-based importance and SHAP values together for exactly this reason.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">High-cardinality categorical bias</span>
+    A categorical feature with many distinct levels has, by construction, more candidate splits available than a low-cardinality or numeric feature, and impurity-based scoring tends to over-select it at the root. The classic example is a customer-ID column, which can achieve a perfect training split because each ID has one observation and one outcome. Standard fixes are to set a minimum samples per leaf so single-observation splits cannot win, to apply rare-label grouping upstream, and to prefer permutation-based importance over impurity-based importance when evaluating the fitted model.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Distribution drift in deployed splits</span>
+    A tree's first few splits encode the training distribution at the time of fitting. If the underlying population drifts (a fraud ring switches merchant categories, a product launch shifts the income distribution of new applicants), the splits that were optimal at training time can become useless or actively misleading. A linear model with the same drift typically degrades gracefully; a tree degrades sharply at the leaf level. The fix is monitoring (the vignette in section 2) and ensembling, which dilutes the dependence on any single split.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A decision tree is a recursive partition of the feature space into axis-aligned rectangles, chosen greedily to minimise impurity within each rectangle. For classification, impurity is Gini or entropy; for regression, it is the within-node variance. The tree stops growing under one of three rules and is then pruned back via cost-complexity pruning to find a defensible point on the bias-variance curve. The model handles mixed-type features and missing values natively, needs no scaling, and is interpretable end to end. The price is variance: a single tree's structure is sensitive to the training sample, and the model cannot extrapolate beyond the training range. Every modern tabular ML system addresses that variance by ensembling many trees.</p>
+
+  <p>What this lecture deliberately did not do. It did not derive any ensemble method; random forests, bagging, and gradient boosting are <a href="05-ensemble_learning.html">lecture 11</a>. It did not cover oblique trees (splits on linear combinations of features) or model trees (linear regressions in the leaves); these exist but are rare in mainstream tooling and rarer still in regulated finance. It did not derive the impurity functions from first principles in information theory; the <a href="../05_statistics/">statistics module</a> covers entropy in its own right.</p>
+
+  <p>Lecture 9, <a href="03-support_vector_machines.html">support vector machines</a>, returns to a parametric, geometric view of classification. Where a tree partitions the feature space with axis-aligned cuts and pays for diagonal boundaries with depth, an SVM finds a single hyperplane that maximises the margin between classes, and uses the kernel trick to handle non-linear boundaries without an explicit feature transformation. The contrast with this lecture is informative: the same classification task can be approached by a piecewise-constant partition or by a smooth large-margin separator, and the choice between them sets up the bias-variance and interpretability trade-offs that the rest of Part II explores.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the Gini impurity formula for $C$ classes and the entropy formula. Explain why both peak at uniform class proportions and equal zero at a pure node.</li>
+      <li>A binary-classification node holds 100 observations: 70 positive, 30 negative. A candidate split produces a left child of 40 observations (35 positive, 5 negative) and a right child of 60 observations (35 positive, 25 negative). Compute the Gini impurity of the parent and of each child, then the information gain of the split. Report each to three decimal places.</li>
+      <li>Why is finding the globally optimal decision tree NP-hard, and what is the practical consequence for the trees that scikit-learn actually fits?</li>
+      <li>Explain cost-complexity pruning in one paragraph. Include the form of the criterion, the role of $\alpha$, and how the final $\alpha$ is chosen.</li>
+      <li>You fit a <code>DecisionTreeClassifier</code> with defaults and obtain training accuracy 1.00 and test accuracy 0.71. Name the diagnostic and three hyperparameter changes that would reduce the gap.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 9 (<a href="03-support_vector_machines.html">support vector machines</a>) contrasts the tree's piecewise-constant partition with a maximum-margin hyperplane, and introduces the kernel trick as the alternative route to non-linear boundaries.</li>
+      <li><strong>Previous:</strong> Lecture 7 (<a href="01-k_nearest_neighbours.html">k-nearest neighbours</a>) was the other non-parametric model in this sub-module; it stores training data and predicts by similarity, where this lecture compresses training data into a partition.</li>
+      <li><strong>Foundations:</strong> Lecture 1 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the machine learning landscape</a>) framed the bias-variance trade-off; this lecture's stopping and pruning rules are the concrete knobs on which that trade-off is operated for a tree.</li>
+      <li><strong>Forward link:</strong> Lecture 11 (<a href="05-ensemble_learning.html">ensemble learning</a>) takes the single tree's variance as its starting point and constructs random forests and gradient-boosted trees, the workhorses of modern tabular machine learning.</li>
+      <li><strong>Interpretability:</strong> The <a href="../08_model_interpretation/02-model_specific_methods.html">model-specific interpretation lecture</a> exploits tree structure to compute feature importance, decision paths, and SHAP values, with no surrogate model required.</li>
+      <li><strong>Outside this course:</strong> Stage allocation under IFRS 9, A-IRB segmentation pools, and most expert overrides on retail scorecards are tree-shaped. The credit risk track at <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/">application/banking/01_internal_environment/risk_measurement/credit_risk/</a> is full of trees by another name.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Supervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 8 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

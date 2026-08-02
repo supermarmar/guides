@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 13: conformal prediction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Supervised learning</a></div>
+  <h1>Conformal prediction</h1>
+  <p class="subtitle">Every predictive model in this course returns a number. Conformal prediction returns a range with a coverage guarantee that holds for any model, any data distribution, and any sample size, in exchange for one mild assumption: the calibration set is exchangeable with the test point.</p>
+  <div class="meta">
+    <span>Lecture 13 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part II: supervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Conformal prediction</strong> is a wrapper that turns any point-prediction model into a prediction set with a coverage guarantee. For a chosen miscoverage rate $\alpha$ (commonly $0.05$, giving 95% coverage), conformal prediction returns an interval (in regression) or a label set (in classification) that contains the true outcome with probability at least $1 - \alpha$. The guarantee is <strong>distribution-free</strong> (no assumption about $P(X, Y)$), <strong>finite-sample</strong> (it holds at any $n$, not asymptotically), and <strong>model-agnostic</strong> (it wraps a random forest, a neural network, or a linear regression equally). The price is a single assumption: the calibration data and the test point are exchangeable, which is weaker than i.i.d. and strictly weaker than any parametric model assumption. The most-used variant, <strong>split conformal</strong>, partitions the labelled data into a training fold (to fit the model) and a calibration fold (to measure how wrong the model is), takes a quantile of the calibration residuals, and pads the point prediction by that quantile. The result is a coverage-valid interval in five lines of code, and the same recipe yields adaptive intervals when the noise varies with $x$ and label sets when the outcome is categorical.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A model gives you a single number when you ask it to predict tomorrow's loan default probability. You do not know whether to trust that number to two decimal places or one. Conformal prediction takes the same model, runs it on a held-out chunk of data, sees how wrong it tended to be on that chunk, and returns a range built from those residuals. If the model was off by at most $0.04$ on 95% of the held-out chunk, the conformal interval at a new point is the model's prediction plus or minus $0.04$. The maths backing that interval makes one assumption (the held-out chunk and the new point come from the same process) and delivers one guarantee (the true value lands in the interval 95% of the time). No normality, no homoscedasticity, no model correctness required.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Beyond the source</span>
+    The wiki note for this topic is a 27-line stub linking to an awesome-list on GitHub. This lecture is written to fill that gap because predictive uncertainty quantification is now standard practice in deployed ML systems and is increasingly relevant to credit, where PD point estimates are giving way to PD ranges that auditors and supervisors can interrogate. The 2017 to 2023 conformal-prediction literature has matured to the point that <code>mapie</code> in Python wraps any scikit-learn estimator in one line, and the EBA's discussion of model uncertainty in IRB monitoring (2024) points the same way without naming the technique.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Sub-module 03 of the machine-learning course covers supervised algorithms. <a href="06-causal_models.html">Lecture 12</a> on causal models was the last point-prediction method; this lecture takes any of those models and adds uncertainty quantification on top. It is the only lecture in the sub-module that does not propose a new estimator; it proposes a new <em>output</em>. The same wrapper applies to the regression methods covered earlier in the sub-module, the classifiers, and the tree ensembles, and the recipe does not change. The next lecture starts <a href="../04_unsupervised_learning/01-k_means_clustering.html">unsupervised learning</a>, where there is no label and the question of coverage does not arise.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons a point prediction is no longer enough. First, <strong>decisions need ranges, not points.</strong> A PD of $0.04$ might justify an approval at the current cut-off; a PD that the model says is somewhere between $0.02$ and $0.09$ leaves the decision on the boundary and demands either additional information or a margin of safety. Most credit, pricing, and capital decisions are sensitive to the spread of plausible values rather than the single best estimate. A model that delivers only a point estimate forces the decision-maker to invent that spread themselves, usually by adding an arbitrary buffer.</p>
+
+  <p>Second, <strong>existing uncertainty methods come with assumption baggage.</strong> Two alternatives compete with conformal prediction. <strong>Bayesian credible intervals</strong> require a prior, a likelihood, and posterior inference (analytic, variational, or MCMC). When the prior is well chosen and the likelihood is correct, credible intervals are sharp and decision-useful. When either is misspecified (and they always are, to some degree) the intervals are calibrated to the wrong distribution and there is no guarantee in finite samples that they cover the truth at the nominal rate. <strong>Bootstrap intervals</strong> resample the training data, refit the model, and compute intervals from the empirical distribution of predictions. They make no parametric assumption but require many model refits (expensive for deep networks), assume the bootstrap distribution approximates the true sampling distribution (asymptotically true under conditions that include i.i.d. sampling and well-behaved estimators), and quantify the uncertainty in the <em>fitted parameters</em> rather than in the prediction itself. Conformal prediction sidesteps both: no prior, no refit, and it quantifies prediction error directly.</p>
+
+  <p>Third, <strong>regulators are converging on uncertainty quantification</strong>. The PRA's SS1-23 on model risk management requires that uncertainty be characterised and disclosed for material models. The EBA's repair programme for IRB models has elevated margin of conservatism (MoC) from a Pillar 2 add-on to a Pillar 1 input. ECB supervisors increasingly ask whether the bands around a PD or LGD estimate are themselves estimated rather than asserted. Conformal prediction is one of the few methods that produces such bands with a defensible mathematical guarantee, which is why it is appearing in supervisory consultations and bank model-validation playbooks even when the term itself is not used.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A wholesale lender's PD model was challenged by validation when a borrower with a model PD of $0.018$ defaulted within six months. The model owner's defence was that PDs of $0.018$ defaulting does happen by chance. Validation's response was that the model had never produced a measure of how confident it was in $0.018$ versus, say, $0.05$, and that without one the model was indistinguishable from an oracle. The team retrofitted a split-conformal wrapper using twelve months of out-of-time data as the calibration set; the borrower's conformal interval at the time of approval had been $[0.011, 0.083]$, which the validation team accepted as an honest representation of what the model had actually known. The PD was unchanged; the disclosure changed.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Split conformal prediction is a four-step assembly line. The labelled data is divided into two folds. The first fold is used to fit the model in the usual way. The second fold is used not to refit but to measure: each calibration row passes through the fitted model, a non-conformity score is computed (how strange this row looks given the model's prediction), and the scores are accumulated. A quantile of those scores becomes the half-width of the interval. At test time, the model produces a point prediction and the half-width pads it on either side. The width of the interval is set by the calibration scores, the centre by the model.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The split conformal prediction procedure">
+      <defs>
+        <marker id="cpArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Split conformal prediction: from labelled data to a coverage-valid interval</text>
+
+      <!-- Labelled data -->
+      <g>
+        <rect x="40" y="50" width="160" height="60" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="120" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">LABELLED DATA</text>
+        <text x="120" y="90" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">n rows of (x, y)</text>
+        <text x="120" y="102" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">drawn exchangeably</text>
+      </g>
+
+      <line x1="200" y1="80" x2="240" y2="80" stroke="#71717a" stroke-width="1.5" marker-end="url(#cpArrow)"/>
+      <text x="220" y="72" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">split</text>
+
+      <!-- Training fold -->
+      <g>
+        <rect x="250" y="50" width="160" height="60" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="330" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">TRAINING FOLD</text>
+        <text x="330" y="90" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">step 2: fit any model</text>
+        <text x="330" y="102" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">f-hat on these rows</text>
+      </g>
+
+      <!-- Calibration fold -->
+      <g>
+        <rect x="250" y="140" width="160" height="60" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="330" y="164" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">CALIBRATION FOLD</text>
+        <text x="330" y="180" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">step 3: score residuals</text>
+        <text x="330" y="192" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">s_i = |y_i - f-hat(x_i)|</text>
+      </g>
+
+      <line x1="200" y1="100" x2="250" y2="160" stroke="#71717a" stroke-width="1" stroke-dasharray="3 2"/>
+
+      <!-- Sorted scores -->
+      <g>
+        <rect x="460" y="140" width="180" height="60" rx="10" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="550" y="164" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">SORTED SCORES</text>
+        <text x="550" y="180" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">step 4: take the ceil((n+1)(1-alpha))/n</text>
+        <text x="550" y="192" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">quantile q of the scores</text>
+      </g>
+
+      <line x1="410" y1="170" x2="460" y2="170" stroke="#71717a" stroke-width="1.5" marker-end="url(#cpArrow)"/>
+
+      <!-- New point -->
+      <g>
+        <rect x="460" y="50" width="180" height="60" rx="10" fill="#FEF3C7" stroke="#b45309" stroke-width="1.5"/>
+        <text x="550" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">NEW POINT x*</text>
+        <text x="550" y="90" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">point prediction f-hat(x*)</text>
+        <text x="550" y="102" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">from the trained model</text>
+      </g>
+
+      <line x1="410" y1="80" x2="460" y2="80" stroke="#71717a" stroke-width="1" stroke-dasharray="3 2"/>
+
+      <!-- Interval -->
+      <g>
+        <rect x="690" y="95" width="160" height="60" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="770" y="119" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">PREDICTION INTERVAL</text>
+        <text x="770" y="135" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">[f-hat(x*) - q, f-hat(x*) + q]</text>
+        <text x="770" y="147" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">coverage at least 1 - alpha</text>
+      </g>
+
+      <line x1="640" y1="80" x2="690" y2="115" stroke="#b45309" stroke-width="1.5" marker-end="url(#cpArrow)"/>
+      <line x1="640" y1="170" x2="690" y2="135" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#cpArrow)"/>
+
+      <!-- Bottom: residual plot -->
+      <line x1="60" y1="270" x2="820" y2="270" stroke="#b45309" stroke-width="1"/>
+      <text x="60" y="262" font-family="Inter" font-size="10" font-weight="600" fill="#92400e">sorted calibration scores (smallest to largest)</text>
+
+      <!-- Dots for scores -->
+      <g fill="#7c3aed">
+        <circle cx="80" cy="270" r="3"/>
+        <circle cx="110" cy="270" r="3"/>
+        <circle cx="140" cy="270" r="3"/>
+        <circle cx="180" cy="270" r="3"/>
+        <circle cx="220" cy="270" r="3"/>
+        <circle cx="260" cy="270" r="3"/>
+        <circle cx="300" cy="270" r="3"/>
+        <circle cx="345" cy="270" r="3"/>
+        <circle cx="390" cy="270" r="3"/>
+        <circle cx="440" cy="270" r="3"/>
+        <circle cx="495" cy="270" r="3"/>
+        <circle cx="555" cy="270" r="3"/>
+        <circle cx="620" cy="270" r="3"/>
+        <circle cx="695" cy="270" r="3"/>
+        <circle cx="780" cy="270" r="3"/>
+      </g>
+
+      <!-- Quantile marker -->
+      <line x1="720" y1="250" x2="720" y2="290" stroke="#b45309" stroke-width="2"/>
+      <text x="720" y="244" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">q (the (1 - alpha) quantile)</text>
+      <text x="720" y="306" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">95% of scores below, 5% above</text>
+
+      <!-- Footer -->
+      <line x1="40" y1="340" x2="840" y2="340" stroke="#71717a" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="440" y="362" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#18181b">The guarantee</text>
+      <text x="440" y="380" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">P(true y in interval) is at least 1 - alpha, for any model, any distribution, any n,</text>
+      <text x="440" y="394" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">provided the calibration set and the test point are exchangeable</text>
+    </svg>
+    <figcaption>The labelled data splits into a training fold (green, fits any model) and a calibration fold (purple, scores how wrong the model is on held-out rows). The quantile $q$ of the sorted calibration scores becomes the half-width of the prediction interval at a new point $x^*$. The amber bar restates the guarantee and its single assumption.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The training fold and the calibration fold do different jobs and must not overlap: a row used to fit the model has a residual smaller than a held-out row would, and using it for calibration would understate the half-width. The quantile $q$ is computed once, on the calibration scores, and is the same for every test point in vanilla split conformal; locally adaptive variants (covered below) let $q$ depend on $x^*$ but keep the recipe. The guarantee is <strong>marginal</strong>, meaning it holds averaged over the joint distribution of $(X, Y)$, not conditionally on a specific $x^*$; the coverage on hard regions of the input space can be worse and on easy regions better, with the average hitting the target.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The split conformal algorithm in five steps</h3>
+
+  <p>Given a labelled dataset of size $n$ and a chosen miscoverage level $\alpha \in (0, 1)$:</p>
+
+  <p><strong>Step 1, split.</strong> Partition the labelled data into a training fold $\mathcal{D}_\text{train}$ of size $n_\text{train}$ and a calibration fold $\mathcal{D}_\text{cal}$ of size $n_\text{cal}$, with $n_\text{train} + n_\text{cal} = n$. The split is random and uniform under the exchangeability assumption. A common split ratio is 70/30 or 80/20 in favour of training; the calibration fold should be large enough that the relevant quantile of its score distribution is estimable (a rule of thumb is $n_\text{cal} \ge 100$ for $\alpha = 0.1$ and $n_\text{cal} \ge 1{,}000$ for $\alpha = 0.01$).</p>
+
+  <p><strong>Step 2, fit.</strong> Train the predictive model $\hat{f}$ on $\mathcal{D}_\text{train}$ using whatever algorithm is appropriate (linear regression, random forest, neural network, gradient-boosted trees, GLM). The conformal wrapper does not constrain the choice of $\hat{f}$ and does not require any modification to the training procedure.</p>
+
+  <p><strong>Step 3, score.</strong> Compute a non-conformity score for every row in the calibration fold. For regression, the absolute residual is the standard choice:</p>
+  $$s_i = |y_i - \hat{f}(x_i)|, \quad i = 1, \ldots, n_\text{cal}.$$
+  <p>The score measures how far the model's prediction was from the true value on a held-out point. Other scoring functions are possible (signed residuals for one-sided intervals, normalised residuals for adaptive intervals); the absolute residual is the cleanest default.</p>
+
+  <p><strong>Step 4, quantile.</strong> Sort the calibration scores $s_{(1)} \le s_{(2)} \le \ldots \le s_{(n_\text{cal})}$ and take the empirical quantile</p>
+  $$q = s_{\left(\lceil (n_\text{cal} + 1)(1 - \alpha) \rceil\right)}.$$
+  <p>The ceiling and the $n_\text{cal} + 1$ are not cosmetic. They are the finite-sample correction that makes the validity proof go through. With $n_\text{cal} = 100$ and $\alpha = 0.05$, the relevant index is $\lceil 101 \cdot 0.95 \rceil = 96$, so $q$ is the 96th-smallest of the 100 sorted scores rather than the 95th. The correction is one rank for typical sample sizes but it is the difference between exact and asymptotic validity.</p>
+
+  <p><strong>Step 5, interval.</strong> For a new test point $x^*$, the prediction interval is</p>
+  $$C(x^*) = [\hat{f}(x^*) - q, \, \hat{f}(x^*) + q].$$
+  <p>The interval is symmetric around the point prediction and has constant half-width $q$ over the entire input space. Coverage is guaranteed:</p>
+  $$P(Y^* \in C(x^*)) \ge 1 - \alpha.$$
+  <p>If the calibration scores are continuous (no ties), the coverage is also bounded above by $1 - \alpha + 1/(n_\text{cal} + 1)$, so the interval is not grossly conservative.</p>
+
+  <h3>Why this works: the exchangeability proof sketch</h3>
+
+  <p>The validity proof is one paragraph and worth carrying around. Suppose the calibration scores $s_1, \ldots, s_{n_\text{cal}}$ and the test score $s^* = |y^* - \hat{f}(x^*)|$ are exchangeable. By exchangeability, $s^*$ is equally likely to occupy any of the $n_\text{cal} + 1$ ranks when inserted into the sorted calibration scores. The event that $s^*$ exceeds $q$ is the event that $s^*$ falls strictly above the $\lceil (n_\text{cal} + 1)(1 - \alpha) \rceil$-th rank, which by symmetry has probability at most $\alpha$. The complement, $s^* \le q$, has probability at least $1 - \alpha$, and that event is exactly $y^* \in C(x^*)$. No distributional assumption appears in the argument, only exchangeability.</p>
+
+  <p>Exchangeability is weaker than i.i.d. A sequence is exchangeable if its joint distribution is invariant under any permutation. Independent and identically distributed sequences are exchangeable, but so are finite samples from a hypergeometric or any joint distribution that is symmetric in its arguments. What exchangeability rules out is any ordering effect: time-series data with temporal dependence is not exchangeable, data with covariate shift between calibration and test is not exchangeable, and stratified samples where calibration and test are drawn from different strata are not exchangeable. These cases break the guarantee in predictable ways, covered below.</p>
+
+  <h3>Conformal prediction for classification</h3>
+
+  <p>The same template extends to classification with one change: the non-conformity score, and the output is a label set rather than an interval. For a classifier producing a conditional probability $\hat{p}(y \mid x)$ for each class, a standard score is one minus the probability assigned to the true class:</p>
+  $$s_i = 1 - \hat{p}(y_i \mid x_i).$$
+  <p>A row where the model assigned high probability to the true class gets a low score (low non-conformity, the model fit it well); a row where the true class had low probability gets a high score. The quantile $q$ is taken exactly as before. The prediction set at $x^*$ is then the set of labels with sufficiently high predicted probability:</p>
+  $$C(x^*) = \{y : 1 - \hat{p}(y \mid x^*) \le q\} = \{y : \hat{p}(y \mid x^*) \ge 1 - q\}.$$
+  <p>The set can have one element (the model is confident, only one class crosses the threshold), several elements (the model is unsure, multiple classes cross the threshold), or in pathological cases none (every predicted probability is below the threshold, which under exchangeability happens at rate at most $\alpha$ and is usually treated by returning the most probable class with a flag). The output is naturally interpretable: a single-label set is a confident prediction, a multi-label set is an honest "the model cannot distinguish these classes at this coverage". Lecture 31 on <a href="../07_model_evaluation/03-classification_metrics.html">classification metrics</a> discusses how to evaluate set-valued predictions; the standard summary statistics are average set size (efficiency) and conditional coverage by class.</p>
+
+  <h3>Adaptive intervals for heteroscedastic noise</h3>
+
+  <p>Vanilla split conformal returns a constant-width interval. If the underlying noise varies with $x$ (income predictions are noisier at high incomes, default predictions are noisier for subprime borrowers), the constant-width interval is too wide where noise is low and too narrow where noise is high. The <strong>locally adaptive</strong> variant rescales the residual by a predicted noise magnitude. Train an auxiliary model $\hat{\sigma}(x)$ on the training fold to predict the absolute residual as a function of $x$, and replace the score with</p>
+  $$s_i = \frac{|y_i - \hat{f}(x_i)|}{\hat{\sigma}(x_i)}.$$
+  <p>The quantile $q$ is computed on these scaled scores, and the interval becomes</p>
+  $$C(x^*) = [\hat{f}(x^*) - q \cdot \hat{\sigma}(x^*), \, \hat{f}(x^*) + q \cdot \hat{\sigma}(x^*)].$$
+  <p>The half-width is now $q \cdot \hat{\sigma}(x^*)$, which widens in regions where the noise model expects more error and narrows where it expects less. The marginal coverage guarantee is preserved (the proof goes through unchanged with the scaled scores), and the conditional coverage is closer to the nominal rate in heteroscedastic settings. A related variant, <strong>conformalised quantile regression</strong>, trains two quantile regressors at $\alpha/2$ and $1 - \alpha/2$ as the inner model and uses the gap between them as the adaptive width; it is the current default in practice when adaptive intervals are needed.</p>
+
+  <h3>When exchangeability breaks</h3>
+
+  <p>Three settings violate the exchangeability assumption in the field and require correction. <strong>Distribution shift</strong> between calibration and test (the test borrowers come from a different segment than the calibration borrowers, the test period is post-pandemic but the calibration period is pre-) means the test score is not drawn from the same distribution as the calibration scores. Coverage drops below the nominal rate, sometimes substantially. Remedies include weighted conformal prediction (reweight the calibration scores by an estimate of the density ratio between calibration and test), online conformal prediction (update the quantile $q$ as new labelled data arrives), and conformal-PI procedures that track and bound the worst-case shift.</p>
+
+  <p>Time-series data is the second case. Successive observations are correlated and the temporal order makes them non-exchangeable. Naively applying split conformal with a random split shuffles past and future in the calibration set, which leaks future information and overstates coverage at deployment. The standard fix is to keep the temporal order: calibration is a contiguous block immediately before the deployment window, training is the period before calibration, and the score-quantile is recomputed as the window rolls forward. Adaptive conformal inference (ACI) and EnbPI are two named variants that explicitly handle the time-series case with theoretical guarantees.</p>
+
+  <p>Stratified sampling is the third case. If the calibration set is drawn with one stratification scheme and the test set with another (different industry mix, different geography, different vintage), the joint distribution of calibration and test scores is not symmetric and exchangeability fails. The remedy is to stratify the conformal procedure itself: split calibration scores by stratum, compute a per-stratum quantile, and apply the stratum-specific quantile at test time. This trades marginal coverage for conditional coverage by stratum and is increasingly the practice in credit, where coverage on the subprime segment matters separately from coverage on prime.</p>
+
+  <h3>Credit applications: PD bands and set-valued LGD</h3>
+
+  <p>Two applications are now appearing in IRB monitoring and IFRS 9 production. <strong>PD bands</strong> wrap a logistic-regression or gradient-boosted PD model in a conformal layer trained on out-of-time calibration data. The output for each obligor is not a single PD but an interval $[\underline{PD}, \overline{PD}]$ with a stated coverage. The upper bound is naturally interpreted as a conservative PD for capital purposes (it is the value the true PD does not exceed, with the stated probability, on average), and several institutions are now using the conformal upper bound to inform their margin of conservatism (MoC) under the EBA guidelines. The lower bound is useful for pricing and for identifying segments where the PD estimate is implausibly low.</p>
+
+  <p><strong>Set-valued LGD</strong> applies the classification variant to LGD pools. A bank that uses discrete LGD grades (high, medium, low recovery) can run a multinomial classifier with a conformal wrapper that returns the set of plausible grades for each facility. A single-grade set is a confident assignment; a multi-grade set indicates pools where the LGD signal is not strong enough to distinguish, and these facilities are flagged for manual review or assigned a conservative LGD until more data is gathered. The procedure is also being used in counterparty credit risk, where the wholesale loss distribution is computed conformally rather than parametrically.</p>
+
+  <h3>Implementation: mapie</h3>
+
+  <p>The Python package <code>mapie</code> (Model Agnostic Prediction Interval Estimator) wraps any scikit-learn-compatible estimator in a conformal layer with one additional line. For regression, the call pattern is:</p>
+  <pre><code>from mapie.regression import MapieRegressor
+mapie = MapieRegressor(estimator=model, method="plus", cv=5)
+mapie.fit(X_train, y_train)
+y_pred, y_pis = mapie.predict(X_test, alpha=0.05)</code></pre>
+  <p>The <code>y_pis</code> array contains the lower and upper bounds for each test row at the specified $\alpha$. The package supports split conformal, cross-conformal (uses cross-validation to avoid the train/calibration split inefficiency), CV+, jackknife+, and the locally adaptive variants. For classification, <code>MapieClassifier</code> exposes <code>predict</code> with an alpha argument that returns prediction sets. The library has become the de facto standard for conformal prediction in production Python pipelines.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes recur. Each is invisible if the validation suite only checks point-prediction accuracy and obvious once coverage is monitored alongside it.</p>
+
+  <div class="callout warn">
+    <span class="tag">Using training data for calibration</span>
+    A row used to fit the model has a smaller residual than the same row would as a held-out point: the model has seen it. Calibration scores computed on training rows are systematically smaller than the score the test point will produce, the quantile $q$ is too low, and the resulting interval is too narrow. Coverage drops below the nominal rate, often substantially. The fix is structural: the calibration fold is held out from training and never seen by the model during fit, exactly like a test set. The training/calibration split is mandatory in split conformal and the CV+ variants exist precisely to avoid the inefficiency of giving up labelled rows to calibration.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Conditional coverage confused with marginal coverage</span>
+    The guarantee is marginal: averaged over the joint distribution of $(X, Y)$, the interval covers $Y$ at the nominal rate. It is not a guarantee that coverage holds on every region of input space. A model that is well calibrated on the bulk of the population but systematically over-confident on a minority segment will produce intervals that cover correctly on average and under-cover the minority. The fix is to monitor conditional coverage by segment as part of validation and to use stratified conformal procedures or locally adaptive scores when conditional coverage matters. Quoting the marginal guarantee as if it were a conditional guarantee is a common error in vendor pitches.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Ignoring the finite-sample correction</span>
+    Using the $\lceil n_\text{cal} (1 - \alpha) \rceil / n_\text{cal}$ quantile rather than the $\lceil (n_\text{cal} + 1)(1 - \alpha) \rceil / n_\text{cal}$ quantile is asymptotically equivalent and gives the wrong answer in finite samples. The correction is one index up; with $n_\text{cal} = 200$ and $\alpha = 0.05$ the relevant indices are 191 versus 190. The difference is small in expectation but it is what converts an asymptotic argument into a finite-sample guarantee. Use a library that gets this right (<code>mapie</code> does); avoid hand-rolling the quantile in production code.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Applying split conformal to time series with a random split</span>
+    Random splitting of a time-ordered dataset puts future rows into the calibration set and past rows into the training set with equal probability. The calibration scores are computed on rows that the model has effectively seen the future of (because the training set contained later rows than the calibration set), the quantile is artificially low, and the deployment coverage is well below the nominal rate. The fix is to respect the temporal order: training comes first, calibration is a contiguous block immediately after, and any production prediction is for the period after calibration. Specialised time-series conformal methods (ACI, EnbPI) handle the rolling-window updating; vanilla split conformal does not.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Conformal prediction is a wrapper that adds a coverage guarantee to any point-prediction model with minimal cost. The split conformal recipe is five steps: split labelled data into training and calibration, fit the model on training, compute non-conformity scores on calibration, take the $\lceil (n_\text{cal} + 1)(1 - \alpha) \rceil$-th sorted score as the quantile $q$, and pad the point prediction by $q$ to get an interval. The validity proof rests on exchangeability and not on any distributional assumption; the coverage is marginal and finite-sample. The classification analogue replaces the residual with one minus the predicted probability of the true class and returns label sets. Adaptive scores handle heteroscedastic noise; specialised variants handle distribution shift, time series, and stratified populations. The Python package <code>mapie</code> exposes all of this in a scikit-learn-compatible API.</p>
+
+  <p>What this lecture deliberately did not do. It did not propose a new estimator: the same wrapper sits on top of the regression, classification, and ensemble methods covered earlier in this sub-module. It did not replace Bayesian inference: where a defensible prior exists and the likelihood is correct, credible intervals are sharper and decision-richer. It did not solve the conditional coverage problem in full generality: marginal coverage is what conformal prediction guarantees, and conditional coverage requires care with stratification or adaptive scores. It did not derive the validity proof in full; it sketched the exchangeability argument because the full proof is one paragraph and the sketch is the load-bearing intuition.</p>
+
+  <p>The next lecture begins <a href="../04_unsupervised_learning/01-k_means_clustering.html">unsupervised learning</a>, starting with k-means clustering. Conformal prediction in the unsupervised setting is an active research area (anomaly detection with conformal p-values is the most mature application) but is not yet standard practice; the bulk of the deployed methodology continues to sit in supervised regression and classification, where this lecture leaves it.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the five steps of the split conformal procedure for regression, including the exact quantile index used in step 4.</li>
+      <li>Explain in one paragraph why the coverage guarantee holds without any distributional assumption. Identify the single assumption the proof does require.</li>
+      <li>A split conformal regressor with $n_\text{cal} = 200$ and $\alpha = 0.1$ is fit. The calibration scores sorted in ascending order have the 180th value at $0.042$, the 181st at $0.045$, and the 182nd at $0.048$. Which value becomes $q$, and what is the half-width of the prediction interval?</li>
+      <li>A PD model is wrapped in a conformal layer using six months of recent labelled data as the calibration set. A new economic shock causes a step change in the borrower mix in the following quarter. What goes wrong with the coverage guarantee, and which two remedies were discussed in the lecture?</li>
+      <li>For a binary classifier with $\hat{p}(y = 1 \mid x^*) = 0.62$ and $q = 0.5$, what is the prediction set at $x^*$? What does the set tell the decision-maker that the point prediction does not?</li>
+      <li>Distinguish marginal coverage from conditional coverage and give an example of a credit-portfolio segmentation where the difference would matter to a model-validation team.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 12 (<a href="06-causal_models.html">causal models</a>) was the last point-prediction method in this sub-module; this lecture wraps any of those methods in an uncertainty layer.</li>
+      <li><strong>Next:</strong> Lecture 14 (<a href="../04_unsupervised_learning/01-k_means_clustering.html">k-means clustering</a>) opens the unsupervised learning sub-module; conformal prediction in unsupervised settings exists but is less mature and not covered here.</li>
+      <li><strong>Prerequisite:</strong> Statistics lecture 3 (<a href="../../statistics/03-inferential_statistics.html">inferential statistics</a>) covers confidence intervals, hypothesis testing, and the frequentist coverage interpretation that conformal prediction inherits and strengthens.</li>
+      <li><strong>Related:</strong> Lecture 31 (<a href="../07_model_evaluation/03-classification_metrics.html">classification metrics</a>) covers the evaluation of set-valued predictors, including average set size and conditional coverage by class.</li>
+      <li><strong>Foundation:</strong> The six-stage pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a> situates conformal prediction at the output stage; it does not change the upstream feature engineering or model fitting but adds a post-fit calibration step.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Supervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 13 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

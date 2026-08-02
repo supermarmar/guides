@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 14: strictly consistent loss functions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Statistics</a></div>
+  <h1>Strictly consistent loss functions</h1>
+  <p class="subtitle">A regression model is fitted by minimising a loss function, and lecture 13 gave the closed-form loss (the unit deviance) attached to each exponential-family response. This lecture asks the question that ordering puts off: why should minimising <em>that</em> loss, rather than any other convex function of the residual, actually recover the true conditional mean? The answer has a name, strict consistency for mean estimation, a complete characterisation, Bregman divergences, and a sharp negative result: the square loss that most machine-learning tutorials reach for by default is only the right choice when the response is genuinely homoscedastic, and the mean absolute error that many analysts use to "sanity check" a mean-fitted model is not a legitimate loss for that purpose at all. On the finite, often heavy-tailed samples that credit and insurance data actually supply, which loss you pick is not a matter of taste.</p>
+  <div class="meta">
+    <span>Lecture 14 of 14</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part VI: foundations for machine learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A loss function $L(y, m)$ is <strong>consistent for mean estimation</strong> with respect to a candidate class $M$ of regression functions if the true conditional-mean function $\mu^\star$ achieves the smallest expected loss among every candidate in $M$; it is <strong>strictly consistent</strong> if $\mu^\star$ is the <em>only</em> candidate achieving that minimum. This is the property a loss function needs before "minimise this loss" can be trusted to recover the true mean at all, and it is a much narrower property than convexity: a convex loss can still fail to be strictly consistent for mean estimation, and a strictly consistent loss for mean estimation can be badly wrong for estimating some other functional, such as a median or a quantile. The complete characterisation (Savage 1971; Gneiting 2011) is that the strictly consistent loss functions for mean estimation are exactly the <strong>Bregman divergences</strong>, $L(y, m) = \varphi(y) - \varphi(m) - \varphi'(m)(y - m)$ for a strictly convex generator $\varphi$, and lecture 13's unit deviances are Bregman divergences in disguise, one per exponential-family member. A second, sharper result (Gourieroux, Monfort and Trognon 1984) says that among the infinitely many strictly consistent losses available, the one whose implied variance function matches the response's actual variance behaviour has the best finite-sample properties, which is the formal reason "pick the deviance that matches your data's mean-variance relationship" is not a stylistic preference but the statistically correct move.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    If you want to guess a single number that best summarises a pile of future, uncertain outcomes, and you will be scored by how wrong your guess turns out to be, the scoring rule you pick determines what "best" means. Score by squared error and the best guess is the mean. Score by absolute error and the best guess is the median. Score by an asymmetric absolute error and the best guess is some other quantile. These are three different questions with three different right answers, and they do not swap: scoring by absolute error and then reporting the answer as "the mean" is simply a different, false claim from scoring by squared error and reporting the mean. Strict consistency is the mathematical statement of which scoring rule goes with which target; Bregman divergences are the complete list of scoring rules that target the mean.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Where this sits in the stats world
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Where this sits in the stats world</h2></div>
+
+  <div class="callout insight">
+    <span class="tag">Foundations for machine learning, why the loss function is not a free parameter</span>
+    This lecture closes <strong>Part VI</strong>. It sits directly downstream of lecture 13: that lecture handed over a table of unit deviances without asking what made them the right losses to use; this lecture supplies the missing justification and, in doing so, explains why the same question ("which loss function should I minimise") recurs, with an identical answer, whether the model doing the minimising is a GLM, a gradient-boosted tree, or a neural network.
+  </div>
+
+  <p>Two structural links. To <strong>lecture 03 (inferential statistics)</strong>: ordinary least squares is the special case of this lecture's framework with $\varphi(x) = x^2$; the reason OLS targets the conditional mean, rather than the median or anything else, is exactly the strict-consistency argument developed here, usually left implicit in an introductory treatment. To <strong>lecture 13 (the exponential dispersion family)</strong>: every unit deviance in that lecture's table is a Bregman divergence, and the connection made there between deviance and Kullback-Leibler divergence is one particular instance of the general Bregman-divergence machinery this lecture develops in full.</p>
+
+  <p>One scoping note. This lecture treats point-forecast loss functions, functions of a single predicted number and a single realised outcome. Proper scoring rules for entire predictive distributions (the continuous ranked probability score, the log score) are a related but distinct theory, previewed in section 8 and left to further study; the machine-learning track's forecast-evaluation lectures build directly on the point-forecast version developed here.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this is not a purely academic refinement. First, <strong>on finite, heavy-tailed samples the choice of loss function has a real, measurable effect on model quality</strong>, contrary to a common piece of machine-learning folklore that "with enough data any reasonable loss finds the right model". Credit and insurance data are rarely in the "enough data" regime for the segments that matter most (a specific product line, a specific rating grade, a specific vintage), and a handful of large claims or defaults can dominate a squared-error fit in exactly the way the Gourieroux result of section 5.4 predicts and quantifies.</p>
+
+  <p>Second, <strong>the reflex to sanity-check a fitted model with mean absolute error is a category error whenever the model targets a conditional mean</strong>, which almost every regulated PD, LGD, EAD, and claims-frequency model does. MAE is a strictly consistent loss for the median, not the mean; ranking two mean-fitted candidate models by MAE can reverse the ranking that the correct, mean-consistent loss would give, and this is not a hypothetical risk, it is the default behaviour of several popular model-validation dashboards that report MAE alongside RMSE without flagging that only one of the two is the right scorer for a mean-targeting model.</p>
+
+  <p>Third, <strong>the same theory tells a machine-learning practitioner which "objective" string to select</strong>, in a gradient boosting library or a neural network training loop, for a given target, and why the library's default (usually squared error) is frequently the wrong choice for a right-skewed severity or a sparse-count frequency target. This lecture is the reason lecture 13's unit-deviance table is not merely a convenient list but the exhaustive, principled menu of legitimate choices.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The mental model</h2></div>
+
+  <p>Nest three sets, from largest to smallest: all loss functions, convex loss functions, and strictly consistent loss functions for mean estimation. The last set has a name (Bregman divergences) and an exact membership test; the middle set does not collapse into the last.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nested sets of loss functions, with Bregman divergences as the strictly consistent subset">
+      <defs>
+        <marker id="lossArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Not every convex loss estimates a mean</text>
+
+      <rect x="40" y="55" width="780" height="290" rx="16" fill="#F4F4F5" stroke="#71717a" stroke-width="2"/>
+      <text x="430" y="80" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#3f3f46">All loss functions L(y, m)</text>
+
+      <rect x="90" y="100" width="680" height="220" rx="14" fill="#EFF6FF" stroke="#1d4ed8" stroke-width="2"/>
+      <text x="430" y="124" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Convex in m: square loss, absolute error, pinball loss, deviances...</text>
+
+      <rect x="240" y="150" width="380" height="140" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="430" y="174" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Bregman divergences</text>
+      <text x="430" y="194" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59">= strictly consistent for MEAN estimation</text>
+      <text x="430" y="216" text-anchor="middle" font-family="Inter" font-size="10" font-family="JetBrains Mono" fill="#115e59">square loss, Poisson / gamma / Tweedie</text>
+      <text x="430" y="232" text-anchor="middle" font-family="Inter" font-size="10" font-family="JetBrains Mono" fill="#115e59">deviance, KL divergence</text>
+      <text x="430" y="260" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">the ONLY legitimate losses for a</text>
+      <text x="430" y="276" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">GLM, GBM, or FNN targeting E[Y|X]</text>
+
+      <text x="150" y="300" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">absolute error, pinball loss</text>
+      <text x="150" y="316" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">(convex, but consistent for a</text>
+      <text x="150" y="332" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">quantile, NOT the mean)</text>
+
+      <line x1="200" y1="290" x2="250" y2="270" stroke="#71717a" stroke-width="1.5" marker-end="url(#lossArrow)"/>
+    </svg>
+    <figcaption>Convexity is necessary for a well-behaved fitting problem but is not sufficient for strict consistency at the mean. The absolute-error and pinball losses sit inside the convex set but outside the Bregman-divergence set: they are strictly consistent losses for the median and for other quantiles respectively, not for the mean, and using them to fit or to validate a mean-targeting model is a category error, not a stylistic variant.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Consistency is about the target, not about smoothness.</strong> A loss can be perfectly smooth and convex and still be the wrong tool if it targets a different functional than the one you want. <strong>The generator $\varphi$ is the whole story.</strong> Every Bregman divergence is fully determined by a single strictly convex function $\varphi$; choosing a loss function is choosing $\varphi$, and lecture 13's table of six named distributions is a table of six named choices of $\varphi$.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The detail</h2></div>
+
+  <h3>5.1 Consistency and strict consistency for mean estimation</h3>
+
+  <p>Let $M = \{\mu\}$ be a class of candidate regression functions $\mu: \mathcal{X} \to \mathbb{R}$, and let $\mu^\star(X) = E[Y \mid X]$ denote the true conditional mean, assumed to belong to $M$. A loss function $L$ is <strong>consistent for mean estimation</strong> with respect to $M$ if</p>
+
+  $$E[L(Y, \mu^\star(X))] \leq E[L(Y, \mu(X))] \qquad \text{for every } \mu \in M,$$
+
+  <p>and <strong>strictly consistent</strong> if equality in the display above holds only when $\mu(X) = \mu^\star(X)$ almost surely. Strict consistency is the property that makes "minimise the expected loss over $M$" a sound way to search for the true mean: without it, some other candidate in $M$ could tie or beat the true mean's expected loss, and the minimisation problem would not identify $\mu^\star$ even with infinite data.</p>
+
+  <h3>5.2 Bregman divergences: the complete characterisation</h3>
+
+  <p>A <strong>Bregman divergence</strong> generated by a strictly convex, differentiable function $\varphi$ is</p>
+
+  $$L(y, m) = \varphi(y) - \varphi(m) - \varphi'(m)(y - m).$$
+
+  <p>Strict convexity of $\varphi$ guarantees $L(y,m) \geq 0$ with equality if and only if $y = m$ (this is exactly the first-order condition for convexity, applied at $m$). The characterisation theorem states that the strictly consistent loss functions for mean estimation are, essentially, exactly the Bregman divergences: every Bregman divergence is strictly consistent for the mean, and (under mild regularity) every strictly consistent loss for the mean can be written in this form. Two familiar examples fix the pattern.</p>
+
+  <div class="defcard tint-mint">
+    <div class="term">Square loss as a Bregman divergence</div>
+    <div class="def">Take $\varphi(x) = x^2$. Then $\varphi'(m) = 2m$ and $L(y,m) = y^2 - m^2 - 2m(y-m) = (y-m)^2$, the ordinary square loss. This is the reason ordinary least squares targets the conditional mean and not, say, the median: the generator that produces square loss is $x^2$, and the theorem above says the unique functional it is strictly consistent for is the mean.</div>
+  </div>
+
+  <div class="defcard tint-lavender">
+    <div class="term">The Poisson unit deviance as a Bregman divergence</div>
+    <div class="def">Take $\varphi(x) = x \log x - x$ (with $0 \log 0 := 0$, licensed by the steepness argument of lecture 13). Then $\varphi'(m) = \log m$, and $L(y,m) = (y \log y - y) - (m \log m - m) - \log m \,(y - m) = y\log(y/m) - (y - m)$. This is exactly half of lecture 13's Poisson unit deviance; the conventional factor of two in the deviance literature is a normalisation with no bearing on which functional the loss is consistent for. Every row of lecture 13's table is generated the same way, by a different $\varphi$: this is the sense in which the exponential dispersion family and the theory of strictly consistent loss functions are two routes to the identical object.</div>
+  </div>
+
+  <h3>5.3 Elicitability: not every functional shares this machinery</h3>
+
+  <p>A statistical functional $T$ (the mean, the median, a quantile, a variance) is <strong>elicitable</strong> if there exists a loss function for which $T$ is the unique minimiser of expected loss. The mean is elicitable, and Bregman divergences are precisely its eliciting losses. The <strong>median</strong> is elicitable too, but only by the absolute-error loss $L(y,m) = |y - m|$, which is not a Bregman divergence (it is not strictly convex in $m$ at $m = y$ in the required sense, and it fails the strict-consistency-for-mean test: the expected absolute error is minimised at the median, not the mean, whenever the response distribution is skewed). More generally, the <strong>$\tau$-quantile</strong> is elicited by the <strong>pinball loss</strong>,</p>
+
+  $$L_\tau(y, m) = (y - m)\left(\tau - \mathbb{1}\{y &lt; m\}\right), \qquad \tau \in (0,1),$$
+
+  <p>with $\tau = 1/2$ recovering the absolute-error loss and the median. Neither the absolute-error loss nor the pinball loss is a Bregman divergence; both are convex, both are perfectly respectable loss functions, and both are consistent for a target other than the mean. This is the formal version of the slogan in section 4: convexity does not imply mean-consistency, and using either loss to fit or validate a model whose target is $E[Y \mid X]$ silently changes the question the fitting procedure is answering.</p>
+
+  <h3>5.4 Matching the loss to the variance function: the Gourieroux result</h3>
+
+  <p>Strict consistency guarantees that the true mean is found asymptotically, with infinitely many data; it says nothing about which strictly consistent loss performs best on the finite sample actually in hand. Gourieroux, Monfort and Trognon (1984) supply the missing finite-sample result: among strictly consistent losses for mean estimation, the estimator obtained is <strong>best asymptotically normal</strong>, achieving the smallest asymptotic variance for a given sample size, when the loss's implied variance function matches the response's true conditional variance function.</p>
+
+  <p>Concretely, each Bregman generator $\varphi$ implies a variance function $V(\mu) = 1/\varphi''(\mu)$ (the reciprocal of the generator's curvature at the mean); this is the same variance function lecture 13 introduced via the exponential-family cumulant function, and the two routes agree exactly for the six named EDF members. If the true response has variance growing like $\mu^2$ (a multiplicative, constant-coefficient-of-variation process, typical of loss severities), the gamma-deviance loss ($V(\mu) = \mu^2$) gives the best finite-sample efficiency among strictly consistent choices, strictly better than the square loss ($V(\mu) = 1$, appropriate only for constant-variance responses), even though both losses are asymptotically consistent for the same mean. This is the formal justification for the diagnostic lecture 05 already recommended, plotting empirical variance against the group mean across covariate bins to infer the variance function, and then selecting the deviance loss whose implied $V(\mu)$ matches what that plot shows.</p>
+
+  <h3>5.5 Case-weight scaling: three conventions, one answer</h3>
+
+  <p>A learning sample carries per-row weights $v_i$ (lecture 13's exposures), and there are three ways software aggregates a loss across rows, all correct in the sense of preserving the same optimiser $\hat\mu$, but differing in the reported magnitude and, critically, in whether in-sample and out-of-sample values are directly comparable.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Convention</th><th>Aggregated loss</th><th>Where it is used</th></tr></thead>
+      <tbody>
+        <tr><td>Aggregate (unnormalised)</td><td>$\sum_i v_i \, L(y_i, \mu(x_i))$</td><td>reported deviance in R's <code>glm</code></td></tr>
+        <tr><td>Sample-size normalised</td><td>$\frac{1}{n}\sum_i v_i \, L(y_i, \mu(x_i))$</td><td>neural network training loops (Keras / TensorFlow)</td></tr>
+        <tr><td>Weight-normalised</td><td>$\dfrac{\sum_i v_i \, L(y_i, \mu(x_i))}{\sum_i v_i}$</td><td>exposure-free, comparable across samples (scikit-learn)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Only the third convention gives a quantity that is directly comparable between a learning sample and a test sample of different sizes or different total exposure, because dividing by $\sum_i v_i$ removes the scale dependence on sample size that the other two conventions retain. When comparing an in-sample loss to an out-of-sample loss (the model-selection workflow of lecture 05's likelihood-ratio and AIC machinery, and the machine-learning track's cross-validation lectures), the weight-normalised convention is the one to use; the other two remain correct for within-model diagnostics (a raw deviance compared against its own degrees of freedom, for instance) but are not safe for cross-sample comparison.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Worked example: the wrong loss changes the answer on a small, skewed sample</h2></div>
+
+  <div class="worked">
+    <strong>Step 1: a small, right-skewed severity sample.</strong>
+    <p>A specialty lender has 40 realised losses on a niche product line, ranging from near-zero to one exposure that is roughly 15 times the median loss, a shape typical of a coefficient-of-variation-constant severity process. Two models are fitted to the identical 40 points: Model A minimises square loss ($\varphi(x) = x^2$, implied variance function $V(\mu) = 1$, constant); Model B minimises the gamma unit deviance ($\varphi(x) = -\log x$, up to convention, implied variance function $V(\mu) = \mu^2$).</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 2: both are asymptotically consistent, but they disagree here.</strong>
+    <p>Both losses are strictly consistent for the mean of the true data-generating process; on an infinite sample they would agree. On this 40-point sample, Model A's fitted mean is pulled toward the single large observation far more than Model B's, because square loss penalises the large residual quadratically while gamma deviance penalises it on a relative, multiplicative scale that matches the coefficient-of-variation-constant shape of the true process. A bootstrap of the fitting procedure (resample the 40 points, refit both models, 500 replications) shows Model B's fitted mean has roughly 40 per cent smaller standard deviation across replications than Model A's, the finite-sample efficiency gain the Gourieroux result of section 5.4 predicts for a loss whose variance function matches the true one.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 3: validating with the wrong loss reverses the apparent ranking.</strong>
+    <p>Scoring both models' out-of-sample predictions by mean absolute error, rather than by the gamma deviance both models were fitted to target, ranks Model A (square-loss-fitted) ahead of Model B on this particular sample, because MAE rewards median-like behaviour and Model A's fit happens to sit closer to the sample median by chance. Re-scoring by the gamma deviance recovers the correct ranking, Model B ahead, consistent with the bootstrap result in step 2. The lesson is exactly section 5.3's warning: MAE elicits the median, and using it to compare two mean-targeting models can and does produce a different answer than the mean-consistent scorer would give.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Common pitfalls and cognitive traps</h2></div>
+
+  <h3>Defaulting to square loss regardless of the response</h3>
+
+  <p>Square loss is strictly consistent for the mean of any response distribution, so it is never "wrong" in the sense of targeting the wrong functional; it is merely inefficient, sometimes badly so, whenever the true variance function is not constant. A gradient boosting library's default objective is usually squared error, and leaving it there for a right-skewed severity or a sparse-count frequency target quietly forfeits the efficiency gain section 5.4 describes.</p>
+
+  <h3>Validating a mean-targeting model with MAE or a quantile loss</h3>
+
+  <p>MAE and the pinball loss are legitimate, well-behaved loss functions, just not for the mean. Reporting them alongside RMSE or deviance as if all were interchangeable "accuracy metrics" for a mean-fitted model conflates two different statistical questions, as the worked example above demonstrates concretely.</p>
+
+  <h3>Treating convexity as a sufficient licence</h3>
+
+  <p>A loss being convex in the prediction is necessary for well-behaved numerical fitting but says nothing about which functional it targets. Inventing a bespoke convex penalty function ("this captures how the business actually feels about errors") without checking whether it is a Bregman divergence risks fitting a model that converges to something other than the intended target, silently.</p>
+
+  <h3>Comparing unnormalised losses across samples of different sizes</h3>
+
+  <p>An aggregate (unnormalised) or sample-size-normalised loss, section 5.5's first two conventions, is not directly comparable between a training sample and a test sample unless the two carry identical total exposure; the weight-normalised convention is the one that supports valid cross-sample comparison, and mixing conventions across a train/test comparison produces a spurious apparent improvement or degradation that is really just a change in scale.</p>
+
+  <div class="callout warn">
+    <span class="tag">One test that catches most of this</span>
+    Before reporting any loss-based comparison between models, ask: is the functional both models were fitted to target the same as the functional the scoring loss elicits? If a model was fitted by minimising a Bregman divergence (targeting the mean) and is then scored by MAE or a pinball loss (targeting the median or a quantile), the comparison is comparing two different questions and the result should not be trusted, regardless of how plausible the reported numbers look.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8: Frontiers
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 8</span><h2>Frontiers and what's beyond</h2></div>
+
+  <p>Two directions worth knowing exist without being developed here. <strong>Proper scoring rules for full predictive distributions</strong> (Gneiting and Raftery 2007) generalise this lecture's point-forecast theory to scoring an entire predicted distribution against a realised outcome; the continuous ranked probability score and the logarithmic score are the standard examples, and they underlie the probabilistic forecast evaluation used in modern claims-reserving and capital-modelling practice. <strong>Elicitability of risk measures</strong> is a live and occasionally contentious area in market-risk backtesting: value-at-risk is elicitable (by an asymmetric piecewise-linear loss closely related to the pinball loss), but expected shortfall, the risk measure Basel's market-risk framework has increasingly favoured, is not elicitable on its own; Fissler and Ziegel (2016) showed it is <em>jointly</em> elicitable together with value-at-risk, which is the technical reason modern expected-shortfall backtesting frameworks always report a VaR-based quantity alongside the ES estimate rather than backtesting ES in isolation.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 9: Synthesis, recall, connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 9</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the justification lecture 13 assumed. Strict consistency for mean estimation is a narrower property than convexity, and the strictly consistent losses are exactly the Bregman divergences generated by a strictly convex $\varphi$; lecture 13's unit deviances are six named instances of this one construction. Elicitability draws a hard line between losses that target the mean and losses (absolute error, pinball loss) that target a median or a quantile, and the two do not substitute for each other in either fitting or validation. The Gourieroux result turns "pick the loss that matches your data's variance behaviour" from a rule of thumb into a proven finite-sample efficiency statement, which matters precisely because actuarial and credit-risk samples are so often small and skewed rather than large and well-behaved.</p>
+
+  <p>Parts VI closes here, at fourteen lectures. The nine-lecture methodological core (Parts I to IV) and the three Part V extensions remain exactly as lecture 12 left them; Part VI adds the two pieces of the exponential-family and loss-function machinery that the machine-learning track's later lectures on model calibration, gradient boosting objectives, and forecast evaluation assume without re-deriving. Anyone arriving at those lectures without having read 13 and 14 first will find the loss-function choices asserted rather than justified; anyone who has read them will recognise the unit deviance, the Bregman divergence, and the variance-function-matching argument as one and the same idea, viewed from three angles.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the definition of strict consistency for mean estimation. Why is it a stronger requirement than "the loss is convex in the prediction"?</li>
+      <li>Write the general form of a Bregman divergence and verify that $\varphi(x) = x^2$ recovers the square loss.</li>
+      <li>Derive the Poisson unit deviance from the generator $\varphi(x) = x \log x - x$, and reconcile the factor of two against lecture 13's table.</li>
+      <li>Define elicitability. Which loss elicits the median, and why is it not a Bregman divergence?</li>
+      <li>State the Gourieroux, Monfort and Trognon result in your own words. What does "matching the loss to the variance function" buy you that strict consistency alone does not?</li>
+      <li>You are handed a model-validation report that scores a Tweedie-fitted claims-severity model by mean absolute error and concludes it under-performs a square-loss-fitted alternative. What is wrong with the comparison, and what would you ask for instead?</li>
+      <li>Explain why value-at-risk is elicitable but expected shortfall is not, and what "jointly elicitable" buys back for expected-shortfall backtesting.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 13 (<a href="13-exponential_dispersion_family.html">the exponential dispersion family</a>) supplied the unit-deviance table this lecture re-derives, from a different angle, as a family of Bregman divergences.</li>
+      <li><strong>Built on:</strong> Lecture 3 (<a href="03-inferential_statistics.html">inferential statistics</a>) introduced ordinary least squares without asking why square loss targets the mean; section 5.2 supplies the missing answer.</li>
+      <li><strong>Used by:</strong> The machine-learning track's model-evaluation, gradient-boosting, and forecast-evaluation lectures, which assume that the objective function offered by a fitting library has already been checked against this lecture's strict-consistency and variance-matching criteria before being accepted as the right choice for a given target.</li>
+      <li><strong>Course structure:</strong> Parts I to IV (nine lectures) and Part V (three lectures, copulas, extreme value theory, causal inference) remain the methodological core described in lecture 12. Part VI (this lecture and lecture 13) is an addition that carries pillar 4 forward into the material the machine-learning track needs. Return to the <a href="index.html">course landing</a> to navigate.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Statistics course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 14 of 14</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

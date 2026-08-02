@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 22: universality, non-identifiability, and Kolmogorov-Arnold networks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Deep learning</a></div>
+  <h1>Universality, non-identifiability, and Kolmogorov-Arnold networks</h1>
+  <p class="subtitle">Lecture 1 quoted the universal approximation theorem as a reason neural networks earn their place in the toolkit. This lecture asks what the theorem does not promise: on a finite sample, there is no such thing as the best small network, only infinitely many roughly-equally-good ones, found by an optimiser whose starting point and random seed genuinely change which one you get. Understanding why sharpens two later lectures: it explains why nagging (lecture 3) is not a hack but a principled response, and it motivates Kolmogorov-Arnold networks, an architecture that swaps which part of the network is learnable and, in doing so, changes what "the model" even means.</p>
+  <div class="meta">
+    <span>Lecture 22 of 62</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Part IV: deep learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The <strong>universal approximation theorem</strong> guarantees that a feed-forward network of sufficient width (or depth) can approximate any continuous function on a compact domain arbitrarily well. It is an existence statement about the function class, not a statement about what happens when you fit that class to a finite, noisy sample. Two uncomfortable corollaries follow. First, there is <strong>no parsimonious best network</strong>: within the class of networks that fit a given finite sample about equally well, infinitely many distinct parameter settings achieve nearly identical loss, so "the" fitted network is not identified by the data in the way a low-dimensional GLM's coefficients are. Second, the fitting problem is <strong>high-dimensional and non-convex</strong>, so gradient descent finds a local optimum whose identity depends on the random initialisation and the stochastic minibatch order; two training runs on the identical data and architecture, differing only in random seed, converge to two different functions, close in loss but not identical in behaviour away from the training distribution. <strong>Kolmogorov-Arnold networks</strong> (KANs) respond to a different question, not "how much capacity" but "what should be learnable": rather than fixed activation functions on neurons and learnable weights on edges, a KAN puts learnable spline-based activation functions on the edges themselves and fixes every node's combination rule to simple summation, a structural swap motivated by the Kolmogorov-Arnold representation theorem rather than by the universal approximation theorem.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Fit a small neural network to the same hundred rows of data ten times, changing only the random seed used to initialise the weights. All ten fits will report almost identical training loss. None of them will have identical weights, and if you ask all ten what they predict for a covariate combination that never appeared in training, you can get ten different answers. The universal approximation theorem told you a network exists that fits the data well; it never told you which one, and the optimiser's random seed is quietly making that choice for you every time you train.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture sits directly after lecture 1 and before lecture 3 on ensembling. It does not re-derive gradient descent, Adam, or dropout, all covered in lecture 1's detail section; it isolates the one property of the fitting problem, non-identifiability under finite data, that makes ensembling a principled remedy rather than an ad hoc trick, and it closes with KANs as a structural alternative worth knowing about even though they remain a research-stage architecture for tabular actuarial and credit data.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this distinction between "a good network exists" and "you have found it" matters in regulated practice.</p>
+
+  <p>First, <strong>a validator who asks for the model's confidence interval is asking a question the fitting procedure cannot honestly answer from a single training run</strong>. Because the loss surface has many near-equally-good solutions, retraining with a new seed gives a different point estimate, and the spread across seeds is a genuine, measurable source of model uncertainty distinct from ordinary sampling uncertainty in the data. Reporting a single fitted network's predictions without disclosing this seed-sensitivity is an incomplete picture of the model's reliability.</p>
+
+  <p>Second, <strong>the non-identifiability is worse, not better, in the regions of the covariate space with the least data</strong>. Two seeds that agree closely on well-populated segments of the portfolio can disagree substantially on a thin segment, exactly the segment where getting the answer right matters most for concentration risk or a new product line. Knowing this in advance changes how a validator reads a single network's output in a sparse segment: with suspicion, not confidence.</p>
+
+  <p>Third, <strong>Kolmogorov-Arnold networks are increasingly mentioned in vendor pitches, and knowing what actually changed structurally, rather than taking a marketing claim of "more interpretable deep learning" at face value, is a basic diligence requirement</strong>. The genuine claim is narrower and more interesting than the marketing version, and this lecture states it precisely.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A model validation team retrained a production fraud-detection network five times with different random seeds, keeping architecture, data, and hyperparameters fixed, as a routine robustness check before sign-off. Aggregate AUC varied by less than half a point across the five runs, and the team initially closed the check as passed. A closer look at the five networks' predictions on the bottom five per cent of transaction volume by merchant category (a genuinely thin segment) showed disagreement of up to fifteen percentage points in predicted fraud probability between seeds, for the identical transaction. The aggregate metric had hidden a real instability that only mattered where the business actually needed the model to be right: emerging merchant categories with little training history. The remedy adopted was exactly the nagging predictor developed in the next lecture.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold two pictures. First, a loss surface with many valleys of nearly equal depth, so a ball dropped from different starting points (different random seeds) rolls to different valleys that all look equally good from above. Second, the KAN's structural swap: weights move from the edges to fixed summation, and the previously-fixed activation functions move from the nodes onto the edges as learnable splines.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Non-identifiability of the loss surface, and the KAN structural swap">
+      <defs>
+        <marker id="uniArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Many equally-good valleys, and the FNN-to-KAN structural swap</text>
+
+      <g transform="translate(40, 55)">
+        <rect x="0" y="0" width="380" height="255" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="190" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Non-convex loss surface, three seeds</text>
+        <path d="M 20 220 Q 60 100 100 210 Q 140 60 190 200 Q 240 80 290 215 Q 330 110 360 220" fill="none" stroke="#b45309" stroke-width="2"/>
+        <circle cx="100" cy="205" r="6" fill="#dc2626"/>
+        <circle cx="190" cy="195" r="6" fill="#1d4ed8"/>
+        <circle cx="290" cy="210" r="6" fill="#166534"/>
+        <text x="100" y="238" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">seed A</text>
+        <text x="190" y="238" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">seed B</text>
+        <text x="290" y="238" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">seed C</text>
+        <text x="190" y="20" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e"></text>
+      </g>
+
+      <g transform="translate(460, 55)">
+        <rect x="0" y="0" width="380" height="255" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="190" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">FNN vs KAN: where learning happens</text>
+
+        <text x="95" y="45" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">FNN</text>
+        <circle cx="60" cy="90" r="12" fill="#fff" stroke="#115e59" stroke-width="1.5"/>
+        <circle cx="60" cy="150" r="12" fill="#fff" stroke="#115e59" stroke-width="1.5"/>
+        <circle cx="150" cy="120" r="12" fill="#fff" stroke="#115e59" stroke-width="1.5"/>
+        <line x1="70" y1="94" x2="140" y2="118" stroke="#0d9488" stroke-width="2.5"/>
+        <line x1="70" y1="146" x2="140" y2="122" stroke="#0d9488" stroke-width="2.5"/>
+        <text x="150" y="145" text-anchor="middle" font-family="Inter" font-size="8" fill="#115e59">fixed φ, learnable w</text>
+
+        <text x="290" y="45" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">KAN</text>
+        <circle cx="255" cy="90" r="10" fill="#fff" stroke="#115e59" stroke-width="1"/>
+        <circle cx="255" cy="150" r="10" fill="#fff" stroke="#115e59" stroke-width="1"/>
+        <circle cx="345" cy="120" r="10" fill="#fff" stroke="#115e59" stroke-width="1"/>
+        <path d="M 265 92 Q 300 70 335 116" fill="none" stroke="#0d9488" stroke-width="2.5" stroke-dasharray="2 2"/>
+        <path d="M 265 148 Q 300 170 335 124" fill="none" stroke="#0d9488" stroke-width="2.5" stroke-dasharray="2 2"/>
+        <text x="300" y="200" text-anchor="middle" font-family="Inter" font-size="8" fill="#115e59">learnable spline on edge, fixed sum at node</text>
+
+        <text x="190" y="235" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#115e59">the flexibility moves from the node to the edge</text>
+      </g>
+    </svg>
+    <figcaption>Left: three random seeds land in three different, nearly equally deep valleys of a non-convex loss surface; each is a genuinely different fitted network, none of them "wrong" by the training loss alone. Right: a standard feed-forward layer fixes the activation function $\phi$ at each node and learns weights $w$ on the edges; a Kolmogorov-Arnold layer fixes a simple sum at each node and learns a spline-based activation function on each edge instead. The swap is about which part of the architecture carries the learnable flexibility, not about how much flexibility there is overall.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>An existence theorem is not a uniqueness theorem.</strong> Universal approximation says a good network exists; it says nothing about how many, how similar to each other, or which one gradient descent will find. <strong>KANs relocate learnability, they do not add or remove it.</strong> A KAN and an FNN of comparable size occupy similar positions on the flexibility axis; what differs is whether the flexible part is a set of numbers on a fixed non-linearity (FNN) or a set of learnable non-linearities acting on fixed connections (KAN).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>What the universal approximation theorem actually promises</h3>
+
+  <p>Lecture 1 stated the theorem: an MLP with a single hidden layer and any non-polynomial activation can approximate any continuous function on a compact subset of $\mathbb{R}^d$ to arbitrary precision, given enough hidden units. Read the theorem's quantifiers carefully. It asserts existence ("there exists a network achieving error less than $\epsilon$"); it does not assert uniqueness, and it says nothing at all about how many hidden units are needed for a given $\epsilon$, nor whether any practical optimiser can find the network the theorem promises exists. All three gaps matter more, not less, once the network is fitted to a finite, noisy sample rather than approximating a known, noise-free function on its full domain.</p>
+
+  <h3>No parsimonious best network on a finite sample</h3>
+
+  <p>Within the class of feed-forward networks of a given architecture, there are, generically, infinitely many distinct weight settings that achieve training loss within numerical tolerance of each other on a finite sample. Some of this is a trivial symmetry (permute the neurons within a hidden layer and relabel the corresponding weights, and the function computed is identical), but a great deal of it is genuine: different weight configurations that are not related by any symmetry nonetheless fit the observed rows about equally well while disagreeing on unobserved covariate combinations. Unlike a correctly specified GLM, where the maximum-likelihood estimate is (generically) a single point identified by the data up to sampling noise, a neural network's fitted parameters are not identified by a finite sample in this sense: the data pins down a region of good-enough solutions, not a point, and the optimiser's path picks an essentially arbitrary point within that region.</p>
+
+  <h3>The fitting problem is non-convex, and the optimiser's path is part of the answer</h3>
+
+  <p>The loss surface of a network with more than a handful of parameters is high-dimensional and, for essentially every architecture used in practice, non-convex: it has many local optima, saddle points, and flat regions, and gradient descent (with momentum or Adam, as lecture 1 developed) follows a path determined by the random initialisation, the order in which minibatches are drawn, and any other source of stochasticity in the training loop (dropout masks, non-deterministic GPU kernels). Two consequences that matter beyond the purely mathematical curiosity. First, the specific weight vector a training run converges to is not solely a function of the data and the architecture; it is a function of the data, the architecture, and the entire sequence of random draws made during training, a genuinely different epistemic status from a maximum-likelihood estimate. Second, replicating a reported result exactly requires recording and fixing every one of those random draws, which is precisely the reproducibility discipline lecture 1's closing pitfall flagged, restated here with the structural reason behind it rather than as an isolated engineering nuisance.</p>
+
+  <h3>Kolmogorov-Arnold networks: relocating the learnable flexibility</h3>
+
+  <p>The <strong>Kolmogorov-Arnold representation theorem</strong> (Kolmogorov, 1957; Arnold, 1957) is a different existence result from universal approximation, originally a solution to a version of Hilbert's thirteenth problem: it states that any multivariate continuous function can be written as a finite composition of continuous univariate functions and the single binary operation of addition. Structurally, this suggests an architecture with the identical layered shape as an MLP but with the roles of node and edge reversed: fix a simple summation at every node, and place a learnable univariate function on every edge. <strong>Kolmogorov-Arnold networks</strong> (Liu et al., 2024) instantiate this with each edge's learnable function parametrised as a linear combination of B-splines,</p>
+  $$x \mapsto S(x) = \sum_s w_s B_s(x),$$
+  <p>with learnable weights $(w_s)$ on a fixed spline basis $(B_s)$, typically combined with a residual connection around a fixed base activation (the SiLU function is standard) so that the learnable spline only needs to capture the deviation from a sensible default shape. A KAN layer's unit is then $z_j^{(m)}(x) = \sum_l \Phi_{j,l}^{(m)}(x_l)$ for learnable edge functions $\Phi_{j,l}^{(m)}$, replacing the FNN unit $z_j^{(m)}(x) = \langle w_j^{(m)}, x\rangle$ followed by a fixed activation.</p>
+
+  <p>Two claimed advantages, and the honest caveats attached to each. The first claim is <strong>parameter efficiency</strong>: for some function classes, particularly compositions of low-dimensional smooth functions, a KAN can match an FNN's approximation quality with fewer total parameters, because the flexibility is spent on a small number of expressive univariate curves rather than a large number of scalar weights combined through a fixed non-linearity. The second claim is <strong>interpretability</strong>: because each edge carries a single, plottable univariate curve rather than a scalar weight, a fitted KAN can sometimes be visually inspected edge by edge to recover the functional form of a genuinely low-dimensional underlying relationship, an appealing property for anyone who has read this course's repeated concerns about black-box audit surfaces.</p>
+
+  <p>The caveats are substantial enough to change how the claims should be read. Liu et al.'s original evidence is concentrated on deterministic function-approximation benchmarks (fitting a known, noise-free mathematical function), a materially easier problem than fitting a noisy statistical model on finite data, where the interesting question is not approximation error but generalisation and finite-sample efficiency, the identical distinction the exponential-dispersion and strictly-consistent-loss lectures in the statistics track spent considerable effort establishing. On genuinely noisy tabular data, the additional flexibility of a learnable spline per edge is a larger in-sample over-fitting risk than a fixed-activation FNN of comparable total parameter count, and the regularisation theory for KANs (how to penalise spline curvature, how many knots to allow) is considerably less mature than the decades of accumulated practice around weight decay and dropout for FNNs. The honest summary for a modeller deciding whether to reach for a KAN on an actuarial pricing problem: worth knowing about, worth watching, not yet the safer regulatory choice over a well-regularised FNN or a gradient-boosted tree.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why this connects forward to nagging</span>
+    The non-identifiability argument above is exactly the premise the next lecture's nagging predictor is built to exploit rather than merely tolerate. If a single fitted network is one arbitrary draw from a set of nearly-equally-good solutions, averaging several independent draws (several seeds) reduces the variance of that average toward the conditional expectation of the fitting procedure itself, a law-of-large-numbers argument that only makes sense once the non-identifiability described here is taken seriously as a real source of variability, not an embarrassment to be minimised away by fixing a single seed and hoping for the best.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Treating a single seed's result as the model</span>
+    Reporting a fitted network's predictions, or its feature-attribution values from an interpretation method, as though they were the unique output of "the model" ignores that a different seed would have produced a different, comparably-loss-achieving network with potentially different predictions in sparse regions. Any production sign-off should include a seed-sensitivity check, exactly the multi-seed comparison in the vignette above, before relying on a single fitted instance.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Confusing existence with tractability</span>
+    Citing the universal approximation theorem as justification for expecting a specific network to have found a good solution conflates an existence claim with a claim about what gradient descent, on this specific non-convex surface, with this specific initialisation, actually converged to. The theorem licenses trying; it does not license assuming success.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Over-reading KAN interpretability claims from a marketing deck</span>
+    A vendor claiming "interpretable deep learning" via KANs is making a claim that holds, if at all, for genuinely low-dimensional, smooth, noise-free or low-noise relationships where the fitted edge splines are simple enough to plot and read. On a high-dimensional tabular credit or insurance dataset with the usual noise levels, a KAN's edges are not guaranteed to settle into simple, human-readable curves, and the interpretability claim should be verified on the actual fitted model, not accepted from the architecture's name alone.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Universal approximation is an existence theorem, not a uniqueness or tractability guarantee: on a finite sample, a network's fitted parameters are not identified by the data the way a well-specified GLM's are, and the non-convex fitting problem means the optimiser's random seed genuinely changes which of many nearly-equally-good solutions you end up with. This is most consequential exactly where a model matters most, sparsely populated segments of the covariate space, and it is the reason a single training run's output should never be mistaken for a definitive answer. Kolmogorov-Arnold networks relocate the learnable flexibility from weighted edges and fixed node activations to fixed summation nodes and learnable spline edges, a structurally distinct but not strictly more powerful architecture, with genuine but currently under-tested advantages in parameter efficiency and edge-level interpretability on simple, low-noise problems.</p>
+
+  <p>The next lecture turns the non-identifiability problem from a warning into a tool: aggregating multiple independently trained networks, the nagging predictor, reduces the variance this lecture has just explained is real, and gives a concrete, cheap recipe for extracting a more reliable prediction from exactly the instability described here.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the universal approximation theorem precisely, distinguishing what it asserts from what it does not.</li>
+      <li>Explain why a neural network's fitted parameters are not identified by a finite sample in the way a correctly specified GLM's coefficients are.</li>
+      <li>Two training runs on identical data and architecture, differing only in random seed, achieve near-identical training loss but disagree substantially on a sparsely populated covariate segment. Explain why, and name the practical remedy developed in the next lecture.</li>
+      <li>Describe the structural difference between a feed-forward layer and a Kolmogorov-Arnold layer. Which part of each carries the learnable flexibility?</li>
+      <li>State the two claimed advantages of KANs and the caveat attached to each.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 1 (<a href="01-neural_networks.html">neural networks</a>) introduced the universal approximation theorem and the training loop this lecture examines the limits of.</li>
+      <li><strong>Next:</strong> Lecture 3 (<a href="03-ensembling_and_nagging.html">ensembling and nagging</a>) turns the non-identifiability argument into a concrete variance-reduction technique.</li>
+      <li><strong>Prerequisite:</strong> The statistics track's <a href="../../statistics/14-strictly_consistent_loss_functions.html">strictly consistent loss functions</a> lecture distinguishes approximation error from finite-sample estimation error, the identical distinction this lecture applies to neural network fitting.</li>
+      <li><strong>Outside this course:</strong> Model risk management frameworks (PRA SS1/23 and equivalents) increasingly expect a seed-sensitivity or retraining-stability check as part of deep-model validation; this lecture supplies the theoretical reason such a check is necessary rather than merely conservative.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Deep learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 22 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 21: neural networks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Deep learning</a></div>
+  <h1>Neural networks</h1>
+  <p class="subtitle">What happens when you stack non-linear functions deep enough that the result can approximate any continuous mapping. The flexibility is bought with data, compute, and interpretability. This lecture is the vocabulary you need to read any neural-network paper or vendor model.</p>
+  <div class="meta">
+    <span>Lecture 21 of 62</span>
+    <span>Reading time, 65 minutes</span>
+    <span>Part IV: deep learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>neural network</strong> is a composition of alternating linear maps and element-wise non-linear functions, with parameters learned by gradient descent on a differentiable loss. The atomic unit is the <strong>perceptron</strong>, a thresholded linear classifier of the form $y = \operatorname{sign}(w^T x + b)$, which can separate two classes only when they are linearly separable, a constraint XOR was the first famous counterexample to. Stack two or more perceptron-like layers with a non-linear activation between them and the resulting <strong>multilayer perceptron</strong> can approximate any continuous function on a compact set to arbitrary accuracy: the <strong>universal approximation theorem</strong>. What changes between vanilla MLPs, convolutional networks, recurrent networks, and transformers is the inductive bias built into the connectivity, not the underlying recipe. Training is forward propagation of a minibatch, evaluation of a loss (mean squared error for regression, cross-entropy for classification), then <strong>backpropagation</strong> of the gradients through the chain rule, then a parameter update by an optimiser (SGD, momentum, Adam). Everything else, the activation choice, the regularisation tricks, the architectural specialisations, is a refinement of that loop.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A neural network is a long, very flexible function. You hand it a vector of inputs, it passes them through a chain of matrix multiplications and squashing functions, and out the other end comes a prediction. The training procedure looks at how wrong the prediction was, walks the error backwards through every step that contributed to it, and nudges each weight in the direction that would have made the prediction less wrong. Do that a few million times on a few million examples and the network learns a representation good enough to recognise faces, translate languages, or score loan applications. There is no special intelligence at any single layer, only a very large pile of small differentiable choices fitted by gradient descent.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Textbooks treat neural networks as a flexible function class with a clean training recipe. In regulated practice the flexibility is the problem. A logistic regression with thirty Weight-of-Evidence features can be explained to a supervisor in a single page, every coefficient signed and bounded, every variable backed by a stability test. A neural network with a hundred thousand parameters cannot. The dominant production use of deep learning in retail banking is therefore not in front-line credit decisions but in fraud detection, document understanding, and customer-service routing, places where the cost of a single decision is low, the volume is high, and a challenger model can shadow the production system. Treat the universal approximation theorem as an upper bound on what is possible, not a recommendation for what to build.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Lecture 21 sits inside the deep-learning module, which assumes everything from earlier sub-modules. The feature matrix is the output of <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1's six-stage pipeline</a>. The training procedure is gradient descent on a differentiable objective, the same machinery generalised linear models use (see <a href="../../statistics/05-generalised_linear_models.html">statistics lecture 5</a>); a logistic regression is exactly a one-layer neural network with a sigmoid output and a binary cross-entropy loss. The dimensionality-reduction toolkit from <a href="../04_unsupervised_learning/02-pca.html">lecture 14 on PCA</a> reappears inside autoencoders. The hyperparameter-tuning principles from <a href="../06_hyperparameter_tuning/01-tuning_principles.html">lecture 32</a> matter more here than anywhere else because the search space is enormous. The interpretation problem this lecture creates is solved (partially) in <a href="../08_model_interpretation/03-model_agnostic_methods.html">lecture 38 on model-agnostic methods</a>.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons a neural network earns its place in a modeller's toolkit. First, <strong>compositional non-linearity buys representational capacity that no single-layer model can match.</strong> A linear regression can only represent functions linear in $x$. A polynomial regression can represent any polynomial of fixed degree, but the number of monomials grows combinatorially with the feature count and the degree. A neural network with even one hidden layer can represent any continuous function on a compact domain (this is the content of the universal approximation theorem) and does so with a parameter count that grows linearly in width rather than combinatorially. The cost is that the function class is so flexible that the data, not the model, has to do most of the work in saying which function to pick.</p>
+
+  <p>Second, <strong>representation is learned rather than engineered.</strong> A credit scorecard requires a human to design Weight-of-Evidence bins, decide which interactions to include, and police multicollinearity. A convolutional network on images, or a transformer on text, takes raw pixels or tokens and learns the intermediate features that the downstream classifier needs. This is the practical content of "deep learning is representation learning". For tabular data with hand-engineered features it rarely beats gradient boosting; for raw text, images, audio, and graphs it is decisive because the engineering step is the bottleneck.</p>
+
+  <p>Third, <strong>the same training recipe scales.</strong> A two-layer network trained on a thousand examples and a 175-billion-parameter language model trained on a trillion tokens are built from the same primitives: a differentiable loss, a forward pass, a backward pass, and an optimiser. The infrastructure that scales (vectorised tensor operations, GPU acceleration, distributed data parallelism) does so because the loop never changes shape. Almost every breakthrough of the last fifteen years (AlexNet, the transformer, GPT, AlphaFold, diffusion models) is a new architecture inside that loop, not a new loop.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail bank's data science team replaced a logistic regression PD model with a four-layer fully connected network and reported a Gini uplift of three points. The model was rejected at second-line validation. Two reasons. Reproducibility: the new model used a non-deterministic dropout schedule on a single GPU, and the validation team could not reproduce the reported numbers from the released artefacts. Interpretability: when asked to explain why a specific application was declined, the team produced SHAP values for the final layer, which a non-quantitative reviewer could not relate back to the input features the customer would recognise. The original logistic-regression scorecard ran in parallel for another two years. The lesson is not that deep learning is bad; it is that the audit surface of a production model has to be designed in from the start, not retro-fitted after a Gini uplift looks attractive.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Inputs enter on the left as a vector of features. Each layer applies an affine map $z = Wx + b$ followed by an element-wise non-linearity $a = \phi(z)$. The output of one layer is the input to the next. The final layer's activation is chosen to match the loss (linear for regression with MSE, sigmoid for binary classification with BCE, softmax for multi-class classification with cross-entropy). Training cycles through three steps: a forward pass to compute the prediction, a loss evaluation, and a backward pass that walks the chain rule from the loss back to every parameter and applies a small update.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Multilayer perceptron architecture diagram showing input, two hidden layers, and output">
+      <defs>
+        <marker id="nnArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#9ca3af"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A multilayer perceptron: alternating linear maps and non-linear activations</text>
+
+      <!-- Layer labels -->
+      <text x="110" y="56" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#71717a">INPUT</text>
+      <text x="320" y="56" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#71717a">HIDDEN 1</text>
+      <text x="530" y="56" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#71717a">HIDDEN 2</text>
+      <text x="730" y="56" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#71717a">OUTPUT</text>
+
+      <text x="110" y="70" text-anchor="middle" font-family="Inter" font-size="9" fill="#9ca3af">features</text>
+      <text x="320" y="70" text-anchor="middle" font-family="Inter" font-size="9" fill="#9ca3af">ReLU</text>
+      <text x="530" y="70" text-anchor="middle" font-family="Inter" font-size="9" fill="#9ca3af">ReLU</text>
+      <text x="730" y="70" text-anchor="middle" font-family="Inter" font-size="9" fill="#9ca3af">softmax</text>
+
+      <!-- Edges (drawn first so nodes sit on top) -->
+      <g stroke="#e5e7eb" stroke-width="0.8">
+        <line x1="110" y1="120" x2="320" y2="110"/><line x1="110" y1="120" x2="320" y2="160"/><line x1="110" y1="120" x2="320" y2="210"/><line x1="110" y1="120" x2="320" y2="260"/><line x1="110" y1="120" x2="320" y2="310"/>
+        <line x1="110" y1="180" x2="320" y2="110"/><line x1="110" y1="180" x2="320" y2="160"/><line x1="110" y1="180" x2="320" y2="210"/><line x1="110" y1="180" x2="320" y2="260"/><line x1="110" y1="180" x2="320" y2="310"/>
+        <line x1="110" y1="240" x2="320" y2="110"/><line x1="110" y1="240" x2="320" y2="160"/><line x1="110" y1="240" x2="320" y2="210"/><line x1="110" y1="240" x2="320" y2="260"/><line x1="110" y1="240" x2="320" y2="310"/>
+        <line x1="110" y1="300" x2="320" y2="110"/><line x1="110" y1="300" x2="320" y2="160"/><line x1="110" y1="300" x2="320" y2="210"/><line x1="110" y1="300" x2="320" y2="260"/><line x1="110" y1="300" x2="320" y2="310"/>
+      </g>
+      <g stroke="#e5e7eb" stroke-width="0.8">
+        <line x1="320" y1="110" x2="530" y2="135"/><line x1="320" y1="110" x2="530" y2="195"/><line x1="320" y1="110" x2="530" y2="255"/>
+        <line x1="320" y1="160" x2="530" y2="135"/><line x1="320" y1="160" x2="530" y2="195"/><line x1="320" y1="160" x2="530" y2="255"/>
+        <line x1="320" y1="210" x2="530" y2="135"/><line x1="320" y1="210" x2="530" y2="195"/><line x1="320" y1="210" x2="530" y2="255"/>
+        <line x1="320" y1="260" x2="530" y2="135"/><line x1="320" y1="260" x2="530" y2="195"/><line x1="320" y1="260" x2="530" y2="255"/>
+        <line x1="320" y1="310" x2="530" y2="135"/><line x1="320" y1="310" x2="530" y2="195"/><line x1="320" y1="310" x2="530" y2="255"/>
+      </g>
+      <g stroke="#e5e7eb" stroke-width="0.8">
+        <line x1="530" y1="135" x2="730" y2="180"/><line x1="530" y1="135" x2="730" y2="240"/>
+        <line x1="530" y1="195" x2="730" y2="180"/><line x1="530" y1="195" x2="730" y2="240"/>
+        <line x1="530" y1="255" x2="730" y2="180"/><line x1="530" y1="255" x2="730" y2="240"/>
+      </g>
+
+      <!-- Input nodes -->
+      <g fill="#FFFFFF" stroke="#0d9488" stroke-width="1.5">
+        <circle cx="110" cy="120" r="16"/><circle cx="110" cy="180" r="16"/><circle cx="110" cy="240" r="16"/><circle cx="110" cy="300" r="16"/>
+      </g>
+      <g font-family="Inter" font-size="10" fill="#115e59" text-anchor="middle">
+        <text x="110" y="124">x1</text><text x="110" y="184">x2</text><text x="110" y="244">x3</text><text x="110" y="304">x4</text>
+      </g>
+
+      <!-- Hidden 1 nodes -->
+      <g fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5">
+        <circle cx="320" cy="110" r="14"/><circle cx="320" cy="160" r="14"/><circle cx="320" cy="210" r="14"/><circle cx="320" cy="260" r="14"/><circle cx="320" cy="310" r="14"/>
+      </g>
+
+      <!-- Hidden 2 nodes -->
+      <g fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5">
+        <circle cx="530" cy="135" r="14"/><circle cx="530" cy="195" r="14"/><circle cx="530" cy="255" r="14"/>
+      </g>
+
+      <!-- Output nodes -->
+      <g fill="#FFFFFF" stroke="#b45309" stroke-width="1.5">
+        <circle cx="730" cy="180" r="16"/><circle cx="730" cy="240" r="16"/>
+      </g>
+      <g font-family="Inter" font-size="10" fill="#92400e" text-anchor="middle">
+        <text x="730" y="184">y1</text><text x="730" y="244">y2</text>
+      </g>
+
+      <!-- Annotation: layer operation -->
+      <line x1="60" y1="345" x2="780" y2="345" stroke="#71717a" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="410" y="365" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#37352F">each layer:  z = W a_prev + b,  a = phi(z)</text>
+    </svg>
+    <figcaption>Each circle is a neuron, each edge a weight. The signal flows left to right at inference time; gradients flow right to left during training. Width (neurons per layer) controls capacity within a layer; depth (number of layers) controls compositional capacity across layers. The universal approximation theorem says one hidden layer of sufficient width is enough in principle; depth is what makes it practical to fit on a finite dataset.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The architecture is a directed acyclic graph in this case (a strict feedforward MLP); convolutional and transformer architectures share the layered structure but constrain the connectivity. Every edge is a parameter to be learned, and the total parameter count for this small network is already $4 \times 5 + 5 \times 3 + 3 \times 2 = 41$ weights plus $5 + 3 + 2 = 10$ biases, a hint of how quickly parameters accumulate. The non-linearity sits between layers, not at the inputs or outputs (except where the output activation matches the loss); without it the entire stack collapses to a single linear map.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The perceptron and what it cannot do</h3>
+
+  <p>Rosenblatt's <strong>perceptron</strong> (1957) is the simplest artificial neuron. Given a feature vector $x \in \mathbb{R}^d$, a weight vector $w \in \mathbb{R}^d$, and a scalar bias $b$, it predicts a binary class by</p>
+  $$y = \operatorname{sign}(w^T x + b).$$
+  <p>Training is a stochastic update rule: for each misclassified example $(x_i, y_i)$, set $w \leftarrow w + \eta\, y_i\, x_i$ and $b \leftarrow b + \eta\, y_i$, where $\eta$ is the learning rate. The rule provably converges in finite steps whenever the classes are linearly separable. The catch is the if. Minsky and Papert's 1969 monograph showed that the exclusive-or function (XOR), which returns 1 iff exactly one of two binary inputs is 1, is not linearly separable: no straight line in the input plane puts the two positive points $(0,1)$ and $(1,0)$ on the same side and the two negative points $(0,0)$ and $(1,1)$ on the other. The perceptron cannot learn XOR. The observation cooled neural-network research for a decade until backpropagation made multi-layer training tractable.</p>
+
+  <p>The XOR counterexample is not a quirk; it is the entire reason hidden layers exist. A second layer can compose two half-planes (one for "x1 OR x2", another for "NOT (x1 AND x2)") into the XOR region. The non-linearity between layers is what lets the composition do something a single linear map cannot.</p>
+
+  <div class="callout insight">
+    <span class="tag">The geometric intuition</span>
+    A single neuron with a linear pre-activation and a step function carves the input space with one hyperplane. Two neurons carve it with two hyperplanes, which can isolate a strip or a wedge. A hidden layer of $k$ neurons can carve up to $\binom{k}{d}$ polygonal regions in $\mathbb{R}^d$, and a second hidden layer can take linear combinations of those region indicators. Depth, not width, is what lets the network build hierarchical concepts: edges out of pixels, parts out of edges, objects out of parts. The XOR problem is the smallest non-trivial instance of this hierarchy, and the proof of concept for everything that followed.
+  </div>
+
+  <p>One reason XOR-style examples are pedagogically valuable is that they isolate the role of the activation function. Remove the non-linearity from a multilayer perceptron and the composition $W^{(L)} \cdots W^{(2)} W^{(1)} x$ collapses to a single linear map $W^* x$ regardless of depth. Every additional layer is wasted parameters. The activation is the only ingredient in the recipe that prevents this collapse, which is why a great deal of practical effort goes into picking the right one.</p>
+
+  <h3>From perceptron to multilayer perceptron</h3>
+
+  <p>A <strong>multilayer perceptron</strong> (MLP) replaces the single perceptron with a stack of layers. Layer $\ell$ takes the activation $a^{(\ell-1)}$ of the previous layer, applies an affine map with weight matrix $W^{(\ell)}$ and bias vector $b^{(\ell)}$, and passes the result through a non-linearity $\phi^{(\ell)}$:</p>
+  $$z^{(\ell)} = W^{(\ell)} a^{(\ell-1)} + b^{(\ell)}, \qquad a^{(\ell)} = \phi^{(\ell)}(z^{(\ell)}).$$
+  <p>The input layer is $a^{(0)} = x$ and the output layer is $\hat{y} = a^{(L)}$. The <strong>universal approximation theorem</strong> (Cybenko 1989, Hornik 1991) states that an MLP with a single hidden layer and any non-polynomial activation can approximate any continuous function on a compact subset of $\mathbb{R}^d$ to arbitrary precision, given enough hidden units. The theorem is an existence result; it does not say how many units are needed, nor whether gradient descent can find them. In practice, depth (many layers of moderate width) is much more parameter-efficient than width (one very wide layer), which is why deep networks dominate.</p>
+
+  <p>The depth-versus-width trade-off is the source of the term "deep learning". A wide single-hidden-layer network needs exponentially many units to approximate functions that a deeper but narrower network represents with linearly many. Intuitively, depth allows the network to construct features hierarchically: low-level features in the early layers, mid-level concepts in the middle, task-specific abstractions near the output. Width, by contrast, only ever adds more competing representations at a single level of abstraction. Empirically, gradient descent finds good solutions much more reliably in deep networks than in equally over-parameterised wide ones, which is the practical consequence the theorem fails to predict.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why "MLP" and "feedforward network" are the same thing</span>
+    The literature uses several near-synonyms. A <strong>feedforward network</strong> is any network where the connectivity is a directed acyclic graph (no recurrent connections). A <strong>multilayer perceptron</strong> is a feedforward network where every layer is fully connected (every neuron in layer $\ell-1$ feeds every neuron in layer $\ell$). A <strong>dense network</strong> is the same thing. A <strong>fully connected network</strong> is the same thing again. Convolutional and transformer networks are also feedforward but are not MLPs because their connectivity is constrained. When a paper says "MLP", it almost always means "two or three fully connected layers tacked onto the end of a richer architecture to produce the final prediction".
+  </div>
+
+  <h3>Tensors: the data structure</h3>
+
+  <p>Deep learning code operates on <strong>tensors</strong>, the generalisation of scalars, vectors, and matrices to arbitrary numbers of indices. A scalar is a zero-order tensor (no indices, a single number). A vector is a first-order tensor (one index, a one-dimensional array). A matrix is a second-order tensor (two indices, rows and columns). A colour image is a third-order tensor (height, width, channel). A minibatch of images is a fourth-order tensor (batch, height, width, channel). A minibatch of video clips is a fifth-order tensor. The choice of which axis represents which dimension is a convention enforced by the framework (PyTorch's default is batch-first; TensorFlow can be configured either way), and a large fraction of debugging time goes into shape mismatches. The forward pass of an MLP is a sequence of tensor contractions: <code>z = a @ W.T + b</code> in PyTorch-style notation.</p>
+
+  <p>The reason tensors deserve a name of their own (rather than being treated as nested arrays) is that all the operations the network performs (matrix multiplication, convolution, attention, softmax) are tensor operations with well-defined gradients. Modern frameworks treat a tensor as the pair of a data buffer and a computation graph node, so that calling <code>.backward()</code> on a loss tensor at the end of the forward pass walks the graph in reverse and accumulates gradients into every parameter tensor that contributed. The same primitive that lets a researcher prototype a new layer in five lines of Python lets a production trainer parallelise the forward and backward passes across a cluster of GPUs without changing the model code. The tensor abstraction is the bridge between "the maths in the paper" and "the system that fits a hundred-billion-parameter model".</p>
+
+  <h3>Activation functions</h3>
+
+  <p>The non-linearity between layers is called an <strong>activation function</strong>. Four families dominate. The <strong>sigmoid</strong> squashes any real input into $(0, 1)$:</p>
+  $$\sigma(z) = \frac{1}{1 + e^{-z}}.$$
+  <p>It was the standard hidden-layer activation in the 1990s and is still the natural choice for binary output layers because $\sigma(z)$ is interpretable as a probability. Inside hidden layers it has been displaced by ReLU because of the <strong>vanishing-gradient problem</strong>: $\sigma'(z) = \sigma(z)(1 - \sigma(z))$ is at most $0.25$ at $z = 0$ and decays exponentially as $|z|$ grows, so gradients passed through a stack of sigmoids shrink by a factor of at least four per layer and effectively vanish after six or seven, stalling learning in the early layers.</p>
+
+  <p>The <strong>hyperbolic tangent</strong> $\tanh(z)$ is a rescaled sigmoid mapping to $(-1, 1)$. Its derivative reaches one at zero and is symmetric about zero, which usually trains better than the sigmoid because activations have mean zero rather than mean $0.5$. It suffers the same vanishing-gradient problem in deep networks.</p>
+
+  <p>The <strong>rectified linear unit</strong> (ReLU) is the current default for hidden layers:</p>
+  $$\operatorname{ReLU}(z) = \max(0, z).$$
+  <p>Its derivative is $1$ for $z > 0$ and $0$ for $z < 0$, so gradients do not vanish through positive activations no matter how deep the network. ReLU has its own failure mode, the <strong>dying-ReLU problem</strong> or <strong>dead-neuron problem</strong>: a neuron whose pre-activation is consistently negative across the training set receives zero gradient and stops updating forever. Variants address this. <strong>Leaky ReLU</strong> replaces the zero slope below the origin with a small positive slope $\alpha$ (typically $0.01$):</p>
+  $$\operatorname{LeakyReLU}(z) = \begin{cases} z & z \ge 0, \\ \alpha z & z < 0. \end{cases}$$
+  <p><strong>Parametric ReLU</strong> (PReLU) makes $\alpha$ a learned parameter. <strong>Exponential linear unit</strong> (ELU) replaces the negative side with $\alpha(e^z - 1)$, which is smooth at the origin and bounded below. <strong>GELU</strong> (Gaussian Error Linear Unit) is a smooth approximation to ReLU used in most modern transformers. The empirical differences between them are small, and most production networks still use plain ReLU or GELU.</p>
+
+  <p>The <strong>softmax</strong> activation is the standard output for multi-class classification with $K$ classes. Given a pre-activation vector $z \in \mathbb{R}^K$, it returns a probability distribution:</p>
+  $$\operatorname{softmax}(z)_k = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}}.$$
+  <p>The exponential ensures positivity, the normalisation ensures the outputs sum to one. Numerically, softmax is computed after subtracting the maximum of $z$ to prevent overflow; the result is mathematically identical. Softmax has a single hyperparameter, the temperature $T$, which divides the pre-activations before the exponential: low temperatures sharpen the distribution toward a one-hot output, high temperatures flatten it toward uniform. Temperature scaling is the standard technique for calibrating a classifier's output probabilities post hoc, distinct from the architecture itself.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why "saturate" matters more than it sounds</span>
+    A saturated activation is one operating in a region where its derivative is near zero (a sigmoid at $|z| > 5$, a tanh at $|z| > 3$, a ReLU at $z < 0$). The local gradient is the activation's derivative, and the global gradient passed back through that neuron is multiplied by it. A saturated neuron transmits a near-zero gradient regardless of the upstream signal. Whole layers can saturate together if the weight initialisation is wrong or if pre-activations drift during training. The diagnostic during a difficult training run is always the same: plot a histogram of pre-activations at each layer. If most are in the saturation zone, the training problem is not the optimiser or the learning rate; it is that no gradient is reaching the early layers.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Activation choice as a design decision</span>
+    The default recipe in 2026 is ReLU (or GELU) in hidden layers, sigmoid in binary output layers, softmax in multi-class output layers, and linear in regression output layers. Departures from this recipe should be justified. Sigmoid or tanh hidden layers in deep networks are almost always a bug carried over from older tutorials. A linear hidden layer is a sign that someone forgot to add the activation. Two ReLUs stacked back-to-back with no intervening linear map is the same as one ReLU. The defaults are defaults because they work; novelty in activation choice is rarely where wins come from.
+  </div>
+
+  <h3>Loss functions</h3>
+
+  <p>The <strong>loss function</strong> measures the discrepancy between a prediction $\hat{y}$ and a ground-truth label $y$. The loss must be differentiable in the parameters and, ideally, convex in $\hat{y}$ given $y$. For <strong>regression</strong>, the default is <strong>mean squared error</strong>:</p>
+  $$\mathcal{L}_{\text{MSE}} = \frac{1}{n} \sum_{i=1}^{n} (\hat{y}_i - y_i)^2.$$
+  <p>MSE assumes Gaussian residuals; it is sensitive to outliers because the squared term grows quadratically with the residual. Robust alternatives (mean absolute error, Huber loss) trade sensitivity for less efficient gradients near the optimum.</p>
+
+  <p>For <strong>binary classification</strong>, the loss is <strong>binary cross-entropy</strong>, the negative log-likelihood under a Bernoulli model:</p>
+  $$\mathcal{L}_{\text{BCE}} = -\frac{1}{n} \sum_{i=1}^{n} \big[ y_i \log \hat{y}_i + (1 - y_i) \log(1 - \hat{y}_i) \big],$$
+  <p>where $\hat{y}_i = \sigma(z_i)$ is the sigmoid of the final-layer pre-activation. BCE penalises confident wrong predictions much more harshly than MSE would; a prediction of $0.99$ for a true class of $0$ contributes $\log(0.01) \approx -4.6$ to the loss.</p>
+
+  <p>For <strong>multi-class classification</strong> with $K$ classes, the loss is <strong>categorical cross-entropy</strong>:</p>
+  $$\mathcal{L}_{\text{CE}} = -\frac{1}{n} \sum_{i=1}^{n} \sum_{k=1}^{K} y_{ik} \log \hat{y}_{ik},$$
+  <p>where $y_{ik}$ is the one-hot indicator for class $k$ on example $i$ and $\hat{y}_{ik}$ is the softmax output. Equivalently, only the term for the true class contributes, so the loss reduces to $-\log \hat{y}_{i, y_i}$ per example. Softmax with cross-entropy is the standard output combination because the gradient with respect to the pre-activation simplifies cleanly to $\hat{y} - y$, the same form as the linear-regression and logistic-regression gradients.</p>
+
+  <div class="callout insight">
+    <span class="tag">Loss as the maximum-likelihood lens</span>
+    MSE, BCE, and categorical cross-entropy are not arbitrary choices; each is the negative log-likelihood under a particular probabilistic model of the target. MSE corresponds to a Gaussian model with constant variance. BCE corresponds to a Bernoulli model. Categorical cross-entropy corresponds to a multinomial model. Choosing the loss is therefore equivalent to choosing what kind of noise you assume the labels carry. The same lens connects neural networks back to generalised linear models, which are exactly this maximum-likelihood machinery with a linear link function and a single layer. A two-layer MLP with a sigmoid output and BCE loss is a GLM in which the linear link function has been replaced by a learned non-linear feature map.
+  </div>
+
+  <h3>Initialisation: where training starts matters</h3>
+
+  <p>A neural network begins training with its weights set to random values, and the variance of that initialisation matters more than it might appear. If the weights are too large, pre-activations explode through the layers and the activations saturate (sigmoid or tanh) or shoot off to infinity (ReLU); if they are too small, pre-activations collapse to zero and the network produces a near-constant output regardless of input. <strong>Xavier initialisation</strong> (Glorot and Bengio, 2010) chooses the variance of each weight to keep the variance of pre-activations roughly constant across layers under a tanh non-linearity:</p>
+  $$W_{ij} \sim \mathcal{N}\!\left(0, \frac{2}{n_{\text{in}} + n_{\text{out}}}\right).$$
+  <p>For ReLU activations, <strong>He initialisation</strong> doubles the variance to compensate for the zero half of the activation:</p>
+  $$W_{ij} \sim \mathcal{N}\!\left(0, \frac{2}{n_{\text{in}}}\right).$$
+  <p>Biases are typically initialised to zero, sometimes with a small positive offset for ReLU layers to encourage units to start active. Modern frameworks set sensible defaults automatically, but a mismatched initialiser is one of the more common causes of an apparently inexplicable training failure on a custom architecture.</p>
+
+  <h3>Forward propagation worked through</h3>
+
+  <p>The <strong>forward pass</strong> computes the network's prediction by chaining the layer equations from input to output. Consider a two-layer network with input $x \in \mathbb{R}^4$, one hidden layer of width 3 with ReLU activation, and a binary sigmoid output:</p>
+  $$z^{(1)} = W^{(1)} x + b^{(1)}, \quad a^{(1)} = \operatorname{ReLU}(z^{(1)}),$$
+  $$z^{(2)} = W^{(2)} a^{(1)} + b^{(2)}, \quad \hat{y} = \sigma(z^{(2)}).$$
+  <p>The shapes are $W^{(1)} \in \mathbb{R}^{3 \times 4}$, $b^{(1)} \in \mathbb{R}^3$, $W^{(2)} \in \mathbb{R}^{1 \times 3}$, $b^{(2)} \in \mathbb{R}$. A minibatch of $n$ examples is processed simultaneously by stacking inputs row-wise into a matrix $X \in \mathbb{R}^{n \times 4}$ and computing $Z^{(1)} = X W^{(1)T} + b^{(1)}$, exploiting the broadcast of $b^{(1)}$ across the batch dimension. This is what makes neural-network training tractable on GPUs: the entire batch is a single matrix multiplication.</p>
+
+  <p>The arithmetic is mechanical but worth doing once by hand. Suppose $x = (2, 4, 6, 8)^T$ and the first row of $W^{(1)}$ is $(0.1, 0.2, 0.3, 0.4)$ with $b^{(1)}_1 = 0$. Then $z^{(1)}_1 = 0.1 \cdot 2 + 0.2 \cdot 4 + 0.3 \cdot 6 + 0.4 \cdot 8 = 6.0$, and $a^{(1)}_1 = \operatorname{ReLU}(6.0) = 6.0$. The same calculation runs for every neuron in the hidden layer in parallel, and then the output layer composes them into $\hat{y}$. For a binary classification with sigmoid output and the same hidden activations $a^{(1)} = (6, 4, 2)^T$ and $W^{(2)} = (0.1, 0.2, 0.3)$, $b^{(2)} = 0$, we have $z^{(2)} = 0.6 + 0.8 + 0.6 = 2.0$ and $\hat{y} = \sigma(2.0) \approx 0.881$. A confident positive prediction.</p>
+
+  <h3>Backpropagation: the chain rule done carefully</h3>
+
+  <p><strong>Backpropagation</strong> is the application of the chain rule to compute the gradient of the loss with respect to every parameter in the network. For the two-layer net above with BCE loss, define the upstream gradient at the output as</p>
+  $$\delta^{(2)} = \frac{\partial \mathcal{L}}{\partial z^{(2)}} = \hat{y} - y,$$
+  <p>using the softmax-plus-cross-entropy (or sigmoid-plus-BCE) simplification. The gradients with respect to the output-layer parameters follow directly:</p>
+  $$\frac{\partial \mathcal{L}}{\partial W^{(2)}} = \delta^{(2)} \cdot a^{(1)T}, \qquad \frac{\partial \mathcal{L}}{\partial b^{(2)}} = \delta^{(2)}.$$
+  <p>To propagate the gradient back to the hidden layer, multiply by the transpose of $W^{(2)}$ and the local derivative of the activation:</p>
+  $$\delta^{(1)} = (W^{(2)T} \delta^{(2)}) \odot \phi'(z^{(1)}),$$
+  <p>where $\odot$ is element-wise multiplication and $\phi'(z^{(1)})$ is the derivative of ReLU, a mask of ones where $z^{(1)} > 0$ and zeros elsewhere. The gradients with respect to the hidden-layer parameters then follow the same template:</p>
+  $$\frac{\partial \mathcal{L}}{\partial W^{(1)}} = \delta^{(1)} \cdot x^T, \qquad \frac{\partial \mathcal{L}}{\partial b^{(1)}} = \delta^{(1)}.$$
+  <p>The recursion generalises to any depth: at each layer, multiply by the transpose of the layer's weight matrix and the local derivative of its activation. Modern frameworks (PyTorch, TensorFlow, JAX) compute this automatically via reverse-mode automatic differentiation; the analyst writes only the forward pass. The complexity argument behind reverse-mode autodiff is worth stating once. Forward-mode differentiation computes a directional derivative in one pass, which costs the same as one extra forward pass per parameter and is therefore $O(P)$ per parameter, $O(P^2)$ overall. Reverse-mode computes the gradient of a scalar loss with respect to all parameters in a single backward pass, which is $O(P)$ overall. For a network with millions of parameters and one scalar loss, reverse-mode is millions of times faster. This is why every deep-learning framework uses reverse-mode autodiff and why backpropagation is, computationally, a special case of a much older trick from numerical analysis.</p>
+
+  <p>The gradient is averaged over the minibatch when computing $\partial \mathcal{L}/\partial W^{(\ell)}$, because the loss itself is a mean over examples. In code, this is handled automatically by accumulating the per-example outer products $\delta_i \cdot a_i^T$ into a single matrix and dividing by the batch size $B$. The bias gradient is the mean of $\delta_i$ across the batch. The whole backward pass for a fully connected layer is then a single matrix multiplication for the weight gradient, a sum-reduction for the bias gradient, and a matrix multiplication by $W^T$ to produce the upstream gradient for the next layer back. The arithmetic intensity of these operations is high, which is why GPUs accelerate them so effectively.</p>
+
+  <div class="callout insight">
+    <span class="tag">Backprop is one algorithm, not many</span>
+    Textbook treatments of backpropagation sometimes give the impression that each layer type needs its own derivation. They do not. Reverse-mode automatic differentiation needs three things at each operation: the forward output (which the framework caches), the local Jacobian (a derivative formula provided by the operation's author), and the upstream gradient. Composition of these via the chain rule then walks the entire graph in reverse. From the user's perspective, building a new layer means writing a forward function in tensor operations the framework already knows how to differentiate; the backward pass is generated automatically. This is why the leap from a two-layer MLP to a transformer requires no new training mathematics.
+  </div>
+
+  <h3>Gradient descent and its variants</h3>
+
+  <p>Once gradients are computed, an <strong>optimiser</strong> uses them to update the parameters. <strong>Vanilla gradient descent</strong> (also called batch gradient descent) updates the parameters using the gradient computed across the entire training set:</p>
+  $$\theta \leftarrow \theta - \eta\, \nabla_\theta \mathcal{L}(\theta).$$
+  <p>It is exact in the sense that the gradient is the true gradient of the empirical risk, but it requires a full pass through the dataset per update, which is infeasible on modern datasets.</p>
+
+  <p><strong>Stochastic gradient descent</strong> (SGD) replaces the full-batch gradient with an estimate computed from a single randomly chosen example:</p>
+  $$\theta \leftarrow \theta - \eta\, \nabla_\theta \mathcal{L}_i(\theta).$$
+  <p>The estimate is unbiased but very noisy. The noise has a regularising effect (it helps escape shallow local minima) but the update path zig-zags and the learning rate has to be small.</p>
+
+  <p><strong>Mini-batch gradient descent</strong> is the practical compromise. The gradient is computed on a random subset of $B$ examples (typically $32$ to $1024$):</p>
+  $$\theta \leftarrow \theta - \eta\, \frac{1}{B} \sum_{i \in \mathcal{B}} \nabla_\theta \mathcal{L}_i(\theta).$$
+  <p>The variance of the estimate falls as $1/B$, the GPU's parallel hardware is fully utilised, and the noise is enough to retain SGD's regularising effect. Every modern training pipeline is mini-batch by default; the term "SGD" in current practice almost always means mini-batch SGD.</p>
+
+  <p>The <strong>learning rate</strong> $\eta$ is the single most important hyperparameter in any neural-network training run. Too small and training converges so slowly that it stalls before reaching a useful solution; too large and the optimiser overshoots the minimum and either oscillates or diverges into NaNs. The standard production setup uses a <strong>learning-rate schedule</strong>: a small warmup phase that ramps the learning rate up linearly from zero over the first few hundred or thousand steps (preventing early divergence on freshly initialised weights), followed by a cosine or step decay that anneals the rate down as training progresses. Modern code rarely treats the learning rate as a single number; it is a curve over training steps.</p>
+
+  <p>Vanilla SGD struggles in narrow ravines (high curvature in one direction, low in another) and on noisy gradients. Two refinements address this. <strong>Momentum</strong> maintains an exponentially weighted moving average $v_t$ of past gradients and steps in that direction:</p>
+  $$v_t = \beta v_{t-1} + (1 - \beta) \nabla_\theta \mathcal{L}_t, \qquad \theta \leftarrow \theta - \eta\, v_t.$$
+  <p>With $\beta \approx 0.9$, momentum smooths the trajectory and accelerates progress along directions of consistent gradient. <strong>RMSprop</strong> divides the gradient by a moving average of its recent magnitudes, giving each parameter an effective learning rate that adapts to the local curvature.</p>
+
+  <p><strong>Adam</strong> (Kingma and Ba, 2014) combines momentum and RMSprop into a single optimiser. It maintains two moving averages, the first moment $m_t$ (momentum) and the second moment $v_t$ (RMSprop), with bias correction for the early steps:</p>
+  $$m_t = \beta_1 m_{t-1} + (1 - \beta_1) g_t, \qquad v_t = \beta_2 v_{t-1} + (1 - \beta_2) g_t^2,$$
+  $$\hat{m}_t = \frac{m_t}{1 - \beta_1^t}, \qquad \hat{v}_t = \frac{v_t}{1 - \beta_2^t},$$
+  $$\theta \leftarrow \theta - \eta\, \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon}.$$
+  <p>The default hyperparameters $\beta_1 = 0.9$, $\beta_2 = 0.999$, $\epsilon = 10^{-8}$ work well across a remarkable range of problems, which is why Adam is the default optimiser in most deep-learning code today. AdamW, a variant that decouples weight decay from the gradient step, is the current best practice for large language models.</p>
+
+  <div class="callout insight">
+    <span class="tag">Adam is the default, not always the best</span>
+    For most workloads, Adam (or AdamW) with default hyperparameters is the sensible starting optimiser. Two exceptions are worth knowing. Vision models trained on large image datasets often generalise better with SGD plus momentum, even though Adam reaches a lower training loss; the noise structure of SGD acts as an additional regulariser. Models with sparse gradients (very large embedding tables) sometimes benefit from sparse-aware variants such as Adagrad or LazyAdam. The right intuition is that an adaptive optimiser is matching learning rates to per-parameter curvature, which is helpful when that curvature varies wildly and unhelpful when uniform updates would generalise better. Try Adam first, then escalate only when the validation loss plateaus.
+  </div>
+
+  <h3>Regularisation</h3>
+
+  <p>An MLP with enough parameters can memorise the training set verbatim. <strong>Regularisation</strong> is the collection of techniques that constrain capacity to improve generalisation. <strong>Weight decay</strong> adds an $L^2$ penalty on the weights to the loss:</p>
+  $$\mathcal{L}_{\text{reg}} = \mathcal{L} + \lambda \sum_{\ell} \|W^{(\ell)}\|_F^2.$$
+  <p>It is mathematically identical to $L^2$ regularisation in linear regression and discourages any single weight from becoming large. Typical values of $\lambda$ are $10^{-5}$ to $10^{-3}$.</p>
+
+  <p><strong>Dropout</strong> (Srivastava et al., 2014) sets a random subset of activations to zero at each training step, with each unit retained independently with probability $p$ (typically $0.5$ for hidden layers, $0.8$ for inputs). The remaining activations are rescaled by $1/p$ so the expected value is unchanged. The effect is to train an exponentially large ensemble of subnetworks that share parameters, which prevents co-adaptation of features. Dropout is disabled at test time and replaced by the deterministic forward pass.</p>
+
+  <p><strong>Early stopping</strong> monitors the validation loss during training and halts when it stops improving for a patience window. The final model is the one at the best validation checkpoint, not the last one. It is the simplest regulariser to implement and one of the most reliably effective, because it picks the moment at which the model has learned the signal but not yet started memorising the noise.</p>
+
+  <p><strong>Batch normalisation</strong> (Ioffe and Szegedy, 2015) normalises each layer's pre-activations across the minibatch to have zero mean and unit variance, then applies learnable per-channel scale and shift parameters $\gamma$ and $\beta$:</p>
+  $$\hat{z} = \frac{z - \mu_{\mathcal{B}}}{\sqrt{\sigma_{\mathcal{B}}^2 + \epsilon}}, \qquad z' = \gamma \hat{z} + \beta.$$
+  <p>The batch statistics are replaced by running averages at inference time. Batch norm stabilises training, allows higher learning rates, and has a mild regularising effect through the noise in the batch statistics. It is the default in convolutional networks. Layer normalisation (which normalises across features within an example rather than across the batch) is the default in transformers, because batch norm interacts badly with sequence models.</p>
+
+  <p><strong>Data augmentation</strong> is the regularisation technique that is almost always the most powerful in practice, particularly for images and audio. Random crops, horizontal flips, rotations, colour jitter, mixup, and cutout extend the effective training set by perturbing each example into many plausible variants. The augmentations encode the invariances the model should learn (a cat is still a cat after a small rotation), and the resulting noise prevents the network from latching onto incidental properties of the training images. For tabular data the augmentation options are thinner, which is one reason gradient-boosted trees remain competitive there. The general principle generalises beyond images: any transformation under which the label is invariant is fair game for augmentation.</p>
+
+  <div class="callout insight">
+    <span class="tag">Hyperparameters that actually matter</span>
+    A small handful of hyperparameters explain almost all of the variance in production neural-network performance. In rough order of importance: the learning rate and its schedule, the batch size, the model size (depth and width), the regularisation strength (weight decay coefficient or dropout probability), and the number of training steps. Activation choice, optimiser variant, and initialisation scheme matter much less once the first list is in a reasonable range. A new project's first week should be spent searching the high-impact axes, not tweaking the low-impact ones. This is the practical content that the hyperparameter-tuning lecture builds out in detail.
+  </div>
+
+  <h3>Black-box behaviour and the interpretation bridge</h3>
+
+  <p>A logistic regression with thirty features is interpretable in the sense that the coefficient on every feature is a number a human can examine, sign-check, and reason about. A neural network with a hundred thousand parameters has no such single-number summary. The intermediate activations are linear combinations of the inputs passed through non-linearities; they correspond to features the network found useful but were not given names by anyone. This is the "black box" framing that has dogged deep learning since its commercial adoption. The response is not to deny the framing but to bridge it: a deep model in production is paired with a layer of <strong>post-hoc interpretation</strong> tools that produce localised explanations of individual predictions and global summaries of feature importance. Shapley-value-based methods, gradient-times-input saliency maps, partial dependence plots, integrated gradients, and counterfactual explanations are all attempts to recover something a human can audit from a function the human cannot read directly. None of them turn the network into a logistic regression; they make the network's predictions defensible by attaching a second model (the explainer) that approximates the local behaviour of the first. The interpretation problem is the subject of a later lecture in this course; the relevant point here is that any deep model destined for production has to be designed alongside its explanation layer, not have one bolted on afterwards.</p>
+
+  <h3>Putting the loop together</h3>
+
+  <p>The full training procedure for a supervised network can be stated in eight lines. Initialise the parameters by an appropriate scheme. Draw a minibatch of examples. Run the forward pass to produce predictions. Evaluate the loss. Backpropagate to produce gradients with respect to every parameter. Apply an optimiser update. Repeat until the validation loss has not improved for a patience window. Restore the best validation checkpoint as the final model. Everything else (architectural choices, regularisation, learning-rate schedules, batch sizes, hardware) is configuration of this loop, not a change to its structure.</p>
+
+  <p>That eight-line loop is the same whether the model has fifty parameters or fifty billion. It is the same whether the input is a fixed-length feature vector, an image, a sentence, an audio waveform, a video, a protein sequence, or a graph. What changes between use cases is the loss function, the layer types, the optimiser hyperparameters, the regularisers, and the data pipeline. The conceptual price of admission is therefore much smaller than the visible breadth of the field suggests: once the loop is understood, every paper is a variation on one of these slots.</p>
+
+  <div class="callout insight">
+    <span class="tag">Compute economics</span>
+    Three resources bound deep-learning workloads in practice: data, compute, and engineering effort. Compute is measured in floating-point operations (FLOPs) or in GPU-hours; a single A100 GPU performs roughly $3 \times 10^{14}$ FLOPs per second at half precision. A model with $P$ parameters trained on $T$ tokens consumes approximately $6PT$ FLOPs for a transformer forward-plus-backward pass under standard assumptions. The 1B-parameter model on 100B tokens that a regional bank might fine-tune for fraud detection is therefore $6 \times 10^{20}$ FLOPs, roughly a week on a single A100. The 70B-parameter foundation models from frontier labs sit at $10^{24}$ FLOPs and require months on a multi-thousand-GPU cluster. Knowing where on this scale a use case sits is the first step in deciding whether to build, fine-tune, or buy.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Which regulariser to reach for first</span>
+    Faced with an overfitting network, the order to try regularisers in is approximately: more data and data augmentation first, then early stopping, then weight decay, then dropout, then batch or layer normalisation. The order is roughly the inverse of how much each technique distorts the loss surface. More data does not change the loss, only the empirical risk it approximates. Early stopping picks a point along the existing trajectory. Weight decay adds a smooth penalty. Dropout and batch norm change the forward pass itself. The further down the list a fix sits, the harder it is to reason about why the model behaves the way it does, which matters at validation time.
+  </div>
+
+  <h3>Architectural specialisations as inductive biases</h3>
+
+  <p>Three architectural families dominate modern deep learning, each chosen to match the structure of its data. <strong>Convolutional neural networks</strong> (CNNs) share weights across spatial positions: the same filter is applied at every location in an image, which encodes the inductive bias that visual features are translation-equivariant. A pixel pattern that identifies an eye at the top-left of an image should also identify an eye at the bottom-right. Weight sharing reduces the parameter count by orders of magnitude relative to a fully connected network on the same input, which is what made it practical to train on raw pixels in the first place. Pooling layers add a soft locality bias by aggregating neighbouring activations, and the depth of the stack lets the receptive field grow from individual pixels at the bottom to whole-image features at the top.</p>
+
+  <p><strong>Recurrent neural networks</strong> (RNNs) share weights across time steps: the same transition is applied at every position in a sequence, encoding the bias that the dynamics generating the sequence are stationary. LSTM and GRU variants add gating to control how much past state to carry forward, alleviating the vanishing-gradient problem on long sequences. RNNs were the dominant architecture for language and time-series modelling until the late 2010s, when transformers displaced them on most tasks for which parallelism over sequence positions was more important than the sequential inductive bias.</p>
+
+  <p><strong>Transformers</strong> replace recurrence with self-attention: each position computes a weighted average of all other positions, with the weights themselves learned from the data. The inductive bias is permutation-equivariance up to positional encoding, with no fixed locality constraint, which makes transformers extremely flexible and extremely data-hungry. The attention operation itself is $O(n^2)$ in the sequence length, which is the binding constraint on context windows in large language models; the techniques used to extend context (sparse attention, sliding windows, low-rank approximations, state-space models) are all attempts to soften that quadratic cost. In all three cases the training recipe (forward pass, loss, backward pass, optimiser) is unchanged; only the layer structure differs. The right way to think about a new architecture is therefore not "what is the magic" but "what is the inductive bias and which data does it match".</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Five failure modes account for almost every neural-network training incident in practice. Each is invisible from the loss curve alone and obvious once diagnosed.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vanishing and exploding gradients</span>
+    A deep network with sigmoid or tanh activations sees its gradients shrink by a factor of at most $0.25$ per layer; after ten layers the early weights effectively stop updating. The mirror failure with poorly initialised weights or unbounded activations is gradient explosion, where the gradient norms grow without limit and training diverges into NaNs. The fixes are structural: ReLU-family activations to prevent vanishing through positive pre-activations, careful initialisation (He initialisation for ReLU, Xavier for tanh) to keep pre-activation variances stable across layers, batch or layer normalisation to keep activations on a controlled scale, and gradient clipping (cap the global gradient norm) to prevent explosion.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Dead ReLUs after a high learning rate</span>
+    A learning rate that is too high in early training can push a ReLU neuron's bias so negative that no input ever activates it again; the neuron is then dead for the rest of training. The diagnostic is a histogram of pre-activations showing a large mass below zero. The fixes are a smaller initial learning rate, a learning-rate warmup that starts small and ramps up over the first thousand steps, or a Leaky ReLU variant that retains a small gradient on the negative side so dead neurons can recover.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Loss decreasing but validation flat</span>
+    Training loss falls while validation loss plateaus or rises. The network is memorising the training set rather than learning a generalisable function. The fixes are the regularisation toolkit: weight decay, dropout, batch norm, early stopping, and (most powerfully) more data or stronger data augmentation. Resist the urge to add more parameters when the model is already overfitting; the cure for overfitting is never more capacity.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Forgotten train and eval modes</span>
+    Dropout and batch norm behave differently at training and inference: dropout zeros activations only during training, batch norm uses batch statistics during training and running averages at inference. Forgetting to switch the model to evaluation mode (calling <code>model.eval()</code> in PyTorch or setting <code>training=False</code> in Keras) before computing validation metrics gives misleading numbers, sometimes flatteringly so. The same bug at deployment gives stochastic predictions for a model that should be deterministic, which usually surfaces as flaky test results in CI.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Reproducibility lost to non-determinism</span>
+    GPU implementations of common operations (matrix multiplication, convolution, dropout) are non-deterministic by default because the order of floating-point additions across parallel threads is not fixed. Two runs with the same seed and the same code produce subtly different weights. For a research paper this is irritating; for a regulated model artefact it is fatal, because the validation team cannot reproduce the candidate model bit-for-bit from the released code and data. The fixes are framework-specific deterministic-mode flags (slower) plus pinning random seeds for Python, NumPy, the framework, and the data loader.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A neural network is an alternating stack of linear maps and non-linearities, trained by gradient descent on a differentiable loss. The perceptron is the atomic unit; the multilayer perceptron is the architecture that gives it the representational capacity of a universal approximator. Tensors are the data structure that lets a minibatch of examples flow through the network as a single matrix multiplication. Activation functions (sigmoid, tanh, ReLU and variants, softmax) supply the non-linearity that prevents the stack from collapsing to a single linear map, with vanishing-gradient and dead-neuron pathologies determining which family is chosen where. Loss functions (MSE for regression, cross-entropy for classification, binary cross-entropy for binary classification) measure the discrepancy that the optimiser tries to minimise. Forward propagation computes the prediction; backpropagation walks the chain rule from the loss back to every parameter; gradient descent with momentum and adaptive learning rates (Adam) takes the step. Regularisation (weight decay, dropout, early stopping, batch norm) controls the trade-off between fitting the training set and generalising. Architectural specialisations (CNNs, RNNs, transformers) are inductive biases that match the structure of images, sequences, and arbitrary sets respectively, but the training recipe inside the loop never changes.</p>
+
+  <p>What this lecture deliberately did not do. It did not derive the universal approximation theorem in full, nor its uncomfortable finite-sample corollary that a network's fitted parameters are not identified by the data the way a GLM's are; <a href="02-universality_and_kan.html">lecture 2</a> takes on both, and closes with Kolmogorov-Arnold networks, a structural alternative that relocates learnable flexibility from weighted edges to learnable edge functions. It did not cover variance reduction across independently seeded fits; <a href="03-ensembling_and_nagging.html">lecture 3</a> develops nagging, the actuarial name for exactly this. It did not cover how high-cardinality categorical covariates or free text get into a network in the first place; <a href="04-tensors_and_embeddings.html">lecture 4</a> and <a href="05-word_embeddings.html">lecture 5</a> develop entity embedding and unsupervised word embedding respectively. And it did not cover the specifics of convolutional, recurrent, or transformer architectures in mechanical detail; lectures <a href="06-convolutional_networks.html">6</a>, <a href="07-recurrent_networks.html">7</a>, and <a href="08-transformers.html">8</a> develop each in turn, with <a href="09-tabular_transformers.html">lecture 9</a> closing the sub-module by adapting attention to ordinary tabular covariate rows. Most importantly, this lecture did not address how to explain a neural network's prediction to a regulator, a customer, or a court. That problem is the subject of <a href="../08_model_interpretation/03-model_agnostic_methods.html">lecture 38 on model-agnostic interpretation</a>, where SHAP, LIME, partial dependence plots, and counterfactual explanations attempt to peel back the black box. They do not turn a neural network into a logistic regression, but they offer enough auditability to make a deep model defensible in many (not all) production settings.</p>
+
+  <p>The next lecture in this sub-module examines what the universal approximation theorem does and does not promise once a network is fitted to a finite, noisy sample rather than approximating a known function exactly. The lectures after that build out the rest of the toolkit: variance reduction through ensembling, representation learning for categorical and text data, and the three major architecture families, convolutional, recurrent, and attention-based, each a re-parameterisation of the linear maps inside a layer to encode the inductive bias a particular data structure, grid, sequence, or set, deserves.</p>
+
+  <p>A short reading map for what this lecture has earned access to. Once the eight-line loop and the activation, loss, optimiser, and regulariser vocabulary are in hand, any neural-network paper or vendor model can be skimmed productively. Skim the abstract for the task and the dataset. Find the architecture diagram and identify which layer types are new. Find the loss function and check it matches the task. Find the optimiser and learning-rate schedule. Find the regularisation. Anything truly novel will sit in one of those slots, and the rest will be the same machinery this lecture has just described.</p>
+
+  <p>One closing observation for the F107 reader. The technology described above is the same machinery that underpins the credit-scoring deep models, fraud-detection systems, document-understanding pipelines, and customer-service routing that an examiner is increasingly likely to ask about. The exam is unlikely to ask for a backpropagation derivation, but it is likely to ask why a regulated bank might prefer a logistic regression over a neural network for a specific use case, or why the supervisor would expect a challenger model alongside any production deep model. The answer in both cases is contained in the audit-surface vignette at the start of this lecture: predictive power is necessary but not sufficient; explainability, reproducibility, and operational resilience are the rest of the bar.</p>
+
+  <p>The PRA's SS1/23 on model risk management is the relevant UK supervisory expectation here, and it applies as much to a deep neural network as to a logistic regression. The standard is not whether the model is interpretable in some absolute sense; it is whether the model risk is identified, measured, monitored, and mitigated through the bank's three lines of defence. A deep model that produces calibrated probabilities, comes with a documented training pipeline, has a challenger model running in parallel, and ships with an explanation layer can meet that bar. A deep model that does none of these things cannot, regardless of how much Gini uplift it shows in a back-test.</p>
+
+  <p>The lectures that follow build the rest of the deep-learning toolkit on top of this foundation. Architectures (CNNs, RNNs, transformers) come first, then training engineering (hyperparameter tuning, regularisation in detail), then interpretation and audit. The vocabulary in this lecture is what makes those later treatments accessible.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the perceptron's prediction rule and explain why it cannot learn the exclusive-or (XOR) function. What architectural change fixes this?</li>
+      <li>Define the universal approximation theorem in one sentence. Why is the theorem not, in practice, a recommendation to use a single very wide hidden layer rather than a deep narrow stack?</li>
+      <li>Write down the formula for the sigmoid activation and its derivative. Explain why the sigmoid is unsuitable as a hidden-layer activation in a network with more than six layers.</li>
+      <li>Give the formulas for mean squared error, binary cross-entropy, and softmax cross-entropy. State which output activation each loss is conventionally paired with.</li>
+      <li>For a two-layer network with input $x$, hidden activation $a^{(1)} = \operatorname{ReLU}(W^{(1)} x + b^{(1)})$, sigmoid output $\hat{y}$, and BCE loss, derive $\partial \mathcal{L}/\partial W^{(1)}$ in terms of the upstream gradient $\delta^{(2)} = \hat{y} - y$.</li>
+      <li>Name three differences between vanilla SGD and Adam. Why has Adam become the default optimiser for most deep-learning applications?</li>
+      <li>Explain why batch normalisation has a mild regularising effect even though its primary purpose is to stabilise training, and name one architecture family (and why) for which layer normalisation is preferred instead.</li>
+      <li>A junior modeller swaps a logistic-regression PD model for a four-layer MLP and reports a Gini uplift of three points. Name three audit-surface concerns a model validator would raise before accepting the change.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 2 (<a href="02-universality_and_kan.html">universality and non-identifiability</a>) examines the limits of the universal approximation theorem on finite data, before the remaining lectures in this sub-module build out ensembling, representation learning, and the CNN, RNN, and transformer architectures. The training loop is unchanged throughout; only the layer structure, and what is learnable, differs.</li>
+      <li><strong>Previous:</strong> Lecture 14 on <a href="../04_unsupervised_learning/02-pca.html">principal component analysis</a> introduced the idea of learning a low-dimensional representation from data; an autoencoder is the neural-network generalisation, with non-linear encoders and decoders that learn whatever representation minimises reconstruction error.</li>
+      <li><strong>Prerequisite:</strong> Statistics lecture 5 on <a href="../../statistics/05-generalised_linear_models.html">generalised linear models</a> derives logistic regression as maximum-likelihood estimation under a Bernoulli model. A binary-classification MLP is exactly that recipe with extra hidden layers in the link function.</li>
+      <li><strong>Tuning:</strong> Lecture 32 on <a href="../06_hyperparameter_tuning/01-tuning_principles.html">hyperparameter tuning principles</a> matters more for neural networks than for any other model class because the search space (architecture, optimiser, learning rate schedule, regularisation strengths) is so large.</li>
+      <li><strong>Interpretation:</strong> Lecture 38 on <a href="../08_model_interpretation/03-model_agnostic_methods.html">model-agnostic interpretation methods</a> addresses the black-box problem this lecture creates: SHAP, LIME, partial dependence, and counterfactuals offer enough audit surface to defend a deep model in many regulated settings.</li>
+      <li><strong>Outside this course:</strong> The ML landscape introduction at <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a> placed deep learning inside the broader machine-learning pipeline and flagged the data, compute, and interpretability costs that this lecture has now made concrete.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Deep learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 21 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

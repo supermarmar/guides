@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LGD risk differentiation: the mixture model build</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>LGD risk differentiation: the mixture model build</h1>
+  <p class="subtitle">Fit the three-component mixture model: two logistic regressions for the binary components (P(Zero), P(Full | not Zero)) and one GLM for the continuous partial-recovery rate. Aggregate via the closed-form composite-LGD formula, plus non-modelled adjustments for debt sale and cost of recoveries. The output is a PiT LGD per facility that ranks loss-severity risk; calibration to LRA and downturn happens in the next lecture.</p>
+  <div class="meta">
+    <span>A-IRB 20 of n &mdash; LGD 5 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Source: <code>05_modelling/lgd/01-model_methodology.md</code>; supplemented from EBA/GL/2017/16 and best ML practice.</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">LGD risk differentiation is the mixture model build. Three regressions are fit in parallel using the per-component feature sets from <a href="19-lgd_feature_engineering.html">lecture 19</a>. Two are logistic regressions on binary outcomes: P(Zero) over the 24-month outcome window, and P(Full | not Zero) over the same window conditional on the obligor having made some recovery. The third is a GLM on the continuous partial-recovery rate over the 60-month outcome window; the standard choice is a Beta-distributed response with a logit link, which respects the [0, 1] bound naturally; some banks use a Gamma-distributed loss-rate with a log link.</p>
+
+  <p>Two non-modelled components round out the composite LGD. The <strong>recovery rates for zero-payers and full-payers</strong> are not regressed: E[r(Zero)] is fixed at 0% by construction, and E[r(Full)] is fixed at 100% undiscounted, adjusted down to roughly 95 to 99% by the discount-rate convention. <strong>Debt-sale proceeds</strong> and <strong>cost of recoveries</strong> are added in at the aggregation step as non-modelled bank-wide adjustments. The composite LGD per facility is then:</p>
+
+  <pre><code>LGD_i  =  1  -  [ R_Zero_i  +  R_Full_i  +  R_Partial_i  +  E[r(Debt Sale)]  -  CoR_i ]
+
+where  R_Zero_i    = P(Zero)_i           * 0%
+       R_Full_i    = (1 - P(Zero)_i)     * P(Full | not Zero)_i * E[r(Full)]
+       R_Partial_i = (1 - P(Zero)_i)     * (1 - P(Full | not Zero)_i) * E[r(Partial)]_i
+</code></pre>
+
+  <p>The same architecture is fit twice: <strong>LGD1</strong> for facilities currently performing (development sample is resolved historical defaults that originated from then-performing facilities), and <strong>LGD2</strong> for facilities currently in default (development sample is resolved historical defaults, with the prediction horizon being the remaining workout). The two models share the mixture architecture but differ in the feature sets (LGD2 admits post-default workout features) and in how the calibrated output is used downstream (LGD1 feeds downturn LGD; LGD2 feeds ELBE).</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The mixture model is what happens when a modeller respects the shape of the data. The empirical LGD distribution has spikes at 0 and 1 and a continuous mass in between. A single regression would average all three regions into one wrong line. The mixture turns each region into its own model. The two binary regressions handle the spikes (probabilities of being in each spike); the continuous regression handles the mass between. The aggregation step puts the three predictions back together into a single LGD using nothing more sophisticated than the law of total expectation. The whole architecture is exactly what the data shape demands, no more, no less.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The single-regression alternative seems simpler but fails materially in practice. A linear regression on realised LGD produces fitted values outside [0, 1]; a Tobit or Beta regression keeps the values in range but cannot capture the bimodality. The Beta distribution alone cannot represent point masses at 0 and 1; only a zero-and-one-inflated Beta (which is itself a mixture) can. The three-component mixture is therefore not an arbitrary modelling choice but the simplest model that respects the empirical distribution. Banks that try to use a single regression find their LGD predictions systematically miss the customers who paid nothing and the customers who paid everything.</p>
+
+  <p>The conditioning order matters for the model's outputs. "Zero-first then Full given not-Zero" is the standard choice (and the one in the wiki and this lecture's diagrams) because the zero-payer outcome is the most distinctive and the easiest to model from pre-default features (collateral type, unsecured flag, exposure size). "Full-first then Zero given not-Full" is the alternative; some banks find it produces a marginally better fit for portfolios where the full-payer outcome is dominant (very secured portfolios). The choice is benchmarked during development and documented; the supervisor's challenge is whether the bank tested both orderings and picked the better-performing one.</p>
+
+  <p>The non-modelled components matter materially in production. <strong>Debt-sale</strong> recoveries are typically 5 to 15% of EAD for unsecured retail, arriving 12 to 36 months after default, and the realised debt-sale rate is volatile. Treating it as a flat adjustment averaged over the development window is the standard simplification; banks with more sophisticated debt-sale modelling (per partner, per contract type, per vintage) can refine the average. <strong>Cost of recoveries</strong> can be 5 to 10% of payments collected post-charge-off (contingency-fee rates negotiated with external agencies). Both must be in the composite-LGD formula because both directly affect the realised LGD; missing them produces a systematically low fitted LGD.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Three regressions run in parallel, then the predictions are combined via the law of total expectation. The diagram below shows the architecture in regression-machinery terms (whereas the diagram in <a href="16-lgd_concept.html">lecture 16</a> showed it in conceptual terms).</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LGD mixture model: three regressions and aggregation">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The three regressions and the aggregation</text>
+
+      <!-- Input: development sample -->
+      <rect x="320" y="50" width="260" height="40" fill="#eff6ff" stroke="#1e3a8a"/>
+      <text x="450" y="68" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Resolved-facility development sample</text>
+      <text x="450" y="82" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">~50k rows; one per resolved default</text>
+
+      <!-- Three branching arrows -->
+      <line x1="450" y1="90" x2="170" y2="120" stroke="#475569"/>
+      <line x1="450" y1="90" x2="450" y2="120" stroke="#475569"/>
+      <line x1="450" y1="90" x2="730" y2="120" stroke="#475569"/>
+
+      <!-- Logistic 1: P(Zero) -->
+      <g>
+        <rect x="40" y="120" width="260" height="120" fill="#fee2e2" stroke="#991b1b" stroke-width="1.3"/>
+        <text x="170" y="142" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">Regression A: P(Zero)</text>
+        <text x="170" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">Logistic regression, logit link</text>
+        <text x="170" y="175" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">target: zero_payer_24m (binary)</text>
+        <text x="170" y="195" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#7f1d1d">logit P(Zero) = &beta;_0 + &Sigma; &beta;_j x_j</text>
+        <text x="170" y="220" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">MLE / IRLS, n &asymp; 50k full sample</text>
+      </g>
+
+      <!-- Logistic 2: P(Full | not Zero) -->
+      <g>
+        <rect x="320" y="120" width="260" height="120" fill="#fee2e2" stroke="#991b1b" stroke-width="1.3"/>
+        <text x="450" y="142" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">Regression B: P(Full | not Zero)</text>
+        <text x="450" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">Logistic regression, logit link</text>
+        <text x="450" y="175" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">target: full_payer_24m | zero_payer = 0</text>
+        <text x="450" y="195" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#7f1d1d">logit P(Full) = &gamma;_0 + &Sigma; &gamma;_j x_j</text>
+        <text x="450" y="220" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">fitted on zero_payer = 0 subset</text>
+      </g>
+
+      <!-- GLM: E[r(Partial)] -->
+      <g>
+        <rect x="600" y="120" width="260" height="120" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="730" y="142" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#134e4a">Regression C: E[r(Partial)]</text>
+        <text x="730" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">Beta GLM, logit link (or Gamma, log)</text>
+        <text x="730" y="175" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">target: partial_recovery_60m &isin; (0, 1)</text>
+        <text x="730" y="195" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#134e4a">logit E[r] = &delta;_0 + &Sigma; &delta;_j x_j</text>
+        <text x="730" y="220" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">fitted on partial-payer subset only</text>
+      </g>
+
+      <!-- Aggregation row -->
+      <line x1="170" y1="240" x2="450" y2="270" stroke="#475569"/>
+      <line x1="450" y1="240" x2="450" y2="270" stroke="#475569"/>
+      <line x1="730" y1="240" x2="450" y2="270" stroke="#475569"/>
+
+      <rect x="60" y="270" width="780" height="80" fill="#fef9c3" stroke="#92400e" stroke-width="1.3"/>
+      <text x="450" y="292" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">Aggregation: composite LGD per facility</text>
+      <text x="450" y="312" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">R_Zero = P(Zero) &times; 0</text>
+      <text x="450" y="326" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">R_Full = (1 - P(Zero)) &times; P(Full) &times; E[r(Full)]</text>
+      <text x="450" y="340" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">R_Partial = (1 - P(Zero)) &times; (1 - P(Full)) &times; E[r(Partial)]</text>
+
+      <!-- Non-modelled adjustments + final LGD -->
+      <rect x="60" y="370" width="780" height="50" fill="#fee2e2" stroke="#991b1b" stroke-width="1.3"/>
+      <text x="450" y="392" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">LGD = 1 - [ R_Zero + R_Full + R_Partial + E[r(Debt Sale)] - CoR ]</text>
+      <text x="450" y="408" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">debt-sale and cost-of-recovery added as non-modelled bank-wide adjustments</text>
+    </svg>
+    <figcaption>The three regressions and the aggregation. Each regression is fit on its own subset of the resolved-facility development sample: A on the full sample, B on the non-zero-payer subset, C on the partial-payer subset. The aggregation step combines the three predictions via the law of total expectation; debt sale and cost of recoveries enter as portfolio-level adjustments.</figcaption>
+  </figure>
+
+  <p>Three properties to internalise. First, the <strong>sample for each regression differs</strong>: A is fit on every resolved facility (full sample); B is fit only on the non-zero-payer subset (about 60 to 80% of the sample in retail unsecured); C is fit only on the partial-payer subset (about 20 to 40%). The further down the chain a regression sits, the smaller its training sample and the more cautious the feature engineering must be. Second, the <strong>aggregation has no free parameters</strong>: once the three regressions have been fit, the composite LGD is deterministic. Modellers cannot tune the aggregation; they can only retrain the components. Third, the <strong>debt-sale and CoR terms appear last and are non-modelled</strong>: they sit outside the per-facility regressions because the bank's debt-sale strategy is portfolio-wide (a forward-flow contract with one external agency, applied to all written-off accounts) rather than facility-specific.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Regression A: P(Zero) via logistic regression</h3>
+
+  <p>Identical machinery to PD's logistic regression (<a href="13-pd_risk_differentiation.html">lecture 13</a>): the logit link plus MLE via IRLS plus the five-criterion iterative refinement (p &lt; 1%, VIF &lt; 2 for LGD, intuitive sign, incremental Gini &ge; 0.25%, coverage across data sources). The target is a binary flag: 1 if the facility recovered nothing in the 24-month outcome window, 0 otherwise. Strong predictors for retail unsecured: collateral type (unsecured = 1 is the strongest single predictor), exposure size at default, age on book at default, bureau score at default, segment / product type, geography.</p>
+
+  <h3>Regression B: P(Full | not Zero) via logistic regression</h3>
+
+  <p>Same logistic machinery as A. The target is a binary flag: 1 if the facility recovered &ge; EAD undiscounted in the 24-month window, 0 otherwise. <strong>The fitting sample is the non-zero-payer subset</strong>: facilities where the zero-payer indicator is 0 (i.e. recoveries &gt; 0). Strong predictors for retail unsecured: payment behaviour in the months immediately before default, balance at default relative to limit (low utilisation at default correlates with the customer being able to pay), age on book.</p>
+
+  <p>The conditioning order ("Zero-first then Full | not Zero") is the standard choice; the alternative ("Full-first then Zero | not Full") is benchmarked during development and the worse-performing one is dropped. The benchmark compares overall LGD prediction accuracy under the two orderings on OOS data; differences are typically small (1 to 3% in relative MPE) but the supervisor will expect the chosen ordering to be the better one.</p>
+
+  <h3>Regression C: E[r(Partial)] via GLM</h3>
+
+  <p>The target is the discounted partial-recovery rate over 60 months, observed only on partial-payers (neither zero nor full). The distribution is bounded in (0, 1) and is typically right-skewed. Two GLM choices:</p>
+
+  <table>
+    <thead>
+      <tr><th>GLM</th><th>Distribution</th><th>Link</th><th>Comment</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Beta GLM</td><td>Beta(a, b) on (0, 1)</td><td>Logit</td><td>The standard. Respects the [0, 1] bound naturally. Maximum-likelihood is well-conditioned. Available in standard packages (statsmodels, R betareg).</td></tr>
+      <tr><td>Gamma GLM</td><td>Gamma on (0, &infin;)</td><td>Log</td><td>Some banks model loss-rate (1 minus recovery rate) as Gamma rather than recovery rate as Beta. Mathematically equivalent for ranking; differs in tail behaviour. Less common.</td></tr>
+      <tr><td>Fractional logit / quasi-binomial</td><td>Logit-linear in expectation</td><td>Logit</td><td>Robustness alternative; same logit-linear expectation as Beta but with quasi-likelihood instead of full likelihood. Used when Beta diagnostics are poor.</td></tr>
+    </tbody>
+  </table>
+
+  <p>The Beta-with-logit-link is the textbook choice for recovery-rate modelling and the standard in retail A-IRB. The strong predictors for partial recovery rate differ from the two binary components: workout-stage features (recovery channel used, costs incurred to date) are the dominant LGD2 drivers; collateral attributes (LTV at default, regional HPI movement during workout) dominate for secured LGD1.</p>
+
+  <h3>The non-modelled components</h3>
+
+  <p><strong>E[r(Zero)] = 0%</strong>. By construction: zero-payers made no recoveries, so the recovery rate is zero. No further modelling required.</p>
+
+  <p><strong>E[r(Full)] = (close to) 100% on discount-adjusted basis</strong>. Full-payers paid back EAD or more in undiscounted terms. After discounting at the regulatory rate (typically SOFR + 5% for LRA), the discounted recovery rate is below 100%: a 24-month workout at a 10% annual discount rate produces a present value of around 87% of the undiscounted recoveries. The exact value depends on the timing pattern of payments and is computed as a portfolio-wide average from the development sample.</p>
+
+  <p><strong>E[r(Debt Sale)]</strong>. Debt-sale recoveries arrive 12 to 36 months after default for accounts that get sold (typically after they have been written off). Computed as a portfolio-wide average from the development sample, with possible segmentation by product type or partner. Some banks model this explicitly per cohort; most treat it as a flat adjustment.</p>
+
+  <p><strong>CoR (cost of recoveries)</strong>. Allocated as a percentage of post-charge-off payments (typically the contingency-fee rate negotiated with external agencies, plus an allocation for direct legal fees and indirect overheads). Computed as a portfolio-wide average. For IRB the indirect cost is included; for IFRS 9 only direct costs are included.</p>
+
+  <h3>Per-component variable selection</h3>
+
+  <p>The per-component feature sets from <a href="19-lgd_feature_engineering.html">lecture 19</a> enter the per-component regressions. Within each regression, the same five-criterion iterative refinement from PD applies, with one LGD-specific tightening: the VIF threshold is &lt; 2 rather than &lt; 3, reflecting the smaller sample. The standard variable count per component is 8 to 15 features; the binary components typically converge on around 10 features, the GLM on around 12 to 15.</p>
+
+  <h3>The aggregation step</h3>
+
+  <p>Once all three regressions are converged, the composite LGD per facility is computed as in the formula above. No tuning; no free parameters. The aggregation respects the conditioning structure exactly: P(Zero) is the marginal probability of being a zero-payer; P(Full) is the conditional probability of being a full-payer given non-zero; E[r(Partial)] is the conditional expectation of the recovery rate given being a partial-payer. The composite LGD is then the law-of-total-expectation aggregation.</p>
+
+  <p>Worked example for a single facility:</p>
+
+  <pre><code>P(Zero)_i       = 0.18    (18% chance of zero recovery)
+P(Full)_i       = 0.42    (42% chance of full recovery given non-zero)
+E[r(Partial)]_i = 0.35    (35% expected recovery if partial)
+
+R_Zero_i        = 0.18 * 0          = 0.000
+R_Full_i        = 0.82 * 0.42 * 0.95 = 0.327   (E[r(Full)] = 0.95 portfolio-wide)
+R_Partial_i     = 0.82 * 0.58 * 0.35 = 0.166
+
+Debt sale       = 0.06    (portfolio-wide average)
+CoR             = 0.04    (portfolio-wide average)
+
+LGD_i = 1 - (0.000 + 0.327 + 0.166 + 0.06 - 0.04)
+      = 1 - 0.513
+      = 0.487   or  48.7%
+</code></pre>
+
+  <h3>LGD1 versus LGD2 fitting</h3>
+
+  <p>Both models use the three-regression architecture. They differ in three ways.</p>
+
+  <table>
+    <thead>
+      <tr><th>Aspect</th><th>LGD1 (performing book)</th><th>LGD2 (defaulted book)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Prediction horizon</td><td>The hypothetical workout if the facility were to default now</td><td>The remaining workout for a facility already in default</td></tr>
+      <tr><td>Feature set</td><td>Pre-default features only (obligor, facility, behavioural, bureau)</td><td>Pre-default features plus post-default workout features (months since default, recoveries to date, costs incurred, recovery channel)</td></tr>
+      <tr><td>Fitting sample</td><td>Resolved facilities with the full default-to-resolution observation</td><td>Same resolved facilities, but with the modelling task framed as "given the facility is at month t of the workout, what is the remaining LGD"</td></tr>
+      <tr><td>Output downstream use</td><td>Feeds the calibrated downturn LGD in lecture 21; enters the K formula for non-defaulted exposures</td><td>Feeds ELBE; enters the K formula for defaulted exposures</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Sub-population testing</h3>
+
+  <p>The composite LGD is tested on the standard LGD sub-populations:</p>
+
+  <ul>
+    <li>Collateral type (residential property by region, commercial property, vehicle, unsecured)</li>
+    <li>Cure / no-cure subgroups</li>
+    <li>Exposure-size bands</li>
+    <li>Origination cohort and default vintage</li>
+    <li>Strategic partners or product lines</li>
+  </ul>
+
+  <p>The diagnostics are predicted vs realised LGD per sub-population, mean prediction error, and Spearman correlation between predicted and realised. Sub-populations with materially weaker performance trigger segment-specific modelling adjustments, partner flags, or MoC overlays.</p>
+
+  <h3>Overall LGD model performance</h3>
+
+  <p>For a well-built retail LGD model, typical discrimination metrics:</p>
+
+  <ul>
+    <li>Spearman correlation between predicted and realised LGD: 0.5 to 0.7 (lower than the equivalent Gini for PD, because the LGD target is noisier).</li>
+    <li>Mean absolute error: 10 to 15 percentage points on the development sample, similar on OOS, with up to 3 percentage points of decay on OOT.</li>
+    <li>Component-level Gini (binaries): 0.50 to 0.70 for P(Zero), 0.30 to 0.50 for P(Full | not Zero). The conditional component is weaker because its sample is smaller and the predictive signal is more diffuse.</li>
+  </ul>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the mixture model is a probabilistic claim, not a methodological convenience</strong>. The aggregation formula is exact: it says LGD = E[loss / EAD] decomposed by the law of total expectation across three mutually exclusive recovery regimes. A modeller who understands this can answer the supervisor's "why this architecture" question by reference to probability theory rather than statistical convenience; this is the right answer at SREP. A modeller who treats the mixture as a recipe to copy from the textbook will lose the argument.</p>
+
+  <p>The second lesson is on <strong>the conditioning order</strong>. The Zero-first ordering is dominant because the zero-payer outcome is the most distinctive (collateral type alone explains most of it). The Full-first ordering can outperform on heavily-secured portfolios where the dominant question is "will the bank fully recover from the collateral". Banks that run a single portfolio across both secured and unsecured exposures should fit the mixture separately per segment with potentially different orderings.</p>
+
+  <p>The third lesson is on the <strong>cost of recoveries</strong>. The CoR allocation is one of the few places where bank-wide cost-accounting decisions enter the regulatory capital calculation. A bank that increases its in-house collections team headcount sees its indirect cost rise, its CoR rise, and its composite LGD rise &mdash; all without any change in the underlying credit risk. The supervisor knows this and will probe whether the CoR allocation methodology has been stable across the calibration window or has shifted with operational decisions. Banks that revise their cost allocation mid-window get caught.</p>
+
+  <p>The fourth lesson is on <strong>LGD2</strong>. The temptation is to treat LGD2 as a minor variant of LGD1 ("same model, different sample"). The reality is that LGD2 admits an entirely different feature family (workout-stage variables) and predicts a different quantity (remaining loss conditional on partial workout completion). For some banks LGD2 is the more important model commercially because it drives ELBE, which directly determines the bank's IFRS 9 Stage 3 provision. Practitioners should be able to articulate why LGD2 is its own model rather than a tweak to LGD1.</p>
+
+  <p>The fifth, and structurally most important: <strong>the calibration in this lecture is incomplete</strong>. The composite LGD per facility is a PiT estimate, not a calibrated regulatory LGD. It rank-orders facilities and produces sensible average levels on the development sample, but it has not been anchored to a long-run-average loss rate, not been stressed for downturn, not had MoC applied, not been compared to the SS4/24 §15.7 reference value. All of that happens in the next lecture (21). The model in this lecture is necessary but not sufficient for capital purposes; the regulatory LGD that enters the K formula is the calibrated version produced by lecture 21.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>State the composite LGD formula in full, naming each component. Which components are modelled and which are non-modelled?</li>
+    <li>Explain why a single regression on realised LGD fails for retail. What property of the empirical distribution forces the mixture architecture?</li>
+    <li>Distinguish the fitting samples for the three regressions (A: P(Zero), B: P(Full | not Zero), C: E[r(Partial)]). What does this imply for variable selection in each?</li>
+    <li>Write the logit link for regression B. Why is the regression fitted only on the non-zero-payer subset?</li>
+    <li>State the standard GLM choice for regression C. Why is the Beta-with-logit-link the textbook default?</li>
+    <li>Explain why E[r(Full)] is approximately 95% rather than 100%. What controls the gap?</li>
+    <li>Worked example. P(Zero) = 0.10, P(Full | not Zero) = 0.50, E[r(Partial)] = 0.30, E[r(Full)] = 0.95, debt sale = 0.08, CoR = 0.05. Compute the composite LGD.</li>
+    <li>Distinguish the LGD1 model from the LGD2 model on three axes: prediction horizon, feature set and downstream use.</li>
+    <li>What is the standard conditioning order, and why is the alternative ("Full-first") sometimes used? When?</li>
+    <li>The bank's CoR allocation increases mid-calibration window because of a collections-team expansion. What is the supervisory concern, and what would the right remediation be?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/lgd/01-model_methodology.md</code> &mdash; the workout LGD architecture, the mixture decomposition, the composite-LGD formula.</li>
+      <li>Supplementary: EBA/GL/2017/16 paragraphs 96 to 153 (LGD modelling framework); PRA SS4/24 §13 (economic loss components).</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="13-pd_risk_differentiation.html">PD risk differentiation</a> &mdash; the logistic-regression machinery this lecture reuses for the two binary components.</li>
+      <li><a href="16-lgd_concept.html">LGD concept</a> &mdash; the mixture architecture this lecture instantiates.</li>
+      <li><a href="17-lgd_target_and_data.html">LGD target and data</a> &mdash; the three component targets, outcome periods and feature families.</li>
+      <li><a href="19-lgd_feature_engineering.html">LGD feature engineering</a> &mdash; the per-component feature sets that feed the three regressions.</li>
+    </ul>
+
+    <p><strong>Forward references inside the LGD sequence:</strong></p>
+    <ul>
+      <li>21-lgd_risk_quantification (next) &mdash; LRA / downturn LGD calibration, ELBE, MoC.</li>
+      <li>22-lgd_testing (planned) &mdash; component-level and composite-level back-tests.</li>
+    </ul>
+
+    <p><strong>Cross-component:</strong></p>
+    <ul>
+      <li>27-ead_risk_differentiation (planned) &mdash; GLM with Gaussian + identity link for continuous EADF (no mixture).</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>Loterman et al. (2012), "Benchmarking regression algorithms for loss given default modeling". The empirical comparison of mixture, single-regression and tree-based LGD models.</li>
+      <li>Ferrari and Cribari-Neto (2004), "Beta regression for modelling rates and proportions". The canonical reference for Beta GLM.</li>
+      <li>Calabrese (2014), "Downturn loss given default: mixture distribution estimation". Mixture-distribution approaches to recovery-rate modelling.</li>
+      <li>EBA/GL/2017/16 paragraphs 96 to 153. European authority's interpretation of LGD modelling architectures.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 20 of n &middot; LGD 5 of 7.</span>
+  <span><a href="19-lgd_feature_engineering.html">Previous: feature engineering</a> &middot; <a href="21-lgd_risk_quantification.html">Next: risk quantification</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

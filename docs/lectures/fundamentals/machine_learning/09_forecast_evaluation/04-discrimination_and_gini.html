@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 45: discrimination and the Gini score</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Calibration</a></div>
+  <h1>Discrimination and the Gini score</h1>
+  <p class="subtitle">The last two lectures were about whether a model's predicted level is correct. This lecture is about a completely different question: whether the model can tell risks apart at all, regardless of level. The Gini score is the standard answer, built from the same construction as the economic Lorenz curve it borrows its name from, and it comes with a sharp caveat that most practitioners who quote it have never seen stated: Gini is not a valid tool for choosing between models unless the models being compared are already auto-calibrated.</p>
+  <div class="meta">
+    <span>Lecture 45 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part VII: calibration and forecast evaluation</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Sort the test-set instances by the model's predictions $\mu(X_i)$, ascending. The <strong>cumulative accuracy profile</strong> (CAP) at $\alpha \in (0,1)$ compares the share of the total observed response contributed by the top-$\alpha$ fraction of predictions (the riskiest fraction, by the model's own ranking) to the share it would contribute if responses were spread evenly. A model with genuine discriminatory power concentrates a disproportionate share of the actual bad outcomes into the fraction it flagged as riskiest, bowing the CAP curve away from the 45-degree diagonal a null model (no discrimination at all) would trace. The <strong>Gini score</strong> is twice the area between the fitted model's CAP curve and the diagonal, normalised against the area a perfect, all-knowing model would achieve; for a binary response it is exactly $2 \times \text{AUC} - 1$, the familiar credit-scoring statistic under a different name. Gini's defining weakness is that it depends only on the <em>order</em> the model puts observations in, not on the actual numeric level of its predictions: it is completely invariant to any monotone rescaling of $\mu$. This is exactly why Gini is <strong>not, on its own, a strictly consistent tool for choosing between models</strong>; it becomes a valid selection criterion only once every candidate model being compared has already passed the auto-calibration check from lecture 43. Rank two miscalibrated models by Gini and you may be rewarding whichever one happens to distort its levels least, not whichever one genuinely separates risks better.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine you only care about whether your model correctly identifies the worst 10 per cent of risks as the worst 10 per cent, regardless of what specific numbers it attaches to them. Gini measures exactly this: how much of the actual bad outcome you can scoop up by acting on the model's ranking, compared to acting blind. But because it only looks at rank, a model that gets every relative ordering exactly right while reporting numbers on entirely the wrong scale still scores a perfect Gini, and a model that mis-ranks two segments while reporting beautifully calibrated levels loses Gini points for that mistake. Gini answers "can you tell risks apart", never "are the numbers right", and confusing the two is the single most common misuse of the statistic in practice.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This is the discrimination half of the calibration sub-module, deliberately placed after auto-calibration and recalibration rather than before them, because the theorem this lecture proves, Gini's validity as a selection tool requires auto-calibration first, only makes sense once those two properties are already on the table.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this is worth a lecture rather than a footnote to model evaluation.</p>
+
+  <p>First, <strong>Gini (and its binary special case, AUC) is the single most quoted statistic in credit-risk model documentation, and it is routinely used to select between models without the calibration precondition ever being checked</strong>. A model-development report that says "the new model has a Gini of 0.62 versus 0.58 for the incumbent, therefore we recommend deployment" has skipped a step: if neither model has been verified as auto-calibrated, the comparison is not guaranteed to mean what it appears to mean.</p>
+
+  <p>Second, <strong>the scale-invariance that makes Gini attractive (no need to worry about units, just rankings) is exactly the property that makes it dangerous in isolation</strong>. A model can be badly wrong about the actual level of risk at every point on the score distribution and still achieve an excellent Gini, provided the relative ordering happens to be correct; Gini alone cannot detect this failure, and a validator relying on it exclusively will miss a genuinely miscalibrated model that happens to rank well.</p>
+
+  <p>Third, <strong>Gini has a second, distinct, and legitimate use as a monitoring statistic for concept drift</strong>: tracking whether a model's ranking ability has degraded over time, independent of any recalibration of levels, is a valid and common ongoing-monitoring application that does not carry the same calibration precondition as model selection does, because it is comparing the same model's ranking against itself across time rather than comparing two different models against each other.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    Two candidate PD models were compared for a portfolio refresh: the incumbent GLM (Gini 0.54) and a challenger gradient-boosted model (Gini 0.61), and the challenger was recommended on Gini alone. A later, fuller validation found the challenger's calibration was badly compressed in the top risk decile, exactly the failure mode from lecture 43's LGD vignette, understating default risk for the worst borrowers by nearly a third even while correctly identifying them as the worst decile. Because Gini only credits correct ranking, not correct level, the challenger's superior Gini score was real and simultaneously uninformative about whether its predicted PDs were usable for capital calculation without a recalibration step first.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: the cumulative accuracy profile, three curves on the identical axes, a diagonal null model, a fitted model bowing above it, and a perfect model bowing further still. The Gini score is a ratio of two areas between these curves.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The cumulative accuracy profile and the Gini score as a ratio of areas">
+      <defs>
+        <marker id="giniArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="410" y="24" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The cumulative accuracy profile: Gini = area(A) / area(A+B)</text>
+
+      <rect x="90" y="60" width="600" height="280" fill="#FFFFFF" stroke="#e4e4e7" stroke-width="1"/>
+      <line x1="90" y1="340" x2="90" y2="60" stroke="#71717a" stroke-width="1"/>
+      <line x1="90" y1="340" x2="690" y2="340" stroke="#71717a" stroke-width="1"/>
+
+      <!-- null model diagonal -->
+      <line x1="90" y1="340" x2="690" y2="60" stroke="#94a3b8" stroke-width="2" stroke-dasharray="5 4"/>
+      <text x="600" y="130" font-family="Inter" font-size="10" fill="#64748b">null model (no discrimination)</text>
+
+      <!-- perfect model -->
+      <path d="M 90 340 L 240 62 L 690 60" fill="none" stroke="#166534" stroke-width="2.5"/>
+      <text x="260" y="80" font-family="Inter" font-size="10" fill="#166534">perfect model</text>
+
+      <!-- fitted model curve, bowing between diagonal and perfect -->
+      <path d="M 90 340 Q 250 260 400 190 T 690 60" fill="none" stroke="#1d4ed8" stroke-width="2.5"/>
+      <text x="400" y="175" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">fitted model</text>
+
+      <!-- shaded areas (approximate) -->
+      <path d="M 90 340 Q 250 260 400 190 T 690 60 L 690 60 L 90 340 Z" fill="#bfdbfe" fill-opacity="0.5"/>
+      <text x="230" y="300" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">A</text>
+      <path d="M 90 340 Q 250 260 400 190 T 690 60 L 240 62 L 90 340 Z" fill="#bbf7d0" fill-opacity="0.5"/>
+      <text x="330" y="120" font-family="Inter" font-size="12" font-weight="700" fill="#166534">B</text>
+
+      <text x="390" y="360" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">α (share of instances, sorted riskiest by model score)</text>
+      <text x="55" y="200" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a" transform="rotate(-90 55 200)">cumulative share of responses</text>
+    </svg>
+    <figcaption>The cumulative accuracy profile sorts test instances by the fitted model's predictions and asks what share of the total actual response the top $\alpha$ fraction accounts for. A null model with zero discrimination traces the diagonal exactly; a perfect model concentrates all the bad outcomes into the smallest possible fraction, bowing sharply toward the top-left. The fitted model's curve sits somewhere between the two. Area $A$ (between the fitted curve and the diagonal) versus area $A + B$ (between the perfect curve and the diagonal) gives the Gini score: $\text{Gini} = \text{area}(A) / \text{area}(A+B)$, a number in $[0, 1]$ for a well-behaved model, with 1 meaning perfect discrimination and 0 meaning none.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Gini is a statement about order, never about level.</strong> Rescale every prediction by any strictly increasing function and Gini does not move; recalibrate the levels with the previous lecture's isotonic step and Gini does not move either, because isotonic regression preserves rank exactly. <strong>The area interpretation is the Lorenz curve, borrowed from economics.</strong> Gini's original 1912 definition measured wealth concentration the identical way: how much of total wealth is held by the richest fraction of the population, compared to an equal distribution. The machine-learning reading swaps wealth concentration for loss concentration and rewards a model for concentrating the actual bad outcomes into the fraction it flags as risky.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The cumulative accuracy profile, formally</h3>
+
+  <p>Given a fitted model $\mu$ and test-set instances $(Y_t, X_t, v_t)_{t=1}^m$ (unit exposures assumed for simplicity; the exposure-weighted extension is a straightforward generalisation, section below), relabel the instances so that $\mu(X_1) \leq \mu(X_2) \leq \ldots \leq \mu(X_m)$. The cumulative accuracy profile is</p>
+
+  $$\alpha \in (0,1) \;\mapsto\; C_\mu(\alpha) = 1 - \frac{1}{\bar Y}\left(\frac{1}{m}\sum_{t = (1-\alpha)m + 1}^{m} Y_t\right),$$
+
+  <p>with $\bar Y$ the sample mean of the response. Read this as: the share of total response mass accounted for by the riskiest $\alpha$ fraction of instances, as the model itself ranks them, expressed relative to what an even, uniform distribution of that mass would give. It must be computed on a held-out test sample, exactly as the actual-versus-predicted plot required, because an in-sample CAP inherits the identical optimism problem.</p>
+
+  <h3>The Gini score as a ratio of areas</h3>
+
+  <p>The <strong>null model</strong> (no covariate information, predicting the same value for everyone) traces the CAP diagonal exactly, because with no ranking information the riskiest $\alpha$ fraction is a random $\alpha$ fraction, contributing exactly $\alpha$ of the response mass on average. The <strong>perfect model</strong> ranks instances in exactly the order of their true realised responses, so its CAP curve rises as steeply as possible toward the top-left corner. The <strong>Gini score</strong> is</p>
+
+  $$\text{Gini}(\mu) = \frac{\text{area between the fitted model's CAP and the diagonal}}{\text{area between the perfect model's CAP and the diagonal}} \in [0, 1],$$
+
+  <p>with 1 meaning the fitted model discriminates as well as the best possible model given the realised data, and 0 meaning it discriminates no better than the null model. For a <strong>binary response</strong> (default versus no default, claim versus no claim), this construction is exactly equivalent to the receiver operating characteristic (ROC) curve familiar from classification, and the identity</p>
+
+  $$\text{Gini} = 2 \times \text{AUC} - 1$$
+
+  <p>holds exactly, which is the bridge between the credit-scoring convention of quoting Gini and the general machine-learning convention of quoting AUC: they are the identical statistic, rescaled, and either can be derived from the other without re-computing anything.</p>
+
+  <h3>Why Gini is not, by itself, a strictly consistent tool for model selection</h3>
+
+  <p>The statistics track's lecture on strictly consistent loss functions defined precisely what it means for a loss to be a legitimate tool for identifying a true regression function. Gini is not such a loss, and cannot be, because it is invariant to any strictly increasing transformation of $\mu$: replacing $\mu(X)$ by $\log \mu(X)$, by $\mu(X)^3$, or by any other monotone rescaling leaves every CAP curve, and hence the Gini score, exactly unchanged. A statistic that cannot distinguish between a correctly-scaled model and an arbitrarily rescaled version of it cannot possibly be sensitive to whether the model's predicted level is correct, and is therefore blind to exactly the failure modes lectures 42 and 43 were built to catch.</p>
+
+  <div class="defcard tint-sky">
+    <div class="term">The precondition that restores Gini's validity</div>
+    <div class="def">Gini becomes a sensible tool for choosing between candidate models once every candidate under comparison is auto-calibrated (lecture 43). The intuition: once the level is guaranteed correct at every point along the score, by the auto-calibration property, the only thing left for two competing auto-calibrated models to differ on is how well they separate risks, which is exactly what Gini measures. Comparing Gini scores between models that have not been checked for auto-calibration first risks rewarding whichever model's uncorrected miscalibration happens to distort its CAP curve least, an artefact of the levels rather than a genuine difference in discriminatory power.</div>
+  </div>
+
+  <h3>Exposure weighting and ties</h3>
+
+  <p>When exposures $v_i$ vary, the cumulative accuracy profile and the Gini score generalise by weighting both the sorting and the cumulative sums by $v_i$, in exactly the same manner the balance property and the actual-versus-predicted plot were exposure-weighted in the previous two lectures; this also supplies the standard way of handling ties in the ranking (instances with an identical predicted score are treated as a single, combined-weight group, exactly as the isotonic regression algorithm merges tied covariates).</p>
+
+  <h3>Gini as a concept-drift monitor</h3>
+
+  <p>A distinct, legitimate use of Gini, separate from model selection, is tracking a single deployed model's Gini score over successive out-of-time periods to test whether its ranking ability has degraded, a signal that the risk ordering the model learned no longer matches how risk actually orders itself in the current portfolio. This use case does not carry the auto-calibration precondition above, because it compares the same model's discrimination against itself through time rather than comparing two different models' discrimination against each other; a falling Gini trend over successive periods is a standalone, valid early-warning signal for model staleness.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Selecting a model on Gini alone, with no calibration check</span>
+    This is the pitfall the whole lecture has built toward: two candidate models compared purely on Gini, with the higher-scoring one recommended, is a selection procedure with no guarantee attached unless both candidates have already passed the auto-calibration test. The correct order of operations, established across this sub-module, is: check balance, check auto-calibration (recalibrating if necessary), and only then compare discrimination between the calibrated candidates.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Comparing Gini across models with different response definitions</span>
+    A Gini score of 0.6 for a claims-frequency model and a Gini score of 0.6 for a claims-severity model are not comparable statements about anything, because the underlying response, and therefore the achievable ceiling set by the perfect-model curve, differs entirely between them. Gini is only comparable across models fitted to the identical response definition on comparable data.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating a Gini point estimate as free of sampling noise</span>
+    A Gini score computed on a modest test sample carries genuine sampling uncertainty, and a difference of one or two Gini points between two models is frequently within noise. A bootstrap confidence interval around the Gini estimate (resample the test set, recompute Gini, repeat) is standard practice before any "model A beats model B" claim is made on the strength of a Gini comparison alone.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting Gini is invariant to rescaling</span>
+    A colleague reporting that "recalibrating the model improved its Gini" has made a claim that cannot be true if the recalibration was a genuine monotone transformation (which both local and isotonic regression are, when applied as pure recalibration steps): Gini is mathematically incapable of changing under a rank-preserving transformation, and an apparent improvement signals either a computational error or a recalibration step that, contrary to intent, altered the ranking.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The cumulative accuracy profile sorts test instances by the model's own predictions and asks how much of the actual outcome mass concentrates into the fraction the model flags as riskiest; the Gini score is the resulting area ratio, equal to $2 \times \text{AUC} - 1$ for a binary response. Gini measures ranking ability alone, is completely invariant to any monotone rescaling of the predictions, and is therefore blind to exactly the calibration failures the previous two lectures addressed. It becomes a valid tool for choosing between models only once every candidate has already been checked for auto-calibration; used before that check, it can reward a model for an artefact of its miscalibration rather than for genuinely superior discrimination. A separate, legitimate use, tracking one deployed model's own Gini trend over time, is a standard concept-drift early-warning signal that does not carry the same precondition.</p>
+
+  <p>The next lecture completes the calibration sub-module's scoring toolkit: Murphy's score decomposition splits any strictly consistent loss into uncertainty, discrimination, and miscalibration components, giving a single framework that explains exactly how much of a model's overall error is attributable to each, and lift charts and double lift charts give the practical, chart-based version of the identical comparison actuaries present in model documentation.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Describe the construction of the cumulative accuracy profile. What does the null model's curve look like, and why?</li>
+      <li>State the Gini score as a ratio of areas, and state its exact relationship to AUC for a binary response.</li>
+      <li>Explain why Gini is invariant to any strictly increasing transformation of the model's predictions, and why this makes it blind to miscalibration.</li>
+      <li>State the precondition under which Gini becomes a valid tool for selecting between candidate models. Why does auto-calibration restore this validity?</li>
+      <li>Explain why Gini can be legitimately used to monitor a single deployed model's ranking ability over time without the same precondition applying.</li>
+      <li>A colleague reports that isotonic recalibration improved a model's Gini score from 0.58 to 0.63. What should you check first?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 44 (<a href="03-nonparametric_recalibration.html">non-parametric recalibration</a>) supplied the auto-calibration check this lecture's central theorem depends on.</li>
+      <li><strong>Next:</strong> Lecture 5 (<a href="05-score_decomposition_and_lift.html">score decomposition and lift charts</a>) formalises the split between calibration and discrimination that this lecture argued for informally, via Murphy's decomposition.</li>
+      <li><strong>Prerequisite:</strong> The strictly-consistent-loss framework that explains why Gini is not itself a valid loss function is developed in the statistics track's lecture on <a href="../../statistics/14-strictly_consistent_loss_functions.html">strictly consistent loss functions</a>.</li>
+      <li><strong>Outside this course:</strong> Gini is the standard discrimination statistic quoted in every A-IRB PD model development and validation document; the AUC form of the identical statistic is the standard in general machine-learning classification reporting, and the identity in section 4 lets a reader translate freely between the two conventions.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Calibration course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 45 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 4: feature selection</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Feature engineering</a></div>
+  <h1>Feature selection</h1>
+  <p class="subtitle">Not every column earns its place. Three families of method, one principle: keep the features that carry signal, drop the ones that carry noise, and let the bias-variance trade-off decide where the line falls.</p>
+  <div class="meta">
+    <span>Lecture 4 of 62</span>
+    <span>Reading time, 60 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Feature selection</strong> is the decision about which columns of the design matrix to keep and which to drop, made before or during model fitting and distinct from dimensionality reduction (which builds new features from old ones). Three families exist. <strong>Filter methods</strong> rank each feature against the target using a statistic that does not require fitting the downstream model (variance, Pearson correlation, mutual information, information value, population stability, variance inflation, tree-based importance from a quick baseline); they are cheap and model-agnostic but blind to feature interactions. <strong>Wrapper methods</strong> search over subsets of features by fitting the actual model on each candidate subset (sequential forward, sequential backward, their floating variants, recursive feature elimination, exhaustive search); they account for interactions but cost a model fit per candidate. <strong>Embedded methods</strong> let the model itself perform the selection during fitting (L1-regularised regression sets coefficients to zero, L2 shrinks without zeroing, elastic net combines the two, tree-based learners produce importances as a by-product). The position you take along this axis is also a position on bias-variance: fewer features increases bias and decreases variance, more features does the opposite.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    After lectures 2 and 3 you have a transformed and (optionally) reduced design matrix. Some of those columns carry strong signal about the target, some carry weak signal, and some are noise the model would do better without. Feature selection is the explicit decision about which to keep. Filter methods score each column on a one-shot statistic and keep the top ones. Wrapper methods fit the actual model on many candidate subsets and pick the subset that scores best. Embedded methods let the regulariser inside the model do it during training. The right family depends on how much compute you have, how badly you need to account for interactions, and whether the model class you intend to use exposes a useful importance signal.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Textbook treatments enumerate the methods. Practitioner judgement is about ordering. The standard credit-risk pipeline does not pick one family and stop; it composes them. A variance filter and a missingness filter remove dead columns; an information value (IV) screen removes weak features; a VIF screen removes redundant ones; recursive feature elimination on the survivor set picks the final feature subset; L1 logistic regression as the model class then prunes any remaining redundancy during fitting. Each stage rejects features for a different reason. Reporting a single "we selected by IV" understates what actually happened and is the answer that fails the validation review.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 1 of the pipeline from <a href="01-the_ml_landscape.html">lecture 1</a>, the third of three feature-engineering lectures. Lecture 2 transformed columns one at a time; lecture 3 on <a href="03-dimensionality_reduction.html">dimensionality reduction</a> built new columns from combinations of existing ones. This lecture decides which of the resulting columns to keep. The output is the feature subset that goes into <a href="../02_train_test_split/01-train_test_validation.html">train, test, and validation splitting</a>, which is the start of sub-module 02 and the gateway to every supervised algorithm in the course.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons feature selection matters beyond computational tidiness. First, <strong>more features means more variance.</strong> Each estimated coefficient absorbs some of the noise in the training sample; fit too many and the model memorises the noise rather than the signal. This is the variance arm of the bias-variance trade-off introduced in <a href="01-the_ml_landscape.html">lecture 1</a>, and it is what makes a 200-feature logistic regression on 5,000 rows overfit even with regularisation. Dropping a feature increases bias (the model can no longer represent that part of the data-generating process) but decreases variance (one fewer parameter to fit from finite data). The right number of features is the point on that curve where validation error is minimised.</p>
+
+  <p>Second, <strong>redundant features distort interpretation.</strong> If two features are highly correlated, a linear model splits the joint effect between them in a way that depends on noise. The coefficients become individually meaningless even though the joint prediction is fine. Tree-based methods suffer a related problem: Gini-based importance is shared arbitrarily between correlated features, so a genuinely important feature can look unimportant because a correlated cousin is absorbing the credit. Removing redundancy before importance is read is what makes the importance ranking usable.</p>
+
+  <p>Third, <strong>fewer features means a model that survives operations.</strong> Every feature in production is a column that has to be sourced, validated, refreshed, monitored, and explained. A model with twelve features and a model with sixty may have the same training AUC; the twelve-feature version costs a fraction as much to run, monitors a fraction as many drift signals, and is materially easier to defend to a validator who wants to know why each feature is present. The minimum sufficient feature set is the model that survives the first year in production.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail PD model entering validation had 47 features selected by stepwise forward selection on AUC. Validation challenged the inclusion of three features whose information value was below 0.05 and whose coefficients flipped sign between development and out-of-time samples. The modeller's defence (that stepwise had retained them at the chosen significance threshold) was overruled. The rebuild used an IV filter at 0.1 followed by VIF pruning at 5.0 followed by L1 logistic regression, ended with 18 features, lost two basis points of AUC, and passed validation in one round. Cheaper, smaller, more stable, and defensible. The deeper lesson: when a wrapper method's local optimum disagrees with a filter method's first-pass screen, the filter screen is often telling you something the wrapper has overfitted past.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. The three families are arranged along an axis of computational cost on one side and interaction-awareness on the other. Filter methods are cheap and interaction-blind; wrapper methods are expensive and fully interaction-aware; embedded methods sit in between, paying the cost of one model fit and getting interaction-awareness as a by-product. The diagram below shows the three pipelines side by side. Each takes the same input (the transformed feature matrix from lecture 2 and any reduced features from lecture 3) and produces the same output (a selected feature subset), but they reach the answer by different routes.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three families of feature selection: filter, wrapper, embedded">
+      <defs>
+        <marker id="fsArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Three families of feature selection, same input, same kind of output, different cost</text>
+
+      <!-- Input -->
+      <g>
+        <rect x="20" y="160" width="120" height="60" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="80" y="184" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">FEATURE MATRIX</text>
+        <text x="80" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">transformed,</text>
+        <text x="80" y="212" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">optionally reduced</text>
+      </g>
+
+      <!-- Filter -->
+      <g>
+        <rect x="200" y="60" width="200" height="80" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="300" y="84" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">FILTER</text>
+        <text x="300" y="100" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">score each feature once,</text>
+        <text x="300" y="112" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">no model fit needed</text>
+        <text x="300" y="128" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#0d9488">variance, corr, MI, IV, PSI, VIF</text>
+      </g>
+
+      <!-- Wrapper -->
+      <g>
+        <rect x="200" y="160" width="200" height="80" rx="10" fill="#FFF7ED" stroke="#c2410c" stroke-width="1.5"/>
+        <text x="300" y="184" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#9a3412">WRAPPER</text>
+        <text x="300" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#c2410c">search subsets,</text>
+        <text x="300" y="212" text-anchor="middle" font-family="Inter" font-size="9" fill="#c2410c">fit the model per candidate</text>
+        <text x="300" y="228" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#c2410c">SFS, SBS, SFFS, RFE, exhaustive</text>
+      </g>
+
+      <!-- Embedded -->
+      <g>
+        <rect x="200" y="260" width="200" height="80" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="300" y="284" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">EMBEDDED</text>
+        <text x="300" y="300" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">selection happens</text>
+        <text x="300" y="312" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">inside the fit</text>
+        <text x="300" y="328" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#7c3aed">L1, L2, elastic net, tree importance</text>
+      </g>
+
+      <!-- Arrows from input -->
+      <line x1="140" y1="180" x2="200" y2="100" stroke="#71717a" stroke-width="1.2" marker-end="url(#fsArrow)"/>
+      <line x1="140" y1="190" x2="200" y2="200" stroke="#71717a" stroke-width="1.2" marker-end="url(#fsArrow)"/>
+      <line x1="140" y1="200" x2="200" y2="300" stroke="#71717a" stroke-width="1.2" marker-end="url(#fsArrow)"/>
+
+      <!-- Output -->
+      <g>
+        <rect x="680" y="160" width="120" height="60" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="740" y="184" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">SELECTED</text>
+        <text x="740" y="198" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">SUBSET</text>
+        <text x="740" y="212" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">k columns kept</text>
+      </g>
+
+      <line x1="400" y1="100" x2="680" y2="180" stroke="#71717a" stroke-width="1.2" marker-end="url(#fsArrow)"/>
+      <line x1="400" y1="200" x2="680" y2="190" stroke="#71717a" stroke-width="1.2" marker-end="url(#fsArrow)"/>
+      <line x1="400" y1="300" x2="680" y2="200" stroke="#71717a" stroke-width="1.2" marker-end="url(#fsArrow)"/>
+
+      <!-- Cost / awareness annotations -->
+      <text x="500" y="50" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#0d9488">cheap, interaction-blind</text>
+      <text x="500" y="358" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#7c3aed">moderate cost, interaction-aware via the fit</text>
+      <text x="540" y="252" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#c2410c">expensive, fully interaction-aware</text>
+    </svg>
+    <figcaption>The three families take the same input and deliver the same kind of output but trade compute against interaction-awareness. Filter is the fastest and the most naive; wrapper is the slowest and the most thorough; embedded sits in the middle and is what most production credit risk pipelines actually use. In practice the families are composed rather than chosen between.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The three pipelines are alternative routes, not stages in sequence, even though it is common to compose them (run a cheap filter first to cull obvious noise, then an embedded or wrapper method on the survivors). The label "interaction-blind" on filter methods is the key limitation: a feature with low univariate correlation can still carry conditional signal that emerges only in combination with another feature, and a filter method cannot see this. The label "expensive" on wrapper methods is not a marginal cost. Exhaustive search over $p$ features fits $2^p - 1$ models; for $p = 30$ that is over a billion fits, which is why the realistic wrapper methods are greedy approximations.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Filter methods</h3>
+
+  <p>Filter methods evaluate each feature in isolation against the target (or against other features, for redundancy checks) using a statistic that does not require fitting the downstream model. They are fast, model-agnostic, and the standard first pass in any pipeline. Their weakness is that they are blind to interactions: a feature with low univariate signal that becomes informative when conditioned on another feature is invisible to a filter method, and a feature with high univariate signal that is fully redundant with another retained feature looks just as good as a unique one. The remedies are to add a redundancy filter (correlation matrix, VIF) on top of the relevance filter, and to follow the filter stage with an embedded or wrapper method that can see interactions.</p>
+
+  <p>The <strong>variance threshold</strong> drops any column whose variance falls below a chosen cut-off. A constant column (variance zero) carries no information about the target by construction and should always go; a near-constant column carries almost none and is often a candidate as well. The default in scikit-learn's <code>VarianceThreshold</code> is to drop only the zero-variance columns, which catches the obvious dead features (a flag that has the same value for every row in the sample) without making any judgement about useful low-variance columns.</p>
+
+  <p><strong>Pearson correlation</strong> measures the linear association between two numeric variables on a $[-1, 1]$ scale,</p>
+  $$\rho_{X,Y} = \frac{\operatorname{Cov}(X, Y)}{\sigma_X \sigma_Y} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2} \sqrt{\sum_i (y_i - \bar{y})^2}}.$$
+  <p>It has two complementary uses. Against the target, $|\rho_{X_j, Y}|$ ranks features by linear predictive strength; columns with $|\rho| < 0.1$ are commonly dropped as weak. Against other features, the pairwise correlation matrix reveals redundancy: when two features have $|\rho| > 0.7$ (a common threshold; some teams use 0.8) they carry duplicate linear information and one should be dropped, conventionally the one with the weaker correlation to the target. The limitation is the word "linear". Pearson correlation captures only linear association and reports zero for any non-linear relationship, however strong, so a Pearson screen will miss features that interact with the target through thresholds, curvature, or interactions. Spearman rank correlation generalises to monotonic but non-linear relationships; mutual information generalises further.</p>
+
+  <p><strong>Mutual information</strong> measures the dependence between two variables using information theory rather than covariance,</p>
+  $$I(X; Y) = \sum_{x, y} P(x, y) \log\!\left(\frac{P(x, y)}{P(x) P(y)}\right).$$
+  <p>It is zero if and only if $X$ and $Y$ are independent, positive otherwise, and unbounded above. The intuition is the reduction in uncertainty about $Y$ that comes from observing $X$: if knowing the value of $X$ collapses the conditional distribution of $Y$ to a point, the mutual information is maximal; if knowing $X$ leaves the conditional distribution of $Y$ unchanged, it is zero. Unlike Pearson correlation, mutual information captures arbitrary dependence (linear, non-linear, non-monotonic) and works on mixed discrete and continuous variables. Scikit-learn exposes <code>mutual_info_regression</code> and <code>mutual_info_classif</code> as scoring functions for <code>SelectKBest</code>, which picks the top $k$ features by score. The cost is statistical: mutual information estimation from finite samples is noisier than correlation and benefits from larger sample sizes.</p>
+
+  <p><strong>Information value (IV)</strong> is the credit risk practitioner's filter of choice for a binary target, computed on a binned feature using the weight of evidence (WoE) values introduced in <a href="02-feature_transformation.html">lecture 2</a>:</p>
+  $$\operatorname{IV} = \sum_{i=1}^{k} \left(\operatorname{Good\%}_i - \operatorname{Bad\%}_i\right) \cdot \operatorname{WoE}_i, \qquad \operatorname{WoE}_i = \ln\!\left(\frac{\operatorname{Good\%}_i}{\operatorname{Bad\%}_i}\right).$$
+  <p>The standard interpretation bands are: $\operatorname{IV} < 0.02$ is not useful, $0.02$ to $0.1$ is a weak predictor, $0.1$ to $0.3$ is medium, $0.3$ to $0.5$ is strong, and $\operatorname{IV} > 0.5$ is suspiciously high and usually indicates target leakage (a feature that is computed using information from after the outcome was realised, or a feature that is mechanically related to the target). The cut-off in production scorecards is conventionally $0.1$, retaining medium-and-above predictors. IV captures non-linear and non-monotonic associations through the binning step, which is what makes it more informative than Pearson against a binary target. The trap is binning quality: poor bins (too few observations per bin, non-monotonic WoE) inflate or depress IV unreliably, so IV must always be read alongside the underlying bin counts.</p>
+
+  <p>The <strong>population stability index (PSI)</strong> is not a relevance metric but a stability metric, used to filter out features whose distribution drifts between two samples (training versus a recent vintage, development versus out-of-time):</p>
+  $$\operatorname{PSI} = \sum_{i=1}^{n} \left(A_i - E_i\right) \cdot \ln\!\left(\frac{A_i}{E_i}\right),$$
+  <p>where $E_i$ is the expected proportion of observations in bin $i$ (from training) and $A_i$ is the actual proportion in the comparison sample. The standard bands are $\operatorname{PSI} < 0.1$ stable, $0.1$ to $0.25$ moderate shift, $\operatorname{PSI} > 0.25$ unstable. A feature with strong predictive power but high PSI is a feature whose predictive power may not survive into production; some teams drop such features at selection, others retain them but flag them for monitoring. PSI is also used post-deployment to monitor the deployed model, which connects this lecture to stage 6 of the pipeline.</p>
+
+  <p>The <strong>variance inflation factor (VIF)</strong> is a redundancy filter targeted at multicollinearity. For a candidate feature $X_j$, fit a linear regression of $X_j$ on the remaining features and let $R_j^2$ be the resulting coefficient of determination. Then</p>
+  $$\operatorname{VIF}_j = \frac{1}{1 - R_j^2}.$$
+  <p>A VIF of 1 means $X_j$ is uncorrelated with the other features; a VIF of 5 corresponds to $R_j^2 = 0.8$ and is the conventional warning threshold; a VIF of 10 corresponds to $R_j^2 = 0.9$ and is the conventional exclusion threshold. VIF goes beyond pairwise correlation because it captures the joint redundancy of one feature against the entire rest of the matrix; two features can each have modest pairwise correlations with every other feature individually but a high VIF if their combined effect is reproducible. VIF matters for linear models (where multicollinearity inflates coefficient variance and destroys individual interpretability) and matters much less for tree-based models, which are largely indifferent to it but pay a computational cost for the redundancy.</p>
+
+  <p><strong>Tree-based feature importance from a baseline model</strong> is the bridge between filter and embedded methods. A quick random forest or gradient-boosted tree is fitted on the candidate features, and the resulting importance scores (Gini impurity decrease for trees, gain for boosters, permutation importance for any model) rank the features for selection. This is technically an embedded method when the baseline model is the deployed model, and a filter method when the baseline is a quick proxy used only to rank features for a different downstream model. Gini-based importance has two known biases worth flagging: it favours high-cardinality features (continuous over binary) because they offer more split points, and it shares importance arbitrarily between correlated features, so a genuinely important feature can look unimportant if a correlated cousin is in the matrix.</p>
+
+  <h3>Wrapper methods</h3>
+
+  <p>Wrapper methods fit the actual downstream model on each candidate feature subset and pick the subset that scores best on a chosen metric. They account for interactions (a feature that is informative only in combination with another shows up as such because the metric is computed on the actual fit) but they are expensive: each candidate subset costs one model fit, and the number of candidate subsets grows combinatorially.</p>
+
+  <p><strong>Sequential forward selection (SFS)</strong> is the standard greedy approach. Start with no features. Fit the model with each single candidate feature in turn and keep the one that scores best. Then fit the model with that feature plus each remaining candidate in turn, again keeping the best. Continue until a stopping criterion is met (a target number of features, or no improvement above a tolerance). With $p$ candidates and a target of $k$, SFS fits approximately $p \cdot k$ models, which is tractable for moderate $p$ but greedy: a feature added early cannot be removed later, so a locally good choice that becomes redundant in light of later additions persists.</p>
+
+  <p><strong>Sequential backward selection (SBS)</strong> is the mirror procedure. Start with all features. Fit the model with each feature removed in turn and drop the one whose removal scores best (or hurts least). Continue until $k$ features remain. SBS is preferred when the downstream model needs to see the full feature set to identify which subset matters, and SFS is preferred when fitting on the full set is too expensive or unstable. Both produce the same answer in the unlikely case that the metric is monotonic in subset inclusion; in practice they often disagree.</p>
+
+  <p><strong>Floating variants</strong> address the greedy weakness. <strong>Sequential floating forward selection (SFFS)</strong> alternates a forward step with a backward check: after each addition, attempt to remove each currently included feature and keep the removal if it improves the score (without entering an infinite cycle). Sequential floating backward selection (SFBS) is the analogous mirror. The floating variants explore more of the subset space than their plain counterparts, at higher computational cost, and they catch the case where an early addition is rendered redundant by a later one.</p>
+
+  <p><strong>Recursive feature elimination (RFE)</strong> uses the model's own importance signal rather than the score metric to drive the search. Fit the model on all features. Read the feature importances (coefficients for linear models, Gini for trees). Drop the least important feature. Refit on the survivors. Repeat until $k$ features remain. RFE costs only $p - k$ model fits in total, much fewer than SBS's $\binom{p}{2} + \binom{p-1}{2} + \dots$, which is why it is the default wrapper choice when the model class exposes a clean importance signal. <strong>RFE with cross-validation (RFECV)</strong> wraps the elimination loop in cross-validation to choose $k$ automatically: the elimination is run within each fold, the cross-validated score is computed at each subset size, and the subset size that maximises CV score is reported.</p>
+
+  <p><strong>Exhaustive feature selection</strong> evaluates every possible subset, from size 1 to size $p$, and picks the global optimum. For $p$ features this is $2^p - 1$ subsets, which is computationally infeasible past about $p = 20$ even with fast models. Implementations like mlxtend's <code>ExhaustiveFeatureSelector</code> usually accept a minimum and maximum subset size to constrain the search, which makes the cost tractable for small $p$ at the price of giving up the guarantee of finding the global optimum across all sizes. Exhaustive search is rarely justified in practice because the wrapper methods above find subsets within a fraction of a percentage point of the global optimum at a tiny fraction of the cost.</p>
+
+  <h3>Embedded methods</h3>
+
+  <p>Embedded methods perform feature selection during model fitting, as a side effect of the loss function or the model structure. Three matter most in practice. <strong>L1 (lasso) regularisation</strong> adds the sum of absolute coefficient values to the regression loss, scaled by a hyperparameter $\alpha$,</p>
+  $$\mathcal{L}_{\text{L1}}(\beta) = \frac{1}{n} \sum_{i=1}^{n} \left(y_i - x_i^\top \beta\right)^2 + \alpha \sum_{j=1}^{p} |\beta_j|.$$
+  <p>The geometric intuition for why L1 drives coefficients to zero exactly is the shape of its feasible region. Constraining the coefficient vector to live inside the L1 ball $\sum_j |\beta_j| \le s$ traces out a diamond in two dimensions (a cross-polytope in higher dimensions) with corners on the axes. The minimum of the unregularised loss subject to that constraint is the point where the elliptical contours of the loss first touch the diamond; because the diamond has sharp corners on the axes, this contact point falls on an axis with probability one, which is exactly the point where one or more coefficients are zero. The word "Lasso" is an acronym for "least absolute shrinkage and selection operator", and the selection part is precisely this geometric consequence.</p>
+
+  <p><strong>L2 (ridge) regularisation</strong> uses the sum of squared coefficients,</p>
+  $$\mathcal{L}_{\text{L2}}(\beta) = \frac{1}{n} \sum_{i=1}^{n} \left(y_i - x_i^\top \beta\right)^2 + \alpha \sum_{j=1}^{p} \beta_j^2.$$
+  <p>The feasible region is now a circle (a hypersphere in higher dimensions) with no corners. The contact point between the loss contours and the circle is almost always in the interior of a quadrant, away from any axis, so the coefficients shrink toward zero but do not reach it. L2 is therefore a shrinkage method, not a selection method: it controls coefficient magnitude (helping with multicollinearity and stabilising estimates) but it does not produce a sparse feature set. The choice between L1 and L2 is the choice between selection and shrinkage; if you want a smaller feature set, L1; if you want all features but with smaller, more stable coefficients, L2.</p>
+
+  <p><strong>Elastic net</strong> combines the two penalties with a mixing parameter $r \in [0, 1]$,</p>
+  $$\mathcal{L}_{\text{EN}}(\beta) = \frac{1}{n} \sum_{i=1}^{n} \left(y_i - x_i^\top \beta\right)^2 + \alpha \left(r \sum_{j=1}^{p} |\beta_j| + (1 - r) \sum_{j=1}^{p} \beta_j^2\right).$$
+  <p>At $r = 1$ this is pure lasso; at $r = 0$ it is pure ridge; intermediate values give a hybrid that does sparse selection (from the L1 part) while handling correlated features more gracefully than pure lasso (from the L2 part, which spreads the penalty across correlated groups rather than arbitrarily picking one). Elastic net is the default embedded method when correlated features are present and a sparse solution is wanted; pure lasso has the known instability that small data changes can cause it to swap which member of a correlated group survives, which elastic net dampens.</p>
+
+  <p>The <strong>alpha hyperparameter</strong> controls regularisation strength and is directly the position of the model on the bias-variance axis from <a href="01-the_ml_landscape.html">lecture 1</a>. At $\alpha = 0$ the penalty vanishes and the model is the unregularised fit (high variance, low bias). As $\alpha$ grows, the coefficients shrink and the feasible region tightens (bias rises, variance falls); at the extreme of large $\alpha$ the L1 model has all coefficients at zero and the L2 model has coefficients near zero, both of which underfit. The right $\alpha$ is the one that minimises validation loss, found by grid search or by analytic regularisation paths. The same hyperparameter doubles as the feature-selection knob for L1 and elastic net: a larger $\alpha$ produces a sparser feature set, and the regularisation path traces the order in which features enter the model as $\alpha$ is relaxed from infinity to zero.</p>
+
+  <p>Embedded methods do not need to be regularised linear models. Any model class that produces a feature-importance signal as a by-product of fitting is performing embedded selection in the broad sense: gradient-boosted trees produce gain importances, random forests produce mean decrease in impurity, neural networks can be analysed by integrated gradients or SHAP. The same caveat applies in each case: importance is shared between correlated features, so the absolute ranking is informative only after redundancy has been removed.</p>
+
+  <h3>Feature selection and the bias-variance trade-off</h3>
+
+  <p>Feature selection is itself a position on the bias-variance axis introduced in <a href="01-the_ml_landscape.html">lecture 1</a>. Selecting fewer features increases bias (the model has fewer degrees of freedom to represent the data-generating process) and decreases variance (fewer parameters to estimate from finite data, smaller standard errors on each). Selecting more features does the opposite. The optimal number of features is therefore the point on the bias-variance curve where validation error is minimised, exactly as the optimal regularisation strength is the point that minimises validation error along the regularisation path. The two are not independent: an L1 model with a tuned $\alpha$ is simultaneously selecting features and tuning bias-variance, and the two decisions cannot be separated. Filter and wrapper methods, by contrast, leave the bias-variance tuning to a separate hyperparameter search on the final model.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for the majority of feature-selection incidents in practice. Each is invisible at validation time and obvious in retrospect.</p>
+
+  <div class="callout warn">
+    <span class="tag">Selecting on the full dataset before splitting</span>
+    Compute IV, mutual information, or correlation on the full dataset (training plus test) and then keep the top $k$ features. The selected set has been influenced by the test data, and test performance is biased upward. The fix is structural: split first, run all selection on the training fold only, and freeze the selected feature list before the test set is ever consulted. The same rule applies for cross-validation: selection happens inside each fold's training partition, not on the whole dataset prior to the fold loop. Tools like scikit-learn's <code>Pipeline</code> and <code>cross_val_score</code> together enforce this if used correctly; running <code>SelectKBest</code> outside the pipeline does not.
+    </div>
+
+  <div class="callout warn">
+    <span class="tag">Filter blindness to interactions</span>
+    A pure filter-based pipeline (IV plus Pearson plus VIF, no wrapper or embedded step) will discard features that are weak univariately but strong in combination with another feature. In credit risk this is most commonly seen with interaction terms (income times tenure, debt times utilisation) that have zero correlation with default rate individually but strong predictive power jointly. The fix is to follow the filter screen with an embedded or wrapper method that can see joint effects, and to engineer plausible interaction features explicitly before the filter screen so they have a chance to be evaluated.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Suspicious IV being treated as good news</span>
+    A feature with $\operatorname{IV} > 0.5$ looks excellent on the IV table and is almost always wrong. Target leakage (a feature computed using information from after the outcome was realised) is the usual explanation; mechanical redundancy with the target (a feature that is a transformation of the target itself) is the second. The IV bands explicitly flag this regime as "suspicious" rather than "very strong" for that reason. Always investigate any feature with $\operatorname{IV} > 0.5$ by tracing its computation back to a definition document and confirming no future information is used; if you cannot defend it on first principles, drop it.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">L1 sparsity reported without correlated-feature stability check</span>
+    Lasso applied to a matrix with correlated features will pick one member of each correlated group arbitrarily; small changes in the training sample can swap which member survives. The reported feature list is then unstable across resamples and reviewers cannot reproduce it. The fix is either to switch to elastic net (which spreads the L1 penalty across correlated groups and stabilises the selection) or to run lasso with bootstrap resampling and report only features that survive in a high proportion of resamples (stability selection). Reporting a single lasso fit as the selected set without this check is a known source of reproducibility failures.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Feature selection is the third feature-engineering stage and the last decision before splitting into train, test, and validation. Three families do the work. Filter methods score each feature with a one-shot statistic (variance, Pearson correlation, mutual information, IV, PSI, VIF, baseline tree importance) and are cheap, model-agnostic, but interaction-blind. Wrapper methods (SFS, SBS, the floating variants, RFE and RFECV, exhaustive search) search over subsets by fitting the model and are interaction-aware but expensive. Embedded methods (L1, L2, elastic net, native tree importances) build selection into the fit itself and sit in the middle on both cost and capability. The position on the family axis is also a position on bias-variance: fewer features increases bias and decreases variance; the optimal number is the point at which validation error is minimised. In practice the families are composed rather than chosen between, with a cheap filter culling obvious noise before a more expensive embedded or wrapper step finalises the subset.</p>
+
+  <p>What this lecture deliberately did not do. It did not introduce model classes themselves; the supervised algorithms that consume the selected feature set start in sub-module 03. It did not cover model interpretation methods like SHAP and permutation importance in depth; those belong to the model evaluation stage. It did not cover cross-validation as a procedure in its own right, even though every selection method above is best run inside a cross-validation loop to avoid optimistic bias; that is <a href="../02_train_test_split/01-train_test_validation.html">the first lecture of sub-module 02</a>.</p>
+
+  <p>Sub-module 02, starting with <a href="../02_train_test_split/01-train_test_validation.html">train, test, and validation splitting</a>, takes the selected feature matrix and turns it into the partitioned datasets that every supervised algorithm needs to fit, tune, and evaluate without leakage. The transition is the same one feature selection itself has had to respect: any decision made using data must be made on the training partition only, validated on a held-out partition, and tested on a partition that was never touched until the final reporting step.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the three families of feature selection and give one defining example of each. For each family, name its principal strength and its principal weakness.</li>
+      <li>A binary-target scorecard has a feature with three bins and the following good/bad counts: bin 1 (1200 goods, 80 bads), bin 2 (900 goods, 120 bads), bin 3 (500 goods, 200 bads). Total goods 2600, total bads 400. Compute the WoE for each bin and the total information value. State which IV band the result falls in and what action you would take.</li>
+      <li>A feature has $\operatorname{VIF} = 8$. Explain what this means in terms of the multiple regression of that feature on the others, and state whether you would keep or drop the feature for a logistic regression and for a gradient-boosted tree, justifying the asymmetry.</li>
+      <li>Explain geometrically why L1 regularisation drives coefficients exactly to zero while L2 only shrinks them. Reference the shape of the feasible region in each case.</li>
+      <li>You compute mutual information on the full dataset, keep the top 20 features, and then split into train and test. Why is the test AUC optimistically biased, and what is the structural fix?</li>
+      <li>A model has 60 features and validation error is high. Adding more features (extracted from text fields) makes training error fall but validation error rise. Describe what is happening in bias-variance terms and explain how feature selection (rather than adding more features) addresses the problem.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Sub-module 02 begins with <a href="../02_train_test_split/01-train_test_validation.html">train, test, and validation splitting</a>, which takes the selected feature matrix and partitions it for fitting, tuning, and unbiased evaluation. The full sub-module index is at <a href="../02_train_test_split/index.html">train-test split</a>.</li>
+      <li><strong>Previous:</strong> Lecture 3 (<a href="03-dimensionality_reduction.html">dimensionality reduction</a>) built new features from linear or non-linear combinations of existing ones; this lecture decides which of the resulting columns to keep. The two are complementary: reduction changes the basis, selection changes the count.</li>
+      <li><strong>Prerequisite:</strong> Lecture 1 (<a href="01-the_ml_landscape.html">the machine learning landscape</a>) introduced the bias-variance trade-off that this lecture's selection methods navigate. Lecture 2 (<a href="02-feature_transformation.html">feature transformation</a>) introduced weight of evidence, which IV here re-uses as a selection criterion.</li>
+      <li><strong>Outside this course:</strong> Information value and weight of evidence are the standard scorecard-development screen. The application-scoring track at <code>application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/</code> develops a WoE/IV-driven feature-selection workflow end-to-end with the regulatory documentation that accompanies it.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Feature engineering course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 4 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 8: analytical modelling</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Analytical modelling</h1>
+  <p class="subtitle">A fact table is a till roll: a long strip of measurements, each stamped with the codes that say what it was, when, and for whom. Dimensions are the labels those codes point at. Every pivot table anyone has ever built is a star schema whether they knew it or not, and the first question in the design is not which tables to build but what one row means.</p>
+  <div class="meta">
+    <span>Lecture 8 of 20</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Part II: SQL and data modelling</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Analytical modelling arranges data for reading. The dominant pattern, from Ralph Kimball, is the <strong>star schema</strong>: one central <strong>fact table</strong> holding the numbers, surrounded by <strong>dimension tables</strong> holding the descriptive attributes you slice those numbers by. Facts are long and narrow and grow forever; dimensions are short and wide and change slowly.</p>
+
+  <p>The first and most consequential decision is the <strong>grain</strong>: what exactly one row of the fact table represents. "One row per account per month end" is a grain. "One row per payment" is a different grain. Get it wrong or leave it unstated and every subsequent error follows, because a table whose grain nobody can articulate will be double counted by somebody within the month.</p>
+
+  <p>Three schools compete for the layer beneath. <strong>Kimball</strong> builds dimensional marts directly, sharing conformed dimensions between them. <strong>Inmon</strong> builds a normalised enterprise warehouse first and derives dimensional marts from it. <strong>Data Vault</strong> builds an auditable, insert-only layer of hubs, links, and satellites, then derives marts from that. In practice most modern platforms are hybrids expressed through the <strong>medallion</strong> convention: bronze for raw arrivals, silver for conformed and cleaned data, gold for the dimensional models consumers read.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A till roll from a shop. Each line is one measurement, with codes: item 4471, till 3, operator 12, 14:07. The roll itself tells you nothing about what item 4471 is; for that you need the price list, the till register, the staff rota, the calendar. Those four are the dimensions and the roll is the fact table. Nobody would print the full product description on every line of the roll, and nobody would keep the staff rota inside the roll. That separation, measurements in one long thin place, descriptions in several short wide places, is a star schema.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Why the periodic snapshot matters here</span>
+    Kimball classifies fact tables into three kinds, and the second one is exactly what a bank's risk data is. A <em>transaction</em> fact table has a row per event: a payment, a drawdown. A <em>periodic snapshot</em> fact table has a row per entity per period: one row per account per month end, holding the balance, the arrears count, the ECL. An <em>accumulating snapshot</em> has a row per process instance whose dates fill in as it progresses: an application moving through underwriting, or an account moving through the recovery process. The monthly risk mart is a periodic snapshot; the payments and collections histories are transaction facts; the arrears-to-recovery journey is an accumulating snapshot. Naming which one you are building tells you immediately how to load it and what may be summed.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Summing a balance across time is wrong, and the model should make that obvious.</strong> A balance is <strong>semi-additive</strong>: it adds up across accounts, and it does not add up across months, because a customer owing £142,000 in each of twelve months does not owe £1.7 million. Add a monthly snapshot table to a BI tool with a naive sum and this error will be made within a week, by somebody senior, in a paper. A model that declares which measures are additive, semi-additive, and non-additive prevents an entire class of embarrassment. Rates and ratios are the non-additive case: the average of twelve monthly default rates is not the annual default rate, and the only correct route is to sum the numerator and the denominator separately and divide once.</p>
+
+  <p><strong>Two dashboards disagree because they defined the dimension differently.</strong> If the risk report groups by a product hierarchy built in one query and the finance report groups by a product hierarchy built in another, the two will diverge on the awkward cases, and reconciling them costs weeks. Kimball's answer, <strong>conformed dimensions</strong>, is one shared product dimension used by every fact table, so the grouping is identical by construction. This is the single highest-value governance idea in dimensional modelling, and it is organisational as much as technical.</p>
+
+  <p><strong>Without dimension history you cannot answer "at the time".</strong> What was the customer's risk grade when the loan was written? Which branch owned the relationship in 2021? Which product terms applied when the arrears began? Each requires the dimension to remember its past, which is what slowly changing dimension type 2 provides. A platform that keeps only current attributes will answer all three questions with today's values, silently, and every one of those answers is wrong in a way that biases a model.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>A star, drawn for credit risk</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A star schema for a monthly credit risk mart">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">One periodic snapshot fact, five conformed dimensions</text>
+
+      <!-- fact table centre -->
+      <rect x="270" y="150" width="220" height="150" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2.5"/>
+      <text x="380" y="172" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#5b21b6">fact_account_month</text>
+      <text x="380" y="188" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#7c3aed">grain: one row per account per month end</text>
+      <g font-family="JetBrains Mono" font-size="8.5" fill="#5b21b6">
+        <text x="282" y="206">date_key, account_key,</text>
+        <text x="282" y="219">customer_key, product_key,</text>
+        <text x="282" y="232">branch_key</text>
+        <text x="282" y="250" fill="#0d9488">balance          semi-add</text>
+        <text x="282" y="263" fill="#0d9488">drawdowns        additive</text>
+        <text x="282" y="276" fill="#0d9488">ecl              semi-add</text>
+        <text x="282" y="289" fill="#b45309">arrears_months   non-add</text>
+      </g>
+
+      <!-- dimensions -->
+      <rect x="40" y="60" width="160" height="70" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="120" y="80" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">dim_date</text>
+      <text x="120" y="96" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">month end, quarter, year,</text>
+      <text x="120" y="108" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">fiscal period, is_year_end</text>
+      <text x="120" y="123" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#0d9488">SCD type 0</text>
+
+      <rect x="560" y="60" width="160" height="70" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="640" y="80" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">dim_customer</text>
+      <text x="640" y="96" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">segment, risk grade,</text>
+      <text x="640" y="108" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">region, employment</text>
+      <text x="640" y="123" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#be185d">SCD type 2</text>
+
+      <rect x="40" y="330" width="160" height="70" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="120" y="350" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">dim_product</text>
+      <text x="120" y="366" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">name, family, rate basis,</text>
+      <text x="120" y="378" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">margin, term</text>
+      <text x="120" y="393" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#be185d">SCD type 2</text>
+
+      <rect x="560" y="330" width="160" height="70" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="640" y="350" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">dim_branch</text>
+      <text x="640" y="366" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">branch, region, channel,</text>
+      <text x="640" y="378" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">legal entity</text>
+      <text x="640" y="393" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#be185d">SCD type 2</text>
+
+      <rect x="300" y="360" width="160" height="60" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="380" y="380" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#115e59">dim_account</text>
+      <text x="380" y="396" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">origination date, term,</text>
+      <text x="380" y="408" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">purpose, original LTV</text>
+
+      <!-- spokes -->
+      <g stroke="#a1a1aa" stroke-width="1.5">
+        <line x1="200" y1="112" x2="272" y2="168"/>
+        <line x1="560" y1="112" x2="488" y2="168"/>
+        <line x1="200" y1="348" x2="272" y2="284"/>
+        <line x1="560" y1="348" x2="488" y2="284"/>
+        <line x1="380" y1="358" x2="380" y2="302"/>
+      </g>
+
+      <!-- caution -->
+      <rect x="230" y="60" width="300" height="70" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2" stroke-dasharray="5 4"/>
+      <text x="380" y="80" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">ADDITIVITY IS PART OF THE MODEL</text>
+      <text x="380" y="98" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c2d12">balance sums across accounts, never across months</text>
+      <text x="380" y="112" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c2d12">arrears_months and rates never sum at all</text>
+      <text x="380" y="126" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#b45309">declare it in the model, not in a footnote</text>
+    </svg>
+    <figcaption>A star for a monthly risk mart. Every dimension carries a surrogate key referenced by the fact table, and the three marked type 2 keep history so that "at the time" questions are answerable. The date dimension is type 0 because the calendar does not change. Note that the additivity of each measure is recorded next to it: this belongs in the model and in the BI tool's semantic layer, not in a caveat nobody reads.</figcaption>
+  </figure>
+
+  <h3>The four-step design process</h3>
+
+  <p>Kimball's procedure is four questions in a fixed order, and taking them out of order is how designs go wrong.</p>
+
+  <div class="defcard tint-mint"><span class="term">1. Choose the business process</span><span class="def">What activity are we measuring? Origination, monthly credit risk position, collections activity, recovery. One process, one fact table. Trying to model two processes in one fact table is the most common structural error.</span></div>
+  <div class="defcard tint-lavender"><span class="term">2. Declare the grain</span><span class="def">What does one row mean, stated in a sentence with no conjunctions? "One row per account per calendar month end." Write it in the table's documentation. Everything downstream depends on it, and a mixed-grain table cannot be aggregated safely by anyone.</span></div>
+  <div class="defcard tint-peach"><span class="term">3. Identify the dimensions</span><span class="def">By what do we want to slice? Each answer is a dimension, and each must be single-valued at the declared grain. If an account can have several collaterals at a month end, collateral is not a dimension of this fact; it is either a separate fact or a bridge.</span></div>
+  <div class="defcard tint-sky"><span class="term">4. Identify the facts</span><span class="def">What are we measuring? Each measure must be true at the grain, and each must be labelled additive, semi-additive, or non-additive. A measure that is not true at the grain belongs in another fact table.</span></div>
+
+  <h3>Slowly changing dimensions</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Type</th><th>Behaviour on change</th><th>Use for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Type 0</strong></td><td>Never changes; the attribute is fixed forever</td><td>Date attributes, original loan-to-value at origination, date of birth</td></tr>
+      <tr><td><strong>Type 1</strong></td><td>Overwrite; the old value is gone</td><td>Genuine corrections of data entry errors, where the old value had no meaning</td></tr>
+      <tr><td><strong>Type 2</strong></td><td>Add a new row with validity dates, keeping the old one; the surrogate key changes</td><td>Anything you may need "at the time": segment, risk grade, branch, product terms</td></tr>
+      <tr><td><strong>Type 3</strong></td><td>Add a column holding the previous value</td><td>Rare; useful only when exactly one prior value is ever needed</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <pre><code>-- a type 2 dimension: one row per version, with validity and a current flag
+CREATE OR REPLACE TABLE dim_customer (
+    customer_key      BIGINT      PRIMARY KEY,   -- surrogate, changes per version
+    customer_id        VARCHAR    NOT NULL,      -- natural key, stable across versions
+    segment            VARCHAR    NOT NULL,
+    risk_grade         VARCHAR,
+    region             VARCHAR,
+    valid_from         DATE       NOT NULL,
+    valid_to           DATE       NOT NULL DEFAULT DATE '9999-12-31',
+    is_current         BOOLEAN    NOT NULL,
+    CHECK (valid_to &gt; valid_from)
+);</code></pre>
+
+  <p>The mechanics that make type 2 work in practice. Use a half-open validity interval, <code>valid_from</code> inclusive and <code>valid_to</code> exclusive, so that consecutive versions never overlap and a point-in-time lookup is a single unambiguous comparison. Use the far-future sentinel rather than null for the open interval, so that range comparisons need no null handling. Keep <code>is_current</code> as a convenience for the common query, accepting that it is derivable and must be maintained consistently. And critically, the fact table stores the <em>surrogate</em> key of the dimension version that was current when the fact occurred, which is what makes historical attribution automatic: joining a 2019 fact to the dimension by surrogate key yields the 2019 attributes with no date logic in the query at all. That is the payoff for the whole apparatus.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Star or snowflake</h3>
+
+  <p>A <strong>star</strong> keeps each dimension in one flat table, repeating the hierarchy: the product dimension holds product, family, and division on every row. A <strong>snowflake</strong> normalises the hierarchy into separate tables joined together. The star wins in almost every modern case: fewer joins, simpler for consumers and BI tools, and the redundancy costs almost nothing because dimensions are small. Snowflake where a hierarchy level is genuinely large or is maintained independently, and accept the extra join.</p>
+
+  <h3>The three schools</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th></th><th>Kimball</th><th>Inmon</th><th>Data Vault 2.0</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Direction</strong></td><td>Bottom-up: build marts per business process, share conformed dimensions</td><td>Top-down: build a normalised enterprise warehouse, derive marts from it</td><td>Middle: build an insert-only integration layer, derive marts from it</td></tr>
+      <tr><td><strong>Core structures</strong></td><td>Fact and dimension tables, star schemas</td><td>Third normal form enterprise model, then dimensional marts</td><td>Hubs (business keys), links (relationships), satellites (attributes with history)</td></tr>
+      <tr><td><strong>Optimised for</strong></td><td>Query performance and comprehensibility</td><td>Enterprise consistency and a single integrated model</td><td>Auditability, parallel loading, and absorbing source change</td></tr>
+      <tr><td><strong>Weakness</strong></td><td>Conforming dimensions across many marts is organisational work that never ends</td><td>Slow to deliver; the enterprise model is a large upfront commitment</td><td>Query complexity; nobody consumes a vault directly, so you always build marts too</td></tr>
+      <tr><td><strong>Fits</strong></td><td>Most teams, most of the time; smaller organisations especially</td><td>Large enterprises with strong central governance</td><td>Regulated environments with many sources, frequent source change, and hard audit requirements</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The Data Vault deserves a note for a banking audience, because its design goals line up unusually well with supervisory expectations. Hubs hold business keys and nothing else. Links hold relationships between hubs. Satellites hold descriptive attributes with load timestamps and record sources, and are insert-only, so nothing is ever updated or deleted and the full history of what each source asserted, and when, is preserved by construction. That is BCBS 239 lineage as a physical data model. The cost is real: more tables, more joins, and an obligatory presentation layer on top, because no analyst should query a vault directly. The pragmatic hybrid that has become common is a vault for raw integration and history, with Kimball stars on top for consumption, and that is a defensible design for a risk platform with many source systems.</p>
+
+  <h3>The medallion convention</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Contents</th><th>Modelling style</th><th>Who reads it</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Bronze</strong></td><td>Raw arrivals, exactly as received, plus load metadata; append-only</td><td>None; source shape preserved</td><td>Engineers, and anyone reproducing a dispute</td></tr>
+      <tr><td><strong>Silver</strong></td><td>Typed, deduplicated, conformed, keys resolved, quality-checked</td><td>Third normal form or Data Vault</td><td>Engineers and analysts building things</td></tr>
+      <tr><td><strong>Gold</strong></td><td>Business-meaning tables: stars, aggregates, model feature tables, report extracts</td><td>Kimball dimensional</td><td>Analysts, BI tools, models, regulatory reporting</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The layering is a convention rather than a technology, and its value is that it separates three concerns that get tangled otherwise: fidelity to the source, correctness of interpretation, and convenience of consumption. The rule that makes it work is that each layer reads only from the layer below, so a defect can be located by descending one level at a time, and a definition change is a rebuild of gold from silver rather than a re-extraction from the source.</p>
+
+  <div class="callout warn">
+    <span class="tag">Bridges, and the multi-valued dimension trap</span>
+    An account may have several collateral items at one month end, so collateral is multi-valued at the account-month grain and cannot be a dimension of that fact without fanning it out. Three legitimate resolutions. Aggregate it into facts at the correct grain, such as total collateral value and charge count, which is usually best. Build a separate collateral fact at its own grain. Or, if you genuinely need to slice by individual collateral attributes, add a <em>bridge</em> table between the fact and the dimension, and accept that any query through the bridge double counts unless it applies an allocation factor. Never simply join and sum. This is the fan-out of Lecture 05 appearing as a modelling decision rather than a query bug.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: designing fact_account_month, and the query that proves the grain</strong>
+    <p>Run the four steps on the central table of a credit risk mart.</p>
+    <p><em>1. Business process.</em> The monthly measurement of credit risk position on the lending book. Not origination, which has its own fact at a different grain, and not collections activity, which is an event stream.</p>
+    <p><em>2. Grain.</em> "One row per account per calendar month end, for every account open at any point during that month." The clause after the comma is a real decision: including accounts closed mid-month changes the population, and stating it prevents two teams computing different denominators. Write it into the table description and into the test suite.</p>
+    <p><em>3. Dimensions.</em> Date (type 0), account (mostly type 0 attributes fixed at origination), customer (type 2), product (type 2), branch or legal entity (type 2). Collateral is excluded as multi-valued, per the caution above, and enters as aggregated facts instead.</p>
+    <p><em>4. Facts, each labelled.</em></p>
+    <pre><code>balance                DECIMAL(18,2)  -- semi-additive: sum across accounts, never across months
+undrawn_commitment     DECIMAL(18,2)  -- semi-additive
+drawdowns_in_month     DECIMAL(18,2)  -- additive: a flow, sums across both accounts and months
+repayments_in_month    DECIMAL(18,2)  -- additive
+ecl_12m                DECIMAL(18,2)  -- semi-additive
+ecl_lifetime           DECIMAL(18,2)  -- semi-additive
+collateral_value_total DECIMAL(18,2)  -- semi-additive, aggregated from the collateral table
+collateral_charge_count INTEGER       -- semi-additive
+arrears_months         INTEGER        -- non-additive: never sum, never average naively
+pd_12m                 DECIMAL(9,6)   -- non-additive: weight by exposure if aggregating
+lgd                    DECIMAL(9,6)   -- non-additive
+ifrs9_stage            INTEGER        -- non-additive: a category, count rows instead</code></pre>
+    <p><em>The query that proves the grain holds.</em> Two assertions, run every load, both of which fail loudly rather than silently:</p>
+    <pre><code>-- 1. the grain is unique: no duplicates at account-month
+SELECT date_key, account_key, COUNT(*) AS n
+FROM   fact_account_month
+GROUP BY 1, 2
+HAVING COUNT(*) &gt; 1;      -- must return zero rows
+
+-- 2. every dimension key resolves: no orphans
+SELECT COUNT(*) AS unresolved
+FROM   fact_account_month f
+LEFT JOIN dim_customer d ON d.customer_key = f.customer_key
+WHERE  d.customer_key IS NULL;   -- must be zero</code></pre>
+    <p><em>The wrong query the model must survive.</em> An analyst opens the mart and computes total exposure for 2026 as <code>SUM(balance)</code> across all twelve months, getting roughly twelve times the true figure. The model cannot forbid this, but it can make it obvious and it can make the right thing easy: name the column so its nature is visible, record additivity in the semantic layer of the BI tool so that summing across the date dimension is blocked or warned, and publish a gold aggregate table at the portfolio-month grain that answers the common question correctly. The correct calculation for a period figure on a semi-additive measure is a point-in-time selection, the closing month, or an average of the monthly values, and which of the two is right depends on the question. Documenting that choice next to the measure is part of the modelling work, not an afterthought.</p>
+    <p><em>The non-additive trap, spelled out.</em> The 2026 default rate is not the mean of twelve monthly default rates. Sum the defaults and sum the exposures, then divide once. Likewise a portfolio PD is an exposure-weighted average, not a simple one. Both errors are common enough in production reporting to be worth a test that compares the naive and correct figures and alerts when they diverge beyond a tolerance, since a divergence means somebody has wired up the naive one.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Analytical modelling denormalises on purpose. Declare the grain first and in one sentence, choose dimensions that are single-valued at that grain, label every measure additive, semi-additive, or non-additive, and keep history in dimensions with type 2 validity intervals so that "at the time" questions have answers. Kimball for the consumption layer, third normal form or a Data Vault beneath it if the source landscape justifies the integration effort, and the medallion convention to keep raw fidelity, correct interpretation, and easy consumption in separate places.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State Kimball's four design steps in order and say what goes wrong if you choose dimensions before declaring the grain.</li>
+      <li>Give the three kinds of fact table and say which one a monthly risk mart is.</li>
+      <li>Classify balance, drawdowns in month, and arrears months by additivity, and give the correct way to compute an annual default rate.</li>
+      <li>Explain why a type 2 dimension plus a surrogate key in the fact table makes historical attribution automatic.</li>
+      <li>Why is a half-open validity interval with a far-future sentinel preferable to nullable end dates?</li>
+      <li>An account has three collateral charges at a month end. Give three valid ways to model this and say which is usually best.</li>
+      <li>Contrast Kimball, Inmon, and Data Vault on what each optimises for, and say why a Data Vault appeals to a regulated bank.</li>
+      <li>What is the rule that makes the medallion layering useful, and what does it buy when a definition changes?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="07-normalisation.html">Lecture 07</a> built the normalised layer this lecture denormalises from, and flagged that third normal form says nothing about time.</li>
+      <li><strong>Next:</strong> <a href="09-duckdb.html">Lecture 09 (DuckDB)</a> is the engine that makes all of this runnable on a laptop.</li>
+      <li><strong>Cross-link:</strong> <a href="06-sql_manipulation.html">Lecture 06</a> supplied the merge pattern that maintains a type 2 dimension; <a href="15-dbt_analytics_engineering.html">Lecture 15</a> is how these models get built, tested, and documented in practice; <a href="14-lakehouse_table_formats.html">Lecture 14</a> stores them.</li>
+      <li><strong>Banking link:</strong> <code>fact_account_month</code> as designed here is the physical form of the modelling dataset used throughout <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">A-IRB and IFRS 9 development</a>, and the additivity table is the answer to a large share of reporting disputes.</li>
+      <li><strong>Further reading:</strong> Kimball and Ross, <em>The Data Warehouse Toolkit</em> (3rd edition, 2013) is the standard reference and its first three chapters cover everything above; Inmon's <em>Building the Data Warehouse</em> (1992) for the alternative; Linstedt and Olschimke, <em>Building a Scalable Data Warehouse with Data Vault 2.0</em> (2015) for the third.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 8 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

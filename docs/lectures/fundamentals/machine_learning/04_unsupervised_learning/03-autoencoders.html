@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 16: autoencoders</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Unsupervised learning</a></div>
+  <h1>Autoencoders</h1>
+  <p class="subtitle">PCA closed by noting that a linear autoencoder recovers the same subspace as the top principal components. This lecture makes that connection precise, then asks the question PCA cannot answer: what happens when the data's genuine low-dimensional structure is curved rather than flat? Bottleneck neural networks and kernel PCA are two different answers, and understanding the single dissimilarity-and-reconstruction framework that unifies PCA, both of them, and (two modules ahead) the variational autoencoder is worth more than memorising any one of them separately.</p>
+  <div class="meta">
+    <span>Lecture 16 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part III: unsupervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>dissimilarity function</strong> $L: \mathbb{R}^q \times \mathbb{R}^q \to \mathbb{R}_+$ measures how different two points are, with $L(x, x') = 0$ if and only if $x = x'$; unlike a metric distance, it need not be symmetric and need not satisfy the triangle inequality, which matters once dissimilarity is applied to categorical data later in this module. An <strong>autoencoder</strong> is a pair of mappings, an <strong>encoder</strong> $\varphi: \mathbb{R}^q \to \mathbb{R}^p$ and a <strong>decoder</strong> $\psi: \mathbb{R}^p \to \mathbb{R}^q$, with $p &lt; q$, chosen so that the round trip $\psi(\varphi(X))$ has small expected dissimilarity from $X$ itself: the pair is forced to squeeze every observation through a $p$-dimensional bottleneck and still reconstruct it as faithfully as possible. Lecture 2's PCA is the special case where $\varphi$ and $\psi$ are both linear: the encoder is $\varphi(x) = W_k^\top(x - \bar x)$ and the decoder is $\psi(z) = W_k z + \bar x$, for $W_k$ the matrix of the leading $k$ eigenvectors, and a classical result (Eckart-Young-Mirsky) confirms that minimising squared reconstruction error over <em>every possible</em> linear encoder-decoder pair, not merely orthogonal projections assumed in advance, still recovers exactly this subspace. A <strong>bottleneck neural network</strong> (BNN) generalises the idea by letting $\varphi$ and $\psi$ be non-linear feed-forward networks, trained by ordinary backpropagation on the reconstruction loss; <strong>kernel PCA</strong> generalises differently, performing linear PCA not on the raw data but implicitly on a non-linear feature map of it, via the kernel trick.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine trying to describe a photograph to someone using only ten words, then having them redraw the photograph from your ten words alone. If your ten words let them redraw something close to the original, you have found a good compressed description; if the redrawing is nothing like the original, your ten words missed what mattered. An autoencoder is exactly this game played automatically: the encoder is the process of choosing the ten words, the decoder is the redrawing, and training adjusts both simultaneously so the redrawing gets as close to the original as a ten-word description possibly allows. PCA plays this game using only straight lines and flat planes; a bottleneck neural network is allowed to bend.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture makes precise the connection lecture 2 (PCA) flagged only informally, and it is the direct prerequisite for the variational autoencoder developed in the generative-models module later in this course, which adds a probabilistic layer on top of the identical encoder-decoder structure. It also sets up a running theme for the rest of this sub-module: most unsupervised methods need a dissimilarity function chosen deliberately, and the choice matters as much as the algorithm built on top of it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this framework earns a lecture of its own rather than staying a footnote to PCA.</p>
+
+  <p>First, <strong>PCA is a linear tool applied, in practice, to data that is frequently not linear</strong>. A telematics driving-behaviour dataset, a claims-development shape, a set of policy features, can lie on a genuinely curved lower-dimensional surface, and forcing a straight-line (linear) compression onto curved structure discards exactly the information a bottleneck neural network or kernel PCA is built to preserve.</p>
+
+  <p>Second, <strong>reconstruction-error anomaly detection, already flagged for PCA, becomes considerably more powerful once the encoder-decoder pair can bend</strong>: a linear autoencoder can only flag deviations from a flat subspace as anomalous, while a non-linear one can learn the genuine shape of normal behaviour and flag deviations from that shape specifically, catching anomalies a linear method would miss entirely because they sit within the flat subspace's span but off the true, curved manifold of normal cases.</p>
+
+  <p>Third, <strong>the dissimilarity function is a modelling choice, not a detail</strong>, and this lecture is where that choice is made explicit rather than assumed. Squared Euclidean distance, the implicit default in both PCA and a standard bottleneck network trained with MSE, is the right choice for continuous, roughly symmetric data and a poor one elsewhere, a point that becomes acute once this module reaches categorical covariates.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A telematics team built a PCA-based anomaly detector to flag unusual driving sessions from a dozen behavioural features (harsh braking rate, speed variance, cornering g-force, and similar). The detector performed well on sessions with unusually high values across the board but consistently missed a specific, genuinely risky pattern: moderate values on every individual feature combined in an unusual way (smooth driving that nonetheless combined an atypical route timing with an atypical acceleration profile), because that combination sat on a curved region of the feature space that a linear reconstruction could not distinguish from normal. Replacing the linear autoencoder with a small bottleneck neural network, same bottleneck width, non-linear encoder and decoder, recovered the pattern: the network's reconstruction error rose sharply for exactly the sessions a domain expert had independently flagged as unusual, because the non-linear decoder had learned the true curved shape of normal driving rather than its best flat approximation.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: data lying on a curved one-dimensional manifold (a noisy circle) in two dimensions, where a linear encoder-decoder pair (PCA) can only approximate it with a flat line, while a non-linear one can trace the curve itself.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A linear autoencoder (PCA) versus a non-linear bottleneck network on curved data">
+      <defs>
+        <marker id="aeArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Data on a noisy circle: a flat reconstruction versus a curved one</text>
+
+      <g transform="translate(40, 50)">
+        <rect x="0" y="0" width="360" height="250" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+        <text x="180" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Linear autoencoder (PCA), p = 1</text>
+        <circle cx="180" cy="150" r="70" fill="none" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="3 2"/>
+        <g fill="#78716c">
+          <circle cx="250" cy="150" r="3"/><circle cx="230" cy="188" r="3"/><circle cx="180" cy="205" r="3"/>
+          <circle cx="130" cy="188" r="3"/><circle cx="110" cy="150" r="3"/><circle cx="130" cy="112" r="3"/>
+          <circle cx="180" cy="95" r="3"/><circle cx="230" cy="112" r="3"/>
+        </g>
+        <line x1="110" y1="150" x2="250" y2="150" stroke="#b45309" stroke-width="2.5"/>
+        <text x="180" y="235" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">the flat line only fits the widest diameter well</text>
+      </g>
+
+      <g transform="translate(460, 50)">
+        <rect x="0" y="0" width="360" height="250" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="180" y="24" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Bottleneck neural network, p = 1</text>
+        <circle cx="180" cy="150" r="70" fill="none" stroke="#0d9488" stroke-width="2.5"/>
+        <g fill="#78716c">
+          <circle cx="250" cy="150" r="3"/><circle cx="230" cy="188" r="3"/><circle cx="180" cy="205" r="3"/>
+          <circle cx="130" cy="188" r="3"/><circle cx="110" cy="150" r="3"/><circle cx="130" cy="112" r="3"/>
+          <circle cx="180" cy="95" r="3"/><circle cx="230" cy="112" r="3"/>
+        </g>
+        <text x="180" y="235" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">the learned curve traces the true one-dimensional structure</text>
+      </g>
+    </svg>
+    <figcaption>Both panels compress the identical two-dimensional data to a one-dimensional code, $p = 1$. The linear autoencoder (PCA, left) can only represent the code as a straight line, the best flat approximation to a circle, and reconstruction error is large for points on the far sides of the circle. The bottleneck neural network (right), with non-linear activations in its encoder and decoder, can represent the code as the angle around the circle, tracing the true one-dimensional manifold and achieving near-zero reconstruction error everywhere.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>An autoencoder is a reconstruction bet, not a compression algorithm per se.</strong> Whatever $\varphi$ and $\psi$ are, they are chosen jointly to win that bet as well as possible under the constraint of a $p$-dimensional bottleneck; PCA, a BNN, and kernel PCA are three different bets on the same underlying game. <strong>Linear is a special case, not the general rule.</strong> PCA's flat-subspace answer is exactly right when the data's genuine structure is flat, and is a systematic underperformer whenever it is not.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Dissimilarity functions</h3>
+
+  <p>A <strong>dissimilarity function</strong> $L: \mathbb{R}^q \times \mathbb{R}^q \to \mathbb{R}_+$ satisfies only $L(x, x') = 0 \iff x = x'$; it need not be symmetric ($L(x,x') = L(x',x)$ is not required) and need not satisfy the triangle inequality, both properties a proper metric distance would need. This weaker requirement matters because several dissimilarities used throughout this sub-module (the Kullback-Leibler divergence reappearing in the mixture-model and visualisation lectures later in this module, in particular) are genuinely asymmetric. The most familiar family is the $L^k$ norms,</p>
+  $$L(x, x') = \|x - x'\|_k = \left(\sum_{j=1}^q |x_j - x_j'|^k\right)^{1/k},$$
+  <p>with $k=2$ the ordinary Euclidean distance, $k=1$ the Manhattan distance, and $k \to \infty$ the supremum norm. The <strong>Mahalanobis distance</strong>, $L(x,x') = (x-x')^\top A (x-x')$ for a positive-definite matrix $A$, generalises squared Euclidean distance to account for correlation and differing scale between features, with $A = \Sigma^{-1}$ (the inverse covariance) the standard choice; it is the metric that makes distance calculations scale-invariant in the same sense standardisation makes PCA scale-invariant.</p>
+
+  <h3>The autoencoder, formally</h3>
+
+  <p>Select dimensions $p &lt; q$. An <strong>autoencoder</strong> is a pair $(\varphi, \psi)$ of mappings, encoder and decoder,</p>
+  $$\varphi: \mathbb{R}^q \to \mathbb{R}^p, \qquad \psi: \mathbb{R}^p \to \mathbb{R}^q,$$
+  <p>such that the composition $\psi \circ \varphi$ has small reconstruction error with respect to the chosen dissimilarity function,</p>
+  $$X \mapsto L\big(X, \psi(\varphi(X))\big) \text{ is small for all instances } X \text{ of interest.}$$
+  <p>A perfect reconstruction for every $X \in \mathbb{R}^q$ is impossible whenever $p &lt; q$ (the bottleneck genuinely loses information across the whole space), but if every instance actually of interest lives on (or near) a $p$-dimensional object embedded in $\mathbb{R}^q$, a suitable $(\varphi, \psi)$ can reconstruct that object essentially perfectly, exactly the noisy-circle example in the mental-model figure, where the "object" is the one-dimensional circle embedded in two-dimensional space.</p>
+
+  <h3>PCA as the linear autoencoder</h3>
+
+  <p>Lecture 2 derived PCA as an eigendecomposition of the covariance matrix; the identical solution emerges from the autoencoder framework directly. Restrict $\varphi$ and $\psi$ to be linear, $\varphi(x) = W^\top(x - \bar x)$ and $\psi(z) = Wz + \bar x$ for some $q \times p$ matrix $W$, and minimise expected squared reconstruction error $E\big[\|X - \psi(\varphi(X))\|_2^2\big]$ over every such $W$, not assuming in advance that its columns are orthonormal. The <strong>Eckart-Young-Mirsky theorem</strong> establishes that the minimising $W$ has columns spanning exactly the subspace of the top $p$ eigenvectors of the covariance matrix, the identical subspace lecture 2's Lagrangian derivation produced. This is a genuinely useful fact beyond mathematical tidiness: it confirms that PCA is not merely "a sensible thing to do" but the provably optimal linear autoencoder under squared-error reconstruction, which is exactly why relaxing linearity, rather than replacing the reconstruction-error framework itself, is the right way to generalise it.</p>
+
+  <h3>Bottleneck neural networks</h3>
+
+  <p>A <strong>bottleneck neural network</strong> (BNN) replaces the linear $\varphi$ and $\psi$ with feed-forward networks (lecture 1 of the deep-learning sub-module), typically with one or more hidden layers wider than $p$ on each side, narrowing to a bottleneck layer of width exactly $p$ in the middle:</p>
+  $$X \xrightarrow{\ \varphi\ } Z \in \mathbb{R}^p \xrightarrow{\ \psi\ } \hat X, \qquad \hat\theta = \arg\min_\theta \, E\big[\|X - \psi_\theta(\varphi_\theta(X))\|_2^2\big],$$
+  <p>trained end to end by ordinary backpropagation and stochastic gradient descent, exactly as any other network in this course. The non-linear activations inside $\varphi$ and $\psi$ let the network represent curved manifolds a linear map cannot, at the cost of every generalisation this course has already flagged for deep networks: the fitting problem is non-convex, the fitted network is not identified by a finite sample the way PCA's eigenvectors are, and nagging (ensembling independently seeded fits) is the standard remedy where reconstruction-error stability matters, exactly as in the deep-learning sub-module's ensembling lecture.</p>
+
+  <h3>Kernel PCA</h3>
+
+  <p><strong>Kernel PCA</strong> takes a third route: rather than making the encoder and decoder themselves non-linear, it maps the input into a (possibly very high-dimensional, even infinite-dimensional) feature space via an implicit non-linear map $\Phi: \mathbb{R}^q \to \mathcal{H}$, and performs ordinary linear PCA in that feature space. The key trick is that PCA in feature space needs only inner products $\langle \Phi(x), \Phi(x')\rangle$, never $\Phi(x)$ itself, and a <strong>kernel function</strong> $k(x,x') = \langle \Phi(x), \Phi(x')\rangle$ (a Gaussian RBF kernel, $k(x,x') = \exp(-\|x-x'\|^2/2\sigma^2)$, is the standard default) computes this inner product directly from $x$ and $x'$ without ever constructing $\Phi(x)$ explicitly, a construction directly analogous to the kernel trick behind the support-vector-machine lecture in the supervised-learning sub-module. Kernel PCA solves an eigenvalue problem on the $n \times n$ Gram matrix $K$, with entries $K_{ij} = k(x_i, x_j)$, in place of the $q \times q$ covariance matrix ordinary PCA decomposes, and it can capture curved structure (the noisy-circle example again) without ever training a neural network at all, at the cost of a kernel and bandwidth choice that, much like a BNN's architecture, is a genuine hyperparameter requiring validation.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Applying squared-error reconstruction to categorical data</span>
+    Squared Euclidean reconstruction error, the implicit default in both PCA and a standard BNN, assumes a continuous, roughly symmetric notion of "close" that does not transfer to categorical covariates; reconstructing a one-hot-encoded categorical column with squared error treats a small numeric difference in the reconstructed probability-like output as automatically meaningful, which it is not. This module's later lectures on categorical-covariate handling in unsupervised settings return to this problem directly.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing bottleneck width without checking a reconstruction-error curve</span>
+    Exactly as PCA's number of retained components should be chosen against a scree plot rather than assumed, a BNN's or kernel PCA's bottleneck width $p$ should be chosen by tracking reconstruction error (on held-out data) as $p$ varies, watching for the point of diminishing returns, rather than fixed arbitrarily in advance.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Flagging any nonzero reconstruction error as anomalous</span>
+    A well-trained autoencoder still has nonzero reconstruction error on ordinary, non-anomalous data, because the bottleneck genuinely discards some information even for typical instances. An anomaly-detection threshold needs to be calibrated against the empirical distribution of reconstruction error on clean, held-out normal data (a percentile cutoff, say), not set to "any error at all".
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating kernel choice as a minor implementation detail</span>
+    Kernel PCA's kernel function and bandwidth are as consequential as a BNN's architecture; an RBF bandwidth that is too small effectively treats every point as its own cluster (near-zero off-diagonal Gram-matrix entries), and one that is too large collapses the kernel toward ordinary linear PCA. Cross-validating the bandwidth against a genuine downstream task, rather than a default value, is standard practice.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>An autoencoder is an encoder-decoder pair trained to minimise expected reconstruction dissimilarity through a bottleneck narrower than the input. PCA is the provably optimal linear instance of this framework under squared-error reconstruction, a fact the Eckart-Young-Mirsky theorem makes precise rather than merely plausible. Bottleneck neural networks generalise by allowing non-linear encoders and decoders, trained by ordinary backpropagation; kernel PCA generalises differently, performing linear PCA implicitly in a non-linearly transformed feature space via the kernel trick. All three answer the identical question, compress to $p$ dimensions and reconstruct as faithfully as possible, and the choice between them is a choice about how much, and in what form, non-linear structure the data actually has.</p>
+
+  <p>The next lecture turns from dimension reduction to clustering, returning to the k-means algorithm from lecture 1 of this sub-module but building outward: hierarchical clustering constructs a full nested tree of groupings rather than a single flat partition, using exactly the dissimilarity-function machinery this lecture introduced.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Define a dissimilarity function and state the two properties it need not satisfy that a metric distance must.</li>
+      <li>State the autoencoder framework in general terms, and explain how PCA fits it as a special case.</li>
+      <li>State the Eckart-Young-Mirsky result in your own words. Why does it matter that PCA is the optimal linear autoencoder, not merely a sensible one?</li>
+      <li>Describe a bottleneck neural network and explain what it can represent that a linear autoencoder cannot.</li>
+      <li>Explain the kernel trick as applied to kernel PCA: what quantity does the Gram matrix replace, and why does this avoid computing the feature map explicitly?</li>
+      <li>A telematics anomaly detector using PCA misses a genuinely risky driving pattern that a BNN of the identical bottleneck width catches. Explain the mechanism behind the difference.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 2 (<a href="02-pca.html">principal component analysis</a>) derived the linear special case this lecture generalises.</li>
+      <li><strong>Next:</strong> Lecture 4 (<a href="04-hierarchical_clustering.html">hierarchical clustering</a>) returns to clustering, using the dissimilarity-function framework introduced here.</li>
+      <li><strong>Built on:</strong> The deep-learning sub-module's <a href="../05_deep_learning/01-neural_networks.html">neural networks lecture</a> supplies the feed-forward architecture and training loop a bottleneck neural network uses directly; its <a href="../05_deep_learning/03-ensembling_and_nagging.html">ensembling lecture</a> is the standard remedy for BNN fitting instability.</li>
+      <li><strong>Used by:</strong> The generative-models module later in this course develops the variational autoencoder, which adds a probabilistic layer on top of the identical encoder-decoder structure introduced here.</li>
+      <li><strong>Outside this course:</strong> Reconstruction-error anomaly detection using autoencoders, linear or non-linear, is standard practice in fraud detection, telematics risk scoring, and network intrusion monitoring.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Unsupervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 16 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 59: Markov decision processes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Reinforcement learning</a></div>
+  <h1>Markov decision processes</h1>
+  <p class="subtitle">Every idea developed so far in this sub-module, exploration versus exploitation, incremental updating, has lived inside a single state with no transitions at all. This lecture removes that restriction and introduces the full framework almost the entire remaining literature on reinforcement learning is built on: multiple states, a policy mapping states to actions, and the Bellman equations that let a value be assigned not just to an immediate reward but to an entire future sequence of them.</p>
+  <div class="meta">
+    <span>Lecture 59 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part IX: reinforcement learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>Markov decision process (MDP)</strong> is defined by a set of <strong>states</strong> $\mathcal{S}$, a set of <strong>actions</strong> $\mathcal{A}$, a transition dynamics function $p(s', r \mid s, a)$ giving the probability of landing in state $s'$ and receiving reward $r$ after taking action $a$ in state $s$, and a discount factor $\gamma \in [0,1]$. The <strong>Markov property</strong> is the assumption that $p(s', r \mid s, a)$ depends only on the current state and action, never on the full history that led there, a genuine simplifying assumption, not automatically true of every real process, that is what makes the whole framework tractable. A <strong>policy</strong> $\pi(a \mid s)$ is a rule (possibly randomised) for choosing an action given the current state. The <strong>return</strong> $G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}$ is the discounted sum of all future rewards from time $t$ onwards, and the <strong>value function</strong> $v_\pi(s) = \mathbb{E}_\pi[G_t \mid S_t = s]$ is the expected return from state $s$ under policy $\pi$, with the closely related <strong>action-value function</strong> $q_\pi(s,a) = \mathbb{E}_\pi[G_t \mid S_t = s, A_t = a]$ generalising the previous two lectures' bandit action-value to the multi-state setting. The <strong>Bellman equation</strong> expresses $v_\pi(s)$ recursively in terms of the values of states one step ahead, $v_\pi(s) = \sum_a \pi(a\mid s) \sum_{s',r} p(s',r\mid s,a)\left[r + \gamma v_\pi(s')\right]$, the single equation the entire rest of this sub-module is built to solve, approximately or exactly, for progressively harder settings.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine a chess player evaluating a position, not by asking "how good is my very next move" in isolation, but by asking "how good is this position, accounting for every reasonable move I might make from here, and every position that follows from each of those, all the way to the end of the game". The Bellman equation is the precise mathematical version of exactly this recursive idea: the value of being in a position right now equals the reward available immediately, plus the (discounted) value of wherever you are likely to end up next, itself defined the same recursive way, all the way down. Nothing about a single move's immediate reward captures how good a position really is; the recursive, forward-looking structure is the entire point.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture is the structural centre of the entire sub-module: every earlier lecture (bandits, incremental updating) is the single-state degenerate case of the framework defined here, and every later lecture (dynamic programming, Monte Carlo and TD control, deep RL) is a different algorithmic strategy for solving, exactly or approximately, the Bellman equation this lecture introduces. Nothing here is optional background for what follows; it is the object every later technique operates on.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the full MDP framework, and specifically its recursive structure, earns careful attention before any solution method is introduced.</p>
+
+  <p>First, <strong>almost every genuine sequential-decision problem in actuarial practice has delayed, not immediate, consequences</strong>, and only a framework that explicitly represents the discounted sum of all future rewards, not just the immediate one, can correctly value a decision whose main benefit arrives several periods later: a retention-focused pricing discount today may cost immediate margin but improve the discounted value of a multi-year customer relationship, exactly the trade-off a one-step-only evaluation cannot represent.</p>
+
+  <p>Second, <strong>the discount factor $\gamma$ is a genuine, consequential modelling choice, not a technical nuisance</strong>: it encodes how much future reward is worth relative to immediate reward, directly analogous to a discount rate in the financial-mathematics track's present-value calculations, and choosing $\gamma$ too close to zero myopically undervalues a decision's long-run consequences while choosing it too close to one can make an otherwise-tractable problem numerically unstable or slow to solve.</p>
+
+  <p>Third, <strong>the Markov property is an assumption, and a testable one, not a law of nature</strong>: a genuine business process that depends on more history than just its current state (a customer's cumulative claims count over their whole tenure, not just their most recent claim) violates the Markov property unless the state representation is deliberately expanded to include that extra history, a modelling decision with real consequences developed in the pitfalls below.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team modelling a multi-period customer-retention strategy initially defined the "state" as simply the customer's current premium tier, discarding all information about how many times the customer had previously moved between tiers or how long they had held their current tier. The resulting model performed poorly at predicting retention outcomes, because two customers in the identical current tier but with very different histories (one who had just been moved up after years of stability, another who had bounced between tiers repeatedly) behaved very differently going forward, a dependence on history the chosen state definition had discarded, violating the Markov property the whole framework depends on. Expanding the state to include tenure in the current tier and the number of tier transitions in the past two years restored the Markov property well enough for the model's predictions to improve substantially, at the direct cost of a larger, more complex state space, a trade-off the team judged worthwhile only after diagnosing the original problem correctly.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a tree of states branching out from the present, each branch weighted by a transition probability and carrying an immediate reward, with the value of the root defined recursively as its own immediate reward plus the discounted, recursively-defined value of wherever the tree leads next.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Bellman recursion: value of a state defined via immediate reward plus discounted value of successor states">
+      <defs>
+        <marker id="mdpArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The Bellman recursion, one step of the tree</text>
+
+      <circle cx="120" cy="160" r="34" fill="#7c3aed"/>
+      <text x="120" y="155" text-anchor="middle" font-family="Inter" font-size="11" fill="#ffffff" font-weight="700">$s$</text>
+      <text x="120" y="172" text-anchor="middle" font-family="Inter" font-size="8" fill="#ede9fe">$v_\pi(s)$</text>
+
+      <path d="M 154 145 Q 260 90 350 90" stroke="#0d9488" stroke-width="2" fill="none" marker-end="url(#mdpArrow)"/>
+      <text x="250" y="80" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">$a_1$, $\pi(a_1|s)$</text>
+
+      <path d="M 154 160 Q 260 160 350 160" stroke="#b45309" stroke-width="2" fill="none" marker-end="url(#mdpArrow)"/>
+      <text x="250" y="150" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">$a_2$, $\pi(a_2|s)$</text>
+
+      <path d="M 154 175 Q 260 230 350 230" stroke="#dc2626" stroke-width="2" fill="none" marker-end="url(#mdpArrow)"/>
+      <text x="250" y="245" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">$a_3$, $\pi(a_3|s)$</text>
+
+      <circle cx="385" cy="90" r="26" fill="#0d9488"/>
+      <text x="385" y="94" text-anchor="middle" font-family="Inter" font-size="9" fill="#ffffff" font-weight="700">$s_1'$</text>
+      <circle cx="385" cy="160" r="26" fill="#b45309"/>
+      <text x="385" y="164" text-anchor="middle" font-family="Inter" font-size="9" fill="#ffffff" font-weight="700">$s_2'$</text>
+      <circle cx="385" cy="230" r="26" fill="#dc2626"/>
+      <text x="385" y="234" text-anchor="middle" font-family="Inter" font-size="9" fill="#ffffff" font-weight="700">$s_3'$</text>
+
+      <text x="500" y="90" font-family="Inter" font-size="9" fill="#115e59">reward $r_1$, then $\gamma v_\pi(s_1')$</text>
+      <text x="500" y="160" font-family="Inter" font-size="9" fill="#92400e">reward $r_2$, then $\gamma v_\pi(s_2')$</text>
+      <text x="500" y="230" font-family="Inter" font-size="9" fill="#7f1d1d">reward $r_3$, then $\gamma v_\pi(s_3')$</text>
+
+      <rect x="60" y="270" width="740" height="40" rx="6" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+      <text x="430" y="295" text-anchor="middle" font-family="Inter" font-size="11" fill="#5b21b6">$v_\pi(s) = \sum_a \pi(a\mid s) \sum_{s',r} p(s',r\mid s,a)\left[r + \gamma v_\pi(s')\right]$, recursively, all the way down</text>
+    </svg>
+    <figcaption>The value of state $s$ is defined recursively: weight each possible action by how likely the policy is to take it, weight each resulting successor state and reward by the environment's transition dynamics, and sum the immediate reward plus the discounted value of the successor state, itself defined by exactly the same recursive equation one step further out.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A state's value is never just its immediate reward.</strong> The entire discounted future matters, which is precisely why the retention vignette's premium-discount example cannot be evaluated correctly by any one-step-only metric. <strong>The Markov property is a modelling choice about what belongs in the state, not a fact about the world.</strong> The customer-retention vignette's fix, expanding the state to restore the property, is the standard, general response whenever a chosen state definition turns out to discard history that genuinely matters.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>States, actions, and the Markov property</h3>
+
+  <p>A <strong>state</strong> $s \in \mathcal{S}$ is whatever information the agent observes and conditions its decision on; an <strong>action</strong> $a \in \mathcal{A}$ is a choice available to the agent in a given state. The <strong>Markov property</strong> requires the transition dynamics $p(s', r \mid s, a) = \Pr(S_{t+1}=s', R_{t+1}=r \mid S_t=s, A_t=a)$ to depend only on the current state and action, never on any earlier history; this is a genuine assumption about how much of the past has been packed into the state's current definition, not an automatic property of any process a modeller happens to call a "state", exactly the distinction the retention vignette's failure and fix illustrate.</p>
+
+  <h3>Policies</h3>
+
+  <p>A <strong>policy</strong> $\pi(a \mid s)$ specifies the probability of taking action $a$ in state $s$ (a <strong>deterministic policy</strong> is the special case placing probability one on a single action per state). The agent's entire objective, across every remaining lecture in this sub-module, is to find a policy that performs as well as possible, formalised precisely below.</p>
+
+  <h3>Returns and the discount factor</h3>
+
+  <p>The <strong>return</strong> from time $t$ is the discounted sum of all future rewards, $G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \cdots = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}$, for a <strong>discount factor</strong> $\gamma \in [0,1]$. A $\gamma$ close to zero makes the agent myopic, valuing only near-term reward; a $\gamma$ close to one weights distant future reward almost as heavily as immediate reward, and is what makes an infinite sum converge to a finite value in the first place whenever rewards are bounded and $\gamma &lt; 1$. The choice of $\gamma$ is directly analogous to a discount rate in ordinary present-value calculations from the financial-mathematics track, and is a genuine, consequential modelling decision, not a default technical parameter to leave unexamined.</p>
+
+  <h3>Value functions</h3>
+
+  <p>The <strong>state-value function</strong> under policy $\pi$ is the expected return from a given state, $v_\pi(s) = \mathbb{E}_\pi\left[G_t \mid S_t = s\right]$, and the <strong>action-value function</strong> is the expected return from taking a specific action in a given state and following $\pi$ thereafter, $q_\pi(s,a) = \mathbb{E}_\pi\left[G_t \mid S_t = s, A_t = a\right]$, the direct multi-state generalisation of the previous two lectures' bandit action-value $Q_t(a)$, now additionally conditioned on the state and defined via a genuinely long-run, discounted return rather than a single-step reward.</p>
+
+  <h3>The Bellman equation</h3>
+
+  <p>Because the return decomposes as $G_t = R_{t+1} + \gamma G_{t+1}$, the value function inherits a recursive structure, the <strong>Bellman equation</strong>,</p>
+  $$v_\pi(s) = \sum_a \pi(a\mid s) \sum_{s',r} p(s',r\mid s,a)\left[r + \gamma v_\pi(s')\right],$$
+  <p>expressing the value of a state entirely in terms of the values of states one step away, weighted by the policy's action probabilities and the environment's transition dynamics. An analogous Bellman equation holds for the action-value function, $q_\pi(s,a) = \sum_{s',r} p(s',r\mid s,a)\left[r + \gamma \sum_{a'} \pi(a'\mid s') q_\pi(s',a')\right]$. Every method in the rest of this sub-module, dynamic programming (lecture 5) when $p(s',r\mid s,a)$ is fully known, and Monte Carlo or temporal-difference methods (lecture 6) when it is not, is best understood as a different computational strategy for solving one of these two Bellman equations, exactly or approximately.</p>
+
+  <h3>Tabular problems</h3>
+
+  <p>A problem is <strong>tabular</strong> when $\mathcal{S}$ and $\mathcal{A}$ are both small and finite enough that $v_\pi(s)$ or $q_\pi(s,a)$ can be represented and stored explicitly as a table, one entry per state (or state-action pair), with no function approximation required at all. Every method in lectures 5 and 6 is developed in this tabular setting first, precisely because it is where the underlying ideas are cleanest and easiest to verify by hand; lecture 7 develops what changes once the state or action space is too large for a table, requiring the deep function approximators this sub-module has been building towards since the generative-modelling sub-module's architectures.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Defining a state that discards history the process genuinely depends on</span>
+    Developed directly in the vignette: choosing a state definition purely for convenience, without checking whether it actually satisfies the Markov property for the process at hand, produces a model that systematically mispredicts exactly the cases where discarded history would have mattered; expanding the state to restore the property is the standard, general fix, at the cost of a larger state space.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating the discount factor as a default technical parameter</span>
+    $\gamma$ directly encodes how much the agent should value distant future consequences relative to immediate ones, a genuine business or actuarial judgement (how much should a multi-year customer relationship's future value count against this period's margin), not a value to leave at whatever a software library happens to default to.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Confusing the value function with a single-step expected reward</span>
+    $v_\pi(s)$ is an expectation over the entire discounted future, not the immediate reward available in state $s$; a decision that looks poor by immediate reward alone can still be the right decision once its full discounted future consequences are correctly accounted for, exactly the retention-discount example in "why this matters" above.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming a tabular representation scales to any problem</span>
+    The tabular methods developed in the next two lectures require an explicit table over every state (or state-action pair), which becomes infeasible the moment the state space is large or continuous; recognising this limitation now, before working through the tabular methods in detail, avoids the false impression that lectures 5 and 6 are a complete, general-purpose solution rather than the foundation lecture 7's function approximation builds on.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A Markov decision process extends the previous lectures' single-state bandit to multiple states connected by transition dynamics $p(s',r\mid s,a)$, under the Markov assumption that these dynamics depend only on the current state and action. A policy $\pi(a\mid s)$ chooses actions; the return $G_t$ discounts all future rewards by $\gamma$; and the value functions $v_\pi(s)$ and $q_\pi(s,a)$ generalise the bandit's action-value to this fuller setting via the Bellman equation, a recursive relationship expressing a state's value in terms of the values of states one step ahead. Every remaining lecture in this sub-module is a different strategy for solving this recursion.</p>
+
+  <p>The next lecture develops the first solution strategy, dynamic programming, for the special case where the transition dynamics $p(s',r\mid s,a)$ are fully known in advance, before lecture 6 develops the considerably more broadly applicable case where they are not.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the Markov property, and explain why it is a modelling assumption rather than an automatic fact about any chosen state definition.</li>
+      <li>Define the return $G_t$ and explain the role of the discount factor $\gamma$.</li>
+      <li>Define the state-value function $v_\pi(s)$ and the action-value function $q_\pi(s,a)$, and explain how the latter generalises the bandit action-value from lecture 2.</li>
+      <li>Derive the Bellman equation for $v_\pi(s)$ from the recursive decomposition of the return, $G_t = R_{t+1} + \gamma G_{t+1}$.</li>
+      <li>Define a tabular problem, and explain why lectures 5 and 6 restrict attention to this setting before lecture 7 generalises beyond it.</li>
+      <li>In the customer-retention vignette, explain precisely why the original state definition violated the Markov property, and what the team's fix cost in return.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lectures 2 and 3 (<a href="02-multi_armed_bandits.html">bandits</a>, <a href="03-incremental_learning.html">incremental learning</a>) are the single-state degenerate case of this lecture's framework.</li>
+      <li><strong>Next:</strong> Lecture 5 (<a href="05-dynamic_programming.html">dynamic programming</a>) solves the Bellman equation exactly when the transition dynamics are known.</li>
+      <li><strong>Forward:</strong> Lecture 6 (<a href="06-monte_carlo_and_td_control.html">Monte Carlo and TD control</a>) solves it when they are not.</li>
+      <li><strong>Outside this course:</strong> The financial-mathematics track's present-value and discounting lectures develop the identical mathematical role $\gamma$ plays here, applied to cashflows rather than rewards.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Reinforcement learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 59 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

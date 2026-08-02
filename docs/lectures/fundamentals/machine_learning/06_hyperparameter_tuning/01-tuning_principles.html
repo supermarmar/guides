@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 30: tuning principles</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Hyperparameter tuning</a></div>
+  <h1>Tuning principles</h1>
+  <p class="subtitle">Every algorithm in the previous three sub-modules has knobs. Tuning is the disciplined search for where those knobs should sit, framed against the same bias-variance axis the whole course is built on.</p>
+  <div class="meta">
+    <span>Lecture 30 of 62</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>parameter</strong> is a quantity the model learns from data by minimising a loss: the slope of a regression line, the weights of a neural network, the split thresholds inside a decision tree. A <strong>hyperparameter</strong> is a quantity the modeller (or a search procedure wrapping the fit) chooses before training begins: the regularisation strength $\alpha$, the depth limit of a tree, the learning rate of gradient descent, the number of neighbours in k-nearest neighbours. Parameters are fit by the data; hyperparameters are chosen for the data. Every hyperparameter is, in effect, a position on the bias-variance axis. Increasing model capacity (more trees, deeper net, smaller $\alpha$, larger $C$, smaller $k$) lowers bias and raises variance; decreasing capacity does the opposite. <strong>Hyperparameter tuning</strong> is the search for the minimum of the resulting U-curve, conducted on a validation set or via cross-validation so the test set is never touched until the final model is locked. When a single hyperparameter must be chosen and reported with an honest generalisation estimate, the standard pattern is <strong>nested cross-validation</strong>: an outer loop estimates how well the whole pipeline (including its tuning) generalises, and an inner loop does the tuning on each outer fold's training data.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A machine learning model has two kinds of numbers inside it. Some are filled in by the data: the model looks at the training rows and works out what those numbers should be to make the predictions as close to the targets as possible. Those are the parameters. The others have to be set by hand before any training can start, because they determine what kind of model is being trained in the first place: how flexible it is allowed to be, how hard it is penalised for overfitting, how many components it has. Those are the hyperparameters. Tuning is the discipline of trying different values for the hand-set numbers, scoring each combination on data the model has not seen, and keeping the combination that wins.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Textbooks treat tuning as a search problem with grid search at the easy end and Bayesian optimisation at the hard end. In credit risk practice, the harder question is usually which hyperparameter is allowed to be tuned at all. Regulators tend to view aggressive tuning of model capacity as a form of dataset overfit that compromises through-the-cycle stability. The convention in a regulated A-IRB build is to fix capacity-related hyperparameters (tree depth, neural network architecture) at conservative values agreed up front and to tune only the operational ones (early stopping rounds, decision thresholds). The "search space" is therefore set by governance, not by the modeller, and the role of validation cross-validation is to demonstrate that the constrained choice is reasonable rather than to find the global optimum.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Tuning sits in stage 4 of the pipeline from <a href="../01_feature_engineering/01-the_ml_landscape.html">lecture 1</a>, immediately after model fitting and immediately before the final test-set evaluation in stage 5. It relies on the train-validation-test split established in <a href="../02_train_test_split/01-train_test_validation.html">lecture 5</a>: tuning is the activity that gives the validation set its purpose. It applies to every supervised algorithm covered in sub-module 03 and every deep learning architecture in <a href="../05_deep_learning/01-neural_networks.html">sub-module 05</a>; the specific knobs change, but the bias-variance framing does not. The next lecture, <a href="02-grid_search.html">grid search</a>, moves from principles to the search algorithms themselves.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons tuning deserves its own lecture rather than a footnote inside each algorithm. First, <strong>the same algorithm spans a wide range of bias-variance positions depending on its hyperparameters.</strong> A k-nearest neighbour classifier with $k = 1$ is a high-variance, near-zero-bias model that memorises the training set. The same algorithm with $k$ equal to the entire training size becomes the majority-class classifier, with maximum bias and near-zero variance. The choice of $k$ is not a detail; it is the choice of which model the algorithm becomes. The same is true of regularisation strength in a linear model, tree depth in a decision tree, the number of estimators in a random forest, and the learning rate in a gradient-boosted ensemble. A model is not a fixed object that gets tuned; the tuning is what fixes the model.</p>
+
+  <p>Second, <strong>tuning is the only honest way to compare algorithms.</strong> Comparing a default-hyperparameter logistic regression with a default-hyperparameter gradient-boosted tree is comparing two arbitrary points in two different hypothesis spaces, neither of them necessarily the best point. The comparison only becomes meaningful once each algorithm has been allowed to find its own best hyperparameters under a common validation protocol. When a paper or a colleague reports that "XGBoost beat logistic regression by 5 AUC points", the first question is whether both models were tuned with comparable effort.</p>
+
+  <p>Third, <strong>the test set is a single-use resource.</strong> Touching it more than once during tuning is the cardinal sin: every time a hyperparameter is chosen because it improved the test-set score, a small amount of test-set information leaks into the model, the test estimate becomes optimistically biased, and the production performance gap widens. The discipline of holding the test set inviolate until the final fit is what makes the headline performance number defensible. Tuning has to happen somewhere, and that somewhere is the validation set (a held-out partition) or, more rigorously, cross-validation on the training fold.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A challenger PD model was reported with a test AUC of 0.84 against the incumbent's 0.79. Validation discovered that the modeller had iterated over twenty-three hyperparameter combinations and reported the best test-set score for each. The "honest" test AUC, computed using only the final model on a freshly-held-out partition that had not been seen by the tuning loop, was 0.78. The five-point gain was test-set leakage. The lesson is structural rather than computational: a tuning loop must never see the data on which the final headline number will be reported.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Every hyperparameter, when varied with all others fixed, traces out a U-curve of generalisation error. On the left of the curve, the model has too little capacity, bias dominates, both training and validation errors are high, and they sit close together. On the right, the model has too much capacity, variance dominates, training error has fallen toward zero and validation error has risen, so the two curves have separated. Somewhere in the middle is a minimum: enough capacity to fit the signal, not enough to fit the noise. Tuning is the search for that minimum, on a validation surface, with as little wasted compute as the search method allows.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bias-variance U-curve with hyperparameter capacity positions annotated">
+      <defs>
+        <marker id="htArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Validation error as a function of model capacity</text>
+
+      <!-- Axes -->
+      <line x1="80" y1="280" x2="760" y2="280" stroke="#37352F" stroke-width="1.5"/>
+      <line x1="80" y1="60" x2="80" y2="280" stroke="#37352F" stroke-width="1.5"/>
+
+      <text x="420" y="320" text-anchor="middle" font-family="Inter" font-size="11" fill="#52525b">model capacity (smaller alpha, deeper tree, more trees, smaller k)</text>
+      <text x="40" y="170" text-anchor="middle" font-family="Inter" font-size="11" fill="#52525b" transform="rotate(-90 40 170)">error</text>
+
+      <!-- Training error curve (monotone decreasing) -->
+      <path d="M 100 110 Q 250 130 400 180 Q 550 230 740 260" fill="none" stroke="#0d9488" stroke-width="2"/>
+      <text x="700" y="250" font-family="Inter" font-size="10" font-weight="600" fill="#0d9488">training error</text>
+
+      <!-- Validation error curve (U-shape) -->
+      <path d="M 100 110 Q 230 130 370 175 Q 470 210 560 175 Q 660 130 740 95" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
+      <text x="640" y="115" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">validation error</text>
+
+      <!-- Minimum marker -->
+      <circle cx="470" cy="210" r="5" fill="#FFFFFF" stroke="#5b21b6" stroke-width="2"/>
+      <text x="470" y="235" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">U-curve minimum</text>
+      <text x="470" y="248" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">target of tuning</text>
+
+      <!-- Underfit zone -->
+      <rect x="100" y="60" width="200" height="220" fill="#FEF3C7" fill-opacity="0.35"/>
+      <text x="200" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">UNDERFIT</text>
+      <text x="200" y="95" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">high bias, low variance</text>
+      <text x="200" y="107" text-anchor="middle" font-family="Inter" font-size="9" fill="#b45309">both errors high &amp; close</text>
+
+      <!-- Overfit zone -->
+      <rect x="600" y="60" width="160" height="220" fill="#FEE2E2" fill-opacity="0.35"/>
+      <text x="680" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#991b1b">OVERFIT</text>
+      <text x="680" y="95" text-anchor="middle" font-family="Inter" font-size="9" fill="#b91c1c">low bias, high variance</text>
+      <text x="680" y="107" text-anchor="middle" font-family="Inter" font-size="9" fill="#b91c1c">training drops, validation rises</text>
+
+      <!-- Sweet spot -->
+      <rect x="380" y="60" width="180" height="220" fill="#ECFEF6" fill-opacity="0.35"/>
+      <text x="470" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">SWEET SPOT</text>
+
+      <!-- Annotations of hyperparameter movement -->
+      <line x1="160" y1="295" x2="380" y2="295" stroke="#52525b" stroke-width="1" marker-end="url(#htArrow)"/>
+      <text x="270" y="345" text-anchor="middle" font-family="Inter" font-size="9" fill="#52525b">decreasing alpha, increasing depth, more neighbours becoming fewer</text>
+    </svg>
+    <figcaption>Validation error is U-shaped in model capacity. The horizontal axis is "capacity", which is the projection of all capacity-related hyperparameters onto a single direction; the vertical axis is held-out error. Training error is monotone in capacity (it keeps falling as the model is allowed to fit harder). The gap between the two curves is variance; the height of both curves on the left is bias. Tuning is the search for the validation minimum.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The two curves meet on the left and diverge to the right: under-capacity models do not overfit because they cannot. The validation minimum is not where the training error is lowest; the training error keeps falling past the minimum because the model is fitting noise. The horizontal axis is a composite. For a random forest it might be tree depth, for a gradient-boosted ensemble the number of rounds, for a ridge regression the inverse of $\alpha$. The curve has the same shape in all of these cases; the algorithm changes only what "capacity" is measured in.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Parameters versus hyperparameters</h3>
+
+  <p>A linear regression $y = \beta_0 + \beta_1 x_1 + \dots + \beta_p x_p + \varepsilon$ has $p + 1$ parameters $\{\beta_0, \beta_1, \dots, \beta_p\}$ that are estimated by minimising the residual sum of squares. If the regression is ridge-regularised the objective becomes</p>
+  $$\min_{\beta} \; \sum_{i=1}^{n} (y_i - x_i^{\top}\beta)^2 + \alpha \sum_{j=1}^{p} \beta_j^2,$$
+  <p>and the regularisation strength $\alpha$ is a hyperparameter: it controls how aggressively the optimiser shrinks the $\beta_j$ but it is not itself estimated from the data inside this optimisation. Setting $\alpha = 0$ recovers ordinary least squares; setting $\alpha \to \infty$ shrinks all coefficients to zero (the intercept-only model). Tuning chooses a single value of $\alpha$ to balance the two extremes, and that single value defines a new optimisation problem whose solution gives the parameter estimates.</p>
+
+  <p>The same separation appears everywhere. In a decision tree, the parameters are the split features, split thresholds, and leaf predictions, all determined by the greedy split procedure on training data; the hyperparameters are the depth limit, the minimum number of samples per leaf, the splitting criterion (Gini, entropy, MSE). In a neural network, the parameters are the weights and biases learned by backpropagation; the hyperparameters are the architecture (number of layers, units per layer, activation function), the optimiser settings (learning rate, momentum, batch size), and the regularisation knobs (dropout rate, weight decay). The rule of thumb is operational: if a quantity is updated by the training loop, it is a parameter; if it has to be set before the loop starts, it is a hyperparameter.</p>
+
+  <h3>The bias-variance reading</h3>
+
+  <p>The expected squared error of a prediction at a fixed input $x$ decomposes as</p>
+  $$\mathbb{E}\!\left[(y - \hat{f}(x))^2\right] = \underbrace{\big(\mathbb{E}[\hat{f}(x)] - f(x)\big)^2}_{\text{bias}^2} + \underbrace{\operatorname{Var}(\hat{f}(x))}_{\text{variance}} + \underbrace{\sigma^2}_{\text{irreducible noise}},$$
+  <p>where the expectation is over training sets drawn from the data-generating process. Every hyperparameter that controls model capacity shifts this decomposition. A smaller ridge $\alpha$ allows the coefficients to fit the training residuals more closely (lower bias) but makes the coefficient vector more sensitive to which training sample was drawn (higher variance). A deeper tree captures more of the structure in the training set (lower bias) at the cost of more sample-dependent leaf predictions (higher variance). A smaller $k$ in k-nearest neighbours produces a more wiggly decision boundary (lower bias on local structure) that is highly sensitive to which observations are nearby (higher variance). Tuning is the search for the value at which $\partial(\text{bias}^2 + \text{variance})/\partial(\text{hyperparameter}) = 0$, evaluated on held-out data because we cannot compute the expectation analytically.</p>
+
+  <h3>Validation strategy</h3>
+
+  <p>The reason tuning has to happen on data the model has not been fit on is that the training error is a monotonically decreasing function of capacity. A model evaluated on its own training data will always prefer more capacity, because more capacity always reduces in-sample loss; this is the left-to-right descent of the green training curve in the figure above. The U-curve only appears when error is measured on data the model has not seen. The standard pattern uses three partitions: a <strong>training set</strong> on which parameters are fit, a <strong>validation set</strong> on which hyperparameters are tuned, and a <strong>test set</strong> on which the final tuned model is evaluated exactly once. The split is established in <a href="../02_train_test_split/01-train_test_validation.html">lecture 5</a> and is the structural prerequisite for everything in this lecture.</p>
+
+  <p>When data is scarce, a single validation split is wasteful: the model trains on fewer rows than necessary and the validation estimate has high variance. <strong>k-fold cross-validation</strong> recovers both. The training set is partitioned into $k$ folds; for each fold $i$, the model is fit on the other $k-1$ folds and scored on fold $i$; the $k$ scores are averaged. Tuning then chooses the hyperparameter that maximises the mean cross-validation score. The test set is held out from the entire procedure and used only at the end. Common choices are $k = 5$ and $k = 10$; larger $k$ uses more data per fit (lower bias in the estimate) at the cost of more compute and a higher variance in the average across folds.</p>
+
+  <h3>Nested cross-validation</h3>
+
+  <p>When the data is too small to afford a separate test set, or when the headline number that has to be reported is "how well does this whole tuned pipeline generalise", a single layer of cross-validation is not enough. The validation scores used for tuning are not honest estimates of generalisation, because the chosen hyperparameter was selected precisely because it scored well on those folds. <strong>Nested cross-validation</strong> wraps a second loop on the outside. The outer loop is itself $k$-fold; for each outer fold, the model is tuned on the inner folds of the remaining $k - 1$ outer folds (so the inner loop never sees the held-out outer fold), the chosen hyperparameter is locked, the model is re-fit on the full outer training partition, and the score is recorded on the outer test fold. The mean of the outer scores is an honest generalisation estimate; the inner loop is where tuning happens. When the inner loop is itself just cross-validation, the outer loop plays the role of the test set.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nested cross-validation: outer loop estimates generalisation, inner loop tunes hyperparameters">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Nested cross-validation: outer loop estimates generalisation, inner loop tunes</text>
+
+      <!-- Outer folds -->
+      <text x="60" y="60" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">Outer</text>
+      <g>
+        <rect x="120" y="45" width="120" height="30" rx="4" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="180" y="65" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">train (k-1 folds)</text>
+        <rect x="250" y="45" width="60" height="30" rx="4" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="280" y="65" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">test fold</text>
+      </g>
+      <text x="330" y="65" font-family="Inter" font-size="10" fill="#5b21b6">outer fold 1</text>
+
+      <g>
+        <rect x="120" y="85" width="60" height="30" rx="4" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+        <rect x="180" y="85" width="50" height="30" rx="4" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="205" y="105" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">test</text>
+        <rect x="230" y="85" width="80" height="30" rx="4" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+      </g>
+      <text x="330" y="105" font-family="Inter" font-size="10" fill="#5b21b6">outer fold 2</text>
+
+      <g>
+        <rect x="120" y="125" width="190" height="30" rx="4" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="215" y="145" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">train</text>
+        <rect x="120" y="125" width="50" height="30" rx="4" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="145" y="145" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">test</text>
+      </g>
+      <text x="330" y="145" font-family="Inter" font-size="10" fill="#5b21b6">outer fold 3</text>
+
+      <!-- Inner loop block -->
+      <rect x="450" y="40" width="320" height="130" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="610" y="60" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">INNER LOOP (on outer training data)</text>
+      <text x="610" y="80" text-anchor="middle" font-family="Inter" font-size="10" fill="#0d9488">k-fold CV across candidate hyperparameters</text>
+      <text x="610" y="98" text-anchor="middle" font-family="Inter" font-size="10" fill="#0d9488">pick the value with the best mean inner score</text>
+      <text x="610" y="116" text-anchor="middle" font-family="Inter" font-size="10" fill="#0d9488">refit on the full outer training partition</text>
+      <text x="610" y="134" text-anchor="middle" font-family="Inter" font-size="10" fill="#0d9488">score the locked model on the outer test fold</text>
+      <text x="610" y="156" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#115e59">never touches the outer test fold</text>
+
+      <!-- Arrow from outer to inner -->
+      <line x1="380" y1="100" x2="445" y2="100" stroke="#37352F" stroke-width="1.5" marker-end="url(#htArrow2)"/>
+      <defs>
+        <marker id="htArrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#37352F"/>
+        </marker>
+      </defs>
+
+      <!-- Footer rule -->
+      <line x1="60" y1="220" x2="760" y2="220" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="245" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">honest generalisation estimate = mean of the outer test scores</text>
+      <text x="410" y="265" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">the hyperparameter chosen on each outer fold may differ; the procedure is what generalises, not a single setting</text>
+      <text x="410" y="290" text-anchor="middle" font-family="Inter" font-size="10" fill="#52525b">in production, retune the inner loop on the full dataset to lock the final hyperparameters</text>
+    </svg>
+    <figcaption>Nested cross-validation separates the question "what hyperparameter should I choose" from the question "how well does this whole tuning-and-fitting procedure generalise". The outer loop never sees the inner loop's data and vice versa. The hyperparameters chosen on different outer folds will sometimes disagree; that disagreement is itself information about how stable the tuning is.</figcaption>
+  </figure>
+
+  <h3>The hyperparameter catalogue</h3>
+
+  <p>Each algorithm has its own set of knobs. The table below summarises the dominant hyperparameter for each of the algorithms covered earlier in the course, the data the knob touches, and the direction in which increasing it moves the model on the bias-variance axis. "Up" in the bias column means the listed change increases bias (and decreases variance); "down" the opposite.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Algorithm</th>
+        <th>Key hyperparameter</th>
+        <th>What it controls</th>
+        <th>Increasing it moves bias</th>
+        <th>Search space</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Ridge / lasso regression</td>
+        <td>$\alpha$ (regularisation strength)</td>
+        <td>Magnitude of coefficients</td>
+        <td>Up</td>
+        <td>Continuous, log-scale</td>
+      </tr>
+      <tr>
+        <td>Logistic regression</td>
+        <td>$C = 1/\alpha$</td>
+        <td>Inverse regularisation</td>
+        <td>Down</td>
+        <td>Continuous, log-scale</td>
+      </tr>
+      <tr>
+        <td>k-nearest neighbours</td>
+        <td>$k$ (number of neighbours)</td>
+        <td>Smoothness of the boundary</td>
+        <td>Up</td>
+        <td>Integer, 1 to $\sqrt{n}$</td>
+      </tr>
+      <tr>
+        <td>Decision tree</td>
+        <td>$\texttt{max\_depth}$</td>
+        <td>Tree size</td>
+        <td>Down</td>
+        <td>Integer, 1 to 30</td>
+      </tr>
+      <tr>
+        <td>Decision tree</td>
+        <td>$\texttt{min\_samples\_leaf}$</td>
+        <td>Minimum leaf size</td>
+        <td>Up</td>
+        <td>Integer, 1 to 100</td>
+      </tr>
+      <tr>
+        <td>SVM (RBF kernel)</td>
+        <td>$C$, $\gamma$</td>
+        <td>Margin softness, kernel width</td>
+        <td>$C$ down, $\gamma$ down</td>
+        <td>Continuous, log-scale</td>
+      </tr>
+      <tr>
+        <td>Random forest</td>
+        <td>$\texttt{n\_estimators}$, $\texttt{max\_features}$</td>
+        <td>Number of trees, features per split</td>
+        <td>$\texttt{n\_estimators}$ flat after a knee; $\texttt{max\_features}$ down</td>
+        <td>Integer and categorical</td>
+      </tr>
+      <tr>
+        <td>Gradient boosting</td>
+        <td>$\texttt{learning\_rate}$, $\texttt{n\_estimators}$</td>
+        <td>Step size, number of rounds</td>
+        <td>$\texttt{learning\_rate}$ up at fixed rounds; rounds down</td>
+        <td>Continuous and integer</td>
+      </tr>
+      <tr>
+        <td>Neural network</td>
+        <td>Width, depth, dropout, weight decay</td>
+        <td>Architectural and regularising capacity</td>
+        <td>Width and depth down; dropout and decay up</td>
+        <td>Mixed</td>
+      </tr>
+      <tr>
+        <td>k-means</td>
+        <td>$k$ (number of clusters)</td>
+        <td>Partition granularity</td>
+        <td>Within-cluster sum of squares down, instability up</td>
+        <td>Integer, elbow method</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Three things to read off the table. The same letter ($k$, $C$, $\alpha$) means different things in different rows; the meaning is set by the algorithm, not by the symbol. The capacity direction is not always intuitive: $C$ in logistic regression is the inverse of regularisation strength, so increasing $C$ reduces bias, the opposite direction to $\alpha$. The ensemble algorithms (random forest, gradient boosting, ensemble methods from <a href="../03_supervised_learning/05-ensemble_learning.html">lecture 11</a>) have hyperparameters that interact: at a fixed learning rate, more rounds reduces bias and increases variance, but at a smaller learning rate the same number of rounds achieves less of both, so the right way to tune them is jointly with early stopping.</p>
+
+  <h3>Search spaces</h3>
+
+  <p>Hyperparameters fall into three types and the choice of search method follows the type. A <strong>continuous</strong> hyperparameter (learning rate, regularisation strength, kernel width, momentum) takes real values, usually on a logarithmic scale because the meaningful changes are multiplicative rather than additive: a learning rate of $0.001$ is roughly as different from $0.01$ as $0.01$ is from $0.1$, but only one unit apart from $0.01$ on a linear scale. Continuous spaces are the natural home of random search and Bayesian optimisation; grid search on a log-scale grid is the no-frills alternative.</p>
+
+  <p>An <strong>integer</strong> hyperparameter (number of trees, tree depth, number of neighbours, number of clusters) takes discrete values, often with a meaningful upper bound implied by the data (the number of clusters in k-means cannot exceed the number of observations; the maximum useful tree depth grows with $\log_2(n)$). Integer spaces are searchable by grid; they also admit early-stopping shortcuts (fit one large tree, score it at every depth from one to the maximum, pick the best, rather than fitting a separate tree per depth).</p>
+
+  <p>A <strong>categorical</strong> hyperparameter (kernel type for SVM, splitting criterion for trees, activation function for neural networks, optimiser type) takes one value from a small set with no metric between values. Categorical spaces are searchable only by enumeration. When categoricals and continuous values are mixed (an SVM with kernel chosen from {linear, polynomial, RBF}, each with its own continuous hyperparameters), the natural pattern is a nested search: enumerate the categorical, then run a continuous search inside each branch.</p>
+
+  <h3>Stopping early</h3>
+
+  <p>The validation curve provides a free overfitting alarm. As capacity rises, validation error falls until it does not. The point at which it starts rising again is the right place to stop. For iterative algorithms (gradient-boosted trees, neural networks, any optimiser with a notion of "rounds"), this is operationalised as <strong>early stopping</strong>: at each round, evaluate on a held-out validation set; if the validation score has not improved for some number of consecutive rounds (the "patience"), halt training and keep the parameters from the best round. Early stopping is a regularisation method in its own right, and it removes "number of rounds" from the search space at very little cost. The trade-off is the small bias introduced by the validation set being seen by the stopping rule; if a separate test set exists, this does not propagate into the final score, but in nested cross-validation the early-stopping validation must be a partition of the inner training fold, not the outer test fold.</p>
+
+  <h3>Multi-objective tuning</h3>
+
+  <p>When accuracy is not the only metric, tuning becomes a multi-objective problem. A credit decision model has to balance AUC, calibration, fairness across protected groups, model size (which matters in low-latency settings), and inference time. A neural recommender has to balance offline NDCG, training cost, serving cost, and the diversity of recommendations. The standard approaches are weighted scalarisation (combine the metrics into a single scalar with chosen weights, then tune as a single-objective problem), constrained optimisation (tune to maximise the primary metric subject to all other metrics being above their thresholds), and Pareto front search (return all hyperparameters for which no other configuration dominates on every metric, and let a human pick from the front). The choice between them is a governance question. In a regulated build, the constraint approach is standard: fairness and stability thresholds are fixed up front, and the tuning loop is told to find the highest-AUC configuration that satisfies them.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for most reproducibility problems in tuning. Each is invisible in the moment and obvious in retrospect.</p>
+
+  <div class="callout warn">
+    <span class="tag">Tuning on the test set</span>
+    The test set is touched repeatedly during tuning, with the hyperparameter that maximises test score reported as "the model". The test estimate is no longer a generalisation estimate; it is an upper bound on the model's in-sample performance on the test set, which is a very different quantity. The reported number is optimistically biased, and the gap between reported and production performance shows up only after deployment. The fix is structural: tune on validation (or cross-validation on training), report on test, and never let the tuning loop see the test partition.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Feature engineering inside the wrong loop</span>
+    A feature selection step or a target encoder is fit on the full training partition, including the validation fold, before the tuning loop runs. The tuned hyperparameters are chosen on a validation set that has already seen the labels; the leakage is the same as in <a href="../01_feature_engineering/04-feature_selection.html">lecture 4</a>'s wrapper-method pitfall, just one level up. The fix is to put the feature engineering and the model fit inside the same pipeline, and to call cross-validation on the pipeline rather than on the model alone.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Comparing models at different tuning budgets</span>
+    Algorithm A is tuned with five hyperparameter values, algorithm B with five hundred. B is reported as superior. The comparison is meaningless because the two models have explored hypothesis spaces of very different sizes. The fix is to fix the tuning budget per algorithm (same number of iterations, same time budget, same search method) and report the comparison under matched effort. When budgets cannot be matched, report the budget alongside the score.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Re-tuning silently after a data refresh</span>
+    A production model is retrained quarterly on the latest data. Each retrain reruns the tuning loop and locks in whichever hyperparameters happened to score best that quarter. The hyperparameters drift across refreshes, the model behaviour drifts with them, and the governance file no longer describes the model in production. The fix is to either freeze the hyperparameters at production lock-in (retune only when a formal change is approved) or to record the tuning result with every retrain and flag material shifts for review. The same discipline applies to deep learning architectures retrained on rolling windows.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Hyperparameter tuning is what fixes a model. Parameters are fit by the data, but the model that gets fit is the one chosen by the hyperparameters, so a model is not a fixed object until tuning has been done. Every capacity-related hyperparameter is a position on the bias-variance axis, and validation error traces a U-curve along that axis: too little capacity wastes signal, too much chases noise, and tuning is the search for the minimum. The search has to happen on data the model has not been fit on, which is what gives the validation set (or cross-validation on the training fold) its purpose. When a generalisation estimate is also required, nested cross-validation separates the question "what hyperparameter to choose" from the question "how well does the whole tuned pipeline generalise"; the inner loop tunes, the outer loop scores. Algorithms differ in which knobs they have, in whether those knobs are continuous, integer, or categorical, and in how the knobs interact, but the framing is uniform across them.</p>
+
+  <p>What this lecture deliberately did not do. It did not pick a search algorithm: grid search, random search, Bayesian optimisation, Hyperband, and successive halving each have a place, and choosing between them is the subject of <a href="02-grid_search.html">lecture 31</a>. It did not derive the bias-variance decomposition formally; that is a statistics result imported wholesale. It did not introduce automated machine learning (AutoML) frameworks that wrap the search-and-tune cycle into a single call; those are operational scaffolding rather than principles, and they all use one of the methods covered in the next lecture under the hood.</p>
+
+  <p>The next lecture, <a href="02-grid_search.html">grid search</a>, moves from why tuning matters to how to do it efficiently. It covers exhaustive grid search and its scaling problem, random search and the surprising result that randomly sampled points outperform grids when only a few hyperparameters matter, and the more sophisticated successor methods that allocate compute non-uniformly across configurations.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the operational definition of a hyperparameter and contrast it with that of a parameter. Give one example of each from a regularised logistic regression.</li>
+      <li>A k-nearest neighbour classifier is trained with $k = 1$. What does the bias-variance decomposition predict for its training error and its test error? In which direction should $k$ move to reach the U-curve minimum?</li>
+      <li>Explain why tuning on the test set produces an upward-biased estimate of generalisation performance, and state the structural fix.</li>
+      <li>Describe nested cross-validation in one paragraph. What does the outer loop estimate? What does the inner loop estimate? Why must they be separated?</li>
+      <li>You are tuning a gradient-boosted tree with two hyperparameters, the learning rate and the number of rounds. Why is it inefficient to tune them independently, and what is the standard shortcut that removes "number of rounds" from the search space?</li>
+      <li>A challenger model reports a test AUC five points higher than the incumbent after twenty-three hyperparameter combinations were tried. Without knowing the tuning protocol, why would a validator be sceptical of the headline number, and what evidence would they ask for?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 31 (<a href="02-grid_search.html">grid search</a>) implements the search algorithms that the present lecture's principles imply, from exhaustive grids through random sampling to successive halving.</li>
+      <li><strong>Prerequisite:</strong> Lecture 5 (<a href="../02_train_test_split/01-train_test_validation.html">train, test, and validation splits</a>) establishes the data partitioning on which all of this lecture's validation strategy depends; lecture 1 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the machine learning landscape</a>) places tuning in stage 4 of the pipeline.</li>
+      <li><strong>Cross-reference:</strong> Lecture 11 (<a href="../03_supervised_learning/05-ensemble_learning.html">ensemble learning</a>) introduces the hyperparameters that gradient boosting and random forests bring to the table; the present lecture is where they get tuned. Sub-module 05 (<a href="../05_deep_learning/01-neural_networks.html">neural networks</a>) adds architecture and optimiser hyperparameters that behave the same way under the same framing.</li>
+      <li><strong>Outside this course:</strong> In credit risk practice, A-IRB model governance constrains the search space before tuning starts. The application-scoring track and the A-IRB capital lifecycle treat hyperparameter choices as part of the model documentation, not as a free parameter for the modeller, and the inner cross-validation loop is the audit trail rather than the search.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Hyperparameter tuning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 30 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

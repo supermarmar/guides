@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 7: survival analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Statistics</a></div>
+  <h1>Survival analysis</h1>
+  <p class="subtitle">The second lecture under pillar 5. Observations are time-to-event durations, but the analyst is denied the luxury of seeing every event: study windows close, customers leave, accounts are sold. The presence of these <em>censored</em> observations is what makes survival analysis its own subject. The unifying object is the hazard function $h(t)$, the instantaneous event rate at time $t$ given survival to $t$. Around it sit the Kaplan-Meier estimator for the unadjusted survival curve, the log-rank test for group comparison, parametric AFT models, and the Cox proportional hazards model as the semi-parametric workhorse. The credit application is time-to-default, with discrete-time survival reducing to a logistic regression on the monthly hazard.</p>
+  <div class="meta">
+    <span>Lecture 7 of 9</span>
+    <span>Reading time, 85 minutes</span>
+    <span>Part III: stochastic processes</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Survival analysis</strong> is regression for a non-negative random variable $T$, the time until an event of interest, when some observations are <em>censored</em> (the event has not yet occurred at the end of follow-up) and possibly <em>truncated</em> (the subject only enters the study after some delay). The challenge that censoring poses is real: dropping censored observations biases the analysis downward (you are conditioning on the event having occurred), and imputing them as "did not have the event" biases it upward. Survival analysis is the family of methods that uses the censored observations correctly, by extracting the information they do carry: the event time, whatever it is, is at least as long as the censoring time.</p>
+
+  <p>Three estimators carry most of the workload. The <strong>Kaplan-Meier estimator</strong> (Kaplan and Meier 1958) is the non-parametric estimator of the survival function $S(t) = P(T > t)$; it handles right-censoring exactly without assuming any functional form. The <strong>Cox proportional hazards model</strong> (Cox 1972) is the semi-parametric regression workhorse, leaving the baseline hazard non-parametric while imposing a multiplicative effect of covariates on the hazard. The <strong>parametric AFT models</strong> (Weibull, lognormal, log-logistic, Gompertz, generalised gamma) give a fully specified likelihood when a parametric shape is justified, and are needed for extrapolation past the observed follow-up.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The whole subject pivots on one trick. A censored observation says "$T &gt; c$ for this subject"; an observed event says "$T = t$". The likelihood is $f(t)$ for observed events and $S(c)$ for censored ones. Everything else, Kaplan-Meier, log-rank, Cox PH, parametric AFT, follows from putting these two pieces into the right place. The complications, time-varying covariates, competing risks, frailty, are elaborations on the same scaffold. The hazard function $h(t)$ is the natural object because the contribution of a censored observation to the cumulative-hazard estimator is zero past the censoring point, so the apparatus self-corrects.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Where this sits in the stats world
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Where this sits in the stats world</h2></div>
+
+  <div class="callout insight">
+    <span class="tag">Pillar 5, censoring as the dependence</span>
+    This lecture is the second of three under <strong>pillar 5</strong> of the <a href="index.html">stats world map</a>. Lecture 06 dropped the IID assumption along a time index; this lecture drops it in a different direction, by allowing the outcome itself (a non-negative duration) to be only partially observed for some subjects. The dependence is not between observations through time; it is between the true outcome $T$ and the observed pair $(\min(T, C), \mathbb{1}[T \leq C])$, where $C$ is the censoring time. Lecture 08 will introduce a third kind of dependence, transitions through discrete states, and complete the trilogy.
+  </div>
+
+  <p>The link back to GLMs (lecture 05) is closer than the unfamiliar machinery suggests. Survival models are GLMs in disguise. The <strong>discrete-time survival model</strong>, in which time is binned into months or quarters and a binary "did the event occur in this interval?" variable is fitted across interval-level rows, is literally a logistic regression with one row per subject-month. The Poisson regression of event counts against exposure-time offsets is mathematically equivalent to an exponential survival model with covariates on the hazard. Cox's partial likelihood, by an elegant argument due to Breslow, can be re-expressed as a Poisson regression on event indicators with an offset, allowing all of survival modelling to be fitted with GLM software. The reason survival analysis remains its own subject is partly historical (medical statistics needed its own toolkit), partly that the continuous-time non-parametric estimators (Kaplan-Meier, Nelson-Aalen, the Breslow estimator) deserve their own treatment, and partly that the failure modes (informative censoring, non-proportional hazards, competing risks) are distinctive enough to require named diagnostics.</p>
+
+  <p>One scoping note. This lecture treats classical right-censored survival analysis with independent censoring, the case that covers ~95% of real applications. Multi-state models, joint models for longitudinal-and-survival data, and recurrent-event models are pointers in section 8. Bayesian survival models are mentioned in lecture 09 as one of the Bayesian re-derivations of pillar 5.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons survival analysis deserves the same depth as time series for a credit risk modeller. First, every <strong>time-to-default model</strong> in credit risk is a survival model. The IFRS 9 lifetime expected credit loss requires a probability of default at every horizon $t = 1, 2, \ldots, T_{\max}$ over the remaining life of the exposure, not just a 12-month figure. The natural object is the term structure of cumulative hazard $H(t \mid \mathbf{x})$ for a customer with covariates $\mathbf{x}$; the survival function $S(t \mid \mathbf{x}) = \exp(-H(t \mid \mathbf{x}))$ then gives marginal PDs at every horizon directly. A logistic regression on a 12-month PD outcome is a single slice of this object; a survival model gives the whole curve in one go. The IRB capital approach, with its 12-month PD definition, can be derived from a survival model by integrating to one year; the IFRS 9 approach genuinely needs the survival object.</p>
+
+  <p>Second, <strong>recovery and cure-time modelling</strong> for LGD is a survival problem. The time from default to recovery, or from default to cure (re-performance), is a duration with right-censoring at the workout cut-off date. The proportion of accounts that cure within 24 months is a function of recovery hazards; the loss-given-default conditional on cure-by-24-months is a different object from the LGD conditional on full workout. Survival analysis cleanly separates these.</p>
+
+  <p>Third, the <strong>failure modes of survival analysis</strong> are distinctive and far less forgiving than those of ordinary regression. <strong>Informative censoring</strong>, where the reason for censoring is correlated with the propensity to have the event, biases all standard estimators (the bias has no general sign and can be large). The <strong>proportional hazards assumption</strong> of the Cox model is easy to violate undetected; non-proportional hazards produce reasonable-looking point estimates with disastrously wrong predicted survival curves. <strong>Competing risks</strong> (default, prepayment, sale) are not mutually exclusive in the sense of multinomial logit; each is a competing event and the standard Cox model treats the others as censoring, which produces misleading "cause-specific" survival probabilities. Each of these failure modes has a named diagnostic and a named correction; knowing them is the difference between a survival model that works and one that quietly miscalibrates the term structure.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The mental model</h2></div>
+
+  <p>The picture below shows the three core objects of survival analysis and the relationships between them.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Survival, density, hazard, and cumulative hazard">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The four functions of a non-negative random variable T</text>
+
+      <!-- Survival panel -->
+      <g transform="translate(40, 50)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#0d9488">Survival S(t) = P(T &gt; t)</text>
+        <line x1="0" y1="100" x2="340" y2="100" stroke="#71717a" stroke-width="0.7"/>
+        <line x1="0" y1="20" x2="0" y2="100" stroke="#71717a" stroke-width="0.7"/>
+        <path d="M 0 20 Q 80 30, 160 60 T 320 95 L 340 98" stroke="#0d9488" stroke-width="2.2" fill="none"/>
+        <text x="-8" y="24" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">1</text>
+        <text x="-8" y="103" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">0</text>
+        <text x="170" y="118" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">monotone non-increasing</text>
+      </g>
+
+      <!-- Density panel -->
+      <g transform="translate(440, 50)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#7c3aed">Density f(t) = -dS/dt</text>
+        <line x1="0" y1="100" x2="340" y2="100" stroke="#71717a" stroke-width="0.7"/>
+        <line x1="0" y1="20" x2="0" y2="100" stroke="#71717a" stroke-width="0.7"/>
+        <path d="M 0 95 Q 60 30, 130 50 Q 200 75, 280 92 L 340 98" stroke="#7c3aed" stroke-width="2.2" fill="none"/>
+        <text x="170" y="118" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">probability per unit time</text>
+      </g>
+
+      <!-- Hazard panel -->
+      <g transform="translate(40, 200)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#b45309">Hazard h(t) = f(t) / S(t)</text>
+        <line x1="0" y1="100" x2="340" y2="100" stroke="#71717a" stroke-width="0.7"/>
+        <line x1="0" y1="20" x2="0" y2="100" stroke="#71717a" stroke-width="0.7"/>
+        <path d="M 0 80 Q 60 30, 140 35 T 280 60 L 340 70" stroke="#b45309" stroke-width="2.2" fill="none"/>
+        <text x="170" y="118" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">instantaneous event rate; can rise or fall</text>
+      </g>
+
+      <!-- Cumulative hazard panel -->
+      <g transform="translate(440, 200)">
+        <text x="170" y="14" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#be185d">Cumulative hazard H(t) = -log S(t)</text>
+        <line x1="0" y1="100" x2="340" y2="100" stroke="#71717a" stroke-width="0.7"/>
+        <line x1="0" y1="20" x2="0" y2="100" stroke="#71717a" stroke-width="0.7"/>
+        <path d="M 0 100 Q 80 90, 160 60 T 320 25 L 340 22" stroke="#be185d" stroke-width="2.2" fill="none"/>
+        <text x="170" y="118" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">monotone non-decreasing; cumulative risk</text>
+      </g>
+
+      <!-- Bottom note -->
+      <text x="410" y="345" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#52525b">Any one of these four functions determines the other three. Choose whichever is most convenient: S for clinical communication, h for regression, H for the Nelson-Aalen estimator.</text>
+    </svg>
+    <figcaption>The four equivalent representations of a non-negative random variable $T$. The <strong>survival function</strong> $S(t) = P(T &gt; t)$ is the proportion of subjects still event-free at time $t$, monotone decreasing from $S(0) = 1$ to $S(\infty) = 0$. The <strong>density</strong> $f(t) = -S'(t)$ is the rate at which mass flows out of survival. The <strong>hazard</strong> $h(t) = f(t)/S(t)$ is the instantaneous rate of failure given survival to $t$; it can rise (ageing), fall (burn-in), or be constant (memoryless). The <strong>cumulative hazard</strong> $H(t) = \int_0^t h(u) du = -\log S(t)$ is the total accumulated risk by time $t$. The four are mutually transformable: knowing one is knowing all of them. The choice of which to model depends on the application: clinicians read survival curves, statisticians fit hazard models, and the Nelson-Aalen estimator targets the cumulative hazard directly.</figcaption>
+  </figure>
+
+  <p>Two slogans pin the methodology. <strong>Model the hazard, read the survival.</strong> Almost every survival regression model parameterises the hazard function (proportional hazards, AFT, additive hazards) because the hazard takes the natural form of a per-unit-time rate, where covariates have intuitive multiplicative effects, and where the contribution of censored observations is mechanically zero past the censoring point. The survival function is then derived by exponentiating the negative cumulative hazard. <strong>Censoring is information, not missingness.</strong> A censored observation tells you the subject was event-free up to time $c$; this is real information, and the likelihood machinery uses it. Discarding censored observations is a beginner's mistake that biases every estimate downward; coding them as zeros (no event) biases everything upward. The likelihood-based methods handle censoring exactly, with no imputation.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The detail</h2></div>
+
+  <h3>5.1 Setup, censoring, and truncation</h3>
+
+  <p>Let $T \geq 0$ be the random time to the event of interest. In credit risk, $T$ is months from origination to first default; in oncology, days from diagnosis to death; in reliability engineering, hours to component failure. The full survival data on subject $i$ is $(T_i, \mathbf{x}_i)$, but in practice the analyst observes the pair $(\tilde{T}_i, \delta_i)$ where</p>
+
+  $$\tilde{T}_i = \min(T_i, C_i), \qquad \delta_i = \mathbb{1}[T_i \leq C_i].$$
+
+  <p>$C_i$ is the censoring time, $\delta_i = 1$ for an observed event, $\delta_i = 0$ for a (right-) censored observation. Three flavours of censoring matter.</p>
+
+  <p><strong>Right censoring</strong> is the dominant case: the subject is observed up to $C_i$ but the event has not yet occurred by then. Sources: end of study, loss to follow-up, account closure, sale of the portfolio. <strong>Left censoring</strong>: the event occurred before the subject entered the study, so the only information is "$T_i &lt; C_i$"; rare in credit but common in epidemiology. <strong>Interval censoring</strong>: the event is known to have occurred in some interval $(L_i, R_i]$ but the exact time is unknown; the natural framing for monthly observation of credit accounts (you observe that default happened during month $m$, not on which day).</p>
+
+  <p><strong>Truncation</strong> is a different beast. Left-truncation: subject $i$ enters the study only at age $\tau_i &gt; 0$, so the analyst conditions on $T_i &gt; \tau_i$. This is the natural framing for credit accounts that are sampled at a portfolio snapshot (the account has already survived to its current age). Right-truncation: subjects are observed only if the event happened before some calendar date; rarer.</p>
+
+  <p>The crucial assumption underlying classical estimators is <strong>independent censoring</strong> (sometimes called non-informative): given covariates, the censoring time $C$ is independent of the event time $T$. Equivalently, the hazard for subjects still at risk at time $t$ should be the same as the hazard would be for those who were censored at or before $t$ if they were still under observation. Violations are catastrophic and the bias has no general sign. Examples in credit: a portfolio sale that selects accounts on residual credit quality (informative censoring); customer attrition correlated with the propensity to default (informative censoring). Diagnosing informative censoring usually requires either sensitivity analysis or external information; there is no general statistical test that flags it from the data alone, because every plausible test confounds the censoring mechanism with the survival mechanism.</p>
+
+  <h3>5.2 The three core functions and the relationships between them</h3>
+
+  <p>The four equivalent representations of the distribution of $T$:</p>
+
+  $$S(t) = P(T &gt; t), \qquad f(t) = -S'(t),$$
+  $$h(t) = \lim_{\Delta t \downarrow 0} \frac{P(t \leq T &lt; t + \Delta t \mid T \geq t)}{\Delta t} = \frac{f(t)}{S(t)}, \qquad H(t) = \int_0^t h(u) \, du = -\log S(t).$$
+
+  <p>The last identity is the most useful one in practice: $S(t) = \exp(-H(t))$. Estimate $H$ non-parametrically (Nelson-Aalen) and exponentiate to get $S$; estimate $S$ non-parametrically (Kaplan-Meier) and take the negative log to get $H$. The two are asymptotically equivalent.</p>
+
+  <p>The <strong>hazard is the natural quantity for regression</strong> because it takes the form of a per-unit-time rate, has the dimension of inverse time, and admits multiplicative covariate effects (constant on the log scale). It is also the only one of the four whose value at $t$ can be estimated from observations still under follow-up at $t$, which is exactly what the censoring structure provides. The survival function, by contrast, depends on the entire trajectory from $0$ to $t$ and is awkward to model directly with covariates.</p>
+
+  <p>Three named families distinguish themselves by hazard shape. <strong>Constant hazard</strong> $h(t) = \lambda$ gives the exponential distribution, $S(t) = e^{-\lambda t}$; the memoryless property is the defining feature and almost never holds in real data. <strong>Increasing hazard</strong> models ageing (wearout in reliability, mortality at old ages); <strong>decreasing hazard</strong> models burn-in (early failures in newly installed equipment, early defaults in newly originated loans where the worst risks default first). The Weibull distribution covers monotone hazards in both directions through its shape parameter; the lognormal and log-logistic cover non-monotone (unimodal) hazards that rise to a peak and then decline.</p>
+
+  <h3>5.3 The likelihood under right-censoring</h3>
+
+  <p>The fundamental result that makes survival analysis work. For independently right-censored data $\{(\tilde{T}_i, \delta_i)\}_{i=1}^n$ from a parametric family with density $f(t; \theta)$, hazard $h(t; \theta)$, and survival $S(t; \theta)$, the likelihood is</p>
+
+  $$L(\theta) = \prod_{i=1}^n f(\tilde{T}_i; \theta)^{\delta_i} S(\tilde{T}_i; \theta)^{1 - \delta_i} = \prod_{i=1}^n h(\tilde{T}_i; \theta)^{\delta_i} S(\tilde{T}_i; \theta).$$
+
+  <p>The first form makes the censoring intuitive: each subject contributes the density $f$ if observed and the survival $S$ if censored. The second form, using $f = h \cdot S$, is the one that generalises cleanly to time-varying covariates and to non-parametric estimation: the log-likelihood is</p>
+
+  $$\ell(\theta) = \sum_{i=1}^n \delta_i \log h(\tilde{T}_i; \theta) - \sum_{i=1}^n H(\tilde{T}_i; \theta).$$
+
+  <p>The first sum runs only over observed events; the second sum runs over everyone and accumulates the cumulative hazard up to each subject's observation time. This is the same algebraic shape as a Poisson log-likelihood with $\delta_i$ as the count and $H(\tilde{T}_i; \theta)$ as the expected count, which is why Poisson regression with offsets is a valid computational route to survival models with piecewise-constant hazards.</p>
+
+  <h3>5.4 Non-parametric estimation: Kaplan-Meier and Nelson-Aalen</h3>
+
+  <p>The Kaplan-Meier estimator (Kaplan and Meier 1958) is the non-parametric MLE of $S(t)$ under right-censoring. At each distinct event time $t_{(1)} &lt; t_{(2)} &lt; \cdots$, let $d_j$ be the number of events and $n_j$ the number at risk just before $t_{(j)}$ (the risk set). The estimator is</p>
+
+  $$\hat{S}(t) = \prod_{j: t_{(j)} \leq t} \left(1 - \frac{d_j}{n_j}\right).$$
+
+  <p>The product runs only over event times: at each event time, the estimator drops by a factor $(1 - d_j / n_j)$; between event times it is flat. Censored observations affect the estimator only by reducing the risk set $n_j$ at later event times. The estimator is monotone step-function from $1$ to whatever value remains at the last event time; if the largest observation is censored, the estimator never reaches zero, and the survival function past the last observation is undefined without parametric extrapolation.</p>
+
+  <p>The pointwise variance is given by <strong>Greenwood's formula</strong>:</p>
+
+  $$\widehat{\text{Var}}(\hat{S}(t)) = \hat{S}(t)^2 \sum_{j: t_{(j)} \leq t} \frac{d_j}{n_j (n_j - d_j)}.$$
+
+  <p>The standard pointwise 95 per cent CI is $\hat{S}(t) \pm 1.96 \sqrt{\widehat{\text{Var}}(\hat{S}(t))}$, but this can produce intervals outside $[0, 1]$ when $\hat{S}(t)$ is near the boundary. A common fix is to construct the CI on the log-log scale (the complementary log-log transformation maps $S$ to $\log(-\log S)$ on the real line) and back-transform.</p>
+
+  <p>The <strong>Nelson-Aalen estimator</strong> targets the cumulative hazard directly:</p>
+
+  $$\hat{H}(t) = \sum_{j: t_{(j)} \leq t} \frac{d_j}{n_j}.$$
+
+  <p>This is the sum of empirical conditional event probabilities at each event time. The Aalen-Johansen relationship $\hat{S}(t) \approx \exp(-\hat{H}(t))$ holds asymptotically and the two estimators agree to second order; the multiplicative Kaplan-Meier and the additive Nelson-Aalen differ only in finite samples. The Nelson-Aalen is typically preferred for diagnostic plots and for assessing hazard shape, because the curve is read most easily on a log scale.</p>
+
+  <h3>5.5 Comparing groups: the log-rank test</h3>
+
+  <p>The log-rank test (Mantel 1966; Peto and Peto 1972) tests $H_0$: $S_1(t) = S_2(t) = \cdots = S_K(t)$ for all $t$ across $K$ groups, against the alternative of any difference. It is the survival analogue of the chi-square test for proportions and the natural primary endpoint test in a randomised trial.</p>
+
+  <p>The construction is a series of $2 \times K$ contingency tables, one per event time. At event time $t_{(j)}$, let $d_{jk}$ be the number of events in group $k$ and $n_{jk}$ the number at risk in group $k$. Under $H_0$, the expected number of events in group $k$ at time $t_{(j)}$ is $E_{jk} = n_{jk} d_j / n_j$. The log-rank statistic for two groups is</p>
+
+  $$Z = \frac{\sum_j (d_{j1} - E_{j1})}{\sqrt{\sum_j V_{j1}}}, \qquad V_{j1} = \frac{n_{j1} n_{j2} d_j (n_j - d_j)}{n_j^2 (n_j - 1)},$$
+
+  <p>which under $H_0$ is asymptotically standard normal. For $K$ groups it generalises to a chi-square statistic with $K - 1$ degrees of freedom by stacking the per-event-time contributions into a vector and inverting the asymptotic covariance matrix.</p>
+
+  <p>The log-rank test has full asymptotic efficiency against the proportional-hazards alternative. Against alternatives where the hazard ratio changes sign over time (crossing survival curves), it has very low power; in fact the test statistic can be near zero when survival curves cross even though they are obviously different. Three remedies. (1) The <strong>weighted log-rank</strong>: weight the per-event-time contributions to emphasise early or late differences (Gehan-Breslow weights $w_j = n_j$ emphasise early; Peto weights $w_j = \hat{S}(t_j^-)$ are an intermediate compromise; Fleming-Harrington $G^{\rho, \gamma}$ weights $\hat{S}(t_j^-)^\rho (1 - \hat{S}(t_j^-))^\gamma$ allow user-selected emphasis). (2) Stratify the log-rank by a confounder, summing test statistics across strata (Mantel-Haenszel framing). (3) Use a Renyi or supremum test, which is sensitive to any kind of departure including crossings.</p>
+
+  <h3>5.6 Parametric survival models</h3>
+
+  <p>Five named parametric families cover most real applications. For each, the hazard shape, the canonical interpretation, and the standard credit-risk application.</p>
+
+  <p><strong>Exponential</strong>, $h(t) = \lambda$. Constant hazard, memoryless. $S(t) = e^{-\lambda t}$, $f(t) = \lambda e^{-\lambda t}$. Rare in real data because the memoryless property is so strong. Used as a baseline for likelihood ratio tests against more flexible models.</p>
+
+  <p><strong>Weibull</strong>, $h(t) = \lambda \rho (\lambda t)^{\rho - 1}$. A two-parameter family with shape $\rho$ and scale $1/\lambda$. $\rho &gt; 1$ gives increasing hazard (ageing); $\rho &lt; 1$ gives decreasing hazard (burn-in); $\rho = 1$ recovers the exponential. The most widely used parametric family in reliability engineering and a frequent choice in credit risk for time-to-default. $S(t) = \exp(-(\lambda t)^\rho)$, $\log H(t) = \rho \log t + \rho \log \lambda$, so a log-log plot of $-\log \hat{S}$ against $t$ is linear with slope $\rho$ under Weibull, which gives a simple graphical diagnostic.</p>
+
+  <p><strong>Lognormal</strong>, $\log T \sim \mathcal{N}(\mu, \sigma^2)$. Unimodal hazard rising from zero, peaking, then declining. Natural fit for "time to event with maturation" data: the first few months are safe (no event), risk peaks at intermediate times, then declines as the high-risk subjects exit the at-risk pool. Sometimes preferred over Weibull for time-to-recovery and time-to-cure in credit.</p>
+
+  <p><strong>Log-logistic</strong>, $S(t) = 1/(1 + (\lambda t)^\rho)$. Similar non-monotone hazard shape to lognormal but with closed-form survival and CDF. Useful when the analyst wants the lognormal shape but with a more tractable form for AFT regression.</p>
+
+  <p><strong>Gompertz</strong>, $h(t) = \lambda \exp(\gamma t)$. Exponentially increasing hazard. The classical mortality model: human mortality after age 30 follows a Gompertz curve to remarkable precision over a century of data, with hazard doubling roughly every 8 years. Used for old-age mortality and for chronic-disease incidence.</p>
+
+  <p><strong>Generalised gamma.</strong> A three-parameter family that nests the exponential, Weibull, and lognormal as special cases. Useful for model selection: fit the generalised gamma and check whether the maximum-likelihood parameters land at a sub-family boundary. The cost is a flatter likelihood near the boundary, which makes the MLE unstable in small samples.</p>
+
+  <p><strong>Two regression framings.</strong> The same parametric family admits two distinct regression approaches that are equivalent for some distributions and different for others. The <strong>proportional hazards (PH)</strong> framing imposes</p>
+
+  $$h(t; \mathbf{x}) = h_0(t) \exp(\mathbf{x}^\top \boldsymbol{\beta}),$$
+
+  <p>so covariates have a constant multiplicative effect on the hazard. The <strong>accelerated failure time (AFT)</strong> framing imposes</p>
+
+  $$\log T = \mathbf{x}^\top \boldsymbol{\beta} + \sigma W,$$
+
+  <p>where $W$ is a baseline error distribution; covariates act as a multiplicative effect on time itself (a positive $\beta$ doubles the time-to-event). PH and AFT coincide for the exponential and Weibull families; for the lognormal, log-logistic, and generalised gamma they are distinct, with AFT typically the preferred framing for those distributions.</p>
+
+  <h3>5.7 The Cox proportional hazards model</h3>
+
+  <p>Cox's 1972 paper (a JRSS B paper that has been cited more than 60,000 times, the most-cited statistics paper in history) proposed a semi-parametric approach that leaves the baseline hazard $h_0(t)$ entirely unspecified and only imposes the proportional-hazards structure on the covariate effect:</p>
+
+  $$h(t; \mathbf{x}) = h_0(t) \exp(\mathbf{x}^\top \boldsymbol{\beta}).$$
+
+  <p>The intuition: the actual shape of the baseline hazard is rarely the scientific question; the question is "by how much does covariate $X_j$ change the hazard, holding other covariates fixed?". Cox showed that $\boldsymbol{\beta}$ can be estimated by maximising a <strong>partial likelihood</strong> that conditions out $h_0$ entirely.</p>
+
+  <p>The partial likelihood is built as follows. Sort the data by event time. At each event time $t_{(j)}$, the conditional probability that the subject who failed was the one observed to fail, given the risk set $R_j$ (the set of subjects still under follow-up just before $t_{(j)}$), is</p>
+
+  $$\frac{h_0(t_{(j)}) \exp(\mathbf{x}_{(j)}^\top \boldsymbol{\beta})}{\sum_{l \in R_j} h_0(t_{(j)}) \exp(\mathbf{x}_l^\top \boldsymbol{\beta})} = \frac{\exp(\mathbf{x}_{(j)}^\top \boldsymbol{\beta})}{\sum_{l \in R_j} \exp(\mathbf{x}_l^\top \boldsymbol{\beta})}.$$
+
+  <p>The baseline hazard cancels in numerator and denominator. The partial likelihood is the product of these conditional probabilities over all event times $j = 1, \ldots, D$:</p>
+
+  $$L_p(\boldsymbol{\beta}) = \prod_{j=1}^D \frac{\exp(\mathbf{x}_{(j)}^\top \boldsymbol{\beta})}{\sum_{l \in R_j} \exp(\mathbf{x}_l^\top \boldsymbol{\beta})}.$$
+
+  <p>Maximisation gives the Cox estimator $\hat{\boldsymbol{\beta}}$. Cox's argument and Andersen-Gill's (1982) counting-process formalisation show that $\hat{\boldsymbol{\beta}}$ has the usual MLE asymptotic properties: consistency, asymptotic normality, and an asymptotic variance estimable by the inverse of the partial-likelihood information matrix. The remarkable thing is that this is achieved without any parametric assumption on $h_0$.</p>
+
+  <p>Once $\hat{\boldsymbol{\beta}}$ is in hand, the baseline cumulative hazard is estimated by the <strong>Breslow estimator</strong>:</p>
+
+  $$\hat{H}_0(t) = \sum_{j: t_{(j)} \leq t} \frac{d_j}{\sum_{l \in R_j} \exp(\mathbf{x}_l^\top \hat{\boldsymbol{\beta}})}.$$
+
+  <p>Note the structural similarity to Nelson-Aalen: the numerator is the count of events at $t_{(j)}$, the denominator is the risk-weighted sum across the risk set (using the fitted partial likelihood weights). The predicted survival curve for a covariate vector $\mathbf{x}$ is then $\hat{S}(t \mid \mathbf{x}) = \exp(-\hat{H}_0(t) \exp(\mathbf{x}^\top \hat{\boldsymbol{\beta}}))$.</p>
+
+  <p><strong>Tied event times.</strong> If two or more subjects have the same event time (common in monthly observation of credit accounts), the partial likelihood above is not quite right. Three methods to handle ties: <strong>Breslow's approximation</strong> (uses the same risk set for all tied events, fast but biased toward zero when ties are heavy); <strong>Efron's approximation</strong> (a more accurate adjustment that downweights the risk-set contribution; the default in R and Stata); and the <strong>exact partial likelihood</strong> (sums over all orderings of the tied events; exact but computationally expensive). For heavy tying (more than a few percent of event times tied), the discrete-time formulation in section 5.10 is usually preferable to any of these approximations.</p>
+
+  <h3>5.8 Diagnostics for the Cox model</h3>
+
+  <p>Three named residuals carry the diagnostic burden.</p>
+
+  <p><strong>Schoenfeld residuals</strong> test the proportional-hazards assumption. For covariate $X_j$ and event time $t_{(k)}$, the residual is the difference between the observed value of $X_j$ at the event and the weighted mean of $X_j$ over the risk set, with weights from the fitted partial likelihood:</p>
+
+  $$r_{jk}^{Sch} = X_{j(k)} - \bar{X}_{j}(t_{(k)} \mid \hat{\boldsymbol{\beta}}), \qquad \bar{X}_j(t \mid \hat{\boldsymbol{\beta}}) = \frac{\sum_{l \in R(t)} X_{jl} \exp(\mathbf{x}_l^\top \hat{\boldsymbol{\beta}})}{\sum_{l \in R(t)} \exp(\mathbf{x}_l^\top \hat{\boldsymbol{\beta}})}.$$
+
+  <p>Under proportional hazards, scaled Schoenfeld residuals against event time should have zero slope. A non-zero slope (tested by the Grambsch-Therneau (1994) global test) indicates a time-varying effect of the covariate, i.e. non-proportional hazards. The standard remedies: (1) stratify the Cox model on the offending covariate (allow each stratum its own baseline hazard); (2) include a time-by-covariate interaction (allow the covariate effect to change linearly with $\log t$); (3) switch to an AFT model where time-varying coefficients have a different interpretation.</p>
+
+  <p><strong>Martingale residuals</strong> assess the functional form of continuous covariates. The residual for subject $i$ is</p>
+
+  $$M_i = \delta_i - \int_0^{\tilde{T}_i} \exp(\mathbf{x}_i^\top \hat{\boldsymbol{\beta}}) d\hat{H}_0(u).$$
+
+  <p>It is the difference between the observed event indicator and the expected cumulative hazard for subject $i$. Plotting martingale residuals from a null model (no covariates) against a continuous covariate suggests the appropriate functional form (linear, quadratic, log, spline); a smooth fit through the residual plot is the recommended graphical approach.</p>
+
+  <p><strong>Deviance residuals</strong> are martingale residuals symmetrised on the real line (sign$(M_i) \cdot \sqrt{-2[M_i + \delta_i \log(\delta_i - M_i)]}$), and are useful for detecting outlier subjects whose event time is poorly predicted by the model. <strong>DFBETA</strong>-style influence diagnostics give the change in $\hat{\boldsymbol{\beta}}$ when each subject is deleted; the largest absolute changes flag observations that drive the fit.</p>
+
+  <h3>5.9 Extensions</h3>
+
+  <p><strong>Time-varying covariates.</strong> The standard Cox model takes covariates measured at baseline. A subject's macroeconomic environment, credit-card balance, employment status, or behavioural score all change over time and should enter the hazard at the time they take effect. The data structure becomes long: one row per subject per time interval, with covariates updated at each interval. The partial likelihood machinery generalises seamlessly through the Andersen-Gill counting-process formalism: at each event time, the risk-set sum uses the covariate value as of that time. Care is needed to use only past values (not future values that would not yet be observed), otherwise the model is anticipating the future and the resulting estimates are anti-conservative.</p>
+
+  <p><strong>Stratification.</strong> Allow each level of a categorical variable its own baseline hazard $h_{0g}(t)$, with a common $\boldsymbol{\beta}$ for the remaining covariates. The partial likelihood becomes a product over strata. Useful when proportional hazards fails for one variable but the remaining variables are well-behaved. The cost is that the stratifying variable's effect is not estimated (only its baseline hazard).</p>
+
+  <p><strong>Frailty (random effects).</strong> A subject-level or cluster-level random multiplicative effect on the hazard: $h_i(t) = u_i h_0(t) \exp(\mathbf{x}_i^\top \boldsymbol{\beta})$, with $u_i$ drawn from a distribution (typically gamma or lognormal). Used for clustered data (multiple loans per customer, multiple customers per branch) and for unobserved heterogeneity. The marginal hazard ratios from the unfrailty model are attenuated relative to the subject-specific ratios; the frailty model recovers the subject-specific quantities.</p>
+
+  <p><strong>Competing risks.</strong> When subjects can fail from multiple mutually exclusive causes (default, prepayment, sale), each cause is a competing event for the others. Two approaches.</p>
+
+  <p><em>Cause-specific hazards.</em> Fit a separate Cox model for each cause, treating events of the other causes as censoring. The cause-specific hazard $h_k(t) = \lim P(\text{event of cause } k \text{ in } (t, t + dt) \mid \text{event-free at } t)/dt$ is interpretable as "what is the instantaneous risk of cause $k$, given still being event-free at $t$". This is the right object for biological / mechanistic understanding.</p>
+
+  <p><em>Sub-distribution hazards (Fine-Gray 1999).</em> Fit a model on the cumulative incidence function $F_k(t) = P(T \leq t, \text{cause} = k)$. The sub-distribution hazard $\tilde{h}_k(t) = -\frac{d}{dt} \log(1 - F_k(t))$ keeps subjects who experience competing events in the risk set with weights derived from the inverse-probability-of-censoring formula. This is the right object for prediction (predicted cumulative incidence under all causes). The two approaches give numerically different and conceptually different quantities; analysts must specify which they intend. Credit example: predicting the probability that a loan defaults within 5 years, accounting for prepayment as a competing risk, requires Fine-Gray; estimating "what is the instantaneous default propensity holding prepayment fixed" requires cause-specific.</p>
+
+  <h3>5.10 Discrete-time survival and the connection to logistic regression</h3>
+
+  <p>In credit applications, time is naturally discrete: monthly account observations, quarterly arrears flags, annual default observations. The discrete-time survival model treats time as a sequence of intervals $1, 2, \ldots, k_{\max}$ and parameterises the conditional probability of an event in interval $k$ given survival to the start of interval $k$:</p>
+
+  $$h_k(\mathbf{x}) = P(T = k \mid T \geq k, \mathbf{x}).$$
+
+  <p>This is the discrete-time hazard. The likelihood for a subject with event time $k$ is $h_k(\mathbf{x}) \prod_{j&lt;k}(1 - h_j(\mathbf{x}))$; for a subject censored after interval $k$ it is $\prod_{j \leq k}(1 - h_j(\mathbf{x}))$. The standard parameterisation uses the logit:</p>
+
+  $$\text{logit}(h_k(\mathbf{x})) = \alpha_k + \mathbf{x}^\top \boldsymbol{\beta},$$
+
+  <p>where $\alpha_k$ is an interval-specific intercept (the discrete-time analogue of the baseline hazard, often modelled with a spline in $k$ rather than $k$-many free parameters). Cox PH translates approximately to discrete-time logistic via the complementary log-log link instead of logit: $\text{cloglog}(h_k(\mathbf{x})) = \alpha_k + \mathbf{x}^\top \boldsymbol{\beta}$. For small $h_k$, logit and cloglog are nearly identical; for larger $h_k$ they diverge, and cloglog is the more theoretically correct choice when proportional hazards in continuous time is the underlying assumption.</p>
+
+  <p>The practical importance: discrete-time survival data is one row per subject per interval, with a binary "event in this interval" indicator. This is the long-format dataset, and the model is a logistic regression on it. All the apparatus of lecture 05 carries over: model selection, AIC/BIC, regularisation, diagnostics, calibration plots. Many practical implementations of "PD term structure models" in credit risk are exactly this: a logistic regression on a long-format dataset with monthly observations, interval dummies or splines for the baseline hazard, and time-varying covariates. The discrete-time framing is also the natural one when the data is observed in intervals and ties at the interval boundary are heavy, which is when the Cox model's Breslow / Efron tie-handling becomes uncomfortable.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Worked example: time-to-default for an IFRS 9 lifetime PD curve</h2></div>
+
+  <p>IFRS 9 stage-2 ECL requires lifetime PD curves: the cumulative probability of default at every horizon $t = 1, 2, \ldots, T_{\max}$ over the remaining life of the exposure. A survival model is the natural engine. Here is the workflow on a representative retail unsecured portfolio.</p>
+
+  <div class="worked">
+    <strong>Step 1: data structure.</strong>
+    <p>Take all accounts opened between January 2015 and December 2022. Follow each from origination month to the earliest of: first default (Basel definition, 90 days past due or unlikeliness to pay), prepayment, account closure, or the data cut-off date (December 2025). The observation for each account is the pair (time in months to event, event-type indicator). Of 250,000 accounts: 8 per cent default observed, 35 per cent prepayment observed, 12 per cent closure observed, 45 per cent right-censored at data cut-off. The default-event indicator is $\delta = 1$ when the event is default and $0$ for everything else; this treats prepayment and closure as right-censoring (cause-specific framing) in the first pass.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 2: descriptive Kaplan-Meier.</strong>
+    <p>Estimate $\hat{S}_{\text{default}}(t)$ on the full sample by Kaplan-Meier (censoring at prepayment and closure). The curve drops from $1.00$ to $\approx 0.91$ over 60 months, with a steep early drop in months 6 to 18 and a flattening thereafter. The shape suggests a unimodal hazard: defaults are rare in the first few months (lender screening still effective), peak around month 12 to 18 (the riskiest cohort exits), and decline thereafter (the surviving population is the better risks). Verify by plotting $\hat{H}(t)$ (Nelson-Aalen) on a log scale: the slope is steep then shallow, consistent with a non-monotone hazard.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 3: log-rank stratification.</strong>
+    <p>Stratify by application score band (low, mid, high). Log-rank chi-square test on three groups: $\chi^2 = 1{,}248$ on 2 df, $p \approx 0$. The three Kaplan-Meier curves are visually distinct: 60-month default-free survival is 0.78 (low), 0.92 (mid), 0.97 (high). The score band is a strong predictor of default-time as expected; the assumption of proportional hazards across the bands is provisional and will be tested.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 4: Cox PH model.</strong>
+    <p>Fit a Cox PH model with application-time covariates: application score, loan size (log), term (months), age at origination, prior-product flag, regional dummies. Behavioural covariates (current balance, current arrears state, current behavioural score) are added as time-varying. The fitted hazard ratios on a log scale: application score $-0.85$ per standard deviation (so $e^{-0.85} \approx 0.43$ multiplicative effect, a strong protective effect), behavioural-score $-0.65$ per SD (the behavioural score adds predictive power above the application score), loan size $+0.12$ per log unit, term $+0.04$ per month over 36, regional effects small and mostly non-significant.</p>
+    <p>Concordance index ($C$) of 0.78 on a 30 per cent holdout; AUC computed at 12 months 0.81. Both adequate for retail unsecured.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 5: diagnose proportional hazards.</strong>
+    <p>Scaled Schoenfeld residuals against time. Global test (Grambsch-Therneau) $p = 0.003$, suggesting at least one covariate has a time-varying effect. Per-covariate p-values: application score $p = 0.001$, behavioural score $p = 0.04$, others $p &gt; 0.2$. The pattern: the application-score effect is strong early (months 1 to 18) and attenuates after month 24, consistent with the "selection wearing off" intuition. Behavioural score by contrast is weaker early (when behaviour is poorly observed) and stronger later.</p>
+    <p>Remedy: include a $\text{(application score)} \times \log t$ interaction; refit. The interaction is significant; concordance improves marginally to 0.79; the residual Schoenfeld test no longer rejects. The model is acceptable.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 6: generate the lifetime PD curve.</strong>
+    <p>For a representative new account with given covariates $\mathbf{x}$, compute the predicted survival $\hat{S}(t \mid \mathbf{x}) = \exp(-\hat{H}_0(t) e^{\mathbf{x}^\top \hat{\boldsymbol{\beta}}})$ for $t = 1, 2, \ldots, 60$. The lifetime PD at horizon $t$ is $\hat{F}(t \mid \mathbf{x}) = 1 - \hat{S}(t \mid \mathbf{x})$. For the 12-month horizon, $\hat{F}(12)$ on a mid-score account is approximately 4 per cent; for the lifetime (60 months) it is 14 per cent. The full vector is the input to the ECL calculation.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 7: competing-risks check.</strong>
+    <p>The cause-specific Cox above treats prepayment as censoring, which is appropriate for the cause-specific hazard interpretation but produces overestimates of "default by time $t$" because in reality, accounts that prepay before defaulting cannot default. Refit using the Fine-Gray sub-distribution hazard model. The 60-month cumulative default incidence drops from 14 per cent (cause-specific naive) to 9.5 per cent (Fine-Gray, accounting for prepayment competing). The difference is large enough to be material for ECL purposes. The Fine-Gray output is the right object for prediction; the cause-specific output is the right object for the relative impact of covariates on default propensity.</p>
+  </div>
+
+  <p>Three diagnostic curves anchor the workflow. (1) Kaplan-Meier with confidence band, eyeballed against fitted survival. (2) Predicted vs observed cumulative incidence at month 12 and month 60 by decile of predicted risk (the calibration plot). (3) Time-dependent ROC at month 12 (Heagerty et al. 2000). All three should be reported alongside the C-index for any production survival model.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Common pitfalls and cognitive traps</h2></div>
+
+  <h3>Informative censoring</h3>
+
+  <p>The classical assumption is that conditional on covariates, censoring is independent of the latent event time. If censoring is driven by something correlated with the unobserved propensity to fail (a portfolio sale that selects on residual credit quality; a customer who leaves the bank when they sense an impending default), the apparatus silently miscalibrates. There is no general statistical test that detects informative censoring from the survival data alone. The defences are external: design the data collection to minimise the issue, conduct sensitivity analyses under different censoring-mechanism assumptions, and use covariates that absorb the censoring mechanism wherever possible.</p>
+
+  <h3>Non-proportional hazards in a Cox model</h3>
+
+  <p>The Cox model is widely fitted without checking the assumption that underlies it. Non-proportional hazards (the hazard ratio changes over time) produce reasonable-looking coefficients but miscalibrated predicted survival curves, especially at long horizons. Always check Schoenfeld residuals; if PH fails, the remedies are stratification, time-by-covariate interaction, or switching to AFT. The credit application is particularly vulnerable because the application-score effect typically attenuates over time as the high-risk cohort exits, and a naive Cox model will under-predict default risk at long horizons for high-score accounts.</p>
+
+  <h3>Treating competing events as censoring without thinking about it</h3>
+
+  <p>In a portfolio with defaults and prepayments, the cause-specific Cox model on defaults treats prepayments as censoring. This produces the right "what is the instantaneous default risk holding all else fixed" object, but the wrong "what is the probability of default by time $t$" object. For lifetime PD estimation and IFRS 9 ECL, Fine-Gray or another competing-risks framework is the appropriate choice. The difference can be 30 to 50 per cent at long horizons, which is material.</p>
+
+  <h3>Ignoring left-truncation in portfolio-snapshot data</h3>
+
+  <p>When the analyst samples accounts from a portfolio snapshot and follows them forward, accounts in the snapshot have already survived to their current age. The natural risk-set adjustment for left-truncation (subjects enter the risk set at their age at observation, not at age zero) is sometimes forgotten, and the resulting model conflates "survival from origination" with "survival from observation", biasing the early-life hazard estimates. The cure is to use the start-stop data structure with delayed entry.</p>
+
+  <h3>Discarding censored observations</h3>
+
+  <p>Beginners sometimes drop the censored observations and fit OLS on the observed event times. This is wrong in two ways: it discards real information (censored observations tell you the event time exceeds the censoring time), and it conditions on the event having occurred, which biases the analysis toward subjects whose event times happened to be short. The bias is typically large and downward; the survival quantiles can be off by a factor of two or more in heavily-censored data. Use the likelihood-based methods, which handle censoring correctly.</p>
+
+  <h3>Predicting past the observed follow-up</h3>
+
+  <p>The non-parametric Kaplan-Meier estimator is undefined past the last observed event time, and the Cox model's predicted survival curve relies on a Breslow-estimated baseline hazard that is also undefined past the last event. Extrapolating beyond the observed follow-up requires a parametric assumption (Weibull, Gompertz, log-logistic). Beware: the choice of distribution can change the 10-year prediction dramatically when the model is fitted on 3 years of follow-up. Sensitivity analysis across plausible families is essential.</p>
+
+  <div class="callout warn">
+    <span class="tag">Why survival modelling requires named diagnostics</span>
+    All six failure modes above have specific tests or remedies (Schoenfeld for PH, Fine-Gray for competing risks, start-stop for truncation, parametric models for extrapolation, sensitivity analysis for informative censoring). Unlike ordinary regression, where residual diagnostics are quasi-universal, survival modelling has a checklist of named diagnostics each targeting a specific failure mode. A survival model that has not had Schoenfeld residuals plotted, competing risks examined, and the proportional-hazards assumption explicitly tested is not a finished model. The audit cost of survival models, in regulated credit, is higher than that of cross-sectional logistic regressions, but the analytical payoff (a full term structure of risk) is also higher.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8: Frontiers
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 8</span><h2>Frontiers and what's beyond</h2></div>
+
+  <p>Five frontiers sit past the classical material.</p>
+
+  <p><strong>Multi-state models.</strong> A generalisation of survival to multiple non-absorbing states. A loan starts in "current"; it can transition to "1-29 dpd" (days past due), then to "30-59 dpd", "60-89 dpd", "90+ dpd default", or back to "current" at each stage. The natural representation is a continuous-time Markov chain on a finite state space with transition intensities (covariate-dependent hazards) between states. The R packages <code>msm</code> and <code>mstate</code> implement the standard machinery; estimation is by likelihood maximisation with a hazard model on each transition. Multi-state models are the natural bridge to lecture 08 (Markov chains).</p>
+
+  <p><strong>Joint models for longitudinal and survival data.</strong> A subject's covariates (a behavioural score, a balance trajectory, a credit-bureau score) are themselves stochastic processes evolving over time. A joint model fits a longitudinal model for the covariates (a mixed-effects model or a state-space model) and a survival model for the event, with the longitudinal trajectory entering the hazard. The framework due to Wulfsohn and Tsiatis (1997) and developed by Rizopoulos addresses two limitations of the time-varying covariate approach: it imputes the covariate value between observation points (handling missingness gracefully), and it propagates uncertainty in the covariate trajectory into the survival estimates.</p>
+
+  <p><strong>Recurrent events.</strong> Some events can occur multiple times for the same subject: re-delinquency, re-default after cure, hospitalisation. The standard Cox model treats events as terminal; recurrent-event models (Andersen-Gill, Prentice-Williams-Peterson, Wei-Lin-Weissfeld) handle multiple events per subject with carefully constructed risk sets and either marginal or conditional formulations. Frailty models (subject-level random effects on the hazard) are the natural way to handle the within-subject correlation that recurrent events induce.</p>
+
+  <p><strong>Machine-learning survival models.</strong> Three named families. <em>Random survival forests</em> (Ishwaran et al. 2008) generalise random forests to the censored-outcome setting by splitting on the log-rank statistic and computing a Kaplan-Meier curve in each leaf. <em>Survival gradient boosting</em> (the <code>gbm</code> Cox loss; <code>XGBoost</code>'s <code>survival:cox</code>) adapts boosting to the partial likelihood. <em>DeepSurv</em> (Katzman et al. 2018) and follow-ups model the hazard ratio as a neural network output, retaining proportional hazards in time while learning a flexible covariate-effect function. The performance gain over a careful Cox model is real but typically small in moderate-sized credit datasets; the interpretability cost is substantial, so regulated applications still favour the Cox or AFT model.</p>
+
+  <p><strong>Bayesian survival analysis.</strong> The natural framework for low-default portfolios (where MLE-based Cox or parametric models suffer from sparse-event instability) and for incorporating expert prior information. Bayesian Cox models use either a non-parametric prior on the baseline hazard (gamma processes, Beta-Dirichlet processes) or a parametric prior with regularising hyperpriors. The R package <code>rstanarm</code> and the <code>survHE</code> package implement standard Bayesian survival workflows. Lecture 09 will pick this up as one of the Bayesian re-derivations of pillar 5.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 9: Synthesis, recall, connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 9</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the survival analysis toolkit. The hazard function is the natural object for modelling because censoring contributes mechanically zero to the cumulative hazard past the censoring point. Kaplan-Meier and Nelson-Aalen are the non-parametric estimators of survival and cumulative hazard; the log-rank test compares groups under proportional hazards. Parametric models (Weibull, lognormal, Gompertz, generalised gamma) supply fully-specified hazards for extrapolation and AFT regression. The Cox proportional hazards model is the semi-parametric workhorse, with partial likelihood estimation and the Breslow baseline-hazard estimator. Diagnostic apparatus (Schoenfeld for PH, martingale for functional form, Fine-Gray for competing risks) is integral to the model-building workflow. The discrete-time formulation reduces survival to a logistic regression on a long dataset, which is how most credit applications implement it in practice.</p>
+
+  <p>The next lecture introduces another flavour of dependence: state transitions. A loan moves between states (current, delinquent, default, cure) governed by transition probabilities; a credit rating migrates between rating notches over time. The Markov property, which says the next state depends only on the current one, makes the analysis tractable: transition matrices, stationary distributions, absorbing states, hitting times. The connection to survival is direct: a multi-state survival model is a continuous-time Markov chain, and the rating-migration matrix is the natural object for through-the-cycle credit modelling. Lecture 08 takes them up.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Define right-censoring, left-truncation, and interval censoring. Give one credit-risk example of each.</li>
+      <li>Write the likelihood for right-censored survival data in two equivalent forms (using $(f, S)$ and using $(h, H)$). Which form generalises to time-varying covariates?</li>
+      <li>State the Kaplan-Meier estimator and Greenwood's variance formula. Why is the standard 95 per cent CI on the original scale problematic near the boundaries, and what is the standard fix?</li>
+      <li>Derive the Cox partial likelihood. What property of the proportional-hazards specification allows the baseline hazard to cancel?</li>
+      <li>Describe Schoenfeld residuals. What do they test, and what are the standard remedies for a non-proportional hazards finding?</li>
+      <li>Distinguish cause-specific hazards from sub-distribution hazards in competing-risks analysis. Which is the appropriate object for predicting the cumulative incidence of default in a portfolio with prepayment?</li>
+      <li>Show that a discrete-time survival model with logit link is logistic regression on a long-format dataset. What is the substantive difference if cloglog is used instead?</li>
+      <li>You are asked to build a lifetime PD curve for IFRS 9 on a portfolio with three competing events (default, prepayment, sale). Describe the model family and the diagnostics you would report.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 6 (<a href="06-time_series.html">time series</a>) dropped the IID assumption along a time index; this lecture dropped it along a censoring mechanism for the response itself.</li>
+      <li><strong>Next:</strong> Lecture 8 (Markov chains) generalises survival to a finite discrete state space with transitions among states; a multi-state survival model is a continuous-time Markov chain.</li>
+      <li><strong>Built on:</strong> Lecture 5 (<a href="05-generalised_linear_models.html">GLMs</a>) supplied the regression scaffolding. Discrete-time survival is literally logistic regression on a long dataset; piecewise-constant hazards are Poisson regression with offsets.</li>
+      <li><strong>Used by:</strong> IFRS 9 lifetime PD curves; behavioural-score time-to-default modelling; recovery and cure-time modelling for LGD; actuarial mortality projections; reliability engineering; medical-statistics randomised trials.</li>
+      <li><strong>Outside this course:</strong> the contingencies track uses life-table machinery, which is exactly survival analysis with discrete annual time and parametric (Gompertz, Makeham) hazards; the risk modelling track uses survival models for time-to-claim and reinsurance triggers.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Statistics course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 7 of 9</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

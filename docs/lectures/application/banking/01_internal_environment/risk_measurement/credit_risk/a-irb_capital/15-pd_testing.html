@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PD testing: discrimination, stability and calibration back-tests</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Testing: validating discrimination, calibration and stability</h1>
+  <p class="subtitle">The closing lecture of the PD sequence. A battery of tests run on the PiT model (discrimination, stability, robustness, benchmarking) and on the grade-and-LRA table (concentration, homogeneity, heterogeneity, migration, calibration accuracy). Each test has a defined threshold, a designated sample (OOS, OOT or application), and a remediation pathway if it fails.</p>
+  <div class="meta">
+    <span>A-IRB 15 of n &mdash; PD 7 of 7</span>
+    <span>Reading time, 35 minutes</span>
+    <span>Sources: <code>06_testing_results/pd/01-risk-differentiation.md</code>, <code>02-risk-quantification.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Testing is the back-test of everything the previous six PD lectures produced. The battery splits cleanly along the two phases of the model. <strong>Differentiation testing</strong> validates the PiT model: accuracy (mean percentage error), discrimination (Gini), stability (PSI, CSI, parameter sensitivity), robustness (seasonality, partner resilience), stress (single and multi-factor input shocks), and benchmarking (against an external score such as FICO). <strong>Quantification testing</strong> validates the grades and the LRA: concentration (HHI plus 1% to 30% per-grade volume), homogeneity (bootstrap chi-square within grades), heterogeneity (binomial z-test between adjacent grades), migration (the ±1-band and ±2-band stability check), and calibration accuracy (MPE of LRA against realised ODR).</p>
+
+  <p>Each test has three attributes. A <strong>method</strong> (the statistical procedure). A <strong>threshold</strong> (the value separating pass from fail). A <strong>sample</strong> (which of the development, OOS, OOT or application populations the test runs over). The combination produces an unambiguous outcome: green if the test passes, amber if it fails on a small number of cohorts or segments, red if it fails systematically. Amber tests document a watch-point in the limitations register and may feed MoC category B; red tests trigger remediation (re-train, re-bin, re-calibrate) and re-test before the model can go to validation.</p>
+
+  <p>The legal anchor is CRR Article 185 (validation of internal estimates), the supervisory anchors are PRA SS3/24 §15 to 17 and EBA/GL/2017/16 paragraphs 86 to 90. The test battery is what the validator runs as an independent challenge and what the supervisor inspects first at SREP. Everything from lecture 06 through lecture 14 has been preparation for this lecture's tests; the rest of the IRB lifecycle (MoC, RWA, monitoring) downstream consumes the results.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Testing is the only place in the IRB build where the modelling team is not trying to win. Every previous lecture was an attempt to extract the most signal from the data, the cleanest segmentation, the highest Gini, the most defensible calibration. Testing is the opposite: it tries to disprove every choice. The Gini is high on development, but is it still high on OOT? The grades are heterogeneous on the most recent cohort, but are they heterogeneous on the 2009 cohort? The LRA matches realised ODR on average, but does it match in stressed quarters? A model that passes the test battery is one that survives this adversarial inspection on its own terms.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>CRR Article 185 explicitly requires firms to perform a regular cycle of validation on their internal PD estimates, including back-testing against realised default rates, comparing predicted PDs to observed default frequencies, comparing the bank's own model to external benchmarks, and assessing the stability of the model under varying conditions. The article does not list specific tests; it sets the principle and leaves the implementation to the supervisor. PRA SS3/24 §15 to 17 and EBA/GL/2017/16 fill that gap with the test battery in this lecture.</p>
+
+  <p>The two-block structure (differentiation tests then quantification tests) mirrors the two-phase model build. This is not coincidental: each phase has a different aim (ranking versus calibration) and so requires a different test. A model that passes the differentiation tests but fails the quantification tests has a good scorecard with the wrong absolute level (LRA window mis-selected, MoC under-stated, floor not applied correctly). A model that passes the quantification tests but fails the differentiation tests has the right average PD but cannot rank obligors (the calibration is anchored to a correct number through a weak model). Both failures are remediable; conflating them is what makes remediation slow.</p>
+
+  <p>The validator and the supervisor read the test pack first; the development document second; the data pack third. A practitioner whose test pack is comprehensive, results are tabulated cleanly, and remediation log is current spends much less time in supervisory dialogue than one whose tests are scattered through the development document. The discipline this lecture imposes is therefore as much a documentation discipline as a statistical one.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The full battery contains 14 standard tests grouped into two blocks. The diagram below maps each test to its sample (where the test runs) and its target (what it validates).</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The PD testing battery">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The PD testing battery: 14 tests across 2 blocks</text>
+
+      <!-- Block A: Differentiation tests -->
+      <g>
+        <rect x="40" y="50" width="400" height="340" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.3"/>
+        <text x="240" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Block A: Differentiation tests</text>
+        <text x="240" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">validates the PiT scorecard from lecture 13</text>
+
+        <rect x="60" y="105" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="124" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A1. Accuracy</text>
+        <text x="410" y="124" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">MPE on OOS, OOT</text>
+
+        <rect x="60" y="140" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="159" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A2. Discrimination</text>
+        <text x="410" y="159" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">Gini, Lorenz curve on OOS, OOT</text>
+
+        <rect x="60" y="175" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="194" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A3. Stability (PSI)</text>
+        <text x="410" y="194" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">OOT, application</text>
+
+        <rect x="60" y="210" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="229" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A4. Stability (CSI)</text>
+        <text x="410" y="229" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">OOT, application</text>
+
+        <rect x="60" y="245" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="264" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A5. Parameter sensitivity</text>
+        <text x="410" y="264" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">re-fit on OOS</text>
+
+        <rect x="60" y="280" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="299" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A6. Robustness (seasonality, partner)</text>
+        <text x="410" y="299" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">all historical data, OOS, OOT</text>
+
+        <rect x="60" y="315" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="334" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A7. Stress (single/multi-factor &plusmn;10/20%)</text>
+        <text x="410" y="334" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">application</text>
+
+        <rect x="60" y="350" width="360" height="28" fill="#fff" stroke="#1e3a8a"/>
+        <text x="70" y="369" font-family="Inter" font-size="10" font-weight="600" fill="#1e3a8a">A8. Benchmarking (e.g. FICO)</text>
+        <text x="410" y="369" text-anchor="end" font-family="Inter" font-size="9" fill="#1e3a8a">OOS, OOT</text>
+      </g>
+
+      <!-- Block B: Quantification tests -->
+      <g>
+        <rect x="460" y="50" width="400" height="340" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="660" y="74" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">Block B: Quantification tests</text>
+        <text x="660" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">validates the grades + LRA from lecture 14</text>
+
+        <rect x="480" y="105" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="124" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B1. Concentration (HHI + 1% to 30%)</text>
+        <text x="830" y="124" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">all cohorts, application</text>
+
+        <rect x="480" y="140" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="159" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B2. Homogeneity within grade</text>
+        <text x="830" y="159" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">bootstrap chi-square, all cohorts</text>
+
+        <rect x="480" y="175" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="194" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B3. Heterogeneity between grades</text>
+        <text x="830" y="194" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">binomial z-test, all cohorts</text>
+
+        <rect x="480" y="210" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="229" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B4. Migration (&plusmn;1 band, &plusmn;2 band)</text>
+        <text x="830" y="229" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">cohort-on-cohort transitions</text>
+
+        <rect x="480" y="245" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="264" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B5. Calibration accuracy</text>
+        <text x="830" y="264" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">MPE = LRA_PD/ODR - 1, all samples</text>
+
+        <rect x="480" y="280" width="360" height="28" fill="#fff" stroke="#0f766e"/>
+        <text x="490" y="299" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">B6. Monotonicity (cross-overs)</text>
+        <text x="830" y="299" text-anchor="end" font-family="Inter" font-size="9" fill="#134e4a">visual + count of breaches</text>
+      </g>
+
+      <!-- Bottom legend -->
+      <text x="450" y="410" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">CRR Article 185; PRA SS3/24 §15-17; EBA/GL/2017/16 §86-90.</text>
+    </svg>
+    <figcaption>The 14 standard tests grouped into two blocks. Block A validates the PiT scorecard (the lecture 13 output) on out-of-sample and out-of-time data. Block B validates the grade table and LRA calibration (the lecture 14 output) on the calibration window and beyond. Each row lists the test, its sample(s) and what it validates.</figcaption>
+  </figure>
+
+  <p>Three properties of the battery to internalise. First, <strong>tests have specific samples</strong>: accuracy and discrimination on OOS and OOT (the model has not seen these); stability on OOT and application (the cycle has moved on); calibration on the LRA window (the back-test of calibration is against the window the calibration was done on). Mixing the samples mixes the questions; the protocol is to test each one on its designated population. Second, <strong>each block has a separate pass / fail outcome</strong>. A model that passes Block A but fails Block B fixes the calibration without re-training the scorecard; failing Block A requires re-training. Third, the battery is <strong>re-run every monitoring cycle</strong> (typically quarterly), not just at development. The same tests are the early-warning system for model drift in production.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Block A: differentiation testing</h3>
+
+  <h4>A1. Accuracy: mean percentage error</h4>
+
+  <p>Compares predicted PiT PD to realised default rate at the overall, segment and sub-population levels. The Mean Percentage Error (MPE):</p>
+
+  <pre><code>MPE = mean over snapshots of (predicted_PD - observed_DR) / observed_DR
+</code></pre>
+
+  <p>Reported as tables (MPE by sample and segment), scatter plots (predicted vs realised), and line plots (over time). Thresholds vary by segment and supervisor; typical retail tolerance is &plusmn;10 to 15% at the overall level, with wider tolerance at the lower-default segment level. Persistent positive MPE (model over-predicts) is a sign of conservative bias; persistent negative MPE (model under-predicts) is the supervisor's red flag and triggers remediation.</p>
+
+  <h4>A2. Discrimination: Gini and the Lorenz curve</h4>
+
+  <p>Gini is the ratio of the area between the model's Lorenz curve and the uniform diagonal to the maximum possible area:</p>
+
+  <pre><code>Gini = 2 * AUC - 1
+</code></pre>
+
+  <p>where AUC is the area under the ROC curve. For a binary target with continuous predictor, Gini ranks from -1 (perfect inverse ranking) through 0 (random) to 1 (perfect ranking). Reference benchmarks for retail PD scorecards: composite Gini around 75 to 80% on development, with no more than 3 to 5 Gini points of decay on OOS and OOT. Reported per segment, per sub-population, per sample. Material decay on OOT signals temporal drift; material decay on OOS signals weak generalisation across facilities.</p>
+
+  <h4>A3 and A4. Stability: PSI and CSI</h4>
+
+  <p>PSI (population stability index) compares the distribution of predicted PDs between development and current samples; CSI (characteristics stability index) does the same for each individual feature in the scorecard. Both use the same formula:</p>
+
+  <pre><code>PSI / CSI = sum over bins of (q_i - p_i) * ln(q_i / p_i)
+</code></pre>
+
+  <p>where p_i is the development proportion and q_i is the current (OOT or application) proportion in bin i. Standard interpretation: under 0.10 no material shift; 0.10 to 0.25 small shift, investigate; over 0.25 material shift, document and feed MoC. PSI is computed at the model output (predicted PDs); CSI is computed for each model variable to localise where any drift originates.</p>
+
+  <h4>A5. Parameter sensitivity</h4>
+
+  <p>The PiT scorecard is re-fitted on the OOS sample alone and the resulting coefficients are compared to the development coefficients. Two checks:</p>
+
+  <ul>
+    <li><strong>Sign stability</strong>: coefficient signs should not flip between development and OOS fits. Sign flips usually indicate multicollinearity that the development build did not fully resolve.</li>
+    <li><strong>Significance stability</strong>: each variable's p-value should remain below 0.01 on the OOS refit, matching the development threshold.</li>
+  </ul>
+
+  <p>This is a check that the model's structural assumptions (which variables drive risk, in what direction, with what strength) hold up when the data shifts. It is one of the supervisor's favourite tests because it directly probes whether the coefficients are robust or just sample-specific.</p>
+
+  <h4>A6. Robustness: seasonality and partner resilience</h4>
+
+  <p><strong>Seasonality</strong>: the development sample is constructed with an equal number of snapshots from each calendar quarter (typically three from each of March, June, September and December) to avoid embedding a seasonal bias. The check confirms this construction held and applies an Unobserved Components Model (UCM) test to detect any residual seasonal pattern in the model errors.</p>
+
+  <p><strong>Partner resilience</strong>: for portfolios with strategic partners or product-specific cohorts, the model is evaluated separately on each partner / cohort, and the per-partner Gini and MPE are compared to the overall. Materially weaker performance on a single partner triggers either a partner-flag interaction in the model (lecture 13) or a documented limitation with MoC.</p>
+
+  <h4>A7. Stress: single and multi-factor input shocks</h4>
+
+  <p>The model's sensitivity to input shocks is measured by perturbing each feature in turn (single-factor) and all features simultaneously (multi-factor). Standard shocks are &plusmn;10% and &plusmn;20% on the raw feature values. Two diagnostics:</p>
+
+  <ul>
+    <li>How much does the average PiT PD move under each shock?</li>
+    <li>Which features dominate the sensitivity?</li>
+  </ul>
+
+  <p>Typical findings: utilisation is the dominant single-factor driver in higher-risk segments; bureau-score features dominate in lower-risk segments. Materially different sensitivities across segments are documented and used for ICAAP stress-testing inputs.</p>
+
+  <h4>A8. Benchmarking against an external score</h4>
+
+  <p>The model's discriminatory power is compared to a publicly available external score (FICO in the US, an equivalent in other jurisdictions). The Gini of the FICO score against the same 12-month default flag is computed on the same OOS or OOT sample. The internal model should achieve at least the same Gini as FICO; banks whose internal model under-performs the bureau benchmark have a hard time defending the cost of building the internal model. Equivalently, the supervisor's question is whether the internal IRB model adds value above standardised, which uses bureau scores as the primary risk driver.</p>
+
+  <h3>Block B: quantification testing</h3>
+
+  <h4>B1. Concentration: HHI and per-grade volume</h4>
+
+  <p>Two complementary checks. Per-grade volume is compared against the CRR Article 170(3)(b) thresholds (between 1% and 30% of portfolio); breaches are reported per cohort. The Herfindahl-Hirschman Index (HHI) measures overall concentration across grades:</p>
+
+  <pre><code>HHI = sum over grades of (volume_share_grade)^2
+</code></pre>
+
+  <p>HHI ranges from 1/N (perfectly equal) to 1 (single grade holds the entire portfolio). Threshold typically set at 0.25; HHI above 0.25 indicates excessive concentration in a single grade. Reported as a line chart of HHI per quarter.</p>
+
+  <h4>B2. Homogeneity within grades</h4>
+
+  <p>For each grade and each cohort, the chi-square test asks whether the default rates of sub-samples drawn from the same grade are statistically indistinguishable. Bootstrapped: 20 random sub-samples at 5% of the grade are drawn, default rates are computed, the chi-square statistic is:</p>
+
+  <pre><code>chi2 = sum_i (O_i - E_i)^2 / E_i
+</code></pre>
+
+  <p>where O_i is the observed default count and E_i the expected count in sub-sample i. H_0: default rates are equal across sub-samples (homogeneity). Decision rule: p &gt; 5% means H_0 is not rejected, homogeneity holds. Reported as a fail-rate table per grade per cohort; the overall fail rate should sit below 5%.</p>
+
+  <h4>B3. Heterogeneity between grades</h4>
+
+  <p>For each pair of adjacent grades and each cohort, the binomial z-test asks whether their default rates differ:</p>
+
+  <pre><code>Z = (p_1 - p_2) / sqrt( p * (1 - p) * (1/n_1 + 1/n_2) )
+
+where  p = pooled default rate = (defaults_1 + defaults_2) / (n_1 + n_2)
+</code></pre>
+
+  <p>H_0: default rates are equal (heterogeneity fails). Two-tailed test at 10% significance. Reported as a fail-rate table; combined with the count of rank-order breaks (cohorts where grade i has higher ODR than grade i+1). Both should be small.</p>
+
+  <h4>B4. Migration: ±1 band and ±2 band stability</h4>
+
+  <p>Under a PiT philosophy, some grade migration over time is expected and desirable (obligors move as their drivers move). Excessive migration creates RWA volatility. The standard test counts, for each pair of consecutive cohorts (T and T+1), the share of obligors that:</p>
+
+  <ul>
+    <li>Stayed in the same grade</li>
+    <li>Moved by exactly 1 band (up or down)</li>
+    <li>Moved by 2 or more bands</li>
+  </ul>
+
+  <p>The majority should stay within ±1 band; the share moving ±2 bands or more should be small (typically &lt; 5% per cohort transition). Reported as a migration matrix per cohort plus a summary line chart of the ±1 / ±2 / ±3 shares over time.</p>
+
+  <h4>B5. Calibration accuracy</h4>
+
+  <p>The back-test of LRA. The relative prediction error per cohort:</p>
+
+  <pre><code>MPE_cohort = (LRA_PD - observed_DR) / observed_DR
+</code></pre>
+
+  <p>computed at overall, segment and sub-population levels. Tracked over time as a line chart of LRA_PD vs observed_DR. The chart will show the expected asymmetry from lecture 14 (LRA under-estimates in downturns, over-estimates in benign quarters); the test asks whether the time-average MPE is close to zero, not whether each cohort's MPE is. The standard threshold for the overall MPE is &plusmn;15%; for sub-populations &plusmn;25%.</p>
+
+  <h4>B6. Monotonicity</h4>
+
+  <p>For each cohort, the per-grade observed default rate is computed and plotted against grade. The expected pattern: a monotonically increasing line. Cohorts where the line has a cross-over (grade i ODR &gt; grade i+1 ODR for some i) are flagged. The cross-over count per cohort and across all cohorts is tabulated; persistent cross-overs at the same grade boundary indicate the boundary needs revising.</p>
+
+  <h3>How the tests are reported</h3>
+
+  <p>The standard reporting pack contains six artefacts:</p>
+
+  <ol>
+    <li>A <strong>summary scoreboard</strong>: one row per test, columns for the metric value(s), the threshold, and the green / amber / red status. The validator and supervisor read this first.</li>
+    <li>Per-test <strong>detailed pages</strong> with the underlying tables (per segment, per cohort, per sub-population).</li>
+    <li>Per-test <strong>visualisations</strong> (Lorenz curves, accuracy plots, HHI over time, migration matrices).</li>
+    <li>A <strong>limitations / watch-points log</strong> for amber-status tests, mapped to MoC categories where applicable.</li>
+    <li>A <strong>remediation register</strong> for red-status tests, with planned actions, dates and owners.</li>
+    <li>A <strong>sign-off summary</strong> from the model owner, validator and credit-risk-control unit.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The single most important diagnostic is the <strong>OOT Gini compared to development Gini</strong>. A model that scores 80% Gini on development and 79% on OOT is a model that generalises temporally; the validator will spend little time on the rest of the differentiation pack. A model that scores 80% on development and 70% on OOT is a model that has overfit to its training window; whatever the other tests say, the validator will demand a rebuild. The pattern of decay matters as much as the absolute level: smooth decay over time can be explained (the cycle has moved on); a step change at one boundary points to a structural break that the model has not captured.</p>
+
+  <p>The second lesson is on the <strong>amber-versus-red distinction</strong>. A few homogeneity fails (a couple of percent) across cohorts is amber and expected; a homogeneity fail rate of 10% or more is red. The distinction is operationally important because amber findings are normal and accumulate in the limitations register over the life of the model; red findings stop the validation pack until remediated. Practitioners who try to argue that a 10% fail rate is "still acceptable" lose credibility; the right move is to acknowledge red, remediate, and re-submit.</p>
+
+  <p>The third lesson is on <strong>the calibration back-test in stressed quarters</strong>. The LRA is supposed to under-estimate realised ODR in downturns, by design; the supervisor knows this. What the supervisor does <em>not</em> want to see is the LRA over-estimating ODR in downturns (the model is wildly conservative) or under-estimating it by a factor of three or four (the LRA window did not include a real downturn). The 2008 to 2009 cohort is the classic test: the LRA should under-estimate the realised ODR in those quarters by a meaningful but bounded amount. If it does not, the LRA window selection was wrong; if it does, the model is doing its job.</p>
+
+  <p>The fourth lesson is on the <strong>parameter-sensitivity refit</strong>. Banks that have done their feature-engineering work cleanly will see coefficient signs preserved and p-values stable on the OOS refit. Banks that have residual multicollinearity will see signs flip and p-values bounce around. The test is therefore a quick check on the quality of the feature-engineering work upstream; modellers who skip this find out at validation that the supervisor noticed and ran the test themselves.</p>
+
+  <p>The fifth, and operationally most important, lesson: <strong>the test pack is also the monitoring pack</strong>. The same 14 tests run quarterly in production. A green scoreboard at development that turns amber three quarters into production is a model drifting toward the next recalibration; an amber scoreboard that turns red is the trigger for material model change. The discipline of building the test battery once and re-running it forever is what keeps the IRB approval current.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>State the regulatory anchor (CRR Article and PRA paragraphs) for the validation work in this lecture.</li>
+    <li>Distinguish the differentiation block from the quantification block: what does each block validate, and which lecture output is each anchored to?</li>
+    <li>The OOS Gini is 79% and the OOT Gini is 70% versus a development Gini of 80%. What does this combination tell you about the model?</li>
+    <li>State the PSI / CSI formula. What is the difference between the two and why is each computed?</li>
+    <li>The parameter-sensitivity test re-fits the model on OOS data and compares coefficients to development. What two properties of the coefficients are checked, and what does it mean if either fails?</li>
+    <li>The homogeneity test is bootstrapped. Why is bootstrapping necessary, and what is the null hypothesis being tested?</li>
+    <li>Write the binomial z-test formula for heterogeneity. What is the standard significance threshold and why is it two-tailed?</li>
+    <li>The migration test counts the share of obligors that move ±1, ±2 or more bands between cohorts. Why is some migration expected under PiT, and what would over-migration indicate?</li>
+    <li>The LRA back-test shows persistent under-estimation in 2009 cohorts and over-estimation in 2017 cohorts. Is this a sign of model failure?</li>
+    <li>The same test battery runs in development and quarterly in monitoring. What is the operational implication for a model that goes from green to amber three quarters into production?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/06_testing_results/pd/01-risk-differentiation.md</code> &mdash; the eight differentiation tests, methods and sample design.</li>
+      <li><code>docs/wiki/.../a-irb_capital/06_testing_results/pd/02-risk-quantification.md</code> &mdash; concentration (HHI), homogeneity (bootstrap chi-square), heterogeneity (binomial z), migration and calibration accuracy.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="11-pd_sampling_and_representativeness.html">Sampling and representativeness</a> &mdash; the OOS, OOT and application samples this lecture's tests run over.</li>
+      <li><a href="13-pd_risk_differentiation.html">Risk differentiation</a> &mdash; the PiT scorecard that Block A validates.</li>
+      <li><a href="14-pd_risk_quantification.html">Risk quantification</a> &mdash; the grade-and-LRA table that Block B validates.</li>
+    </ul>
+
+    <p><strong>Forward references inside A-IRB capital:</strong></p>
+    <ul>
+      <li>30-moc (planned) &mdash; amber findings in this lecture's tests feed MoC category B; data limitations identified earlier feed MoC category A.</li>
+      <li>31-rwa (planned) &mdash; the regulatory PDs that passed this lecture's tests enter the K formula.</li>
+      <li>32-monitoring (planned) &mdash; the same test battery re-runs quarterly in production to detect drift and trigger remediation.</li>
+    </ul>
+
+    <p><strong>Cross-component:</strong></p>
+    <ul>
+      <li>22-lgd_testing (planned) &mdash; the LGD analogue: Somers' D, Spearman rho, MAE / RMSE.</li>
+      <li>29-ead_testing (planned) &mdash; the EAD analogue: MAE / RMSE / MAPE on realised vs predicted EADF, monotonicity across utilisation bands.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Article 185. The legislative anchor for internal-estimate validation.</li>
+      <li>PRA SS3/24, paragraphs 15 to 17. UK supervisory expectations for validation testing.</li>
+      <li>EBA/GL/2017/16, paragraphs 86 to 90. The European authority's interpretation.</li>
+      <li>BCBS Working Paper 14, "Studies on the Validation of Internal Rating Systems" (May 2005). The classic Basel reference for back-testing and discrimination metrics in IRB.</li>
+      <li>BCBS, "Sound practices for back-testing counterparty credit risk models" (December 2010). The reference for migration matrix analysis.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 15 of n &middot; PD 7 of 7 &mdash; PD sequence complete.</span>
+  <span><a href="14-pd_risk_quantification.html">Previous: risk quantification</a> &middot; <a href="16-lgd_concept.html">Next: LGD concept</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

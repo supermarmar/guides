@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 1: the language AI landscape</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>The language AI landscape</h1>
+  <p class="subtitle">Every technique in this track is an answer to one question that has not changed since the 1950s: how do you turn text into numbers a computer can compute with? The answers have got steadily better at carrying meaning, and each new answer solved a specific failure of the one before it. Knowing which failure each step fixed is what lets you choose the right tool later, because the old answers have not gone away. Bag-of-words is still in production inside topic models, and a 22-million-parameter embedding model still beats a frontier chat model at some tasks it is asked to do.</p>
+  <div class="meta">
+    <span>Lecture 1 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part I: what is under the bonnet</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Language AI</strong> is the subfield of artificial intelligence concerned with understanding, processing and generating human language, and its history is a sequence of increasingly good answers to the problem of representing text numerically. <strong>Bag-of-words</strong> counts how often each vocabulary word appears and throws away everything else. <strong>Word2vec</strong> replaces counts with dense <strong>embeddings</strong>, vectors that place words with similar meanings near each other, but assigns each word one fixed vector regardless of context. Recurrent networks with <strong>attention</strong> made the representation depend on context, at the cost of being impossible to parallelise. The <strong>transformer</strong> removed the recurrence and kept the attention, which made training parallel and therefore made scale affordable. That architecture then split in two. <strong>Encoder-only</strong> models such as BERT, which this track calls <strong>representation models</strong>, produce vectors and are the engine behind classification, clustering and search. <strong>Decoder-only</strong> models such as the GPT family, which this track calls <strong>generative models</strong>, produce text one token at a time. Both are built by the same two-step recipe: expensive <strong>pretraining</strong> on a vast corpus, producing a <strong>foundation model</strong>, then cheap <strong>fine-tuning</strong> onto a narrow task. That second step is the only reason any of this is within reach of an individual practitioner.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Suppose you must summarise a thousand claims narratives for someone who reads no English. Your first attempt is a tally: for each narrative, how many times does each word in a fixed dictionary appear? That is bag-of-words, and it tells the reader roughly what each narrative is about while losing the difference between "the insurer denied the claim" and "the claim denied the insurer". Your second attempt gives every dictionary word a permanent coordinate on a map, placed so that words used in similar company sit close together; now "denied" and "rejected" land near each other, but "bank" gets one coordinate that has to serve both the riverbank and the lender. Your third attempt gives each word a coordinate that is recalculated for every sentence it appears in, by letting it look at its neighbours first. That third attempt is what a transformer does, and the rest of this track is what you can build once you have it.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the track</span>
+    This lecture is the scaffolding. It establishes the representation-versus-generative split that organises all eighteen lectures, the pretraining-then-fine-tuning paradigm that Part V returns to in detail, and the open-weights-versus-API decision you will make on every project. It does not derive attention or the transformer block, because the machine learning track already does that properly; what it does is place them in a lineage so you can see which problem each one was invented to solve.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons a history lesson earns its place at the front of a practical track.</p>
+
+  <p>First, <strong>the old techniques are not obsolete, and knowing when to reach for them is the cheapest performance lever you have</strong>. Bag-of-words survives inside modern topic models as the c-TF-IDF scoring that names each topic, which lecture 6 covers. A sentence embedding model with 22 million parameters answers a semantic search query in milliseconds on a laptop, while a frontier generative model asked the same question costs a network round trip, a per-token fee, and a non-deterministic answer. The single most common design error in this field is reaching for a generative model to do a representation model's job.</p>
+
+  <p>Second, <strong>the two-step training paradigm is the whole reason this work is affordable</strong>. Pretraining a model of any consequence costs millions: Meta's Llama 2 family consumed roughly 3.3 million GPU-hours, which at commodity rental rates is comfortably north of five million dollars. Fine-tuning that same model onto your task costs a few hours on a single rented GPU, and the techniques in Part V push it lower still. Every practical decision in this track is downstream of the fact that somebody else has already paid for the expensive step.</p>
+
+  <p>Third, <strong>the choice between open weights and a proprietary API is a data governance decision before it's a technical one</strong>. Calling a hosted model means your prompt leaves your infrastructure and lands on a third party's. For a great deal of ordinary work that's fine. For anything carrying client identifiers, medical detail, or unpublished financial figures, it's the deciding constraint, and no amount of model quality compensates for it. This is precisely why the track spends as much time on models you can run locally as on ones you call.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team building an internal tool to route incoming queries into one of eleven categories started where everyone starts, with a hosted chat model and a carefully written prompt. It worked: about 91% accuracy on their test set, and a fortnight of prompt refinement got it to 93%. The problems arrived afterwards. The bill scaled linearly with volume and the tool was to run on every inbound message. Latency was around two seconds per call, against a target of under one hundred milliseconds. Worst of all, the same message occasionally routed differently on different days as the provider updated the model behind the endpoint, which made the routing logic impossible to regression-test. The eventual replacement was a 110-million-parameter encoder fine-tuned on four thousand labelled examples the team already had sitting in their ticketing system: 95% accuracy, twelve milliseconds on CPU, zero marginal cost, byte-identical output on every run, and nothing leaving the building. The generative model had been doing a representation model's job, and doing it worse.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a timeline of six representations of text, each one fixing a specific, nameable failure of the one to its left, and each one introducing a new failure that the next one fixes.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Six representations of text from bag-of-words to decoder-only transformers, each with what it captures and what it misses">
+      <defs>
+        <marker id="histArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#a1a1aa"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Each step fixes the previous step's named failure</text>
+
+      <!-- 1 bag-of-words -->
+      <g>
+        <rect x="10" y="36" width="135" height="150" rx="10" fill="#F4F4F2" stroke="#a1a1aa" stroke-width="1.5"/>
+        <text x="77" y="56" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#71717a">2000s</text>
+        <text x="77" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#3f3f46">Bag-of-words</text>
+        <text x="77" y="94" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">one count per word</text>
+        <text x="20" y="118" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; topic overlap</text>
+        <text x="20" y="132" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; fast, transparent</text>
+        <text x="20" y="152" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; word order</text>
+        <text x="20" y="166" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; synonyms</text>
+      </g>
+
+      <!-- 2 word2vec -->
+      <g>
+        <rect x="155" y="36" width="135" height="150" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="222" y="56" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#0d9488">2013</text>
+        <text x="222" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#115e59">word2vec</text>
+        <text x="222" y="94" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#0d9488">one vector per word</text>
+        <text x="165" y="118" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; semantic distance</text>
+        <text x="165" y="132" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; downloadable</text>
+        <text x="165" y="152" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; context: "bank"</text>
+        <text x="165" y="166" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; word order</text>
+      </g>
+
+      <!-- 3 RNN + attention -->
+      <g>
+        <rect x="300" y="36" width="135" height="150" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="367" y="56" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#b45309">2014</text>
+        <text x="367" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">RNN + attention</text>
+        <text x="367" y="94" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#b45309">state per position</text>
+        <text x="310" y="118" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; context-dependent</text>
+        <text x="310" y="132" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; alignment</text>
+        <text x="310" y="152" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; sequential training</text>
+        <text x="310" y="166" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; long dependencies</text>
+      </g>
+
+      <!-- 4 transformer -->
+      <g>
+        <rect x="445" y="36" width="135" height="150" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="512" y="56" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#7c3aed">2017</text>
+        <text x="512" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#5b21b6">Transformer</text>
+        <text x="512" y="94" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#7c3aed">self-attention only</text>
+        <text x="455" y="118" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; parallel training</text>
+        <text x="455" y="132" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; therefore scale</text>
+        <text x="455" y="152" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; quadratic in length</text>
+        <text x="455" y="166" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; one task shape</text>
+      </g>
+
+      <!-- 5 BERT -->
+      <g>
+        <rect x="590" y="36" width="135" height="150" rx="10" fill="#DEEAFB" stroke="#2A3A78" stroke-width="1.5"/>
+        <text x="657" y="56" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#2A3A78">2018</text>
+        <text x="657" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#2A3A78">BERT, encoder</text>
+        <text x="657" y="94" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#2A3A78">contextual vectors</text>
+        <text x="600" y="118" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; sees both directions</text>
+        <text x="600" y="132" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; cheap to fine-tune</text>
+        <text x="600" y="152" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; cannot generate</text>
+        <text x="600" y="166" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; needs a task head</text>
+      </g>
+
+      <!-- 6 GPT -->
+      <g>
+        <rect x="735" y="36" width="135" height="150" rx="10" fill="#FCE7F3" stroke="#be185d" stroke-width="1.5"/>
+        <text x="802" y="56" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#be185d">2018 &#8594;</text>
+        <text x="802" y="74" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#831843">GPT, decoder</text>
+        <text x="802" y="94" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#be185d">next-token distribution</text>
+        <text x="745" y="118" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; generates text</text>
+        <text x="745" y="132" font-family="Inter" font-size="8.5" fill="#115e59">&#10003; one model, many tasks</text>
+        <text x="745" y="152" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; no backward view</text>
+        <text x="745" y="166" font-family="Inter" font-size="8.5" fill="#9f1239">&#10007; costly per token</text>
+      </g>
+
+      <line x1="145" y1="111" x2="155" y2="111" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#histArrow)"/>
+      <line x1="290" y1="111" x2="300" y2="111" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#histArrow)"/>
+      <line x1="435" y1="111" x2="445" y2="111" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#histArrow)"/>
+      <line x1="580" y1="111" x2="590" y2="111" stroke="#a1a1aa" stroke-width="1.5" marker-end="url(#histArrow)"/>
+      <path d="M 580 186 Q 580 210 660 210 Q 760 210 780 190" fill="none" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="3 3" marker-end="url(#histArrow)"/>
+      <text x="672" y="228" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">the same 2017 architecture, split by which half you keep</text>
+      <text x="440" y="248" text-anchor="middle" font-family="Inter" font-size="9" fill="#52525b">Nothing here is retired. Bag-of-words runs inside lecture 6's topic model; word2vec's training trick returns in lecture 14 as contrastive learning.</text>
+    </svg>
+    <figcaption>Six representations of text, left to right in historical order. Each box names what the representation captures and what it still cannot do, and each arrow is a specific failure being fixed. The last two boxes are not successors to the transformer but two halves of it: keep the encoder and you get a representation model, keep the decoder and you get a generative one.</figcaption>
+  </figure>
+
+  <p>Two slogans hold the picture together. <strong>Every representation is a decision about what to throw away.</strong> Bag-of-words throws away order, word2vec throws away context, a causal decoder throws away the ability to look forwards. There is no representation that keeps everything, so the design question is always which loss you can afford for the task in front of you. <strong>The encoder and the decoder are the same machine facing opposite directions.</strong> An encoder lets every position see every other position and produces vectors; a decoder lets each position see only what came before and produces a distribution over what comes next. That single difference in what each position is allowed to look at generates the entire representation-versus-generative split.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Bag-of-words, and why it survives</h3>
+
+  <p>The oldest usable representation is also the simplest. Split each document into tokens, usually by whitespace; collect every unique token across the corpus into a <strong>vocabulary</strong>; then represent each document as a vector of counts, one entry per vocabulary term. A document containing "the cat sat on the mat" scores 2 on "the" and 1 on each of the rest, and zero on the other fifty thousand words in the vocabulary.</p>
+
+  <p>What this buys you is real. Two documents about reinsurance share vocabulary and therefore have overlapping vectors, which is enough to cluster them, retrieve them, or feed them to a linear classifier. The representation is sparse, cheap, and completely transparent: you can point at the coordinate that drove a decision and name the word. What it costs you is everything that depends on order or on meaning. "The claim denied the insurer" and "the insurer denied the claim" are identical vectors. "Vehicle" and "car" are as unrelated as "vehicle" and "tuberculosis", because the representation has no notion that words can mean similar things.</p>
+
+  <p>Bag-of-words is not history. Its weighted variant, term frequency inverse document frequency, is the mechanism behind BM25, still the strongest keyword retrieval baseline and a component of most serious hybrid search systems, which lecture 11 covers. A per-cluster variant of the same idea, c-TF-IDF, is what BERTopic uses to name the topics it finds, which is lecture 6. When you need to explain to a regulator why a document was categorised the way it was, a bag-of-words model is often the only one in the room that can answer.</p>
+
+  <h3>Word2vec, and the static embedding problem</h3>
+
+  <p>An <strong>embedding</strong> is a dense vector representation of a piece of data that attempts to capture its meaning. Word2vec, released in 2013, was the first widely successful attempt at learning them for words. The training procedure is worth stating because it recurs throughout this track in disguise: assign every word in the vocabulary a random vector of, say, fifty numbers, then repeatedly sample pairs of words from a large corpus and train a small neural network to predict whether the two words actually appeared near each other or were paired at random. Words that keep the same company get pushed together; words that don't get pushed apart. The network itself is discarded at the end; the embeddings are the artefact you wanted.</p>
+
+  <p>That "is this pair genuine or fabricated?" objective is <strong>contrastive learning</strong>, and it is the same idea, at a much larger scale and with sentences instead of words, that trains the modern embedding models of lecture 14 and the image-text model of lecture 13. It is worth recognising early, because it is the single most transferable training trick in the field.</p>
+
+  <p>The resulting vectors place words with similar meanings near each other, so you can measure semantic similarity with a distance metric. It's tempting to imagine each of the fifty dimensions standing for a human-legible property, and that intuition is useful for a first pass, but it isn't what happens. Individual dimensions are generally uninterpretable; only the geometry as a whole carries the meaning.</p>
+
+  <p>The flaw is fatal for anything subtle. Word2vec produces one vector per word for all time, so the "bank" in "the bank approved the facility" and the "bank" in "the boat drifted to the bank" get the same coordinates. Fixing that means making the representation depend on the sentence it sits in, which is what the next two steps do.</p>
+
+  <h3>Attention, bolted onto recurrence</h3>
+
+  <p>Recurrent neural networks process a sequence one position at a time, carrying a hidden state forwards, and were the natural first tool for context. In the encoder-decoder set-up used for translation, one network reads the source sentence and compresses it into a single context vector, and a second network generates the target sentence from that vector, one token at a time, consuming each token it has already produced. That second property, consuming your own output to produce the next piece of output, is called being <strong>autoregressive</strong>, and it never goes away: it is exactly how a modern LLM generates text.</p>
+
+  <p>The bottleneck was the single context vector. Compressing an arbitrarily long sentence into one fixed-size vector loses too much, and longer sentences degraded badly. The 2014 fix was <strong>attention</strong>: instead of passing the decoder one summary vector, pass it the hidden states of every input position, and let the decoder compute, at each generation step, a weighted combination of them. The weights say which input positions are relevant right now. Generating the Dutch "lama's" puts high weight on the English "llamas" and low weight on "I".</p>
+
+  <p>This worked, and it introduced the idea that carries the rest of the field. It also kept recurrence's fundamental problem: because position <em>t</em> cannot be computed until position <em>t</em> minus one is finished, training cannot be parallelised across the sequence. On a corpus of internet scale, that is not a slowdown, it's a hard ceiling.</p>
+
+  <h3>The transformer: throwing away the recurrence</h3>
+
+  <p>The 2017 move was to notice that if attention is doing the work, the recurrence is dead weight. Remove it, keep attention, and add <strong>self-attention</strong>, in which every position in a single sequence attends to every other position in that same sequence rather than across two sequences. Positions can now all be computed at once, so training parallelises across the whole sequence, so you can train on far more data with far more parameters in the same wall-clock time. Everything the machine learning track's <a href="../machine_learning/11_large_language_models/01-from_decoders_to_llms.html">scaling laws</a> lecture describes is downstream of that one engineering consequence.</p>
+
+  <p>The mechanics, scaled dot-product attention, multi-head attention, positional encoding and causal masking, are derived in the machine learning track's <a href="../machine_learning/05_deep_learning/08-transformers.html">transformers</a> lecture, and this track assumes them. Lecture 4 picks up where that lecture stops, at the parts that only matter once you are actually running a model: the key-value cache, the context ceiling, and the attention variants that made long contexts affordable.</p>
+
+  <h3>The split: encoder-only, decoder-only, and encoder-decoder</h3>
+
+  <p>The original transformer had both halves, an encoder that reads and a decoder that writes, which suits translation but sits awkwardly on anything else. Within a year, both halves had been taken and used alone.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Encoder-only, decoder-only and encoder-decoder architectures compared by what each position may attend to">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">One architecture, three ways to use it, distinguished by what each position may look at</text>
+
+      <!-- Encoder-only -->
+      <g>
+        <rect x="15" y="38" width="265" height="256" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="147" y="62" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">ENCODER-ONLY</text>
+        <text x="147" y="79" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#0d9488">BERT, RoBERTa, SBERT</text>
+        <text x="147" y="96" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">"representation model"</text>
+
+        <rect x="40" y="112" width="42" height="26" rx="5" fill="#FFFFFF" stroke="#0d9488"/>
+        <text x="61" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#115e59">[CLS]</text>
+        <rect x="88" y="112" width="42" height="26" rx="5" fill="#FFFFFF" stroke="#0d9488"/>
+        <text x="109" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#115e59">the</text>
+        <rect x="136" y="112" width="42" height="26" rx="5" fill="#FFFFFF" stroke="#0d9488"/>
+        <text x="157" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#115e59">bank</text>
+        <rect x="184" y="112" width="42" height="26" rx="5" fill="#FFFFFF" stroke="#0d9488"/>
+        <text x="205" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#115e59">lent</text>
+
+        <path d="M 157 108 Q 133 92 109 108" fill="none" stroke="#0d9488" stroke-width="1.2"/>
+        <path d="M 157 108 Q 181 92 205 108" fill="none" stroke="#0d9488" stroke-width="1.2"/>
+        <path d="M 157 142 Q 108 164 61 146" fill="none" stroke="#0d9488" stroke-width="1.2"/>
+        <text x="147" y="182" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">every position sees every other,</text>
+        <text x="147" y="195" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">forwards and backwards</text>
+
+        <rect x="55" y="210" width="185" height="30" rx="6" fill="#FFFFFF" stroke="#0d9488" stroke-dasharray="3 2"/>
+        <text x="147" y="230" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">output: one vector per token</text>
+        <text x="147" y="258" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">pretrained by masking tokens and</text>
+        <text x="147" y="271" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">predicting them (lecture 16)</text>
+        <text x="147" y="287" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">cannot generate text</text>
+      </g>
+
+      <!-- Decoder-only -->
+      <g>
+        <rect x="300" y="38" width="265" height="256" rx="12" fill="#FCE7F3" stroke="#be185d" stroke-width="2"/>
+        <text x="432" y="62" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#831843">DECODER-ONLY</text>
+        <text x="432" y="79" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#be185d">GPT, Llama, Mistral, Phi-3</text>
+        <text x="432" y="96" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#831843">"generative model"</text>
+
+        <rect x="325" y="112" width="42" height="26" rx="5" fill="#FFFFFF" stroke="#be185d"/>
+        <text x="346" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#831843">the</text>
+        <rect x="373" y="112" width="42" height="26" rx="5" fill="#FFFFFF" stroke="#be185d"/>
+        <text x="394" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#831843">bank</text>
+        <rect x="421" y="112" width="42" height="26" rx="5" fill="#FFFFFF" stroke="#be185d"/>
+        <text x="442" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#831843">lent</text>
+        <rect x="469" y="112" width="52" height="26" rx="5" fill="#FBF1D4" stroke="#be185d" stroke-dasharray="3 2"/>
+        <text x="495" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#831843">?</text>
+
+        <path d="M 442 108 Q 418 92 394 108" fill="none" stroke="#be185d" stroke-width="1.2"/>
+        <path d="M 442 108 Q 394 84 346 108" fill="none" stroke="#be185d" stroke-width="1.2"/>
+        <line x1="466" y1="104" x2="500" y2="104" stroke="#9f1239" stroke-width="1.2" stroke-dasharray="3 2"/>
+        <text x="432" y="182" text-anchor="middle" font-family="Inter" font-size="9" fill="#be185d">each position sees only what came</text>
+        <text x="432" y="195" text-anchor="middle" font-family="Inter" font-size="9" fill="#be185d">before it: the causal mask</text>
+
+        <rect x="340" y="210" width="185" height="30" rx="6" fill="#FFFFFF" stroke="#be185d" stroke-dasharray="3 2"/>
+        <text x="432" y="230" text-anchor="middle" font-family="Inter" font-size="10" fill="#831843">output: p(next token | all before)</text>
+        <text x="432" y="258" text-anchor="middle" font-family="Inter" font-size="9" fill="#831843">pretrained by predicting the next</text>
+        <text x="432" y="271" text-anchor="middle" font-family="Inter" font-size="9" fill="#831843">token, then instruction-tuned</text>
+        <text x="432" y="287" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#831843">generates one token at a time</text>
+      </g>
+
+      <!-- Encoder-decoder -->
+      <g>
+        <rect x="585" y="38" width="280" height="256" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="725" y="62" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">ENCODER-DECODER</text>
+        <text x="725" y="79" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#7c3aed">the original 2017 transformer, T5, Flan-T5</text>
+        <text x="725" y="96" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">"sequence to sequence"</text>
+
+        <rect x="608" y="115" width="105" height="66" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="660" y="140" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">encoder</text>
+        <text x="660" y="157" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">reads the input</text>
+        <text x="660" y="170" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">bidirectionally</text>
+
+        <rect x="738" y="115" width="105" height="66" rx="8" fill="#FCE7F3" stroke="#be185d" stroke-width="1.5"/>
+        <text x="790" y="140" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#831843">decoder</text>
+        <text x="790" y="157" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#be185d">writes the output</text>
+        <text x="790" y="170" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#be185d">causally</text>
+
+        <line x1="713" y1="148" x2="738" y2="148" stroke="#7c3aed" stroke-width="2"/>
+        <text x="725" y="200" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">cross-attention: every decoder position</text>
+        <text x="725" y="213" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">may look at every encoder position</text>
+
+        <text x="725" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">best where input and output are both</text>
+        <text x="725" y="253" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">sequences of different length:</text>
+        <text x="725" y="266" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">translation, summarisation</text>
+        <text x="725" y="287" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#5b21b6">Flan-T5 returns in lectures 5 and 6</text>
+      </g>
+
+      <text x="440" y="318" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#52525b">The blocks inside all three are the same: self-attention followed by a feedforward network. Only the mask changes.</text>
+    </svg>
+    <figcaption>The three arrangements differ in one respect: which positions each position is permitted to attend to. Remove the restriction and you get an encoder, which produces rich bidirectional vectors but has no mechanism for producing text. Impose the causal mask, so each position sees only its predecessors, and you get a decoder, which produces a distribution over the next token and therefore generates. Keep both halves and wire them together with cross-attention and you get the original sequence-to-sequence transformer.</figcaption>
+  </figure>
+
+  <p><strong>Encoder-only models</strong> arrived first, with BERT in 2018. BERT stacks encoder blocks, prepends a special <code>[CLS]</code> token whose output vector serves as a summary of the whole input, and is pretrained by <strong>masked language modelling</strong>: hide a fraction of the input tokens and make the model predict them from both sides. Because the model may look forwards as well as backwards, its vector for "bank" genuinely differs between the two sentences that defeated word2vec. What it cannot do is generate: there is no next-token distribution, and predicting a masked token in the middle of a fixed-length input is not a procedure you can iterate into a paragraph.</p>
+
+  <p><strong>Decoder-only models</strong> arrived the same year with GPT-1: 117 million parameters, trained on seven thousand books plus web text. Stack decoder blocks, apply the causal mask so each position sees only its predecessors, and train by predicting the next token. GPT-2 took this to 1.5 billion parameters and GPT-3 to 175 billion, and the capability changes across that range are the subject of the machine learning track's lecture on scaling.</p>
+
+  <p>The naming convention this track adopts, following the source book, is <strong>representation model</strong> for encoder-only and <strong>generative model</strong> for decoder-only. The distinction is about what the model is asked to produce, not strictly about architecture, and it is the more useful cut for someone choosing a tool. Representation models turn text into vectors and typically don't generate; generative models turn text into text and typically aren't trained to produce good general-purpose vectors.</p>
+
+  <div class="callout insight">
+    <span class="tag">The distinction is about output, not architecture</span>
+    You can put a classification head on a decoder and you can coax embeddings out of one, and people do both. The reason the split is still worth keeping is economic rather than architectural: a task that needs a vector wants a small bidirectional model that runs in milliseconds, and a task that needs prose wants a large causal one that runs in seconds. Lecture 5 puts five approaches to a single classification task side by side and lets the numbers make the argument.
+  </div>
+
+  <h3>What "large language model" actually means in this track</h3>
+
+  <p>The term is unstable and getting worse. Strictly it tends to mean a generative decoder-only transformer that is, by the standards of the moment, large. That definition ages badly: today's large model is next year's small one, and it excludes models that are plainly relevant. A 400-million-parameter embedding model that does excellent semantic search is not generative and is not large, yet you cannot build a modern search system without one.</p>
+
+  <p>This track uses the term the way the source book does, deliberately loosely, to cover representation models and generative models alike, including ones with well under a billion parameters that run comfortably on a laptop. The name you give a model doesn't change what it does, and several of the most useful models in this track would fall outside any strict reading of "large".</p>
+
+  <h3>The two-step training paradigm</h3>
+
+  <p>Classical supervised learning is one step: take labelled data for your task, fit a model, done. Language models are built in at least two.</p>
+
+  <div class="defcard">
+    <span class="term">Pretraining</span>
+    <span class="def">Train on a vast, general corpus with a self-supervised objective, next-token prediction for a decoder or masked-token prediction for an encoder. No task labels are needed, because the text supplies its own targets. This consumes almost all the compute and produces a <strong>foundation model</strong> or <strong>base model</strong>, which knows a great deal about language and follows no instructions whatsoever.</span>
+  </div>
+
+  <div class="defcard">
+    <span class="term">Fine-tuning</span>
+    <span class="def">Take the pretrained model and continue training it on a much smaller, narrower dataset, either to specialise it on a task such as classification or to change its behaviour, most commonly to make it follow instructions. Cheap by comparison, and the entire subject of Part V. Sometimes called post-training.</span>
+  </div>
+
+  <p>A base model given "Create a funny joke about chickens" may well continue with a list of similar prompts, because a document containing that sentence plausibly continues that way. Instruction tuning is what converts a text completer into something that answers. It's worth internalising that the chat behaviour you're used to is a thin layer of fine-tuning over a model whose actual training objective was autocomplete, because a great many surprising failures make sense once you remember it.</p>
+
+  <p>A third step, <strong>preference tuning</strong>, aligns the model with human judgements about which of two responses is better. Lecture 18 covers it, along with the reward models and direct preference optimisation that implement it.</p>
+
+  <h3>Open weights or a proprietary API</h3>
+
+  <p><strong>Proprietary models</strong> such as GPT-4 and Claude keep their weights and architecture private and are reached over an API. The provider hosts and runs them, so you need no GPU and no operational expertise, and at any given moment the strongest available models are usually in this category. You pay per token, you cannot fine-tune what you cannot access, the model behind the endpoint can change without notice, and your data goes to the provider.</p>
+
+  <p><strong>Open models</strong> such as Llama, Mistral, Microsoft's Phi and Cohere's Command R publish their weights. You download them and run them yourself, which means complete control: fine-tune freely, pin an exact version, run entirely offline, and put sensitive data through without it leaving your infrastructure. The costs are a GPU and the knowledge to use it, both of which this track assumes you're willing to acquire.</p>
+
+  <div class="callout warn">
+    <span class="tag">"Open" is doing a lot of work in that sentence</span>
+    Published weights are not the same as open source. Many widely used "open" models carry licences restricting commercial use, and almost none publish their training data or the code that produced them. For a model you intend to put into production, read the actual licence rather than the announcement blog post, and record which model version you used, because reproducibility later depends on it.
+  </div>
+
+  <p>A practical note on hardware, since it shapes what you can attempt. The binding constraint is VRAM, the memory on your GPU, and there is no clean formula for how much a given model needs: it depends on parameter count, numeric precision, context length, and the serving backend. As a rough anchor, a 4-billion-parameter model at 16-bit precision wants around 8 GB, and quantising it to 4 bits, which lectures 9 and 17 cover, brings that under 4 GB at a modest quality cost. A free Google Colab instance currently provides a 16 GB T4, which is a sensible floor for following this track practically.</p>
+
+  <h3>Generating your first text</h3>
+
+  <p>The Hugging Face Hub is where open models live, several hundred thousand of them. Loading one means loading two objects: the model itself and its <strong>tokenizer</strong>, the component that converts text into the integer token IDs the model consumes. They are paired and not interchangeable, a point lecture 2 develops at length.</p>
+
+  <pre><code>from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model = AutoModelForCausalLM.from_pretrained(
+    "microsoft/Phi-3-mini-4k-instruct",
+    device_map="cuda",
+    torch_dtype="auto",
+)
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")</code></pre>
+
+  <p>Phi-3-mini is a reasonable default for learning: 3.8 billion parameters, so it runs on a modest GPU, MIT licensed, so commercial use is unrestricted, and capable enough that its failures are interesting rather than trivial. The <code>pipeline</code> helper wraps the model, its tokenizer and the generation loop into one callable.</p>
+
+  <pre><code>from transformers import pipeline
+
+generator = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    return_full_text=False,   # return only the completion, not the prompt
+    max_new_tokens=500,       # a hard stop, or it may run to the context limit
+    do_sample=False,          # always take the most probable token: deterministic
+)
+
+messages = [{"role": "user", "content": "Create a funny joke about chickens."}]
+output = generator(messages)
+print(output[0]["generated_text"])</code></pre>
+
+  <p>Three arguments deserve attention because they recur. <code>max_new_tokens</code> is a hard stop; without it a model may generate until it hits its context window, which is slow and expensive. <code>do_sample=False</code> selects the single most probable token at every step, making output reproducible, which is what you want while learning and while testing. Lecture 7 turns sampling back on and works through what <code>temperature</code> and <code>top_p</code> actually do to the distribution. The list-of-dictionaries format for <code>messages</code> is not decoration: the tokenizer expands it into the exact control tokens the instruction-tuned model was trained on, and lecture 7 shows what those look like and what happens when you get them wrong.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Language AI's history is a chain of representations, each fixing a named failure of its predecessor: bag-of-words has no sense of meaning, word2vec has no sense of context, recurrence cannot be parallelised, and the transformer fixed all three by keeping attention and discarding everything else. That architecture then split into encoder-only representation models, which turn text into vectors and drive classification, clustering and search, and decoder-only generative models, which turn text into text. Both are produced by expensive pretraining followed by cheap fine-tuning, and that asymmetry is what makes the field accessible. The choice between running open weights yourself and calling a proprietary API is usually settled by data governance rather than by benchmark scores.</p>
+
+  <p>Lecture 2 goes down one level, into the component you just loaded alongside the model and probably will not think about again until it breaks something. Tokenisation determines what the model can see, sets a floor on what it can do with numbers and spelling, and quietly decides how much your API calls cost. Lecture 3 then takes the three distinct things this lecture has loosely called embeddings and separates them properly.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the specific failure of bag-of-words that word2vec fixed, and the specific failure of word2vec that contextual models fixed.</li>
+      <li>Explain why removing recurrence from the attention-based architecture mattered more for training than for inference.</li>
+      <li>State the single architectural difference between an encoder and a decoder, and derive from it why an encoder cannot generate text.</li>
+      <li>Define representation model and generative model, and explain why the distinction is about output rather than architecture.</li>
+      <li>Describe the two steps of the LLM training paradigm, and explain which one you're realistically ever going to perform yourself.</li>
+      <li>Give the two reasons a team handling client data might choose an open model with weaker benchmark scores over a stronger proprietary one.</li>
+      <li>In the query-routing vignette, identify the three distinct problems with the generative solution, and state which of them prompt engineering could have fixed.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Assumed:</strong> The machine learning track's <a href="../machine_learning/05_deep_learning/08-transformers.html">transformers</a> lecture derives attention, multi-head attention, positional encoding and causal masking. This lecture places them historically but does not re-derive them.</li>
+      <li><strong>Next:</strong> Lecture 2 (<a href="02-tokenisation.html">tokenisation</a>) opens up the tokenizer object loaded above.</li>
+      <li><strong>Forward:</strong> The contrastive training trick behind word2vec returns properly in lecture 14 (<a href="14-contrastive_learning_and_sbert.html">contrastive learning and SBERT</a>); bag-of-words returns as c-TF-IDF in lecture 6 (<a href="06-clustering_and_topic_modelling.html">clustering and topic modelling</a>) and as BM25 in lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>).</li>
+      <li><strong>Theory companion:</strong> The machine learning track's <a href="../machine_learning/11_large_language_models/index.html">large language models</a> sub-module covers what happens as decoder models scale: scaling laws, emergent capability, and the competing explanations for in-context learning.</li>
+      <li><strong>Governance:</strong> The same sub-module's <a href="../machine_learning/11_large_language_models/04-responsible_use.html">responsible use</a> lecture develops the bias, transparency, intellectual property and regulatory questions this lecture only names.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 1 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

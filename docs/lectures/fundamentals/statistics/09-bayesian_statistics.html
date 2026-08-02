@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 9: Bayesian statistics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Statistics</a></div>
+  <h1>Bayesian statistics</h1>
+  <p class="subtitle">The transverse framework. Where the previous eight lectures treated the parameter $\theta$ as a fixed unknown to be estimated from data, the Bayesian framework treats $\theta$ as itself a random variable: data updates a prior $p(\theta)$ to a posterior $p(\theta \mid \text{data}) \propto p(\text{data} \mid \theta) p(\theta)$, and all subsequent inference flows from the posterior. The lecture works through the worldview, the priors, the posterior summaries, the computation (MCMC as the canonical engine, itself a construction of Markov chains in the sense of lecture 08), and the model-comparison machinery. The credit-risk application is the Bayesian PD calibration for low-default portfolios, where sparse-event data makes the MLE unstable and the Beta-Binomial conjugate prior supplies a regularising shrinkage that has direct regulatory acceptance.</p>
+  <div class="meta">
+    <span>Lecture 9 of 12</span>
+    <span>Reading time, 90 minutes</span>
+    <span>Part IV: the Bayesian alternative</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Bayesian inference</strong> is the application of Bayes' theorem to the parameters of a statistical model. The parameter $\theta$ is treated as a random variable with a <strong>prior distribution</strong> $p(\theta)$ that encodes whatever is known about it before the data is seen. The data $y$ enters through the likelihood $p(y \mid \theta)$, which is the same likelihood that frequentist methods use. The two combine via Bayes' theorem into a <strong>posterior distribution</strong> $p(\theta \mid y) \propto p(y \mid \theta) p(\theta)$, the full conditional belief about $\theta$ after observing the data. Every inferential question is a question about this posterior: the posterior mean for a point estimate, a quantile interval for uncertainty, a posterior predictive distribution for forecasting, a Bayes factor for hypothesis comparison.</p>
+
+  <p>Three reasons the framework is worth knowing as a complement to the frequentist toolkit. <strong>Sparse data.</strong> When MLE is unstable (low-default portfolios, rare events, small samples), an informative prior regularises the estimate by shrinking it toward a sensible default. Credit-risk regulators (PRA, EBA) explicitly permit Bayesian PD calibration for low-default exposures. <strong>Hierarchical structure.</strong> When data has natural grouping (loans within branches, branches within regions), Bayesian hierarchical models supply principled partial pooling: estimates for each group are shrunk toward the global mean by an amount proportional to the within-group uncertainty. This is the right answer to "should I fit one model or many?". <strong>Decision-theoretic coherence.</strong> The posterior is a probability distribution over parameters, which combines naturally with a loss function to give optimal decisions under uncertainty: this is the natural framing for capital allocation, pricing under uncertainty, and trading-strategy evaluation.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Bayes is not a different mathematics; it is a different ontology. Frequentists hold $\theta$ fixed and ask "what data would I see across many hypothetical repetitions of the experiment?" Bayesians hold the data fixed and ask "what should I believe about $\theta$, given the data I actually saw?" The likelihood is the same; the inferential question is different. The posterior $p(\theta \mid y)$ is the answer to the Bayesian's question, exactly. Once you have the posterior, point estimates, intervals, predictions, and decisions all follow by reading the relevant summary from it. The hard part is computing the posterior when no closed form exists, which is what MCMC is for.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Where this sits in the stats world
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Where this sits in the stats world</h2></div>
+
+  <div class="callout insight">
+    <span class="tag">Transverse framework, re-derives pillars 3-5</span>
+    This lecture sits in the <strong>transverse band</strong> of the <a href="index.html">stats world map</a>: the Bayesian framework re-expresses pillars 3, 4, and 5 under a different inferential logic. There is a Bayesian way to do hypothesis testing (Bayes factors instead of p-values, pillar 3), a Bayesian way to fit a GLM (priors on the regression coefficients, posterior via MCMC, pillar 4), a Bayesian way to fit a time-series model (the dynamic linear model and the Kalman-with-MCMC framework, pillar 5), a Bayesian way to fit a Cox proportional hazards model (lecture 07 frontier), and a Bayesian way to estimate a transition matrix (the Dirichlet prior of lecture 08). The framework is not a sixth pillar; it is a parallel ontology that cuts vertically across the pillars to its left.
+  </div>
+
+  <p>Two structural links tie this lecture to its neighbours. To <strong>lecture 08 (Markov chains)</strong>: the computational engine of modern Bayesian inference is MCMC, which constructs a Markov chain whose stationary distribution is the posterior $p(\theta \mid y)$. The Metropolis-Hastings algorithm, Gibbs sampling, Hamiltonian Monte Carlo, and the No-U-Turn Sampler are all Markov chain constructions; the apparatus of lecture 08 (irreducibility, aperiodicity, ergodicity, mixing time) is the theoretical foundation that justifies the procedure. The convergence diagnostics ($\hat{R}$, effective sample size, trace plots) are diagnostics on the Markov chain's mixing. To <strong>lecture 05 (GLMs)</strong>: ridge regression and lasso are the MAP estimators under Gaussian and Laplace priors respectively on the coefficient vector. The "regularisation" of lecture 05 is the Bayesian "shrinkage toward the prior". The frequentist and Bayesian routes to penalised regression coincide algebraically; they differ in their interpretation of the penalty parameter (a tuning constant chosen by CV versus a prior precision encoding prior belief). To <strong>lecture 03 (inferential statistics)</strong>: Bayesian credible intervals look superficially like frequentist confidence intervals but are not the same object. A 95 per cent credible interval is a region in parameter space that contains 95 per cent of the posterior mass; a 95 per cent confidence interval is a procedure that, under repeated sampling, covers the true parameter in 95 per cent of repetitions. The two often agree numerically but the interpretive content is different.</p>
+
+  <p>One scoping note. This lecture covers the classical Bayesian framework with parametric priors, posterior summaries, hierarchical models, and MCMC at a working level. The frontier of Bayesian non-parametrics (Dirichlet processes, Gaussian processes as priors), approximate Bayesian computation (ABC), and full probabilistic programming environments (Stan, PyMC, Numpyro) is mentioned in section 8 but not developed.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons Bayesian inference is worth the same depth as a frequentist framework for a credit risk modeller. First, <strong>low-default portfolios</strong> are an explicit regulatory use case for Bayesian methods. Basel IRB requires PD estimates for every grade, including grades where defaults are too rare for the MLE to be informative (a grade with zero observed defaults in 5 years and 200 obligors has MLE = 0, which is plainly wrong for capital purposes). The EBA Guidelines on PD estimation (EBA/GL/2017/16) explicitly permit Bayesian methods with a stated prior for low-default-portfolio PD calibration; the standard approach is the Beta-Binomial conjugate model with an expert-elicited or weakly-informative prior. The PRA's UK supervisory expectations (SS11/13) acknowledge Bayesian approaches as appropriate for sparse data. Knowing the apparatus is not optional for an IRB modeller.</p>
+
+  <p>Second, <strong>hierarchical and partial-pooling models</strong> address a class of problems that frequentist methods handle clumsily. A retail credit portfolio has natural groupings: customers within branches, branches within regions, regions within markets. Estimating a separate PD for each branch is noisy (some branches have few accounts); estimating a global PD ignores genuine branch-level variation. The Bayesian hierarchical model gives a principled compromise: each branch's PD is shrunk toward the global mean by an amount proportional to the within-branch sample size and the cross-branch variability. The shrinkage factor is data-driven, not user-tuned. The same machinery solves a litany of related problems: stress-testing scenario weights, IFRS 9 segment-level ECL parameters, multi-jurisdictional credit scoring.</p>
+
+  <p>Third, the <strong>failure modes of Bayesian inference</strong> are distinctive enough to require named diagnostics, just as survival analysis (lecture 07) and time series (lecture 06) did. <strong>Prior sensitivity</strong>: an informative prior dominates the likelihood when the data is sparse, which is sometimes the desired behaviour (low-default portfolios) and sometimes a quiet disaster (the prior was a placeholder, not an actual prior belief). <strong>MCMC non-convergence</strong>: a Markov chain that has not reached its stationary distribution gives posterior summaries that depend on the starting state; the diagnostic apparatus ($\hat{R}$, effective sample size, trace plots) must be checked before any output is reported. <strong>Improper-prior pitfalls</strong>: some "non-informative" priors are improper (they don't integrate to one), and combining them with certain likelihoods can produce improper posteriors that have no inferential meaning. Each of these failure modes is a real problem in production Bayesian work and is invisible in a workflow that just reports posterior means and 95 per cent intervals from a fitted Stan model.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The mental model</h2></div>
+
+  <p>The picture below shows the Bayesian inferential workflow, end to end.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bayesian workflow: prior, likelihood, posterior, decision">
+      <defs>
+        <marker id="bayesArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1d4ed8"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The Bayesian workflow: prior + likelihood → posterior → inference</text>
+
+      <!-- Prior -->
+      <g>
+        <rect x="30" y="60" width="160" height="100" rx="12" fill="#EFF6FF" stroke="#1d4ed8" stroke-width="2"/>
+        <text x="110" y="90" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#1e3a8a">Prior</text>
+        <text x="110" y="108" text-anchor="middle" font-family="Inter" font-size="12" fill="#1d4ed8">p(θ)</text>
+        <text x="110" y="130" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">belief about θ</text>
+        <text x="110" y="144" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">before data</text>
+      </g>
+
+      <!-- Likelihood -->
+      <g>
+        <rect x="30" y="200" width="160" height="100" rx="12" fill="#EFF6FF" stroke="#1d4ed8" stroke-width="2"/>
+        <text x="110" y="230" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#1e3a8a">Likelihood</text>
+        <text x="110" y="248" text-anchor="middle" font-family="Inter" font-size="12" fill="#1d4ed8">p(y | θ)</text>
+        <text x="110" y="270" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">data given θ</text>
+        <text x="110" y="284" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">(same as MLE)</text>
+      </g>
+
+      <!-- Bayes theorem -->
+      <g>
+        <rect x="260" y="130" width="200" height="100" rx="12" fill="#FEF3C7" stroke="#a16207" stroke-width="2"/>
+        <text x="360" y="158" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#713f12">Bayes' theorem</text>
+        <text x="360" y="180" text-anchor="middle" font-family="Inter" font-size="11" fill="#713f12">p(θ | y) =</text>
+        <text x="360" y="198" text-anchor="middle" font-family="Inter" font-size="11" fill="#713f12">p(y | θ) p(θ) / p(y)</text>
+        <text x="360" y="218" text-anchor="middle" font-family="Inter" font-size="10" font-style="italic" fill="#713f12">multiply, normalise</text>
+      </g>
+
+      <!-- Posterior -->
+      <g>
+        <rect x="530" y="130" width="170" height="100" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+        <text x="615" y="160" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#115e59">Posterior</text>
+        <text x="615" y="178" text-anchor="middle" font-family="Inter" font-size="12" fill="#0d9488">p(θ | y)</text>
+        <text x="615" y="200" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">full inferential</text>
+        <text x="615" y="214" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">object</text>
+      </g>
+
+      <!-- Decision -->
+      <g>
+        <rect x="740" y="130" width="120" height="100" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+        <text x="800" y="160" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#5b21b6">Decisions</text>
+        <text x="800" y="180" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">point estimate</text>
+        <text x="800" y="194" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">credible interval</text>
+        <text x="800" y="208" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">posterior predictive</text>
+        <text x="800" y="222" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">Bayes factor</text>
+      </g>
+
+      <!-- Arrows -->
+      <line x1="190" y1="110" x2="260" y2="160" stroke="#1d4ed8" stroke-width="1.8" marker-end="url(#bayesArrow)"/>
+      <line x1="190" y1="250" x2="260" y2="200" stroke="#1d4ed8" stroke-width="1.8" marker-end="url(#bayesArrow)"/>
+      <line x1="460" y1="180" x2="530" y2="180" stroke="#1d4ed8" stroke-width="1.8" marker-end="url(#bayesArrow)"/>
+      <line x1="700" y1="180" x2="740" y2="180" stroke="#1d4ed8" stroke-width="1.8" marker-end="url(#bayesArrow)"/>
+
+      <!-- Footer -->
+      <text x="440" y="335" text-anchor="middle" font-family="Inter" font-size="11" font-style="italic" fill="#52525b">The posterior is the full inferential object. Every Bayesian summary is a function of it.</text>
+    </svg>
+    <figcaption>The Bayesian workflow. The <strong>prior</strong> $p(\theta)$ encodes belief about the parameter before the data is seen. The <strong>likelihood</strong> $p(y \mid \theta)$ is the same likelihood that frequentist methods use; it tells how the data depends on the parameter. Bayes' theorem combines them into the <strong>posterior</strong> $p(\theta \mid y) = p(y \mid \theta) p(\theta) / p(y)$, the full belief about $\theta$ after observing the data. The marginal $p(y) = \int p(y \mid \theta) p(\theta) d\theta$ in the denominator is the normalising constant and also the model-evidence object used in Bayes factors. Every inferential question is a question about the posterior: point estimate = posterior mean (or median or MAP), uncertainty = credible interval, prediction = posterior predictive distribution, model comparison = Bayes factor.</figcaption>
+  </figure>
+
+  <p>Two slogans pin the workflow. <strong>The posterior is the answer.</strong> Once $p(\theta \mid y)$ is computed (analytically if a conjugate prior was used, numerically via MCMC otherwise), every inferential question reduces to reading a summary from it. The posterior mean is the standard point estimate; the 2.5th and 97.5th quantiles give a 95 per cent credible interval; the posterior predictive distribution $p(\tilde{y} \mid y) = \int p(\tilde{y} \mid \theta) p(\theta \mid y) d\theta$ gives the predictive density for future observations. <strong>Computation is the hard part.</strong> The posterior $p(\theta \mid y) \propto p(y \mid \theta) p(\theta)$ is easy to write down up to a constant; the normalising constant $p(y) = \int p(y \mid \theta) p(\theta) d\theta$ is an integral that has a closed form only in special (conjugate) cases. For everything else, MCMC samples from the posterior without ever computing the normalising constant. The art is making MCMC mix well; the diagnostic apparatus is essential.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The detail</h2></div>
+
+  <h3>5.1 The Bayesian worldview and the role of the prior</h3>
+
+  <p>Bayes' theorem, written for a continuous parameter $\theta$ and continuous data $y$, is</p>
+
+  $$p(\theta \mid y) = \frac{p(y \mid \theta) p(\theta)}{p(y)}, \qquad p(y) = \int p(y \mid \theta) p(\theta) d\theta.$$
+
+  <p>The numerator is the joint density $p(y, \theta)$; the denominator is the marginal density of the data. The denominator does not depend on $\theta$, so as a function of $\theta$ the posterior is proportional to the numerator: $p(\theta \mid y) \propto p(y \mid \theta) p(\theta)$, "posterior is proportional to likelihood times prior". This is the working form used in 95 per cent of derivations.</p>
+
+  <p>The prior $p(\theta)$ is the locus of philosophical controversy. Three interpretations. The <strong>subjective Bayesian</strong> (Savage, de Finetti) takes $p(\theta)$ to be the analyst's personal degree of belief, calibrated to be coherent under the axioms of subjective probability. The <strong>objective Bayesian</strong> (Jeffreys, Bernardo) seeks priors that minimise the analyst's input, typically by invariance arguments (Jeffreys prior, reference prior). The <strong>pragmatic Bayesian</strong> (Gelman, McElreath, modern applied work) uses <em>weakly informative priors</em>: priors that exclude impossible regions of the parameter space and softly favour reasonable values without committing strongly to a specific belief. In production Bayesian work, the pragmatic interpretation has won by a wide margin; the controversy is mostly academic at this point.</p>
+
+  <p>The role of the prior is to <strong>regularise</strong> the likelihood. When the likelihood is well-determined by the data, the posterior is dominated by the likelihood and the prior does little. When the likelihood is poorly determined (sparse data, weak identification, low-default portfolios), the prior carries real weight and the posterior is a meaningful blend. The pragmatic prescription is to choose a prior that is appropriate for the latter case, sensitivity-test it across plausible alternatives, and report the posterior under the chosen prior with a documented justification.</p>
+
+  <h3>5.2 Conjugate priors and closed-form posteriors</h3>
+
+  <p>A prior is <strong>conjugate</strong> to a likelihood if the resulting posterior is in the same family as the prior. Conjugate priors give closed-form posterior updates and are the working models for both small introductory examples and serious applied work where the conjugacy survives. Four canonical conjugate pairs.</p>
+
+  <p><strong>Beta-Binomial.</strong> If $y \sim \text{Binomial}(n, \theta)$ and $\theta \sim \text{Beta}(\alpha, \beta)$, the posterior is</p>
+
+  $$\theta \mid y \sim \text{Beta}(\alpha + y, \beta + n - y).$$
+
+  <p>The Beta prior parameters $(\alpha, \beta)$ act as "pseudocounts": $\alpha$ prior successes and $\beta$ prior failures. The posterior is the prior pseudocounts updated by the observed counts. The posterior mean is $(\alpha + y) / (\alpha + \beta + n)$, a weighted average of the prior mean $\alpha / (\alpha + \beta)$ and the data proportion $y/n$. This is the model used for Bayesian PD calibration on a single rating grade: $\alpha$, $\beta$ encode the prior belief about the default rate, $y$ is the number of defaults observed in $n$ obligors.</p>
+
+  <p><strong>Gamma-Poisson.</strong> If $y \sim \text{Poisson}(\lambda)$ and $\lambda \sim \text{Gamma}(\alpha, \beta)$, the posterior is $\lambda \mid y \sim \text{Gamma}(\alpha + y, \beta + 1)$. With $n$ observations, $\lambda \mid \mathbf{y} \sim \text{Gamma}(\alpha + \sum y_i, \beta + n)$. The natural model for Bayesian count regression and for operational-risk frequency modelling.</p>
+
+  <p><strong>Normal-Normal (known variance).</strong> If $y \sim \mathcal{N}(\theta, \sigma^2)$ with $\sigma^2$ known, and $\theta \sim \mathcal{N}(\mu_0, \tau_0^2)$, the posterior is</p>
+
+  $$\theta \mid y \sim \mathcal{N}\left(\frac{\sigma^{-2} y + \tau_0^{-2} \mu_0}{\sigma^{-2} + \tau_0^{-2}}, (\sigma^{-2} + \tau_0^{-2})^{-1}\right).$$
+
+  <p>The posterior precision (inverse variance) is the sum of the data precision and the prior precision; the posterior mean is a precision-weighted average of the data and the prior mean. With $n$ observations, the data precision becomes $n \sigma^{-2}$ and the prior is increasingly dominated by the data as $n$ grows.</p>
+
+  <p><strong>Normal-Inverse-Gamma (unknown mean and variance).</strong> If $y \sim \mathcal{N}(\theta, \sigma^2)$ with both unknown, the conjugate joint prior is $\sigma^2 \sim \text{InvGamma}(\alpha_0, \beta_0)$, $\theta \mid \sigma^2 \sim \mathcal{N}(\mu_0, \sigma^2 / \kappa_0)$. The posterior has the same form with updated parameters that fold in the sample mean, sample variance, and sample size in a predictable way. The marginal posterior on $\theta$ is a Student's $t$ distribution with $2 \alpha_0 + n$ degrees of freedom, a beautiful result that motivates the $t$ distribution as the natural Bayesian companion to a normal likelihood with unknown variance.</p>
+
+  <p>The exponential family conjugates more broadly: each exponential-family distribution has a natural conjugate prior with a closed-form update. The Dirichlet-Multinomial pair (used in lecture 08 for smoothing transition matrices) is the categorical analogue of Beta-Binomial.</p>
+
+  <h3>5.3 Non-informative and weakly informative priors</h3>
+
+  <p>When no genuine prior information is available, the analyst wants a prior that lets the data speak for itself. Three approaches.</p>
+
+  <p><strong>Flat priors.</strong> $p(\theta) \propto 1$ on the parameter space. Intuitive but problematic: a flat prior on $\theta$ is not flat on a transformed parameter $\phi = g(\theta)$, so the "non-informativeness" is not invariant to reparameterisation. A flat prior on $\theta \in (0, 1)$ for a probability is a Beta(1, 1) and is reasonable; a flat prior on a variance $\sigma^2$ on $(0, \infty)$ is improper (does not integrate) and may produce improper posteriors.</p>
+
+  <p><strong>Jeffreys prior.</strong> $p(\theta) \propto \sqrt{|\mathcal{I}(\theta)|}$, where $\mathcal{I}(\theta)$ is the Fisher information matrix. Constructed to be invariant under reparameterisation, in the sense that the Jeffreys prior on $\theta$ implies the Jeffreys prior on $\phi = g(\theta)$ under the standard change-of-variables rule. For a binomial likelihood, the Jeffreys prior is Beta(1/2, 1/2); for a Poisson rate, it is $\propto \lambda^{-1/2}$ (improper). Jeffreys priors are the standard "default" objective priors and are still used as benchmark non-informative priors in applied work.</p>
+
+  <p><strong>Reference priors.</strong> Bernardo's reference priors are derived to maximise the (asymptotic) expected divergence between the prior and the posterior, in a precise information-theoretic sense. They coincide with Jeffreys priors in one-dimensional problems and refine them in multi-dimensional problems. Mostly of academic interest but technically the most principled "objective" prior.</p>
+
+  <p><strong>Weakly informative priors (Gelman et al.).</strong> The modern recommendation. A weakly informative prior is one that excludes physically impossible regions of the parameter space (negative variances, probabilities outside $[0, 1]$, log-hazard ratios above 10) and softly favours reasonable values, but does not commit strongly to a specific belief. Standard examples: $\mathcal{N}(0, 10^2)$ on a log-odds or log-hazard ratio (admits effect sizes up to $\pm 30$ on the relevant scale, which is wildly conservative); $\text{Cauchy}(0, 2.5)$ on a regression coefficient after standardisation (admits heavy tails for an unusual but real effect); $\text{Half-Cauchy}(0, 5)$ on a variance component. The Stan team's prior-choice recommendations document the modern defaults.</p>
+
+  <p><strong>Eliciting priors from experts.</strong> When genuine prior information exists, the formal approach is prior elicitation. Ask the expert for the median, 25th, and 75th percentiles of the parameter, fit a parametric family (typically Beta or Gamma) to those quantiles, and use the fitted distribution as the prior. The credit-risk application is low-default portfolio PD calibration: the analyst elicits from a senior risk officer "what would you guess the long-run default rate for this grade to be, and what would you give as the 95 per cent range?". This produces a Beta prior whose hyperparameters encode the elicited belief.</p>
+
+  <h3>5.4 Posterior summaries</h3>
+
+  <p>Four standard summaries of a posterior $p(\theta \mid y)$.</p>
+
+  <p><strong>Point estimates.</strong> Three natural choices. The <strong>posterior mean</strong> $E[\theta \mid y]$ minimises posterior expected squared loss; it is the standard Bayesian point estimate. The <strong>posterior median</strong> minimises posterior expected absolute loss; useful for skewed posteriors. The <strong>posterior mode</strong>, also called the <strong>maximum a posteriori (MAP)</strong> estimate, is the value $\theta$ that maximises the posterior density. The MAP coincides with the MLE under a flat prior; under an informative prior, MAP is a regularised MLE. Ridge regression's $\hat{\boldsymbol{\beta}}$ is the MAP under a Gaussian prior on $\boldsymbol{\beta}$; lasso's $\hat{\boldsymbol{\beta}}$ is the MAP under a Laplace prior. This is the precise bridge between Bayesian and regularised frequentist regression.</p>
+
+  <p><strong>Credible intervals.</strong> A $1 - \alpha$ credible interval is a region $C$ in parameter space such that $P(\theta \in C \mid y) = 1 - \alpha$. Two standard constructions. The <strong>equal-tailed interval</strong> is $[\theta_{\alpha/2}, \theta_{1 - \alpha/2}]$, the $\alpha/2$ and $1 - \alpha/2$ posterior quantiles. The <strong>highest posterior density (HPD) interval</strong> is the shortest interval containing $1 - \alpha$ of the posterior mass; it consists of every $\theta$ whose posterior density is above some threshold. For symmetric unimodal posteriors the two coincide; for skewed posteriors they differ and HPD is generally preferred. Note again: a credible interval is not a confidence interval. The credible interval is a probabilistic statement about $\theta$ given the data; the confidence interval is a coverage statement about the procedure across repeated sampling.</p>
+
+  <p><strong>Posterior predictive distribution.</strong> For a future observation $\tilde{y}$,</p>
+
+  $$p(\tilde{y} \mid y) = \int p(\tilde{y} \mid \theta) p(\theta \mid y) d\theta.$$
+
+  <p>The posterior predictive averages the data-generating density over the posterior uncertainty in $\theta$. It is wider than the conditional density $p(\tilde{y} \mid \hat{\theta})$ that frequentists typically use, because it incorporates parameter uncertainty into the prediction. The credit-risk application is forecasting: $\tilde{y}$ is the predicted default loss next year, and the posterior predictive distribution gives the full uncertainty distribution on the loss, accounting for uncertainty in the PD parameter.</p>
+
+  <p><strong>Posterior probabilities.</strong> For any event $A$ in parameter space, $P(A \mid y) = \int_A p(\theta \mid y) d\theta$. The posterior probability that "the PD for grade B is less than 1 per cent" is a single number that is the direct answer to a regulatory question; the frequentist analogue requires careful wording about significance levels and types of error.</p>
+
+  <h3>5.5 Bayesian hypothesis testing and the Bayes factor</h3>
+
+  <p>The Bayesian approach to hypothesis testing is the <strong>Bayes factor</strong>. For two competing hypotheses $H_0$ and $H_1$ (each specifying its own prior over the parameter space restricted to the hypothesis), the Bayes factor is</p>
+
+  $$BF_{10} = \frac{p(y \mid H_1)}{p(y \mid H_0)} = \frac{\int p(y \mid \theta, H_1) p(\theta \mid H_1) d\theta}{\int p(y \mid \theta, H_0) p(\theta \mid H_0) d\theta}.$$
+
+  <p>The numerator and denominator are the <em>marginal likelihoods</em> (also called the model evidence) under the two hypotheses. The Bayes factor is the ratio by which the data updates the prior odds in favour of $H_1$. Jeffreys (1961) proposed an interpretive scale: $BF_{10}$ between 1 and 3 is "anecdotal", 3 to 10 is "substantial", 10 to 30 is "strong", 30 to 100 is "very strong", greater than 100 is "decisive". The relationship to the posterior model probability is $P(H_1 \mid y) = BF_{10} \cdot P(H_1) / [BF_{10} \cdot P(H_1) + P(H_0)]$ when only two hypotheses are entertained.</p>
+
+  <p>Two important features. First, Bayes factors penalise model complexity automatically: a more complex model spreads its prior mass over a larger parameter space, which dilutes the marginal likelihood unless the data really favours the complex region. This is the <strong>Occam's razor</strong> property of Bayesian model comparison. Second, Bayes factors are sensitive to the prior; specifically, the marginal likelihood depends on the choice of prior over the model parameters in a way that the posterior typically does not. This is the <strong>Lindley paradox</strong>: with a diffuse prior under $H_1$, a small Bayes factor can favour $H_0$ even when the frequentist p-value strongly rejects $H_0$. The pragmatic response is to use informative (or at least weakly-informative) priors for hypothesis-testing purposes.</p>
+
+  <p>Three relationships to frequentist model comparison. <strong>BIC approximation</strong>: $-2 \log BF_{10} \approx \text{BIC}_0 - \text{BIC}_1$ to first order in large samples; the BIC is essentially $-2 \log$ of the marginal likelihood under a Laplace approximation. <strong>AIC contrast</strong>: AIC targets prediction, not model probability; the two answer different questions. <strong>WAIC and LOO-CV</strong> (Watanabe-Akaike information criterion, leave-one-out cross-validation): modern Bayesian model-comparison criteria that estimate out-of-sample predictive accuracy and avoid some of the prior-sensitivity issues of the Bayes factor. The R package <code>loo</code> (Vehtari, Gelman, Gabry 2017) implements these efficiently from MCMC samples.</p>
+
+  <h3>5.6 Hierarchical models and partial pooling</h3>
+
+  <p>One of the most useful classes of Bayesian model. The setup: data $y_{ij}$ for observation $j$ in group $i$, with group-specific parameter $\theta_i$ and a population-level distribution for the $\theta_i$'s:</p>
+
+  $$y_{ij} \mid \theta_i \sim p(\cdot \mid \theta_i), \qquad \theta_i \mid \boldsymbol{\phi} \sim p(\cdot \mid \boldsymbol{\phi}), \qquad \boldsymbol{\phi} \sim p(\boldsymbol{\phi}).$$
+
+  <p>Three levels: observation-level (data within group), group-level (variation across groups), and hyperparameter-level (the prior on the cross-group distribution). The joint posterior on $(\theta_1, \ldots, \theta_G, \boldsymbol{\phi})$ delivers partial pooling: each $\hat{\theta}_i$ is shrunk toward the population mean by an amount that depends on the within-group sample size $n_i$ and the cross-group variability. Large groups have estimates close to their own data; small groups have estimates close to the population mean.</p>
+
+  <p>The canonical illustration is the <strong>eight schools problem</strong> (Rubin 1981, used as the running example in Gelman et al.'s Bayesian Data Analysis). Eight schools each ran an SAT-coaching study and reported a treatment effect and its standard error. The treatment effects vary from $-1$ to $28$ points; the standard errors are 9 to 18. The choices: pool all eight estimates together (assume the true effect is the same in every school, get a single estimate), or estimate them separately (eight independent noisy effects). The hierarchical model finds a principled middle ground: each school's posterior is shrunk toward the population mean, with more shrinkage for the schools with noisier estimates. The result is more accurate than either extreme as judged by out-of-sample prediction.</p>
+
+  <p>The credit-risk applications are direct. A retail portfolio with regional or branch sub-segments wants partial-pooling estimates of PD, LGD, or behavioural-score weights per segment; the hierarchical model is the natural framework. A multi-jurisdictional bank wants country-specific credit scoring with partial pooling across countries. A stress-testing exercise wants scenario-specific parameter estimates with pooling across scenarios. In each case, the hierarchical model trades off bias (toward the population mean) against variance (of the per-group estimates) in the way that minimises overall out-of-sample prediction error.</p>
+
+  <h3>5.7 Computation: MCMC and its diagnostics</h3>
+
+  <p>For most non-conjugate models, the posterior $p(\theta \mid y)$ has no closed form and must be characterised by simulation. <strong>Markov chain Monte Carlo (MCMC)</strong> constructs a Markov chain on the parameter space whose stationary distribution is the posterior. After a "burn-in" period during which the chain converges to its stationary distribution, samples from the chain are samples from the posterior (asymptotically; the dependence within the chain reduces the effective sample size but does not bias the posterior summaries).</p>
+
+  <p><strong>Metropolis-Hastings.</strong> The general-purpose algorithm. At each step, propose a new state $\theta'$ from a proposal distribution $q(\theta' \mid \theta)$; accept with probability $\min\{1, \frac{p(\theta' \mid y) q(\theta \mid \theta')}{p(\theta \mid y) q(\theta' \mid \theta)}\}$; otherwise stay. The detailed-balance argument (lecture 08) shows that the resulting chain has $p(\theta \mid y)$ as stationary distribution. The art is in choosing the proposal: too small and the chain mixes slowly; too large and acceptance rates plummet. The classical "optimal" acceptance rate is around 23 per cent for high-dimensional Gaussian proposals (Roberts, Gelman, Gilks 1997).</p>
+
+  <p><strong>Gibbs sampling.</strong> When the full conditional distributions $p(\theta_k \mid \theta_{-k}, y)$ are known in closed form (which happens for many conjugate hierarchical models), sample each parameter in turn from its full conditional. Acceptance is always one. The classical algorithm of Geman and Geman (1984) and the workhorse of the BUGS / JAGS era of Bayesian computation.</p>
+
+  <p><strong>Hamiltonian Monte Carlo (HMC).</strong> The modern default. HMC augments the parameter space with a "momentum" variable and simulates Hamiltonian dynamics on the joint space; the long-distance, gradient-informed proposals mix far better than random-walk Metropolis-Hastings in high dimensions. The <strong>No-U-Turn Sampler (NUTS)</strong> of Hoffman and Gelman (2014) is an adaptive variant that automatically tunes the step size and trajectory length, eliminating most of the tuning labour. Stan, PyMC, Numpyro, and TensorFlow Probability all use NUTS as their default sampler.</p>
+
+  <p><strong>Convergence diagnostics.</strong> Four standard tools.</p>
+
+  <ul>
+    <li><strong>Trace plots</strong>: plot each parameter against iteration number. Multiple independent chains starting from different initial values should mix together and explore the same region after burn-in. A trace plot that has not mixed across chains indicates non-convergence.</li>
+    <li><strong>$\hat{R}$ (Gelman-Rubin)</strong>: ratio of between-chain variance to within-chain variance. $\hat{R} \to 1$ at convergence; values above 1.01 (modern threshold; the old threshold was 1.1) flag non-convergence.</li>
+    <li><strong>Effective sample size (ESS)</strong>: the equivalent number of independent samples that the autocorrelated MCMC samples are worth. Low ESS (under a few hundred) flags poor mixing; the posterior summaries are imprecise.</li>
+    <li><strong>Divergences</strong> (HMC-specific): a "divergent transition" in NUTS flags regions of the posterior with high curvature that the sampler cannot navigate; any divergences in the warmed-up phase indicate a problematic model or parameterisation.</li>
+  </ul>
+
+  <p>The Stan workflow's recommended check: $\hat{R} &lt; 1.01$ on every parameter, ESS at least 400 on every parameter, zero divergences after warm-up. Reporting Bayesian posterior summaries without these diagnostics is a defect.</p>
+
+  <p><strong>Variational inference (VI).</strong> An alternative to MCMC: approximate the posterior with a simpler tractable family (typically a factorised Gaussian) by minimising the Kullback-Leibler divergence between the approximation and the posterior. Faster than MCMC and scales better to large problems; sacrifices accuracy (variational posteriors typically under-estimate uncertainty, especially in correlated dimensions). The natural choice for very large-scale Bayesian models in machine learning (Bayesian neural networks, variational autoencoders). Less standard in regulated credit modelling, where MCMC's exact-in-the-limit guarantee is preferred.</p>
+
+  <h3>5.8 Bayesian model checking</h3>
+
+  <p>Three standard tools beyond Bayes factors and information criteria.</p>
+
+  <p><strong>Posterior predictive checks (PPC).</strong> Simulate replicated datasets $y^{\text{rep}}$ from the posterior predictive distribution; compute a test statistic $T$ on each; compare the distribution of $T(y^{\text{rep}})$ with the observed $T(y)$. If the observed test statistic falls in the tails of the simulated distribution, the model does not fit. Standard test statistics: minimum and maximum of the data, quantiles, autocorrelations (for time series), variance ratios. PPC is the Bayesian analogue of a residual diagnostic and is recommended for every fitted Bayesian model.</p>
+
+  <p><strong>WAIC and LOO-CV.</strong> The Bayesian model-comparison criteria. WAIC (Watanabe-Akaike information criterion) is a model-fitting-based estimate of out-of-sample log predictive density; LOO-CV (leave-one-out cross-validation, with the Pareto-smoothed importance-sampling implementation of Vehtari, Gelman, Gabry 2017) is a more accurate estimate of the same quantity. Both can be computed from MCMC samples without re-fitting the model many times. They are the modern recommended tools for Bayesian model comparison; the Bayes factor remains preferred when genuine hypothesis testing is the goal, but for predictive-accuracy comparison, WAIC and LOO-CV are more robust.</p>
+
+  <p><strong>Sensitivity analysis.</strong> Refit the model under alternative priors and compare the posterior. If the posterior is robust to plausible alternative priors, the prior is doing little; if it is sensitive, the prior is doing a lot and the choice needs more careful justification. Modern practice (especially in regulated contexts) requires explicit sensitivity analysis as part of model documentation.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Worked example
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Worked example: Bayesian PD calibration for a low-default portfolio</h2></div>
+
+  <p>The setup. A wholesale low-default portfolio has been segmented into rating grades 1 to 7 (best to worst, excluding default). Over a 5-year observation window, the number of obligor-years and observed defaults per grade are:</p>
+
+  <div class="worked">
+    <strong>Step 1: the data.</strong>
+    <p>Grade 1: 200 obligor-years, 0 defaults. Grade 2: 350, 0. Grade 3: 500, 1. Grade 4: 800, 2. Grade 5: 600, 5. Grade 6: 300, 8. Grade 7: 100, 6. The MLE per-grade default rates are: 0, 0, 0.002, 0.0025, 0.0083, 0.0267, 0.06. The first two grades have MLE zero, which is plainly unusable for capital purposes; the regulator requires a positive PD floor. The third and fourth grades have informative-looking MLEs but with very wide confidence intervals (one default in 500 obligor-years has a 95 per cent CI of roughly 0 to 1.1 per cent).</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 2: choice of prior.</strong>
+    <p>Use a Beta prior on each grade's PD. The prior parameters $(\alpha, \beta)$ encode "prior pseudocounts": $\alpha$ prior defaults and $\beta$ prior non-defaults. For grade 1, the analyst's prior belief (elicited from senior credit officers) is that the grade-1 PD is "around 0.05 per cent, with 95 per cent confidence between 0.01 per cent and 0.2 per cent". The Beta distribution matching this median and 95 per cent range is approximately Beta(0.5, 1000): the prior strongly favours small PDs but has substantial uncertainty. The other grades are given priors of similar form, with the prior mean increasing across grades to match expert beliefs about ordering.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 3: posterior for each grade.</strong>
+    <p>Beta-Binomial conjugate updates. For grade 1 with prior Beta(0.5, 1000), observed 0 defaults in 200 obligor-years: posterior Beta(0.5 + 0 = 0.5, 1000 + 200 = 1200). Posterior mean $= 0.5 / 1200.5 = 0.00042$ ($\approx 0.04$ per cent); posterior 95 per cent interval $\approx (0.000005, 0.0017)$. Comparable updates for grades 2 to 7 produce posterior means: 0.04 per cent, 0.04 per cent, 0.08 per cent, 0.28 per cent, 0.81 per cent, 2.45 per cent, 4.5 per cent. The first two grades have positive PD floors driven by the prior; the higher grades are pulled slightly toward the prior mean but mostly reflect the data.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 4: monotonicity and the posterior for portfolio PDs.</strong>
+    <p>The grade-1 posterior mean (0.04 per cent) is below the grade-3 posterior mean (0.08 per cent) by construction. Bayesian estimation per grade naturally preserves the monotone ordering of PDs across grades when monotone priors are used. A frequentist confidence-interval approach (Pluto-Tasche 2005 upper-confidence bound) produces non-monotone upper bounds for low-default grades and requires post-hoc smoothing; the Bayesian approach has no such artefact. For the portfolio-level expected default count over a one-year horizon, draw posterior samples from each grade's posterior, multiply by the obligor count, and sum. The resulting distribution gives both the expected count and its uncertainty.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 5: regulatory documentation.</strong>
+    <p>The EBA Guidelines on PD estimation require explicit documentation of the prior, justification of the prior in relation to expert judgement and external data, and sensitivity analysis to plausible alternative priors. The standard sensitivity-analysis routine: refit under (a) a Beta(0.5, 0.5) Jeffreys prior; (b) a Beta(1, 1) uniform prior; (c) a Beta(1, 10000) very-strong-low-PD prior. Report the posterior means and 95 per cent intervals under all four priors. If the chosen-prior posterior is within the envelope of the alternatives, the analysis is robust. The prior should also be supported by external data: published rating-agency default rates for comparable portfolios, peer-bank disclosures, supervisory benchmarks. The full Bayesian PD report typically runs to 30 to 50 pages including these checks.</p>
+  </div>
+
+  <div class="worked">
+    <strong>Step 6: hierarchical extension.</strong>
+    <p>The independent-grade-Beta-Binomial model treats each grade as a separate inferential problem. A Bayesian hierarchical model partial-pools across grades by introducing a population-level distribution on the grade-specific log-PDs: $\log(\text{PD}_g) \sim \mathcal{N}(\mu, \tau^2)$, with hyperpriors on $\mu$ and $\tau$. The result is that grades with sparse data (1, 2, 3) borrow strength from grades with abundant data (5, 6, 7) in a principled way: the cross-grade variability $\tau$ is estimated from the data, and the per-grade shrinkage toward the population mean is determined by the relative sizes of within-grade and between-grade uncertainty. This is implemented in Stan or PyMC with a few lines of model code; the MCMC fit takes seconds. The hierarchical model is the modern best-practice approach to PD calibration on low-default portfolios with multiple grades.</p>
+  </div>
+
+  <p>Three sanity checks anchor the workflow. (1) Posterior summaries must satisfy ordering: $\text{PD}_1 \leq \text{PD}_2 \leq \ldots \leq \text{PD}_7$ at posterior means and ideally also at every quantile. Non-monotonicity flags a misspecified prior or a data anomaly. (2) Posterior predictive checks: simulate default counts per grade from the posterior, compare against historical realisations. Systematic over- or under-prediction flags miscalibration. (3) Prior sensitivity: the chosen prior should not dominate the data for the grades with the most observations; if it does, the prior is too strong and the analysis is essentially a prior-driven exercise. The Bayesian apparatus is powerful precisely because it makes these checks possible and explicit; the frequentist alternative tends to handle low-default issues by ad-hoc adjustments that are harder to validate.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Common pitfalls and cognitive traps</h2></div>
+
+  <h3>Treating credible intervals as confidence intervals</h3>
+
+  <p>A 95 per cent credible interval and a 95 per cent confidence interval are different objects. The credible interval is the answer to "what range of $\theta$ contains 95 per cent of my posterior belief"; the confidence interval is the answer to "across many hypothetical repetitions of the experiment, what fraction of constructed intervals would contain the true $\theta$". The two often agree numerically (especially with diffuse priors and well-determined likelihoods) but are not interchangeable in interpretation. Bayesian intervals are direct probabilistic statements about $\theta$; frequentist intervals are not.</p>
+
+  <h3>Improper priors with improper posteriors</h3>
+
+  <p>Some non-informative priors are improper (do not integrate to one). With certain likelihoods this is fine, but with others it produces an improper posterior, which has no probabilistic interpretation. The classical example is a flat prior on the variance of a hierarchical model's random-effect distribution, combined with very few groups: the posterior is improper. Always check that the posterior is proper, either by deriving the marginal likelihood or by checking that an MCMC fit converges to sensible posteriors (an improper posterior typically manifests as a chain that drifts to infinity).</p>
+
+  <h3>MCMC summaries reported without convergence checks</h3>
+
+  <p>A poorly-mixed MCMC chain produces "posterior summaries" that are functions of the starting state, not of the posterior. $\hat{R}$, effective sample size, and trace plots are not optional; they are part of the analysis. Modern Bayesian workflows (Stan, PyMC) emit warnings on $\hat{R} &gt; 1.01$, ESS $&lt; 400$, or non-zero divergences; these warnings are not optional cosmetic notes but flag genuine inferential failures.</p>
+
+  <h3>Over-strong priors masquerading as "informative"</h3>
+
+  <p>An informative prior is appropriate when actual prior information is available; an over-strong prior is one that dominates the data and produces a posterior that is essentially the prior. The diagnostic: posterior credible intervals that are no wider than the prior intervals indicate a prior that is not being updated. The remedy: weaken the prior, or report explicitly that the analysis is prior-dominated and rests on the prior elicitation.</p>
+
+  <h3>The Lindley paradox in Bayesian model comparison</h3>
+
+  <p>With a diffuse prior under the alternative hypothesis, the Bayes factor can favour the null even when the data strongly rejects the null in a frequentist sense. The reason: the diffuse prior spreads its mass over a large region and dilutes the marginal likelihood. The cure is to use informative (or at least weakly-informative) priors when computing Bayes factors; better, to use WAIC or LOO-CV for predictive-accuracy comparison, which is less sensitive.</p>
+
+  <h3>Posterior predictive checks ignored</h3>
+
+  <p>A Bayesian model can have a perfectly converged MCMC fit and still be a bad model. Posterior predictive checks compare the model's predictions with the observed data; systematic mismatches flag model misspecification (the wrong likelihood family, a missing covariate, an over-restricted hierarchical structure). These should be reported alongside the posterior summaries, not deferred.</p>
+
+  <div class="callout warn">
+    <span class="tag">Bayesian work requires its own discipline</span>
+    Each pitfall above has a named diagnostic ($\hat{R}$, ESS, divergences, PPC, sensitivity analysis). A Bayesian model that has not had these diagnostics run is not finished. The advantage of the Bayesian framework is the directness of its probabilistic statements; the cost is that the inferential machinery exposes failure modes that frequentist methods hide. A converged-and-diagnosed Bayesian model is more trustworthy than a frequentist counterpart; an un-diagnosed Bayesian model is harder to trust than either. The framework is not "easier" or "harder" than frequentist methods; it is differently distributed across the workflow.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 8: Frontiers
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 8</span><h2>Frontiers and what's beyond</h2></div>
+
+  <p>Five frontiers sit past the classical material.</p>
+
+  <p><strong>Bayesian non-parametrics.</strong> Where the parameter space is itself infinite-dimensional. The <strong>Dirichlet process</strong> is a distribution over distributions, used as a prior in Bayesian density estimation and clustering; the <strong>Gaussian process</strong> is a distribution over functions, used as a prior in Bayesian function estimation and Bayesian optimisation. The frameworks scale gracefully with data, automatically calibrate model complexity, and have rich theory (Ferguson 1973; Rasmussen and Williams 2006). They are the natural framework for non-parametric Bayesian survival analysis (gamma-process priors on the cumulative hazard, Beta-process priors on transition intensities).</p>
+
+  <p><strong>Probabilistic programming languages.</strong> Stan, PyMC, Numpyro, Pyro, TensorFlow Probability, Turing.jl, Edward. Each provides a domain-specific language for declaring probabilistic models, with automatic differentiation, automatic MCMC tuning (NUTS), and modern auxiliary tools (LOO-CV, posterior predictive checks, model comparison). The pace of progress has been rapid since 2015 and the ergonomics of fitting non-trivial Bayesian models have improved dramatically. Stan remains the most-cited and most-supported in academic statistics; PyMC and Numpyro have eclipsed it in data-science and machine-learning ecosystems.</p>
+
+  <p><strong>Approximate Bayesian computation (ABC).</strong> When the likelihood $p(y \mid \theta)$ cannot be evaluated (because it is defined only through a complex simulator: agent-based models, population genetics models, individual-based credit-loss simulators), ABC accepts proposed $\theta$ values based on whether the simulated data matches the observed data closely enough by a chosen distance. The framework trades off computational tractability against likelihood-free flexibility; the standard implementations are ABC-rejection, ABC-MCMC, and the more recent ABC-NUTS and likelihood-free variational inference.</p>
+
+  <p><strong>Bayesian deep learning.</strong> Place priors on the weights of a neural network and infer the posterior. The full-MCMC approach is computationally prohibitive for modern network sizes; variational inference (with mean-field or normalising-flow approximations) is the standard route. Bayesian neural networks give principled uncertainty estimates, which matter in applications where the cost of overconfident predictions is high (medical diagnosis, autonomous driving, credit decisioning at the margin). The active research area is still evolving rapidly; the production deployments in regulated finance are limited but growing.</p>
+
+  <p><strong>Bayesian decision theory.</strong> The mathematical framework that combines a posterior with a loss function to produce optimal decisions. For a loss function $L(d, \theta)$ where $d$ is a decision and $\theta$ is the parameter, the Bayes-optimal decision is $d^* = \arg\min_d E_{\theta \mid y}[L(d, \theta)]$. The framework underwrites Bayesian portfolio optimisation, Bayesian pricing under uncertainty, Bayesian trading-strategy evaluation, and Bayesian capital allocation. The classical references are Savage (1954), DeGroot (1970), and Berger (1985); Robert (2007) is the modern standard text.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 9: Synthesis, recall, connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 9</span><h2>Synthesis and what's next</h2></div>
+
+  <p>You now have the Bayesian toolkit. The framework treats $\theta$ as a random variable with a prior, updates the prior to a posterior via Bayes' theorem, and reads every inferential question from the posterior: point estimates, credible intervals, posterior predictive distributions, Bayes factors. Conjugate priors give closed-form posterior updates; weakly informative priors are the modern pragmatic default; MCMC (Metropolis-Hastings, Gibbs, HMC, NUTS) computes the posterior when no closed form exists, with $\hat{R}$, ESS, divergences, and posterior predictive checks as the essential diagnostics. Hierarchical models supply partial pooling, the principled middle ground between full pooling and no pooling. The credit-risk applications are direct: Bayesian PD calibration on low-default portfolios is regulator-permitted and uses the Beta-Binomial conjugate update; hierarchical models handle segment-level estimation with sparse-data segments naturally.</p>
+
+  <p>This lecture closes the original nine-lecture sequence. The five pillars (descriptive, theoretical, inferential, modelling, stochastic processes) plus the Bayesian transverse framework give a complete map of the discipline. Three optional extension lectures (10 to 12) cover topics that did not fit into the original framing but are valuable for the credit risk modeller: <strong>copulas and dependence modelling</strong> (the natural framework for portfolio credit risk and the formal foundation of the Basel IRB capital formula), <strong>extreme value theory</strong> (operational and market risk tails), and <strong>causal inference</strong> (the modern framework for treatment effects, A/B testing, and policy evaluation). These three sit at the boundary between this course and the machine-learning, financial-engineering, and econometrics tracks. With them in hand, the toolkit is complete for the working credit risk modeller and for the ASSA F107 candidate.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State Bayes' theorem in its working form ("posterior is proportional to likelihood times prior"). What is the normalising constant called, and why does it not appear in MCMC sampling?</li>
+      <li>Distinguish a 95 per cent confidence interval from a 95 per cent credible interval. Which is the answer to "what range contains the true parameter with 95 per cent probability"?</li>
+      <li>Show that the Beta-Binomial posterior with prior Beta($\alpha, \beta$) and data $y$ successes in $n$ trials is Beta($\alpha + y, \beta + n - y$). What is the interpretation of $\alpha$ and $\beta$?</li>
+      <li>State the Jeffreys prior for a binomial parameter and for a Poisson rate. What property of these priors makes them "objective"?</li>
+      <li>Describe the Bayes factor and the Jeffreys interpretive scale. State the Lindley paradox.</li>
+      <li>Describe Hamiltonian Monte Carlo at a high level. What are the four convergence diagnostics that should be reported for every MCMC fit, and what threshold for each indicates a problem?</li>
+      <li>Explain partial pooling in a hierarchical model. Why does it dominate both full pooling and no pooling out-of-sample?</li>
+      <li>You are asked to calibrate PDs for a regulated low-default portfolio under the EBA Guidelines. Describe the model family, the prior choice, the diagnostics, and the regulatory documentation you would prepare.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 8 (<a href="08-markov_chains.html">Markov chains</a>) supplied the theoretical foundation for MCMC: the algorithms of this lecture are Markov chains constructed to have the posterior as their stationary distribution.</li>
+      <li><strong>Re-derived:</strong> Lecture 3 (<a href="03-inferential_statistics.html">inferential statistics</a>) gave the frequentist apparatus for estimation and testing; this lecture re-derives both under the Bayesian framework. Lecture 5 (<a href="05-generalised_linear_models.html">GLMs</a>) gave us regularisation via penalised likelihood; ridge and lasso are MAP estimators under Gaussian and Laplace priors, so the bridge to Bayesian GLMs is algebraic.</li>
+      <li><strong>Next (optional extensions):</strong> Lecture 10 (copulas) develops the Bayesian-friendly framework for portfolio dependence. Lecture 11 (extreme value theory) introduces the tail-distribution machinery used for operational and market risk. Lecture 12 (causal inference) extends the inferential pillars 3 and 4 to questions of treatment effect.</li>
+      <li><strong>Used by:</strong> Bayesian PD calibration for low-default portfolios (EBA-permitted); Bayesian hierarchical models for segment-level credit modelling; Bayesian VAR for IFRS 9 FLI scenario generation; Bayesian state-space models for behavioural credit scoring; Bayesian decision theory for capital allocation under uncertainty.</li>
+      <li><strong>Outside this course:</strong> the machine-learning track uses Bayesian methods for hyperparameter tuning (Bayesian optimisation), uncertainty quantification (Bayesian neural networks), and probabilistic graphical models. The actuarial track uses Bayesian credibility theory for premium-setting under sparse claims data, a direct conceptual ancestor of modern Bayesian hierarchical modelling.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Statistics course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 9 of 12</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

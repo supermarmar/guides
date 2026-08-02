@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 29: tabular transformers</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Deep learning</a></div>
+  <h1>Tabular transformers</h1>
+  <p class="subtitle">The transformer, as the previous lecture developed it, expects a sequence: tokens in a sentence, time steps in a series, positions with a natural order. An ordinary row of covariates, driver age, vehicle brand, region, has no such order at all: swapping the column order changes nothing about what the row means. This closing lecture of the sub-module adapts attention to exactly this case, via the feature tokeniser transformation and a classification token that reads out a single, order-independent summary of the whole row.</p>
+  <div class="meta">
+    <span>Lecture 29 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part IV: deep learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The <strong>feature tokeniser transformation</strong> (FTT) converts an ordinary tabular row into the sequence-like format a transformer expects, by embedding every covariate, categorical and continuous alike, into the identical $b$-dimensional space: each categorical covariate gets its own entity embedding (lecture 4), and each continuous covariate is passed through its own small feed-forward network mapping the scalar value to a $b$-dimensional vector. Stacking these $q$ embedded covariates gives a $q \times b$ tensor, structurally identical to a length-$q$ "sequence" of $b$-dimensional tokens, one token per covariate, ready for a transformer layer (previous lecture) to process. A single additional row, the <strong>classification (CLS) token</strong>, borrowed from the BERT architecture, is appended to this tensor before the transformer layer runs; after the attention mechanism has let every covariate token exchange information with every other, only the CLS token's final row is passed on to a small decoder network to produce the prediction, so the CLS token functions as a learned, order-independent summary of the entire row. Because covariates have no natural sequence order, a tabular transformer's positional encoding, where used, encodes which covariate a token represents (a categorical identity) rather than a position in a temporal or spatial sense.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine each covariate on a policy, age, vehicle brand, postcode, standing up and describing itself in the identical shared language (the identical embedding dimension), then all of them having a group conversation via attention, each updating its understanding of the risk in light of what every other covariate said. A designated notetaker, the CLS token, listens to the whole conversation and, at the end, writes the single summary that gets handed to the pricing decision. Nothing about the order the covariates originally stood up in matters, because attention lets every covariate hear every other covariate regardless of where it sat in the room.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This closes the deep-learning sub-module, adapting the previous lecture's sequential transformer to the tabular covariate structure most actuarial and credit models actually use. The actuarial-applications module later in this course extends the identical mechanism into the credibility transformer, which adds a Bühlmann-credibility-inspired weighting between the CLS token's prior and post-attention representations.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons the tabular adaptation is worth the detail this lecture gives it.</p>
+
+  <p>First, <strong>most actuarial and credit data is tabular, not sequential or spatial</strong>, and a modeller who only knows the sequential transformer from the previous lecture has no direct route to applying the identical machinery to the covariate rows that make up the large majority of real pricing and underwriting datasets; this lecture supplies that route.</p>
+
+  <p>Second, <strong>tabular transformers are an increasingly credible, benchmarked alternative to gradient boosting</strong>, no longer a research curiosity, and knowing the architecture in enough depth to distinguish a genuine implementation from a superficial rebranding of an ordinary FNN is a real, practical due-diligence skill for evaluating a vendor's claims.</p>
+
+  <p>Third, <strong>attention between covariates gives a natural, if informal, route to interaction discovery</strong>: because every covariate token attends to every other, the mechanism can, in principle, learn interaction effects between covariates without a modeller having to specify candidate interaction terms by hand, the identical value proposition that motivated gradient boosting's popularity over hand-specified GLM interactions in the first place.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    An insurer piloted a tabular transformer for a motor pricing model and found out-of-sample deviance modestly better than the incumbent LightGBM model, but the pilot report described the architecture only as "a neural network with attention", without distinguishing whether categorical and continuous covariates were embedded via the feature tokeniser transformation described in this lecture or simply concatenated as raw numbers into an otherwise ordinary FNN. On inspection, the implementation had, in fact, concatenated one-hot-encoded categoricals with raw continuous covariates and passed the result through a single self-attention layer treating the entire feature vector as one token, which is not a tabular transformer in the sense developed in this lecture at all, merely an FNN with an extra layer of a fashionable name. The genuine FTT-based architecture, once correctly implemented, gave a further, larger improvement.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: every covariate embedded into the identical $b$-dimensional space, stacked into a token sequence with an appended CLS token, processed by a transformer layer, with only the CLS token's output row read out for prediction.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The feature tokeniser transformation and CLS token readout for tabular data">
+      <defs>
+        <marker id="fttArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Feature tokeniser transformation, transformer layer, CLS readout</text>
+
+      <g font-family="Inter" font-size="10">
+        <rect x="30" y="60" width="90" height="34" rx="6" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="75" y="81" text-anchor="middle" fill="#92400e">age (cont.)</text>
+        <rect x="30" y="100" width="90" height="34" rx="6" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="75" y="121" text-anchor="middle" fill="#92400e">brand (cat.)</text>
+        <rect x="30" y="140" width="90" height="34" rx="6" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+        <text x="75" y="161" text-anchor="middle" fill="#92400e">region (cat.)</text>
+        <text x="75" y="190" text-anchor="middle" fill="#92400e">...</text>
+      </g>
+
+      <line x1="120" y1="115" x2="200" y2="115" stroke="#71717a" stroke-width="1.5" marker-end="url(#fttArrow)"/>
+      <text x="160" y="105" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">embed to Rᵇ</text>
+
+      <g transform="translate(210, 55)" font-family="Inter" font-size="10">
+        <rect x="0" y="5" width="70" height="34" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="35" y="26" text-anchor="middle" fill="#115e59">e(age)</text>
+        <rect x="0" y="45" width="70" height="34" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="35" y="66" text-anchor="middle" fill="#115e59">e(brand)</text>
+        <rect x="0" y="85" width="70" height="34" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="35" y="106" text-anchor="middle" fill="#115e59">e(region)</text>
+        <text x="35" y="135" text-anchor="middle" fill="#115e59">...</text>
+        <rect x="0" y="150" width="70" height="34" rx="6" fill="#FEE2E2" stroke="#dc2626" stroke-width="2"/>
+        <text x="35" y="171" text-anchor="middle" fill="#7f1d1d" font-weight="700">CLS</text>
+      </g>
+
+      <line x1="290" y1="150" x2="380" y2="150" stroke="#71717a" stroke-width="1.5" marker-end="url(#fttArrow)"/>
+      <text x="335" y="140" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">transformer layer</text>
+
+      <rect x="390" y="60" width="120" height="200" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="450" y="85" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">attention</text>
+      <text x="450" y="100" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">across tokens</text>
+      <text x="450" y="220" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">every covariate</text>
+      <text x="450" y="234" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">token attends to</text>
+      <text x="450" y="248" text-anchor="middle" font-family="Inter" font-size="9" fill="#5b21b6">every other, and CLS</text>
+
+      <line x1="510" y1="220" x2="600" y2="220" stroke="#71717a" stroke-width="1.5" marker-end="url(#fttArrow)"/>
+      <text x="555" y="210" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">read only CLS row</text>
+
+      <rect x="610" y="195" width="100" height="50" rx="8" fill="#FEE2E2" stroke="#dc2626" stroke-width="2"/>
+      <text x="660" y="216" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">c_trans</text>
+      <text x="660" y="232" text-anchor="middle" font-family="Inter" font-size="8" fill="#7f1d1d">(final CLS)</text>
+
+      <line x1="710" y1="220" x2="790" y2="220" stroke="#71717a" stroke-width="1.5" marker-end="url(#fttArrow)"/>
+      <rect x="790" y="195" width="60" height="50" rx="8" fill="#FEF3C7" stroke="#a16207" stroke-width="2"/>
+      <text x="820" y="225" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#713f12">μ(X)</text>
+    </svg>
+    <figcaption>Every covariate, categorical or continuous, is embedded into the identical $b$-dimensional space (the feature tokeniser transformation), stacked with an appended CLS token, and passed through a transformer layer where every token, covariates and CLS alike, attends to every other. Only the CLS token's row survives to the final decoder, having absorbed, via attention, a summary of every covariate's contribution and their interactions, regardless of the arbitrary order the covariates happened to be listed in.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Every covariate speaks the same language before attention runs.</strong> Categorical entity embeddings and continuous-covariate embeddings share the identical output dimension $b$ specifically so that attention's dot-product comparison is meaningful between any pair of covariates, regardless of their original type. <strong>The CLS token is a designed bottleneck, not an accident.</strong> Forcing every prediction through a single summary row, rather than reading out the whole post-attention tensor, is what makes the architecture produce one row-level prediction from an arbitrary, unordered set of covariate tokens.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Embedding categorical and continuous covariates to a common dimension</h3>
+
+  <p>Let $X = (X_1, \ldots, X_q)$ be a raw covariate row, with the first $q_c$ components categorical and the remaining $q - q_c$ continuous. Select a common embedding dimension $b$, a hyperparameter shared across every covariate. Each categorical covariate $X_j$, $1 \le j \le q_c$, is embedded exactly as in lecture 4,</p>
+  $$e_j^{\text{EE}}: A_j \to \mathbb{R}^b, \qquad X_j \mapsto e_j^{\text{EE}}(X_j),$$
+  <p>with $A_j$ the set of levels of $X_j$. Each continuous covariate $X_j$, $q_c &lt; j \le q$, is embedded by its own small feed-forward network,</p>
+  $$z_j: \mathbb{R} \to \mathbb{R}^b, \qquad X_j \mapsto z_j(X_j),$$
+  <p>mapping the scalar value to a $b$-dimensional vector, exactly the continuous-covariate embedding idea already implicit in an entity-embedding-based architecture, made explicit here. Collecting all $q$ embeddings gives the tokenised covariate tensor</p>
+  $$X_{1:q} = \big(e_1^{\text{EE}}, \ldots, e_{q_c}^{\text{EE}}, z_{q_c+1}, \ldots, z_q\big) \in \mathbb{R}^{q \times b},$$
+  <p>structurally a length-$q$ sequence of $b$-dimensional tokens, one per covariate, in the identical tensor shape the previous lecture's transformer layer expects as input.</p>
+
+  <h3>The classification (CLS) token</h3>
+
+  <p>Borrowing directly from the BERT architecture (Devlin et al.), a single additional row, the <strong>CLS token</strong> $c \in \mathbb{R}^b$, is appended to the tokenised covariate tensor,</p>
+  $$X_{1:q+1} = \begin{pmatrix} X_{1:q} \\ c \end{pmatrix} \in \mathbb{R}^{(q+1) \times b}.$$
+  <p>This augmented tensor is passed through a transformer layer (previous lecture), $z^{\text{trans}}: \mathbb{R}^{(q+1)\times b} \to \mathbb{R}^{(q+1)\times b}$, in which every covariate token, and the CLS token itself, attends to every other token in the row via the identical scaled dot-product attention mechanism. Only the final row of the transformer's output, corresponding to the position of the CLS token, is retained,</p>
+  $$c^{\text{trans}}(X) := z_{q+1}^{\text{trans}}(X_{1:q+1}) \in \mathbb{R}^b,$$
+  <p>and this single $b$-dimensional vector, having absorbed a weighted summary of every covariate's information and their pairwise interactions through the attention mechanism, is what the final decoder network reads to produce the prediction, typically via a small feed-forward layer and a suitable link function,</p>
+  $$X \mapsto \mu^{\text{trans}}(X) = \exp\big(z^{(d:1)}\big(z^{\text{norm}}(c^{\text{trans}}(X))\big)\big),$$
+  <p>for a log-link regression on a positive response, exactly the GLM-style readout that has recurred throughout this sub-module's architectures.</p>
+
+  <h3>Positional encoding for covariates: identity, not sequence position</h3>
+
+  <p>Because covariates have no natural temporal or spatial order, a positional encoding for a tabular transformer, where used, encodes <em>which covariate</em> a token represents rather than a position in a sequence: a learned embedding $e^{\text{pos}}: \{1, \ldots, q\} \to \mathbb{R}^b$, one vector per covariate slot, added to the corresponding covariate's embedding before the transformer layer runs. This lets the attention mechanism distinguish "this token is the age embedding" from "this token is the vehicle-brand embedding" even where two different covariates happen to produce numerically similar embedded vectors, a genuinely useful disambiguation given that, unlike a sentence's word order, a tabular row's covariate order is an arbitrary convention of the dataset rather than meaningful information in its own right.</p>
+
+  <h3>Why this is more than an FNN with an attention layer bolted on</h3>
+
+  <p>The vignette in section 2 illustrates the distinction worth stating precisely. A genuine tabular transformer treats each covariate as a separate token in a genuine sequence-of-tokens sense, embedded into a shared space specifically so that pairwise attention between distinct covariates is meaningful, and reads out through a dedicated CLS token that has to summarise the entire row through the attention mechanism itself. Concatenating a one-hot-encoded categorical vector with raw continuous covariates into a single, long feature vector and applying one round of self-attention to that single vector treats the entire row as one "token" attending only to itself, which computes nothing that a single dense layer could not, and is not the architecture this lecture, or the wider tabular-transformer literature (Gorishniy et al.'s feature tokeniser transformer, the specific construction this lecture follows), refers to.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Accepting "attention-based tabular model" without checking the tokenisation</span>
+    As the vignette shows, the phrase can describe either a genuine feature-tokeniser-transformer architecture or an ordinary FNN with a cosmetic attention layer that computes nothing structurally different from a dense layer; asking explicitly whether every covariate is embedded to a shared dimension and treated as a separate token before attention runs is the specific, checkable question that distinguishes the two.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using a sequence-style positional encoding on tabular data</span>
+    Applying sine-cosine or otherwise order-based positional encoding to a tabular row's covariate tokens imposes a spurious notion of "covariate 3 comes after covariate 2" that has no meaning for tabular data; the covariate-identity positional encoding developed in this lecture, not a sequence-position encoding, is the correct adaptation.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Reading out more than the CLS token without a stated reason</span>
+    Reading predictions from covariate-token positions rather than solely the CLS token defeats the purpose of the bottleneck and can leak information about a specific covariate's raw embedded value directly into the output, bypassing the attention-mediated summary the CLS token is designed to enforce; departures from a CLS-only readout should be a deliberate, documented architectural choice, not an accidental implementation shortcut.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming attention-discovered interactions substitute for domain-informed feature engineering</span>
+    Attention between covariate tokens can surface interaction effects without explicit specification, but it does so within the limits of what the training data actually supports; a genuinely novel interaction that the training sample has too few observations to estimate reliably will not be reliably discovered by attention any more than it would be by a hand-specified GLM interaction term with too little supporting data, and validating any interaction the architecture appears to have learned against the underlying data volume remains necessary.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The feature tokeniser transformation embeds every covariate, categorical via entity embedding and continuous via a small dedicated feed-forward network, into a common $b$-dimensional space, producing a tensor structurally identical to a sequence of tokens, one per covariate. A CLS token, appended before the transformer layer runs, absorbs a summary of every covariate and their attention-mediated interactions, and only this token's final row feeds the decoder that produces the prediction. Covariate positional encoding, where used, identifies which covariate a token represents rather than encoding a sequence position, since tabular covariates carry no natural order. The architecture is a genuine, benchmarked alternative to gradient boosting on tabular actuarial data, and distinguishing a correct implementation from a superficial one, an ordinary FNN with a cosmetic attention layer, is a concrete, checkable due-diligence question.</p>
+
+  <p>This closes the deep-learning sub-module. The nine lectures together cover the training loop and its limits (lectures 1 and 2), variance reduction through ensembling (lecture 3), representation learning for categorical and text data (lectures 4 and 5), and the three major architecture families, convolutional, recurrent, and attention-based, for grid-, sequence-, and set-structured data respectively (lectures 6 through 9). The actuarial-applications module later in this course builds directly on this foundation: CANN and LocalGLMnet extend the GLM-plus-network framing from lecture 1, and the credibility transformer extends the tabular transformer developed in this closing lecture with a Bühlmann-credibility-inspired weighting mechanism.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Describe the feature tokeniser transformation and explain why categorical and continuous covariates are embedded to the identical dimension $b$.</li>
+      <li>Explain the role of the CLS token and why only its final row is read out for prediction.</li>
+      <li>Explain why a tabular transformer's positional encoding, where used, encodes covariate identity rather than sequence position.</li>
+      <li>A colleague describes their model as "a tabular transformer" because it includes a self-attention layer over the concatenated feature vector. What specific question would you ask to check whether this is a genuine feature-tokeniser-transformer architecture?</li>
+      <li>Explain how attention between covariate tokens can surface interaction effects without explicit specification, and why this does not remove the need to validate any discovered interaction against the underlying data volume.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 8 (<a href="08-transformers.html">transformers</a>) developed the sequential attention mechanism this lecture adapts to tabular covariate rows.</li>
+      <li><strong>Built on:</strong> Lecture 4's <a href="04-tensors_and_embeddings.html">entity embedding</a> supplies the categorical-covariate embedding this lecture's feature tokeniser transformation uses directly.</li>
+      <li><strong>Sub-module complete:</strong> Return to the <a href="index.html">deep learning course landing page</a> to review the full nine-lecture sequence, or continue to <a href="../06_hyperparameter_tuning/index.html">hyperparameter tuning</a>, the next sub-module in the course.</li>
+      <li><strong>Outside this course:</strong> The actuarial-applications module later in this course develops the credibility transformer, which extends this lecture's architecture with a credibility-weighted combination of the CLS token's pre- and post-attention representations, directly analogous to Bühlmann credibility's weighted combination of individual and collective experience.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Deep learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 29 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

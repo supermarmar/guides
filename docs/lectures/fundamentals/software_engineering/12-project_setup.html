@@ -1,0 +1,389 @@
+﻿<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 12: project setup and dependency management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Project setup and dependency management</h1>
+  <p class="subtitle">A Python project is not just a folder of scripts. It is a contract: which interpreter, which libraries at which versions, which lint rules, which entry points. This lecture covers <code>pyproject.toml</code>, the choice between pip, uv, poetry, and pdm, virtual environments, lockfiles, semantic versioning, and the pre-commit hooks that keep all of it consistent across a team.</p>
+  <div class="meta">
+    <span>Lecture 12 of 16</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part IV: project and collaboration</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Every Python project, from a one-file script to a thousand-module library, has the same three set-up questions to answer. <strong>Which interpreter?</strong> Python 3.11, 3.12, 3.13, on which operating system. <strong>Which dependencies?</strong> pandas at which version, scikit-learn at which version, with which transitive constraints. <strong>Which dev-loop tooling?</strong> formatter, linter, type checker, test runner, build back-end. Getting all three right is the difference between a project a new joiner can clone and run in ten minutes and a project that requires a Slack thread to set up.</p>
+
+  <p>The modern answer is a single file, <code>pyproject.toml</code> (PEP 518, 2016; PEP 621, 2020), that records every one of those answers in a standardised TOML format. The Python interpreter version goes there or in a sibling <code>.python-version</code>. The dependencies and dev-dependencies go there. The configuration for ruff, mypy, pytest, and the build back-end all goes there. The file is the contract; the tooling reads from it. A project with a well-formed <code>pyproject.toml</code> is one command away from a working environment: <code>uv sync</code>, <code>poetry install</code>, or <code>pip install -e .</code> depending on which front-end the team uses.</p>
+
+  <p>The four front-ends worth knowing are <strong>pip</strong> (Python's bundled installer, plus pip-tools or pip-compile for lockfiles); <strong>poetry</strong> (Sébastien Eustace, 2018), the first all-in-one project manager that put <code>pyproject.toml</code> on the map; <strong>pdm</strong> (Frost Ming, 2019), the PEP-pure alternative to poetry; and <strong>uv</strong> (Astral, 2024), the Rust-written replacement that is 10 to 100 times faster than the rest and has emerged in 2025 as the new default for new projects. All four read the same <code>pyproject.toml</code>; the choice between them is about speed, opinion, and how much they decide for you.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A Python project's set-up is a function. The input is the recipe (<code>pyproject.toml</code> plus a lockfile). The output is a working environment: an interpreter at a known version, with a known set of libraries, each at a known version, installed in an isolated folder. If you can describe what each line of <code>pyproject.toml</code> contributes to that function, and what role the lockfile plays in making the output deterministic, you have the mental model that every dependency-management tool is implementing.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The deep reason dependency management is harder than it looks is that pinning is a graph problem. Project A wants pandas &gt;= 2.0; library B wants pandas &lt; 2.1; the resolver has to find an intersection that satisfies both, and the intersection may not exist (the "dependency hell" problem). The resolver implementing this is the same kind of SAT-solver problem that powers package managers in every language: Cargo for Rust, Bundler for Ruby, npm for JavaScript. The reason uv is so fast is partly that it borrows Cargo's algorithm and rewrites it in Rust; the reason poetry was slow for years is partly that the original resolver did not.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is reproducibility. The Jupyter lecture (Lecture 10) ended with the observation that a notebook only reproduces if its environment is pinned; this lecture is where the pinning happens. A team that pins to a <code>uv.lock</code> or <code>poetry.lock</code> can guarantee that the calibration notebook from January reproduces in October, byte-for-byte. A team that relies on a hand-edited <code>requirements.txt</code> with <code>pandas&gt;=2.0</code> cannot. For regulatory work, where a model has to be re-runnable years after it was first deployed, the gap is not academic; it is the difference between a defensible artefact and an explanatory phone call.</p>
+
+  <p>The second reason is onboarding. The single most common piece of friction reported in developer-experience surveys (Stack Overflow, GitHub State of the Octoverse) is the time from <code>git clone</code> to "first test passes". A project whose set-up is one command (<code>uv sync &amp;&amp; uv run pytest</code>) has effectively zero onboarding cost. A project whose set-up is a wiki page with seven steps, each of which fails on one of macOS, Windows, or Linux, costs a new joiner half a day on their first morning and is the kind of thing that gets remembered. The investment in a clean <code>pyproject.toml</code> is paid back the first time someone new joins the team.</p>
+
+  <p>The third reason is supply-chain hygiene. A 2024 review of Python supply-chain attacks (Sonatype, the State of the Software Supply Chain report) counted 245,000 malicious packages uploaded to public registries in the year, a 156% year-on-year rise. The defence is not abstinence but discipline: pin dependencies to specific versions, review the lockfile in code review, run an SBOM (software bill of materials) scan in CI, prefer well-maintained packages over abandoned ones. None of that works without a single source of truth for what the project depends on, which is what <code>pyproject.toml</code> plus a lockfile gives you.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The four-file contract</h3>
+
+  <p>A well-formed Python project records its set-up in four files. <strong><code>pyproject.toml</code></strong> is the declared contract: human-edited, version-controlled, the source of truth for what the project depends on. <strong>The lockfile</strong> (<code>poetry.lock</code>, <code>pdm.lock</code>, <code>uv.lock</code>, or <code>requirements.txt</code> if produced by <code>pip-compile</code>) is the resolved contract: machine-generated, version-controlled, the exact graph of every package and every transitive dependency at exact versions and hashes. <strong><code>.python-version</code></strong> records the interpreter version, read by pyenv and uv. <strong><code>.pre-commit-config.yaml</code></strong> records the hook configuration. Together the four files describe everything a fresh clone needs.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The project setup contract">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The four-file project contract</text>
+
+      <g font-family="Inter" font-size="12">
+        <rect x="40"  y="60" width="160" height="180" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2" rx="6"/>
+        <text x="120" y="90"  text-anchor="middle" font-weight="700" fill="#3D2EB5">pyproject.toml</text>
+        <text x="120" y="115" text-anchor="middle" font-size="11" fill="#37352F">declared contract</text>
+        <text x="120" y="135" text-anchor="middle" font-size="11" fill="#37352F">human-edited</text>
+        <text x="120" y="160" text-anchor="middle" font-size="11" fill="#71717a">[project]</text>
+        <text x="120" y="178" text-anchor="middle" font-size="11" fill="#71717a">dependencies = [...]</text>
+        <text x="120" y="196" text-anchor="middle" font-size="11" fill="#71717a">[tool.ruff]</text>
+        <text x="120" y="214" text-anchor="middle" font-size="11" fill="#71717a">[tool.pytest.ini_options]</text>
+
+        <rect x="220" y="60" width="160" height="180" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2" rx="6"/>
+        <text x="300" y="90"  text-anchor="middle" font-weight="700" fill="#1E9D54">lockfile</text>
+        <text x="300" y="115" text-anchor="middle" font-size="11" fill="#37352F">resolved contract</text>
+        <text x="300" y="135" text-anchor="middle" font-size="11" fill="#37352F">machine-generated</text>
+        <text x="300" y="160" text-anchor="middle" font-size="11" fill="#71717a">uv.lock /</text>
+        <text x="300" y="178" text-anchor="middle" font-size="11" fill="#71717a">poetry.lock /</text>
+        <text x="300" y="196" text-anchor="middle" font-size="11" fill="#71717a">pdm.lock</text>
+        <text x="300" y="214" text-anchor="middle" font-size="11" fill="#71717a">+ hashes</text>
+
+        <rect x="400" y="60" width="160" height="180" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2" rx="6"/>
+        <text x="480" y="90"  text-anchor="middle" font-weight="700" fill="#C76B2A">.python-version</text>
+        <text x="480" y="115" text-anchor="middle" font-size="11" fill="#37352F">interpreter version</text>
+        <text x="480" y="135" text-anchor="middle" font-size="11" fill="#37352F">one line</text>
+        <text x="480" y="170" text-anchor="middle" font-size="11" fill="#71717a">3.12.4</text>
+        <text x="480" y="200" text-anchor="middle" font-size="11" fill="#71717a">read by pyenv, uv</text>
+
+        <rect x="580" y="60" width="160" height="180" fill="#FBEDE4" stroke="#F08C42" stroke-width="2" rx="6"/>
+        <text x="660" y="90"  text-anchor="middle" font-weight="700" fill="#C76B2A">.pre-commit-</text>
+        <text x="660" y="106" text-anchor="middle" font-weight="700" fill="#C76B2A">config.yaml</text>
+        <text x="660" y="131" text-anchor="middle" font-size="11" fill="#37352F">hooks</text>
+        <text x="660" y="151" text-anchor="middle" font-size="11" fill="#37352F">runs on commit</text>
+        <text x="660" y="180" text-anchor="middle" font-size="11" fill="#71717a">ruff format</text>
+        <text x="660" y="198" text-anchor="middle" font-size="11" fill="#71717a">ruff check</text>
+        <text x="660" y="216" text-anchor="middle" font-size="11" fill="#71717a">mypy, etc.</text>
+      </g>
+    </svg>
+    <figcaption>The four files together describe everything a fresh clone needs to be productive. Two are human-edited (left, right), two are machine-generated or single-purpose (middle). All four are version-controlled.</figcaption>
+  </figure>
+
+  <h3>The declared / resolved distinction</h3>
+
+  <p>The single biggest conceptual leap in dependency management is the distinction between a <strong>declared</strong> dependency and a <strong>resolved</strong> dependency. The declared dependency is what the human writes: "I want pandas, version 2 or higher". It is a <em>constraint</em>. The resolved dependency is what the tool computes: "pandas 2.2.1, numpy 1.26.4, python-dateutil 2.9.0, pytz 2024.1, six 1.16.0, and four more transitive packages, each at a specific version with a specific SHA-256 hash". The resolved set is a <em>solution</em> to the constraint problem.</p>
+
+  <p>The lockfile records the solution. Without it, every fresh install re-runs the resolver against the live state of the package index, which can produce a different solution today than it did yesterday (because a new pandas was released, or a transitive dependency changed). Pinning the lockfile and checking it into git is the move that makes the install deterministic. The team's CI installs from the lockfile; the team's developers install from the lockfile; the production deployment installs from the lockfile. The resolver only runs again when someone deliberately bumps a dependency, at which point the lockfile is regenerated and reviewed in a pull request.</p>
+
+  <h3>The role of the virtual environment</h3>
+
+  <p>A <strong>virtual environment</strong> (<code>venv</code>, built into Python 3.3+; <code>virtualenv</code>, the older standalone version) is a private folder containing a copy of the Python interpreter and a private <code>site-packages</code> directory. Activating the venv prepends its <code>bin</code> directory to <code>PATH</code>, so <code>python</code> and <code>pip</code> refer to the private copy. The mechanism is dumber than it sounds; it is essentially a symlink farm and a <code>PATH</code> hack, but it solves the central problem cleanly: project A and project B can depend on incompatible versions of pandas because each lives in its own venv, with its own site-packages.</p>
+
+  <pre><code class="language-bash"># the modern python -m venv approach
+python -m venv .venv
+.venv/bin/python -m pip install pandas
+
+# uv hides this behind one command
+uv venv          # creates .venv with the project's interpreter
+uv pip install pandas
+</code></pre>
+
+  <p>The convention across modern tooling is to put the venv in a folder called <code>.venv</code> at the project root and add it to <code>.gitignore</code>. The venv is local to a checkout; recreating it is one command. The dependency manager (poetry, pdm, uv) creates and populates the venv on demand, so most users rarely interact with it directly. The <strong>conda</strong> environment (Anaconda, 2012) is a heavier alternative that manages non-Python dependencies (CUDA, R, Fortran libraries) as well; the cost is a slower install and a separate package ecosystem. For modelling work in pure Python, venv is the default; for ML work with GPU or compiled-numerical dependencies, conda still has a role.</p>
+
+  <div class="defcard">
+    <strong>Virtual environment.</strong> A self-contained Python installation in a folder, with its own interpreter and its own site-packages. Activating it changes <code>PATH</code> so the project's interpreter is used in preference to the system one. The mechanism by which two projects on the same machine can depend on incompatible versions of the same library.
+  </div>
+
+  <div class="defcard">
+    <strong>Lockfile.</strong> A machine-generated file that records the exact resolved version of every direct and transitive dependency, with cryptographic hashes. Reproduces the installed set deterministically on any machine. The lockfile is committed; the venv is not.
+  </div>
+
+  <h3>Semantic versioning and the bound choices</h3>
+
+  <p>The version-number convention that the Python ecosystem mostly follows is <strong>semantic versioning</strong> (semver: Tom Preston-Werner, 2011): three numbers <code>MAJOR.MINOR.PATCH</code>. A patch bump is a backwards-compatible bug fix; a minor bump is a backwards-compatible feature addition; a major bump is a breaking change. The convention gives the dependency declarer four useful bounds to pick from:</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Constraint</th><th>Reads as</th><th>Resolves to</th><th>When to use</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>pandas</code></td><td>"any version"</td><td>the newest available</td><td>Throwaway scripts only</td></tr>
+      <tr><td><code>pandas&gt;=2.0</code></td><td>"at least 2.0"</td><td>newest &gt;= 2.0</td><td>Library publishing a minimum</td></tr>
+      <tr><td><code>pandas~=2.2</code></td><td>"compatible with 2.2" (PEP 440)</td><td>&gt;= 2.2, &lt; 3.0</td><td>Application that trusts semver</td></tr>
+      <tr><td><code>pandas==2.2.1</code></td><td>"exactly this"</td><td>2.2.1, no other</td><td>Lockfile contents (machine-written)</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The right default in <code>pyproject.toml</code> is <code>~=</code> (or its caret <code>^</code> equivalent in poetry's syntax), which trusts the upstream library to follow semver and pins the major version while allowing minor and patch updates. The lockfile then resolves to a specific version. The pattern gives you both signals: the declared constraint says "this is what we depend on conceptually", the lockfile says "this is what we have installed today".</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>pyproject.toml: the full anatomy</h3>
+
+  <p>A complete <code>pyproject.toml</code> for a credit-risk modelling project, with comments, looks like this:</p>
+
+  <pre><code class="language-toml"># Build back-end. Tells pip how to build the project when someone
+# runs `pip install .` or builds a wheel. Hatchling is the modern
+# default; setuptools is the legacy choice.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Project metadata (PEP 621). The single source of truth.
+[project]
+name = "credit-risk-models"
+version = "0.3.1"
+description = "PD, LGD, EAD models for the consumer book."
+requires-python = "&gt;=3.12"
+authors = [{ name = "Risk modelling team", email = "risk@bank.example" }]
+readme = "README.md"
+license = { text = "Proprietary" }
+
+dependencies = [
+    "pandas~=2.2",
+    "numpy~=1.26",
+    "scikit-learn~=1.4",
+    "statsmodels~=0.14",
+    "pyarrow~=16.0",
+    "pydantic~=2.6",
+]
+
+# Optional dependencies, grouped. Install with
+# `pip install -e .[dev]` or `uv sync --extra dev`.
+[project.optional-dependencies]
+dev = [
+    "pytest~=8.0",
+    "pytest-cov~=4.1",
+    "hypothesis~=6.99",
+    "ruff~=0.4",
+    "mypy~=1.10",
+    "pre-commit~=3.7",
+]
+notebook = [
+    "jupyterlab~=4.0",
+    "jupytext~=1.16",
+    "nbstripout~=0.7",
+    "papermill~=2.5",
+]
+
+# Project entry points. The CLI command `credit-fit` calls the
+# `main` function in the named module.
+[project.scripts]
+credit-fit = "credit_risk_models.cli:main"
+
+# Tool-specific configuration. Each linter / type checker / test
+# runner reads its own section. Keeps everything in one file.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N"]
+ignore = ["E501"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --cov=credit_risk_models"
+testpaths = ["tests"]
+</code></pre>
+
+  <p>The <code>[build-system]</code> section is required by PEP 518 and tells <code>pip</code> what to do when building the package. The <code>[project]</code> section, standardised by PEP 621, holds the metadata. The <code>[project.optional-dependencies]</code> table groups dependencies by purpose: the production set, the development set, the notebook set. The <code>[tool.*]</code> sections are namespaced for each tool that wants to read its config from the same file, eliminating the proliferation of <code>setup.cfg</code>, <code>.flake8</code>, <code>pytest.ini</code>, and <code>mypy.ini</code> that older projects had.</p>
+
+  <h3>The four front-ends, compared</h3>
+
+  <p>Four tools sit on top of <code>pyproject.toml</code>. They install dependencies, manage the venv, lock versions, and run scripts. They are interchangeable in the file format but differ in speed, ergonomics, and opinion.</p>
+
+  <p><strong>pip + pip-tools</strong> is the orthodox combination. <code>pip</code> installs; <code>pip-compile</code> (from pip-tools) reads <code>pyproject.toml</code> and produces a pinned <code>requirements.txt</code> lockfile. The pair is the lowest-friction choice because pip ships with Python; you do not install anything extra. The cost is that the workflow is several commands long: create a venv, activate it, pip-compile, pip-sync, run.</p>
+
+  <p><strong>poetry</strong> was the first all-in-one tool to popularise <code>pyproject.toml</code>. It manages the venv, resolves dependencies, locks them, builds the package, and publishes it to PyPI in one CLI. Its early adoption is the reason most older projects you encounter use it. The downsides are speed (the resolver is slow on big graphs), and poetry's slightly non-standard TOML schema (<code>[tool.poetry]</code> instead of <code>[project]</code>; the gap closed in 2024 but old projects still use the old schema).</p>
+
+  <p><strong>pdm</strong> is poetry's PEP-pure alternative: same scope, but it sticks to the PEP 621 <code>[project]</code> schema and offers a PEP 582 mode that skips the venv entirely (a <code>__pypackages__</code> folder is used in its place). pdm has a smaller community than poetry but the design is cleaner.</p>
+
+  <p><strong>uv</strong> (Astral, 2024) is the new default for new projects in 2025. Written in Rust, it installs packages 10 to 100 times faster than pip or poetry, resolves the dependency graph using the Cargo-style PubGrub algorithm, manages Python interpreters as well as packages, and reads the standard <code>pyproject.toml</code> schema. The speed difference is qualitative, not just quantitative: a <code>uv sync</code> on a 50-package project completes in two seconds where <code>poetry install</code> takes ninety. Astral, the same company, also makes <strong>ruff</strong> (the linter and formatter used in this course), and the two are designed to work together.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Tool</th><th>Year</th><th>Lockfile</th><th>Manages Python?</th><th>Speed</th><th>When to choose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>pip + pip-tools</code></td><td>2008</td><td><code>requirements.txt</code></td><td>No</td><td>Slow</td><td>Minimal-dependency projects; CI base images</td></tr>
+      <tr><td><code>poetry</code></td><td>2018</td><td><code>poetry.lock</code></td><td>No</td><td>Slow</td><td>Existing projects, or teams already on it</td></tr>
+      <tr><td><code>pdm</code></td><td>2019</td><td><code>pdm.lock</code></td><td>Partial</td><td>Medium</td><td>PEP-purist teams</td></tr>
+      <tr><td><code>uv</code></td><td>2024</td><td><code>uv.lock</code></td><td>Yes</td><td>Very fast</td><td>New projects in 2025+</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The recommendation for new projects, as of this writing, is uv. For existing poetry or pdm projects, the migration cost is real but bounded; uv reads the same <code>pyproject.toml</code>, and the lockfile regeneration is one command. The pip + pip-tools combination remains the right answer for projects whose deployment target cannot install anything but pip, such as some Lambda runtimes or restricted internal package indices.</p>
+
+  <h3>The pre-commit hook layer</h3>
+
+  <p>A team's set-up contract is only enforced if the tools actually run. The <strong>pre-commit</strong> framework (Anthony Sottile, 2014; pre-commit.com) is the standard mechanism: a <code>.pre-commit-config.yaml</code> file declares hooks (ruff, mypy, nbstripout, gitleaks, and a long tail), and a single <code>pre-commit install</code> wires them into the local git hook directory. From then on, every commit runs the hooks, blocking the commit if any hook fails. The same hooks run again in CI as a belt-and-braces check.</p>
+
+  <pre><code class="language-yaml"># .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pandas-stubs, types-requests]
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+</code></pre>
+
+  <p>The hooks above format and lint Python code, type-check it, strip outputs from notebooks, validate TOML and YAML syntax, normalise file endings, and remove trailing whitespace. None of these checks are interesting individually; they are the boring class of bug that takes a full code review to spot and a single hook to prevent. The discipline of running them on every commit is the engineering equivalent of brushing your teeth.</p>
+
+  <h3>Multi-Python: pyenv, asdf, uv</h3>
+
+  <p>Different projects on the same machine often need different Python versions: project A on 3.11, project B on 3.12, project C on 3.13. The classical tool is <strong>pyenv</strong> (Yamashita, 2013): a shim layer that intercepts the <code>python</code> command and routes it to whichever interpreter the current directory's <code>.python-version</code> file names. <strong>asdf</strong> (HashiCorp-adjacent) generalises the pattern to many languages. uv, again, folds the function into itself: <code>uv python install 3.12</code> downloads the interpreter; <code>uv venv --python 3.12</code> uses it; the <code>.python-version</code> file is honoured automatically.</p>
+
+  <pre><code class="language-bash">echo "3.12.4" &gt; .python-version
+uv python install 3.12.4
+uv venv
+uv sync
+</code></pre>
+
+  <p>The convention this course recommends is: commit a <code>.python-version</code> file, install the interpreter through uv (or pyenv for older toolchains), and let the venv be created automatically. The interpreter version then travels with the project; no one has to be told it.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    The most common cause of a "works on my machine" Python bug is the interpreter version, not the package versions. A library may rely on a syntax (the walrus operator, structural pattern matching, the new type-statement syntax) that was added in a particular Python version; running on an older interpreter produces a syntax error. The fix is to commit <code>.python-version</code> and to add <code>requires-python = "&gt;=3.12"</code> to <code>pyproject.toml</code>, so a user with the wrong interpreter is told before they install.
+  </div>
+
+  <h3>Worked example: setting up a fresh credit-risk modelling project</h3>
+
+  <div class="worked">
+    <strong>Worked example: bootstrapping <code>credit-risk-models/</code> from zero</strong>
+    <p>The task is to set up a new repository for the team's PD / LGD / EAD models. The contract is: anyone in the team should be able to clone, run one command, and have a working environment.</p>
+    <p>Step 1 (skeleton). Create the directory, run <code>git init</code>, add a <code>.gitignore</code> that excludes <code>.venv/</code>, <code>__pycache__/</code>, <code>*.pyc</code>, and any data files.</p>
+    <p>Step 2 (Python). Decide on Python 3.12. Write <code>3.12.4</code> into <code>.python-version</code>. Run <code>uv python install 3.12.4</code>.</p>
+    <p>Step 3 (pyproject). Run <code>uv init --package credit-risk-models</code>. The command scaffolds a <code>pyproject.toml</code>, a <code>src/credit_risk_models/__init__.py</code>, and a stub <code>README.md</code>. Edit the TOML to add the production dependencies (pandas, numpy, scikit-learn, statsmodels, pyarrow, pydantic) and the dev group (pytest, ruff, mypy, pre-commit).</p>
+    <p>Step 4 (lock and install). <code>uv sync</code>. The command resolves the dependency graph, creates <code>.venv/</code>, installs every package, and writes <code>uv.lock</code>. Commit the lockfile.</p>
+    <p>Step 5 (pre-commit). Write the <code>.pre-commit-config.yaml</code> shown above. Run <code>uv run pre-commit install</code>. From now on, every commit runs ruff, mypy, and nbstripout before it lands.</p>
+    <p>Step 6 (CI). Add a minimal GitHub Actions workflow that runs <code>uv sync</code> then <code>uv run pytest</code> on every push. Lecture 14 covers this in depth.</p>
+    <p>Step 7 (README). Add a one-paragraph "to run, install uv (<code>curl -LsSf https://astral.sh/uv/install.sh | sh</code>) and run <code>uv sync &amp;&amp; uv run pytest</code>". That is the entire onboarding instruction.</p>
+    <p>The project is now reproducible, lintable, type-checked, and CI-tested. A new joiner clones, runs two commands, and is productive. The whole bootstrap takes about twenty minutes.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A Python project is a contract recorded in four files: <code>pyproject.toml</code>, the lockfile, <code>.python-version</code>, and <code>.pre-commit-config.yaml</code>. Together they describe the interpreter, the dependencies, and the dev-loop tooling. The choice of front-end (pip-tools, poetry, pdm, or uv) determines speed and ergonomics but not the file format, which is the same in every case. The pattern that wins in 2025 is uv with ruff and mypy, with pre-commit enforcing the hooks. The pattern that loses is "we have a <code>requirements.txt</code> and nobody knows whose Python that uses".</p>
+
+  <p>The deeper point is that "set-up" is not a one-off task at the start of a project; it is a continuous concern. Dependencies are bumped, the interpreter is updated, the linter adds new rules, and the lockfile is regenerated each time. Treating <code>pyproject.toml</code> as a living document, reviewed in pull requests like any other code, is the discipline that keeps a project habitable five years in. The next lecture turns to the version control system that makes those reviews possible: git, and the mental model that lets you use it without fear.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What is the difference between a declared dependency and a resolved dependency? Which file holds each?</li>
+      <li>State the four sections of a complete <code>pyproject.toml</code>. What does each one configure?</li>
+      <li>Compare pip-tools, poetry, pdm, and uv on three axes: speed, scope, and lockfile name.</li>
+      <li>Why is the lockfile committed to git but the venv is not?</li>
+      <li>What does <code>pandas~=2.2</code> resolve to, and how does that differ from <code>pandas&gt;=2.2</code> and <code>pandas==2.2.1</code>?</li>
+      <li>Name three pre-commit hooks you would put on a credit-risk modelling project, and what each catches.</li>
+      <li>You join a team whose project uses <code>requirements.txt</code> with unpinned versions. Describe the three steps you would take to make the install reproducible.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="11-jupyter_and_reproducibility.html">Lecture 11 (Jupyter notebooks and reproducibility)</a> identified environment drift as one of three failure modes; this lecture closes that failure mode.</li>
+      <li><strong>Next:</strong> <a href="13-git.html">Lecture 13 (version control with git)</a> covers the system that tracks every change to the four-file contract.</li>
+      <li><strong>Cross-link:</strong> <a href="02-style_and_idiom.html">Lecture 2 (style and idiom)</a> introduced ruff and the formatter discipline that pre-commit now enforces automatically.</li>
+      <li><strong>Cross-link:</strong> <a href="15-ci_cd.html">Lecture 15 (continuous integration and delivery)</a> runs the same checks on the CI server that pre-commit runs locally.</li>
+      <li><strong>Outside this course:</strong> PEP 517, 518, 621, and 660 (the four PEPs that define modern Python packaging); uv documentation (docs.astral.sh/uv); poetry documentation (python-poetry.org); pdm documentation (pdm-project.org); pre-commit documentation (pre-commit.com); Tom Preston-Werner, "Semantic Versioning 2.0" (semver.org); Sonatype, "State of the Software Supply Chain 2024".</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 12 of 16</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

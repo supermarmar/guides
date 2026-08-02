@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 50: GANs and diffusion models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Generative modelling</a></div>
+  <h1>GANs and diffusion models</h1>
+  <p class="subtitle">The variational autoencoder solved the intractable-density problem by optimising a tractable lower bound. This lecture develops two architectures that abandon a likelihood-based objective altogether. The generative adversarial network verifies sample quality by pitting two networks against each other; the diffusion model verifies it by learning to reverse a fixed, gradual corruption process step by step. Both currently produce sharper samples than a comparably sized VAE, at the cost of harder, less stable training.</p>
+  <div class="meta">
+    <span>Lecture 50 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part VIII: generative AI and language models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>generative adversarial network (GAN)</strong> trains two networks in competition: a <strong>generator</strong> $G$ that maps random noise $z$ to a synthetic sample $G(z)$, and a <strong>discriminator</strong> $D$ that tries to distinguish real samples from generated ones. Both are trained simultaneously against the <strong>minimax value function</strong> $\min_G \max_D \; \mathbb{E}_{X \sim p_{\text{data}}}[\log D(X)] + \mathbb{E}_{z \sim p_z}[\log(1 - D(G(z)))]$, with $D$ trying to maximise its ability to tell real from fake and $G$ trying to minimise it, a genuine two-player game rather than the optimisation of any single, jointly agreed objective. A <strong>diffusion model</strong> takes a different route entirely: a fixed <strong>forward process</strong> gradually adds Gaussian noise to a real observation over many steps until it becomes pure noise, and a network is trained to reverse this process one small step at a time, learning to predict (and remove) the noise added at each step; generation runs the learned reverse process starting from pure noise. Both methods share the same goal as the VAE, producing realistic samples from a learned approximation to the data distribution, but neither one ever computes an explicit density.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A GAN is a forger and an art detective locked in an ongoing contest: the forger studies genuine paintings and tries to produce fakes convincing enough to fool the detective, the detective studies both genuine and forged paintings and tries to get better at spotting the fakes, and each side's improvement forces the other to improve in turn, with a good forger eventually emerging from the contest even though neither side was ever told directly what "a good painting" looks like. A diffusion model works more like restoring a photograph that has been slowly, deliberately smudged into pure static over many steps: a restorer practises undoing one small amount of smudging at a time on real photographs, gets very good at each small individual undo step, and, once trained, can start from pure static and repeatedly apply the same small undo step to conjure up a brand new, coherent photograph that was never smudged from anything real in the first place.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Together with the previous lecture's VAE, this lecture completes the three dominant answers to the intractable-density problem that opened this sub-module: a tractable bound (VAE), an adversarial game (GAN), and an iterative denoising process (diffusion). Diffusion models are, as of this course's writing, the dominant architecture behind the most capable image and audio generation systems in production use, making this lecture's content directly relevant beyond the actuarial applications developed in this course's closing sub-module.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this lecture's two architectures earn a place alongside the VAE rather than being a redundant alternative route to the same destination.</p>
+
+  <p>First, <strong>sample sharpness is a genuine, measurable difference, not a matter of taste</strong>: the VAE's Gaussian-likelihood decoder structurally rewards averaged, slightly blurred reconstructions (developed in the previous lecture's pitfalls), while neither the GAN's adversarial loss nor the diffusion model's denoising objective carries that particular averaging bias, which is why both routinely produce sharper, more realistic samples at comparable model scale.</p>
+
+  <p>Second, <strong>the discriminator half of a GAN is, on its own, a genuinely useful actuarial tool independent of the generator</strong>: a network trained to distinguish real observations from synthetic or counterfactual ones is directly repurposable as an indirect-discrimination detector (does a pricing decision correlate with a protected characteristic even after that characteristic is formally excluded), a use developed further in the actuarial-applications sub-module.</p>
+
+  <p>Third, <strong>diffusion models offer a genuinely different reliability profile from GANs</strong>: GAN training is well known to be unstable and prone to specific, diagnosable failure modes (developed below), while diffusion models, despite requiring many more sampling steps and therefore more compute at generation time, train considerably more stably and are now the more common default choice in new work for that reason.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team building a synthetic-claims-narrative generator for training a downstream text-classification model first tried a GAN-based text generator. Training repeatedly produced a generator that settled on a small handful of near-identical claims narratives regardless of the input noise, a failure the team initially misdiagnosed as a data-quality problem in the real claims corpus. Instrumenting the discriminator's loss over training revealed the actual cause: the discriminator had become too good, too early, driving the generator's gradient toward the vanishing-gradient regime described below, so the generator had stopped receiving any useful training signal to diversify its outputs, exactly the mode-collapse failure this lecture develops rather than a fault in the underlying data.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: the GAN as a two-sided tug of war between generator and discriminator, and the diffusion model as a one-way staircase of small, learnable denoising steps run in reverse from pure noise back to a coherent sample.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GAN as a two-player game and diffusion as a reversed staircase of denoising steps">
+      <defs>
+        <marker id="gdArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">GAN: a two-player game &nbsp;|&nbsp; Diffusion: a reversed staircase</text>
+
+      <rect x="30" y="50" width="390" height="260" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="225" y="75" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">GAN</text>
+      <circle cx="130" cy="150" r="34" fill="#fed7aa"/>
+      <text x="130" y="145" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">Generator</text>
+      <text x="130" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">$z \to G(z)$</text>
+      <circle cx="320" cy="150" r="34" fill="#fdba74"/>
+      <text x="320" y="145" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7c2d12">Discriminator</text>
+      <text x="320" y="160" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c2d12">real or fake?</text>
+      <path d="M 165 140 Q 225 110 285 140" stroke="#b45309" stroke-width="2" fill="none" marker-end="url(#gdArrow)"/>
+      <text x="225" y="105" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">fools</text>
+      <path d="M 285 165 Q 225 200 165 165" stroke="#b45309" stroke-width="2" fill="none" marker-end="url(#gdArrow)"/>
+      <text x="225" y="205" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">catches</text>
+      <text x="225" y="240" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">$\min_G \max_D$ minimax game</text>
+      <text x="225" y="260" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">no single joint objective</text>
+      <text x="225" y="280" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">throughout training</text>
+
+      <rect x="440" y="50" width="410" height="260" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="645" y="75" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">Diffusion</text>
+      <circle cx="480" cy="150" r="16" fill="#4c1d95"/>
+      <circle cx="560" cy="150" r="16" fill="#6d28d9" opacity="0.8"/>
+      <circle cx="640" cy="150" r="16" fill="#8b5cf6" opacity="0.6"/>
+      <circle cx="720" cy="150" r="16" fill="#c4b5fd" opacity="0.5"/>
+      <circle cx="800" cy="150" r="16" fill="#ede9fe" stroke="#c4b5fd"/>
+      <path d="M 500 150 L 540 150 M 580 150 L 620 150 M 660 150 L 700 150 M 740 150 L 780 150" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#gdArrow)"/>
+      <text x="640" y="180" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">forward process: add noise, fixed, not learned</text>
+      <path d="M 800 210 L 480 210" stroke="#5b21b6" stroke-width="2" marker-end="url(#gdArrow)"/>
+      <text x="640" y="230" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">reverse process: remove noise, learned by the network</text>
+      <text x="640" y="260" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">generation runs the reverse process</text>
+      <text x="640" y="278" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">starting from pure noise (rightmost circle)</text>
+    </svg>
+    <figcaption>The GAN's generator and discriminator improve each other through direct competition, with no single objective either side is jointly optimising at any instant. The diffusion model's forward process (left to right, fixed and not learned) gradually destroys structure; the network learns only the reverse process (right to left), and generation runs that learned reverse process starting from pure noise.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>A GAN never computes a density; it only ever computes "does this look real".</strong> Every property of GAN-generated samples has to be understood through that single, narrow lens. <strong>A diffusion model only ever has to learn one small, local step, applied many times.</strong> This is precisely why diffusion training is comparatively stable, each individual step is a much easier learning problem than modelling the whole distribution in one shot, at the cost of needing many sequential steps at generation time.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The GAN minimax game</h3>
+
+  <p>Restating the objective from the 30-second version,</p>
+  $$\min_G \max_D V(D, G) = \mathbb{E}_{X \sim p_{\text{data}}}\big[\log D(X)\big] + \mathbb{E}_{z \sim p_z}\big[\log(1 - D(G(z)))\big].$$
+  <p>Training alternates gradient steps: hold $G$ fixed and update $D$ to increase $V$ (get better at distinguishing real from fake), then hold $D$ fixed and update $G$ to decrease $V$ (get better at fooling the current discriminator). At the theoretical optimum, $D$ cannot do better than random guessing on either class, and $G$'s output distribution exactly matches $p_{\text{data}}$; in practice, this equilibrium is rarely reached exactly, and most of what makes GAN training difficult is the gap between this clean theoretical picture and the messy, non-convex reality of training two networks simultaneously against each other.</p>
+
+  <h3>Vanishing gradients and mode collapse</h3>
+
+  <p>Two specific, well-documented failure modes recur across GAN training. <strong>Vanishing gradients</strong> occur when the discriminator becomes too accurate too early: if $D$ confidently classifies every generated sample as fake, the term $\log(1 - D(G(z)))$ saturates and its gradient with respect to $G$'s parameters shrinks toward zero, starving the generator of any useful signal to improve, exactly the mechanism behind the vignette's failure. <strong>Mode collapse</strong> occurs when the generator discovers a small number of outputs that reliably fool the current discriminator and collapses onto producing only those, rather than the full diversity of the true data distribution; because the generator's only feedback is whether it currently fools $D$, nothing in the basic objective directly penalises a lack of diversity across the full generated distribution.</p>
+
+  <h3>Wasserstein GAN</h3>
+
+  <p>The <strong>Wasserstein GAN (WGAN)</strong> replaces the original discriminator (a binary real-or-fake classifier) with a <strong>critic</strong> that instead estimates the Wasserstein (earth-mover's) distance between the real and generated distributions, a continuous, generally better-behaved quantity than the original objective's log-probabilities. The critic's gradient does not saturate in the same way the original discriminator's does, which directly addresses the vanishing-gradient failure mode above, at the cost of requiring the critic's function to satisfy a Lipschitz constraint (enforced in practice via weight clipping or a gradient penalty), an additional piece of training machinery the original formulation does not need.</p>
+
+  <h3>The diffusion forward process</h3>
+
+  <p>Fix a schedule of $T$ steps. The <strong>forward process</strong> is a fixed (not learned) Markov chain that gradually adds Gaussian noise to a real observation $X_0$,</p>
+  $$X_t = \sqrt{1 - \beta_t}\, X_{t-1} + \sqrt{\beta_t}\, \epsilon_t, \qquad \epsilon_t \sim \mathcal{N}(0, I),$$
+  <p>for a schedule of small noise variances $\beta_t$ increasing with $t$; after enough steps, $X_T$ is indistinguishable from pure Gaussian noise. Because this process is fixed and analytically simple, $X_t$ can in fact be sampled directly from $X_0$ in a single step, without simulating every intermediate $X_1, \ldots, X_{t-1}$, a computational convenience that makes training efficient.</p>
+
+  <h3>The reverse process and the denoising objective</h3>
+
+  <p>The <strong>reverse process</strong> is what the network actually learns: a model $p_\theta(X_{t-1} \mid X_t)$ that undoes one step of the forward corruption. In practice, rather than predicting $X_{t-1}$ directly, the network is trained to predict the noise $\epsilon_t$ that was added at step $t$, given the noised observation $X_t$ and the step index $t$; the training objective reduces to a simple mean-squared-error regression,</p>
+  $$\mathcal{L} = \mathbb{E}_{X_0, t, \epsilon}\left[\lVert \epsilon - \epsilon_\theta(X_t, t) \rVert^2\right],$$
+  <p>a substantially simpler and more stable objective than the GAN's adversarial game, because it is an ordinary supervised regression problem at every step, with a clearly defined, correct target. This denoising network is almost always a <strong>U-Net</strong>, a convolutional architecture with downsampling and upsampling paths connected by skip connections, chosen for its strong inductive bias toward image-like and other locally structured data.</p>
+
+  <h3>Sampling</h3>
+
+  <p>Generation starts from pure Gaussian noise $X_T \sim \mathcal{N}(0, I)$ and repeatedly applies the learned reverse step, $X_{t-1} = f_\theta(X_t, t)$, for $t = T, T-1, \ldots, 1$, arriving at a synthetic sample $X_0$. This is the direct source of diffusion models' main practical drawback relative to a GAN or VAE: generating a single sample requires many sequential network evaluations (historically hundreds to thousands, though modern accelerated samplers reduce this substantially), a materially higher generation-time cost than the GAN's or VAE's single forward pass.</p>
+
+  <h3>The score-based view</h3>
+
+  <p>An equivalent, widely used framing treats the denoising network as learning the <strong>score function</strong>, the gradient of the log-density $\nabla_X \log p(X)$, at each noise level; removing predicted noise at each reverse step is mathematically equivalent to taking a small step in the direction that increases the estimated log-density. This score-based perspective connects diffusion models directly back to classical score-matching methods in statistics and is the more general mathematical framework diffusion models are typically derived from in the underlying literature.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Letting the discriminator train faster than the generator</span>
+    An imbalanced training schedule, where the discriminator's parameters update far more frequently or with a far higher learning rate than the generator's, drives the vanishing-gradient failure mode directly; monitoring the discriminator's accuracy over training (it should hover well below near-perfect for most of training, not saturate early) is a standard, cheap diagnostic.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Mistaking mode collapse for a data-quality problem</span>
+    Developed directly in the vignette: a generator producing a suspiciously narrow range of outputs is a classic, specific GAN failure mode with well-known causes and mitigations (mini-batch discrimination, unrolled GANs, the Wasserstein reformulation), not necessarily evidence that the underlying real data is itself narrow or repetitive.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Ignoring diffusion's sampling cost when it is the wrong trade-off</span>
+    Diffusion's many-step sampling cost is a genuine engineering constraint, not a detail to be waved away; an application requiring low-latency, on-demand sample generation (real-time synthetic-data augmentation inside a live pipeline, for instance) may be a poor fit for a diffusion model even though its training stability and sample quality are attractive, and a GAN or VAE may be the better engineering trade-off despite their other weaknesses.</div>
+
+  <div class="callout warn">
+    <span class="tag">Treating GAN-discriminator output as a calibrated probability</span>
+    The discriminator's output is trained to distinguish real from fake within the specific adversarial game it was trained in, not to be a calibrated estimate of anything in the sense the calibration sub-module develops; repurposing a discriminator as a fairness or anomaly-detection score (a genuinely useful technique, flagged above) still requires its own dedicated calibration check before its output is treated as a meaningful probability.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A GAN trains a generator and discriminator against each other via a minimax game with no single jointly optimised objective, producing sharp samples at the cost of training instability, principally vanishing gradients when the discriminator overpowers the generator, and mode collapse when the generator settles on a narrow, repetitive set of outputs; the Wasserstein reformulation directly addresses the former. A diffusion model instead learns to reverse a fixed, gradual Gaussian noising process one small, simple denoising step at a time, an ordinary and stable regression objective at every step, at the cost of requiring many sequential steps to generate a single sample. Both architectures, together with the previous lecture's VAE, represent the three dominant, genuinely distinct engineering answers to the intractable-density problem this sub-module opened with.</p>
+
+  <p>The closing lecture of this sub-module turns to a fourth, architecturally distinct answer: the decoder transformer, which sidesteps the intractability problem entirely for sequential data by factorising the joint distribution exactly, one token at a time, via the causal-masked attention mechanism from the deep-learning sub-module. That architecture is the direct bridge into the next sub-module's large language models.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the GAN minimax value function, and explain what the generator and discriminator are each trying to do to it.</li>
+      <li>Explain the mechanism behind vanishing gradients in GAN training, and how the Wasserstein reformulation addresses it.</li>
+      <li>Define mode collapse, and explain why nothing in the basic GAN objective directly penalises it.</li>
+      <li>Describe the diffusion forward process and the reverse process, and state what quantity the network is actually trained to predict at each step.</li>
+      <li>Explain why diffusion training is comparatively more stable than GAN training, in terms of what each network's objective looks like at any single training step.</li>
+      <li>In the claims-narrative vignette, explain how the discriminator's loss curve revealed the true cause of the narrow, repetitive generator output.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 2 (<a href="02-variational_autoencoders.html">variational autoencoders</a>) developed the tractable-bound alternative to this lecture's two implicit-density approaches.</li>
+      <li><strong>Next:</strong> Lecture 4 (<a href="04-decoder_transformers.html">decoder transformers</a>) develops a fourth, exact-likelihood answer for sequential data.</li>
+      <li><strong>Built on:</strong> The deep-learning sub-module's <a href="../05_deep_learning/06-convolutional_networks.html">convolutional networks</a> lecture is the direct prerequisite for the diffusion model's U-Net denoising architecture.</li>
+      <li><strong>Outside this course:</strong> The actuarial-applications sub-module develops the discriminator-as-fairness-detector technique flagged in this lecture's "why this matters" section in full.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Generative modelling course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 50 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

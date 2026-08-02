@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: CLAUDE.md, the project constitution</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>CLAUDE.md: the project constitution and the drift problem</h1>
+  <p class="subtitle">An instruction file is the only artefact that speaks on every turn of every session, which makes it both the highest-leverage thing you can write and the easiest thing to ruin. The failure is not that people write bad rules. It is that they keep adding good ones until nothing is salient any more.</p>
+  <div class="meta">
+    <span>Lecture 5 of 22</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part II: steering the agent</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>CLAUDE.md</strong> is a markdown file the harness loads at the start of every session and re-sends on every turn. It exists to hold the facts an agent cannot infer from the code: the build command that is not in the README, the convention that differs from the language default, the decision the team made in March and never wrote down. It is delivered as a message after the system prompt rather than as part of it, which places it firmly on the advisory side of the line drawn in Lecture 3: the model reads it, weighs it, and usually complies. There is no enforcement.</p>
+
+  <p>Files load from four scopes, from broadest to most specific: an organisation's managed policy file, your user file at <code>~/.claude/CLAUDE.md</code>, the project's own <code>CLAUDE.md</code>, and a gitignored <code>CLAUDE.local.md</code> for personal notes. They are <em>concatenated rather than overridden</em>, which is the single most consequential fact about the system and the one people get wrong. Adding a project file does not replace your user file. It appends to it. Every scope you use is paid for on every turn, forever.</p>
+
+  <p>Which gives the discipline its shape. The documented target is under 200 lines per file, and the documented failure mode is stated plainly: bloated files cause Claude to ignore your actual instructions, because the important rules get lost in the noise. The test the documentation offers for each line is the right one and almost nobody applies it: <em>would removing this cause a mistake?</em> If not, cut it. An instruction file is not documentation, and treating it as documentation is how it dies.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Every line in an instruction file is rent, paid on every turn of every session in scope, in exchange for preventing a mistake. A line that prevents a mistake once a week is cheap. A line that describes something the agent could read from the code in one grep is a pure loss, twice over: you pay the tokens, and you dilute the lines that matter. The file is not a place to be thorough. It is a place to be selective.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Notice what kind of object this is. It is a configuration file whose semantics are "please", enforced by nothing, interpreted probabilistically, and degrading in effect as it grows. Software engineering has no other artefact quite like it, and the closest analogues are organisational rather than technical: a company handbook, a coding standard, a constitution. They fail the same way, for the same reason. Everyone can add a clause, nobody is responsible for removal, and past a certain length the document stops being read and starts being cited selectively. The engineering response and the organisational response turn out to be identical: give it an owner, review it, and delete more than you add.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that this is where unstated context goes to become stated. Lecture 1 named it as one of the four structural weaknesses: the agent knows what is in its window and nothing else, so every fact that lives only in your head is a fact it will contradict. Writing it down is the entire remedy, and the file is where it goes. A team that has never written one is re-explaining its conventions in every session, paying for it in tokens and in the corrections that follow.</p>
+
+  <p>The second reason is that the file compounds in both directions. Written well, it gets better with age: each entry is a mistake that will not happen again, and the value accrues to everyone who clones the repository. Written badly, it decays with age in a way that is almost invisible, because the symptom of a bloated file is not an error message. It is the agent quietly ignoring the rule you care about while obeying eleven you had forgotten writing. You will diagnose that as the model being unreliable, and you will be wrong.</p>
+
+  <p>The third reason is scope hygiene, which is subtle and expensive to get wrong. Because scopes concatenate, a personal preference written into a user-level file applies to every project on the machine, including the ones where it makes no sense. A convention that belongs to one language ends up loaded during sessions in another. Nobody notices, because there is no error, just a slow accumulation of irrelevant instruction that crowds out the relevant kind. The worked example at the end of this lecture is exactly this failure, measured.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>Four scopes, concatenated</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Scope</th><th>Location</th><th>Applies to</th><th>Shared via</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Managed policy</td><td>System location, deployed by IT</td><td>Everyone on the machine</td><td>MDM or group policy; cannot be excluded</td></tr>
+      <tr><td>User</td><td><code>~/.claude/CLAUDE.md</code></td><td>You, in every project</td><td>Nothing; it is yours</td></tr>
+      <tr><td>Project</td><td><code>./CLAUDE.md</code> or <code>./.claude/CLAUDE.md</code></td><td>Everyone who clones</td><td>git</td></tr>
+      <tr><td>Local</td><td><code>./CLAUDE.local.md</code></td><td>You, in this repository</td><td>Nothing; gitignore it</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Beyond the four scopes, the harness walks up the directory tree from where you started, loading every <code>CLAUDE.md</code> it passes, in order from the filesystem root down. Files in <em>subdirectories</em> behave differently and better: they load on demand, when the agent actually reads a file in that directory. That asymmetry is the lever. Instruction placed above you is always paid for; instruction placed below you is paid for only when it becomes relevant, which is the just-in-time principle from Lecture 2 appearing in the instruction layer.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="How instruction files load relative to the working directory">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Above you loads always. Below you loads on demand.</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <rect x="150" y="42" width="330" height="30" rx="7" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="315" y="62" text-anchor="middle" fill="#C76B2A">~/.claude/CLAUDE.md  +  ~/.claude/rules/*.md</text>
+        <text x="500" y="62" font-size="10.5" fill="#C76B2A">every turn, every project</text>
+
+        <rect x="150" y="82" width="330" height="30" rx="7" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="315" y="102" text-anchor="middle" fill="#C76B2A">repo/CLAUDE.md</text>
+        <text x="500" y="102" font-size="10.5" fill="#C76B2A">every turn in this repo</text>
+
+        <rect x="150" y="122" width="330" height="30" rx="7" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="315" y="142" text-anchor="middle" fill="#C76B2A">repo/docs/CLAUDE.md</text>
+        <text x="500" y="142" font-size="10.5" fill="#C76B2A">every turn from here down</text>
+
+        <rect x="150" y="160" width="330" height="26" rx="7" fill="#f4f4f5" stroke="#a1a1aa" stroke-width="2" stroke-dasharray="4,3"/>
+        <text x="315" y="177" text-anchor="middle" font-weight="600" fill="#3f3f46">you are here: repo/docs/lectures/</text>
+
+        <rect x="150" y="196" width="330" height="30" rx="7" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="315" y="216" text-anchor="middle" fill="#1E9D54">repo/docs/lectures/fundamentals/CLAUDE.md</text>
+        <text x="500" y="216" font-size="10.5" fill="#1E9D54">only when a file here is read</text>
+
+        <text x="60" y="100" font-size="11" font-style="italic" fill="#71717a">upfront</text>
+        <text x="60" y="216" font-size="11" font-style="italic" fill="#71717a">just in time</text>
+      </g>
+    </svg>
+    <figcaption>Only the bottom band is free until needed. Everything above the working directory is a permanent deduction from the context budget for the whole session, which is why the depth at which you launch a session quietly determines how much instruction you are carrying.</figcaption>
+  </figure>
+
+  <h3>What belongs, and what does not</h3>
+
+  <p>The documented include-and-exclude table is the sharpest guidance available on this, and it is worth reproducing in substance because the boundary it draws is not obvious.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Include</th><th>Exclude</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Commands the agent could not guess</td><td>Anything derivable by reading the code</td></tr>
+      <tr><td>Style rules that differ from the language default</td><td>Standard conventions the model already knows</td></tr>
+      <tr><td>The test runner and how to invoke it</td><td>Detailed API documentation; link instead</td></tr>
+      <tr><td>Repository etiquette: branch naming, PR conventions</td><td>Information that changes frequently</td></tr>
+      <tr><td>Architectural decisions specific to this project</td><td>Long explanations and tutorials</td></tr>
+      <tr><td>Environment quirks and required variables</td><td>File-by-file descriptions of the codebase</td></tr>
+      <tr><td>Non-obvious gotchas</td><td>Self-evident advice like "write clean code"</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The unifying principle across the exclude column is that each item is either <em>discoverable</em> or <em>inert</em>. Discoverable content, the directory layout, the dependency list, what a function does, can be retrieved with one tool call at the moment it matters, so paying for it on every turn is a bad trade. Inert content, "write clean code", "follow best practices", changes no decision the model would otherwise make and so buys nothing at all. The include column is the complement: things that are neither discoverable nor inert, which is a narrower set than most people's instinct suggests.</p>
+
+  <div class="defcard">
+    <strong>Instruction rent.</strong> The per-turn token cost of a line in an always-loaded file, multiplied by every turn of every session in that file's scope. The relevant question is never whether a line is true, but whether it earns its rent.
+  </div>
+
+  <div class="defcard">
+    <strong>Path-scoped rule.</strong> A file in <code>.claude/rules/</code> carrying a <code>paths:</code> frontmatter field with glob patterns. It loads only when the agent touches a matching file, converting a permanent cost into a conditional one. Rules without a <code>paths:</code> field load unconditionally, like a CLAUDE.md.
+  </div>
+
+  <div class="defcard">
+    <strong>Import.</strong> The <code>@path/to/file</code> syntax, which splices another file in at launch, up to four hops deep. It organises content across files. It does <em>not</em> reduce context, because imported files are loaded at launch exactly as if pasted in.
+  </div>
+
+  <h3>The three mechanisms, and the choice between them</h3>
+
+  <p>Three places can hold a piece of guidance, and choosing between them is the main design decision in this lecture.</p>
+
+  <p>A <strong>CLAUDE.md entry</strong> is always loaded and always advisory. Use it for facts that apply to every session in scope. A <strong>path-scoped rule</strong> is conditionally loaded and advisory. Use it when the guidance is real but only applies to part of the codebase, which is most style and testing guidance in any multi-language repository. A <strong>skill</strong> is loaded on demand, when invoked or judged relevant. Use it when the guidance is a procedure rather than a fact, and Lecture 8 develops this properly. Behind all three sits the fourth option: if the requirement must hold every time without exception, none of these is right, and it belongs in a <strong>hook</strong>, which Lecture 9 covers.</p>
+
+  <p>The decision rule is a sequence of three questions. Does this apply everywhere, always? Then CLAUDE.md. Does it apply only to certain files? Then a path-scoped rule. Is it a procedure you invoke rather than a fact you hold? Then a skill. And cutting across all of them: must it hold without exception? Then a hook, because everything above is a request.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Writing lines that actually land</h3>
+
+  <p>Three properties separate an instruction that changes behaviour from one that decorates the file.</p>
+
+  <p><strong>Specificity to the point of verifiability.</strong> "Use two-space indentation" beats "format code properly" because you can check compliance without judgement. The test is whether a disagreement about whether the rule was followed could be settled by looking. If it could not, the rule will not be followed consistently, because there is nothing consistent to follow.</p>
+
+  <p><strong>Freedom from contradiction.</strong> When two rules conflict, the documented behaviour is that the model may pick one arbitrarily, and arbitrary means you cannot predict which. Contradictions arrive by accumulation rather than by authorship: a user-level rule and a project-level rule, written months apart by different people for different reasons, that happen to disagree. This is the specific failure that periodic review exists to catch, and it is invisible until you go looking.</p>
+
+  <p><strong>Brevity that preserves salience.</strong> Emphasis markers such as "IMPORTANT" or "YOU MUST" do improve adherence, and they are worth using, but they are a currency that inflates. A file where six rules shout is a file where shouting has stopped meaning anything. Reserve emphasis for the two or three rules whose violation actually costs you something.</p>
+
+  <pre><code class="language-md"># Weak: unverifiable, inert, and derivable
+- Write good tests
+- Follow best practices for error handling
+- The src/ directory contains the source code
+
+# Strong: specific, non-obvious, and each prevents a real mistake
+- Run `pytest -m "not slow"` before pushing; the full suite needs a live DB
+- LGD models must never be fitted on the recovery-window subset; use `lgd_full`
+- Migrations are hand-written, never autogenerated (alembic revision --autogenerate
+  produces the wrong index order against our composite PKs)</code></pre>
+
+  <h3>Diagnosing a file that is not working</h3>
+
+  <p>Two symptoms have specific, documented causes, and knowing them saves an afternoon.</p>
+
+  <p>If the agent <em>keeps doing something you have a rule against</em>, the file is probably too long and the rule is getting lost. The instinct is to strengthen the rule; the correct move is to shorten the file. Adding capitals to a rule buried in line 180 of a 250-line file does very little, because the problem is position and density rather than phrasing.</p>
+
+  <p>If the agent <em>asks you something the file already answers</em>, the phrasing is ambiguous rather than the file being too long. Reread the rule as a stranger would and look for the reading you did not intend.</p>
+
+  <p>Before either diagnosis, confirm the file is actually loaded. Running <code>/context</code> lists the memory files that made it into the session, and a file in the wrong location produces exactly the symptoms above while being entirely absent. Check that first; it is the cheapest hypothesis to eliminate.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Splitting a long CLAUDE.md into several files with <code>@path</code> imports feels like a fix and is not one. Imported files are expanded and loaded at launch exactly as if their contents were pasted in, so the token cost is identical and the salience problem is untouched. You have improved how the content looks to a human editor and changed nothing about what the model sees. The mechanism that genuinely reduces context is the <code>paths:</code> frontmatter on a rules file, because it makes loading conditional. If your motivation is organisation, import; if your motivation is context, scope.
+  </div>
+
+  <h3>Worked example: the instruction stack loaded in this session</h3>
+
+  <div class="worked">
+    <strong>Worked example: 566 lines of always-on instruction, measured</strong>
+    <p>This session runs from <code>guides/docs/lectures/</code>. Counting every file above that directory that loads unconditionally: the user file <code>~/.claude/CLAUDE.md</code> at 109 lines; four rules files at 51, 35, 57, and 32 lines; the repository root <code>guides/CLAUDE.md</code> at 205 lines; and <code>guides/docs/CLAUDE.md</code> at 77. Total 566 lines, re-sent on every turn of every session started at or below this directory.</p>
+    <p><strong>What is genuinely good here.</strong> The content is specific and mostly verifiable. "Never American spelling", "no em or en dashes as punctuation", "stage files by name, not <code>git add -A</code>" are all rules you can check compliance against by looking, and each encodes a real preference the model would otherwise get wrong. The repository file's F107 coverage map earns its rent, for the reasons Lecture 2 set out. Someone has clearly been adding to this file every time a mistake happened, which is exactly the recommended habit.</p>
+    <p><strong>Where the rent is not being earned.</strong> None of the four rules files carries a <code>paths:</code> frontmatter field, so all four load unconditionally in every project on the machine. That means this session, which has written nothing but HTML, has been carrying 32 lines on pytest markers and <code>conftest.py</code> layout, and 35 lines on Google-style docstrings and Python type annotations, on every single turn. They are good rules. They are simply not rules about anything happening here. Adding <code>paths: ["**/*.py", "**/*.ts"]</code> to those two files removes 67 lines from every non-code session and loses nothing, because they reappear the moment a Python file is touched.</p>
+    <p><strong>The size problem.</strong> The documented target is under 200 lines per file. <code>guides/CLAUDE.md</code> is 205 on its own, and much of the overage is the folder tree: a forty-line ASCII diagram of a directory structure that the agent can list in one tool call and that goes stale the moment anyone adds a folder. That is the textbook case from the exclude column, discoverable and volatile at once. Cutting the tree to the half-dozen paths that are genuinely non-obvious would bring the file under target and make it more accurate rather than less.</p>
+    <p><strong>The duplication.</strong> Anti-sycophancy exists twice: as a 51-line always-loaded rule and as an on-demand skill. The split is deliberate and the rule file says so, pointing at the skill for worked examples. But the division is in the wrong place. The behaviour it wants, argue before agreeing, is only load-bearing when the user shares a decision or a piece of work, which is precisely the condition the skill's description already matches on. Two or three lines in the rule with the substance in the skill would cost forty fewer lines per turn at no loss.</p>
+    <p><strong>The general principle.</strong> Instruction files do not decay by containing wrong things. They decay by containing right things in a scope wider than the thing applies to. The audit is mechanical and takes ten minutes: for each block, ask which sessions it is true for, and if the answer is narrower than the file's scope, move it down or add a <code>paths:</code> field. Nobody schedules this, which is why almost every mature instruction stack is carrying a third more than it needs.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>CLAUDE.md holds what the agent cannot infer, on every turn, advisorily. Four scopes concatenate rather than override, ancestor files load in full while subdirectory files load on demand, and the practical target is under 200 lines per file. Include what is neither discoverable nor inert; exclude the rest. When guidance applies to only part of a codebase, a path-scoped rule converts permanent rent into conditional rent, which is the one mechanism that genuinely reduces context, since imports do not. And when a file stops working, the cause is usually length rather than phrasing, so the fix is deletion rather than emphasis.</p>
+
+  <p>The wider point is that this file is a shared artefact with no owner by default, which is the condition under which documents rot. Treating it like code, reviewing it, pruning it, testing whether a change actually shifted behaviour, is the whole of the discipline. The next lecture moves from the standing instruction to the individual request: what makes one prompt produce the change you wanted and another produce a plausible diff you have to read line by line to evaluate.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the four scopes. Do they override or concatenate, and what follows from the answer?</li>
+      <li>How do files above the working directory differ from files in subdirectories, and why does that difference matter for context?</li>
+      <li>Give the two-part test for whether a line belongs in the file. Apply it to "the <code>src/</code> directory contains the source code".</li>
+      <li>What does an <code>@path</code> import actually save, and what does it not save?</li>
+      <li>The agent keeps ignoring a rule you have written twice. What is the documented cause, and what is the wrong instinct?</li>
+      <li>Distinguish a CLAUDE.md entry, a path-scoped rule, a skill, and a hook. Give the question that selects each.</li>
+      <li>A rules file holds testing conventions for Python in a repository that is mostly documentation. What is wrong and what is the one-line fix?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="04-models_and_modes.html">Lecture 4 (models and effort)</a> dissected the routing table that lives in exactly this file.</li>
+      <li><strong>Next:</strong> Lecture 6 (prompting for code) turns from the standing instruction to the individual request.</li>
+      <li><strong>Cross-link:</strong> <a href="02-context_engineering.html">Lecture 2 (context engineering)</a> supplies the altitude test and the rent argument this lecture applies.</li>
+      <li><strong>Cross-link:</strong> <a href="03-the_harness.html">Lecture 3 (the harness)</a> drew the advisory-versus-enforced line that puts this file on the advisory side.</li>
+      <li><strong>Cross-link:</strong> Lecture 8 (skills) and Lecture 9 (hooks) cover the two mechanisms that should absorb what does not belong here.</li>
+      <li><strong>Outside this course:</strong> Anthropic, "How Claude remembers your project" and "Best practices for Claude Code", code.claude.com/docs (the source for scopes, load order, the 200-line target, path-scoped rules, and the include-exclude table).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 5 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 48: generative modelling overview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Generative modelling</a></div>
+  <h1>Generative modelling overview</h1>
+  <p class="subtitle">Every model built so far in this course, from the humble GLM to the deepest transformer, produces a single conditional expectation, or at most a conditional mean and variance under a chosen distributional family. A generative model asks for more: a full, sample-able approximation to a distribution the modeller cannot write down in closed form. This lecture makes the case that this is not an academic indulgence, and previews the two families of solution the next two lectures develop.</p>
+  <div class="meta">
+    <span>Lecture 48 of 62</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Part VIII: generative AI and language models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>generative model</strong> learns an approximation $\hat{p}(X)$ to the true data-generating distribution $p(X)$ itself, rather than a conditional relationship $p(Y \mid X)$ between covariates and a single response. Once trained, it can do two things a supervised or discriminative model cannot: assign a plausibility (a density or an unnormalised score) to any candidate observation, including one never seen in training, and draw fresh, synthetic samples that look as though they came from the same process as the real data. Two broad families dominate current practice. <strong>Latent-factor approaches</strong> (this sub-module's variational autoencoder) posit an unobserved, lower-dimensional latent variable $Z$ that explains the observed data via a tractable generative process $p(X \mid Z)$, and approximate the otherwise-intractable posterior over $Z$. <strong>Implicit-density approaches</strong> (generative adversarial networks, diffusion models, and the autoregressive decoder transformer, all in the next two lectures) never write down $p(X)$ explicitly at all; they instead learn a procedure that produces samples with the right distribution, verified indirectly (an adversarial discriminator, a denoising objective, or a token-by-token likelihood).</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine two students preparing for the same exam. The first, a discriminative learner, only ever practises answering "given this exact question, what is the correct answer", and gets very good at that narrow task, but could not write a plausible new question of the same style if asked to. The second, a generative learner, has internalised something deeper about the whole subject, the range of questions, their typical structure and difficulty, and can both judge how plausible a brand-new question looks and write a fresh one indistinguishable in style from the real exam. Every model up to this point in the course is the first student; this sub-module is about building the second.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Every stage of the ML pipeline map (feature engineering, train/test split, three modelling families, evaluation, interpretation, calibration) has assumed the goal is a single predicted value or distribution parameter conditional on covariates. This sub-module, and the reinforcement-learning sub-module that follows it later in the course, are the two genuine departures from that assumption: generative models learn the joint or marginal distribution of the data itself, and reinforcement learning abandons the forecasting paradigm altogether in favour of an agent that changes the process it acts on.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Four concrete uses justify the extra machinery, each a genuine actuarial or credit-risk workflow rather than a hypothetical.</p>
+
+  <p>First, <strong>reserving and capital work is fundamentally about a distribution, not a point estimate</strong>: a Solvency II or economic-capital calculation needs the full distribution of aggregate claims or losses, including its tail, and a generative model of claim severities or a full reserving triangle is a direct, more flexible extension of the parametric loss-distribution and copula machinery already covered in the risk-modelling course.</p>
+
+  <p>Second, <strong>synthetic data generation solves a genuine data-scarcity and privacy problem</strong>: a generative model trained on a real but sensitive portfolio (telematics traces, individual claims narratives) can produce synthetic records that preserve the statistical structure analysts need for model development without exposing any real policyholder's data, a materially different privacy posture from simple anonymisation, which can still be re-identified via linkage attacks.</p>
+
+  <p>Third, <strong>anomaly and fraud detection is naturally a density-estimation problem</strong>: once a generative model has learned $\hat{p}(X)$ over ordinary claims behaviour, an observation with very low estimated density is, by construction, an outlier worth investigating, a more principled foundation than the ad hoc distance-based outlier rules the unsupervised-learning sub-module's DBSCAN lecture develops.</p>
+
+  <p>Fourth, <strong>fairness auditing benefits from a generative counterfactual</strong>: a GAN-style discriminator trained to detect whether a decision could have depended on a protected characteristic is a direct, adversarial way of testing indirect discrimination, developed further in the actuarial-applications sub-module.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A model development team needed a large, representative synthetic portfolio to stress-test a new pricing engine before the real book of business had grown large enough to support robust back-testing. An early attempt used simple univariate bootstrap resampling of each feature independently, which preserved each feature's own marginal distribution but destroyed every genuine correlation between features (age, vehicle value, and claims history no longer moved together the way they did in the real book), producing synthetic policies that were individually plausible but collectively nonsensical (a teenager with a vintage sports car and a decade of clean claims history). Retraining a variational autoencoder on the real portfolio and sampling from its learned latent space preserved the joint structure directly, because the decoder had learned to reconstruct correlated feature combinations rather than independent marginals, and the resulting synthetic portfolio passed the same correlation diagnostics the real book did.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a discriminative model as a narrow arrow from input to output, and a generative model as a full cloud of probability mass over the entire data space, from which the discriminative arrow could in principle be recovered as one conditional slice, but the reverse is not true.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Discriminative models learn a conditional arrow; generative models learn the full joint distribution">
+      <defs>
+        <marker id="genArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Discriminative arrow versus generative cloud</text>
+
+      <rect x="40" y="60" width="360" height="200" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="220" y="85" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">DISCRIMINATIVE: $\hat{p}(Y \mid X)$</text>
+      <circle cx="110" cy="180" r="10" fill="#b45309"/>
+      <text x="110" y="184" text-anchor="middle" font-family="Inter" font-size="9" fill="#ffffff" font-weight="700">X</text>
+      <path d="M 125 180 L 300 180" stroke="#b45309" stroke-width="2.5" marker-end="url(#genArrow)"/>
+      <circle cx="320" cy="180" r="10" fill="#f59e0b"/>
+      <text x="320" y="184" text-anchor="middle" font-family="Inter" font-size="9" fill="#ffffff" font-weight="700">Y</text>
+      <text x="220" y="225" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">one narrow, learned arrow;</text>
+      <text x="220" y="240" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">cannot generate new X</text>
+
+      <rect x="460" y="60" width="360" height="200" rx="12" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="640" y="85" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#5b21b6">GENERATIVE: $\hat{p}(X)$, full cloud</text>
+      <g fill="#7c3aed" opacity="0.75">
+        <circle cx="560" cy="140" r="5"/><circle cx="590" cy="160" r="5"/><circle cx="610" cy="130" r="5"/>
+        <circle cx="640" cy="175" r="5"/><circle cx="670" cy="145" r="5"/><circle cx="700" cy="170" r="5"/>
+        <circle cx="580" cy="200" r="5"/><circle cx="620" cy="210" r="5"/><circle cx="660" cy="205" r="5"/>
+        <circle cx="720" cy="150" r="5"/><circle cx="750" cy="185" r="5"/><circle cx="540" cy="175" r="5"/>
+      </g>
+      <ellipse cx="645" cy="175" rx="120" ry="55" fill="none" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3 2"/>
+      <text x="640" y="240" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">a density over the whole space;</text>
+      <text x="640" y="253" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">sample fresh points, score any point</text>
+    </svg>
+    <figcaption>A discriminative model draws one arrow from a fixed input to a predicted output; it has no notion of how plausible any given input is, or how to generate a new one. A generative model instead learns the shape of the whole cloud, allowing it to score how plausible any point in the space is (density) or draw a fresh point from the cloud (sampling), at a substantially higher modelling cost.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Predicting $Y$ given $X$ is a much narrower task than modelling $X$ itself.</strong> Every generative model in this sub-module pays a real computational and conceptual price for this extra ambition. <strong>A tractable exact answer rarely exists, so every method here is an engineered approximation.</strong> The VAE approximates via a variational bound, the GAN via an adversarial game, diffusion via an iterative denoising process, and the decoder transformer via an exact but sequential factorisation; recognising which approximation a given tool makes is the key to knowing its failure modes.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Why the exact distribution is intractable</h3>
+
+  <p>For any data of realistic dimensionality (an image, a claims-development triangle, a portfolio of correlated policy features), the true density $p(X)$ cannot be written down or normalised directly: doing so would require integrating over every possible configuration of every feature simultaneously, a computation that grows exponentially with dimension. Every generative architecture in this sub-module is best understood as a specific engineering answer to this one intractability, not as an arbitrary collection of unrelated tricks.</p>
+
+  <h3>Latent-factor approaches</h3>
+
+  <p>A latent-factor model posits an unobserved variable $Z$, typically of much lower dimension than $X$, together with a simple prior $p(Z)$ (commonly a standard Gaussian) and a tractable conditional generative process $p_\theta(X \mid Z)$ (a neural network mapping $Z$ to a distribution over $X$). The marginal $p_\theta(X) = \int p_\theta(X \mid Z) p(Z)\, dZ$ is still intractable to compute exactly, but the structure lets a workable approximation be built (the variational autoencoder's ELBO, developed fully in the next lecture) by simultaneously learning an approximate posterior $q_\phi(Z \mid X)$. The reward for this structure is a genuinely interpretable, continuous latent space that can be sampled from directly and, often, interpolated within meaningfully.</p>
+
+  <h3>Implicit-density approaches</h3>
+
+  <p>An implicit-density model gives up on ever writing down $p_\theta(X)$ or a tractable latent space at all. A <strong>generative adversarial network</strong> learns a generator function purely by playing a game against a discriminator that tries to distinguish real from generated samples; the generator never computes a density, it only produces samples. A <strong>diffusion model</strong> learns to reverse a fixed, gradual noising process step by step; again, no explicit density is ever written down, only a sequence of denoising steps. An <strong>autoregressive decoder transformer</strong> is the partial exception: it factorises $p(X)$ exactly, without any approximation, as a product of conditional probabilities over a sequence of tokens, at the cost of requiring the data to be expressed as an ordered sequence and generated one token at a time.</p>
+
+  <h3>The state-space and time-series parallel</h3>
+
+  <p>Actuaries already have a conceptual foothold here from the statistics track's time-series lecture. A state-space model (the hidden Markov chain underlying an ARMA or GARCH process) posits an unobserved latent state evolving over time, with observed data generated conditionally on that state, exactly the latent-factor structure above, just applied to a temporal rather than a static setting; the Kalman filter's forward-backward recursion is, in spirit, doing the same job the VAE's encoder does, inferring a plausible latent state from observed data. Recognising this parallel is often the fastest route to genuine intuition about what a VAE's encoder and decoder are actually doing, rather than treating them as an unfamiliar deep-learning black box.</p>
+
+  <h3>What a generative model is graded on</h3>
+
+  <p>Unlike a supervised model, there is no single response variable to compute a hold-out loss against, so evaluation is necessarily indirect: log-likelihood on held-out data (where tractable, as in the decoder transformer), sample quality judged by a downstream discriminator or a domain expert, and, for actuarial applications specifically, whether summary statistics of the generated samples (means, correlations, tail behaviour) match the real data on hold-out diagnostics the modeller did not train against. This last check, a direct analogue of the actual-versus-predicted diagnostics from the calibration sub-module, is the standard the vignette's synthetic-portfolio exercise was ultimately held to.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Treating "generative" as synonymous with "better"</span>
+    A full generative model is a materially larger engineering and validation undertaking than a discriminative model built for the identical narrow prediction task; reaching for a VAE or GAN when the actual requirement is a single conditional prediction is solving a harder problem than the one that was asked, at real cost in training time, validation burden, and interpretability.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming independent feature-wise resampling is a generative model</span>
+    The vignette's failed first attempt, bootstrapping each feature independently, is not a generative model in the sense this sub-module develops; it explicitly destroys the joint dependence structure between features, which is usually the entire point of building a synthetic portfolio in the first place.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Expecting an exact density from every architecture</span>
+    Only the decoder transformer in this sub-module computes an exact likelihood; the VAE optimises a lower bound on the log-likelihood, not the log-likelihood itself, and the GAN and diffusion model never compute a likelihood at all. Comparing a "likelihood" reported by one architecture directly against another's without checking what quantity each one actually reports is a common and avoidable error.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Skipping the hold-out diagnostic check</span>
+    Because there is no single hold-out loss to fall back on, it is tempting to judge a generative model purely by whether its samples look plausible on visual inspection; the correlation and tail-behaviour diagnostics the vignette applied are not optional polish, they are the closest available analogue to a genuine out-of-sample test for a model of this kind.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A generative model approximates the full distribution $p(X)$ of the data itself, rather than a conditional relationship between covariates and a single response, enabling both density scoring of any candidate observation and sampling of fresh, synthetic ones. The exact distribution is intractable for any realistically high-dimensional data, and every architecture in this sub-module is a distinct engineered approximation: latent-factor models (the VAE) posit a tractable lower-dimensional latent variable and approximate the posterior over it, while implicit-density models (GANs, diffusion, decoder transformers) never write down an explicit density at all, verifying quality indirectly instead. Reserving distributions, synthetic portfolios, anomaly detection, and fairness auditing are the four concrete actuarial uses that justify the extra machinery.</p>
+
+  <p>The next two lectures develop the two dominant families in full: the variational autoencoder's tractable ELBO bound, and the generative adversarial network and diffusion model's two competing implicit-density solutions. The sub-module then closes with the decoder transformer, the architecture that turns out, in the next sub-module, to be the engine behind every modern large language model.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the difference between what a discriminative model and a generative model each learn, in terms of $p(Y \mid X)$ versus $p(X)$.</li>
+      <li>Explain why the exact density $p(X)$ is intractable for realistically high-dimensional data.</li>
+      <li>Distinguish latent-factor from implicit-density generative approaches, and name one architecture in each category.</li>
+      <li>Explain the parallel between a state-space time-series model and a latent-factor generative model.</li>
+      <li>Name two of the four concrete actuarial or credit-risk uses for a generative model given in this lecture.</li>
+      <li>In the synthetic-portfolio vignette, explain precisely why independent feature-wise bootstrapping failed, and why the VAE's decoder avoided the identical failure.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 2 (<a href="02-variational_autoencoders.html">variational autoencoders</a>) develops the first concrete architecture, the ELBO and the reparameterisation trick.</li>
+      <li><strong>Built on:</strong> The <a href="../04_unsupervised_learning/03-autoencoders.html">autoencoder</a> lecture in the unsupervised-learning sub-module is the deterministic special case the VAE generalises into a genuinely probabilistic model.</li>
+      <li><strong>Built on:</strong> The statistics track's <a href="../../statistics/index.html">time series lecture</a> is the source of the state-space parallel developed above.</li>
+      <li><strong>Outside this course:</strong> The risk-modelling course's loss-distribution and copula machinery is the actuarial discipline's own long-standing answer to full-distribution modelling; this sub-module is a more flexible, data-driven complement to it, not a replacement.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Generative modelling course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 48 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

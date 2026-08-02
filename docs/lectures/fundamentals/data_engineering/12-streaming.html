@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 12: streaming and event-driven data</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Streaming and event-driven data</h1>
+  <p class="subtitle">A lorry arrives at midnight with the day's parcels and you know when you have them all. A conveyor belt never stops, so you can never say "that is all of them", only "that is all of them so far". Every hard problem in streaming is a consequence of losing the right to say the first sentence.</p>
+  <div class="meta">
+    <span>Lecture 12 of 20</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part III: ingestion</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Batch processing operates on a <strong>bounded</strong> dataset: it has an end, so a job can read all of it and finish. Streaming operates on an <strong>unbounded</strong> one: events keep arriving, so a job never finishes and every aggregate is provisional. That single difference generates the whole subject.</p>
+
+  <p>The dominant substrate is <strong>Apache Kafka</strong>, which is best understood not as a queue but as a distributed, replayable, append-only log. Producers append events to a <strong>topic</strong>, which is split into <strong>partitions</strong>; each event gets an <strong>offset</strong>; consumers track their own position and can rewind. Because the log is retained rather than consumed away, several independent consumers can read the same events at different speeds, and a consumer with a bug can be fixed and replayed. <strong>Apache Flink</strong> is the mature engine for computing over such a log with state, and Spark Structured Streaming is the common alternative if you already run Spark.</p>
+
+  <p>The honest position for a bank's risk function: most of what you do does not need streaming. Monthly capital and impairment reporting is batch by nature, and a stream that feeds a monthly report adds machinery without adding value. Streaming earns its complexity where a decision must be made in seconds, which in a bank means payment fraud screening, sanctions and transaction monitoring, intraday liquidity, market risk limit monitoring, and real-time credit decisioning. It also arrives whether you asked for it or not, because change data capture from Lecture 10 is a stream even when the consumer is a nightly batch.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Midnight lorry against a conveyor belt. With the lorry, you count the parcels, reconcile against the manifest, and go home; the day is closed. With the belt, a parcel posted on Tuesday can arrive on Thursday, so "Tuesday's total" is a number you must publish before you can be sure of it, then revise. Do you wait longer for completeness, or publish sooner and correct? There is no right answer, only a stated policy. That policy is called a watermark, and choosing it is the central design decision in stream processing.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">The stream is not the book of record</span>
+    A pattern that works and one that fails. Works: the stream drives alerting and intraday decisions, while the nightly batch remains the authoritative source for reported figures, and the two are reconciled daily. Fails: the stream becomes the source of the reported number, at which point every late event, every replay, and every offset reset is a restatement of a published figure, and reproducing last March's report requires reconstructing the exact state of a streaming job. Unless you have a strong reason and strong engineering, let the stream be fast and let the batch be right.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>Event time and processing time are different, and confusing them corrupts every window.</strong> A card transaction occurs at 23:58 and reaches your consumer at 00:03. Grouped by the time it arrived, it lands in the wrong day. Grouped by the time it happened, it lands correctly but only if the job waited long enough to receive it. Any aggregation over a stream must state which clock it uses, and for anything with a reporting or regulatory meaning the answer is event time, which then forces the lateness question.</p>
+
+  <p><strong>Ordering is only guaranteed within a partition, which makes the partition key a correctness decision.</strong> Kafka orders events within one partition and makes no promise across partitions. If the events for one account can land in different partitions, a consumer may see a balance update before the account creation that precedes it. Keying by account identifier puts all of an account's events in one partition and restores per-account ordering. That single choice is the difference between a consumer that can maintain state correctly and one that cannot.</p>
+
+  <p><strong>Replay is the feature that justifies the log.</strong> Because Kafka retains events rather than deleting them on consumption, a consumer with a defect can be corrected, its offsets reset, and the history reprocessed. That converts a class of incident from "the data is gone" to "rerun it", which is the same property that made idempotent batch loads valuable in Lecture 06. It is also why the retention setting is an architectural decision rather than a housekeeping one: retention shorter than your worst plausible outage is a data loss policy.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A Kafka topic as a partitioned append-only log">
+      <defs>
+        <marker id="ar-str" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A topic is a partitioned, append-only, replayable log</text>
+
+      <!-- producers -->
+      <rect x="30" y="42" width="110" height="76" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="85" y="64" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">PRODUCERS</text>
+      <text x="85" y="82" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#b45309">payment switch,</text>
+      <text x="85" y="94" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#b45309">core banking CDC,</text>
+      <text x="85" y="106" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#b45309">app events</text>
+
+      <!-- partitions -->
+      <text x="380" y="42" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">topic: payments  (key = account_id, so one account is always one partition)</text>
+
+      <g font-family="JetBrains Mono" font-size="8.5">
+        <text x="168" y="64" font-family="Inter" font-size="9" fill="#5b21b6">P0</text>
+        <rect x="186" y="52" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="196" y="65" fill="#5b21b6">off 0</text>
+        <rect x="228" y="52" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="238" y="65" fill="#5b21b6">off 1</text>
+        <rect x="270" y="52" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="280" y="65" fill="#5b21b6">off 2</text>
+        <rect x="312" y="52" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="322" y="65" fill="#5b21b6">off 3</text>
+        <rect x="354" y="52" width="42" height="18" fill="#EDE9FE" stroke="#7c3aed" stroke-dasharray="3 2"/><text x="364" y="65" fill="#7c3aed">off 4</text>
+
+        <text x="168" y="94" font-family="Inter" font-size="9" fill="#5b21b6">P1</text>
+        <rect x="186" y="82" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="196" y="95" fill="#5b21b6">off 0</text>
+        <rect x="228" y="82" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="238" y="95" fill="#5b21b6">off 1</text>
+        <rect x="270" y="82" width="42" height="18" fill="#EDE9FE" stroke="#7c3aed" stroke-dasharray="3 2"/><text x="280" y="95" fill="#7c3aed">off 2</text>
+
+        <text x="168" y="124" font-family="Inter" font-size="9" fill="#5b21b6">P2</text>
+        <rect x="186" y="112" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="196" y="125" fill="#5b21b6">off 0</text>
+        <rect x="228" y="112" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="238" y="125" fill="#5b21b6">off 1</text>
+        <rect x="270" y="112" width="42" height="18" fill="#F5F3FF" stroke="#7c3aed"/><text x="280" y="125" fill="#5b21b6">off 2</text>
+        <rect x="312" y="112" width="42" height="18" fill="#EDE9FE" stroke="#7c3aed" stroke-dasharray="3 2"/><text x="322" y="125" fill="#7c3aed">off 3</text>
+      </g>
+      <text x="420" y="142" font-family="Inter" font-size="8.5" font-style="italic" fill="#7c3aed">dashed = next append; nothing is ever overwritten</text>
+
+      <line x1="143" y1="80" x2="163" y2="80" stroke="#71717a" stroke-width="1.5" marker-end="url(#ar-str)"/>
+
+      <!-- consumers -->
+      <rect x="470" y="42" width="120" height="46" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="530" y="60" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#115e59">group: fraud</text>
+      <text x="530" y="76" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">at offset 3, 1, 3</text>
+
+      <rect x="610" y="42" width="120" height="46" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="670" y="60" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#115e59">group: liquidity</text>
+      <text x="670" y="76" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">at offset 1, 0, 2</text>
+
+      <rect x="470" y="100" width="260" height="42" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="600" y="118" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#115e59">group: lake_sink (writes to bronze)</text>
+      <text x="600" y="133" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0d9488">independent position; can be reset and replayed</text>
+
+      <line x1="400" y1="80" x2="464" y2="66" stroke="#71717a" stroke-width="1.2" marker-end="url(#ar-str)"/>
+      <line x1="400" y1="90" x2="604" y2="66" stroke="#71717a" stroke-width="1.2" marker-end="url(#ar-str)"/>
+      <line x1="400" y1="110" x2="464" y2="118" stroke="#71717a" stroke-width="1.2" marker-end="url(#ar-str)"/>
+
+      <!-- event time vs processing time -->
+      <rect x="30" y="170" width="700" height="120" rx="10" fill="#FEF3C7" stroke="#a16207" stroke-width="2"/>
+      <text x="380" y="192" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#713f12">EVENT TIME AGAINST PROCESSING TIME</text>
+      <line x1="80" y1="228" x2="680" y2="228" stroke="#a16207" stroke-width="1.5"/>
+      <text x="70" y="232" text-anchor="end" font-family="Inter" font-size="9" fill="#713f12">time</text>
+      <circle cx="200" cy="228" r="5" fill="#0d9488"/><text x="200" y="216" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#115e59">txn occurs 23:58</text>
+      <circle cx="340" cy="228" r="5" fill="#7c3aed"/><text x="340" y="216" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#5b21b6">arrives 00:03</text>
+      <circle cx="470" cy="228" r="5" fill="#b45309"/><text x="470" y="216" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#92400e">watermark passes 23:59</text>
+      <circle cx="600" cy="228" r="5" fill="#DC2855"/><text x="600" y="216" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#991b1b">late event 00:20</text>
+      <text x="380" y="254" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#713f12">Group by event time and the 23:58 transaction belongs to the previous day, provided you waited for it.</text>
+      <text x="380" y="270" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#713f12">The watermark declares how long you wait. Anything after it is late: drop it, route it aside, or restate.</text>
+      <text x="380" y="284" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#a16207">There is no setting that gives both completeness and low latency. Choose, and write the choice down.</text>
+    </svg>
+    <figcaption>A topic with three partitions and three independent consumer groups, plus the timeline that defines the lateness problem. Two properties do the real work: keying by account identifier guarantees per-account ordering, and retained offsets let each consumer group progress independently and rewind.</figcaption>
+  </figure>
+
+  <h3>Delivery semantics</h3>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Guarantee</th><th>Means</th><th>Cost</th><th>Use when</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>At most once</strong></td><td>Events may be lost, never duplicated</td><td>Cheapest</td><td>Metrics and telemetry where a gap is tolerable</td></tr>
+      <tr><td><strong>At least once</strong></td><td>Events may be duplicated, never lost</td><td>Cheap; requires idempotent consumers</td><td>The default for almost everything, paired with idempotent writes</td></tr>
+      <tr><td><strong>Exactly once</strong></td><td>Each event affects the result once</td><td>Transactional producers, checkpointed state, coordinated sinks</td><td>Financial state machines where duplication is materially wrong and idempotency is impractical</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The same resolution as Lecture 10 applies with more force here. Exactly-once processing is achievable within a closed system, Kafka transactions with Flink checkpoints being the standard construction, but it does not extend to arbitrary external sinks. The engineering that survives contact with reality is at-least-once delivery into an idempotent write, keyed on an event identifier, so a duplicate updates the same row rather than adding one.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Kafka, the parts you must know</h3>
+
+  <p>A <strong>broker</strong> is a server; a cluster is several. A <strong>topic</strong> is a named log, divided into <strong>partitions</strong> that are distributed across brokers and replicated for durability. The <strong>key</strong> of an event determines its partition, so all events with the same key are in one partition and therefore ordered. A <strong>consumer group</strong> is a set of consumers sharing the work of a topic: each partition is assigned to exactly one member, which is why the partition count is the ceiling on a group's parallelism. Positions are <strong>offsets</strong>, committed by the consumer, so restarting resumes rather than restarts.</p>
+
+  <p>Two retention modes matter. Time or size based retention keeps events for a window, seven days being a common default, after which they are deleted. <strong>Log compaction</strong> instead keeps the most recent event per key indefinitely, which turns a topic into a snapshot of current state, the mechanism behind the stream-table duality below. Choose compaction for reference and state topics such as customer attributes, and time retention for event topics such as payments.</p>
+
+  <p>Schema management is not optional at any scale. A <strong>schema registry</strong> holds the schema for each topic, producers register and validate against it, and compatibility rules, typically backward compatibility, prevent a producer from breaking every consumer. Avro is the traditional pairing, for the reasons Lecture 02 gave: row-oriented, compact per record, with schema evolution as a first-class feature. Without a registry, a producer's field rename is an outage.</p>
+
+  <h3>Windows and lateness</h3>
+
+  <p>Aggregating an unbounded stream requires cutting it into finite pieces. Three window shapes cover most needs. A <strong>tumbling</strong> window is fixed and non-overlapping, five minutes at a time, and is what you want for periodic reporting. A <strong>sliding</strong> window is fixed length but advances by a smaller step, a one-hour window every five minutes, and suits rolling limit monitoring. A <strong>session</strong> window groups events separated by less than a gap threshold, which suits user activity but rarely appears in risk work.</p>
+
+  <p>The <strong>watermark</strong> declares the engine's belief that no event older than a given event time will still arrive, and it is what allows a window to close and emit. Set it too tight and late events are dropped; too loose and results are delayed by the whole margin. Anything arriving after the watermark is <strong>late</strong>, and there are exactly three defensible policies: drop it and count how often you do, route it to a side output for inspection and manual handling, or allow the window to update and emit a correction, which means every downstream consumer must handle restatements. State which one you chose in the data contract of Lecture 18, because a consumer that assumes results are final when they are not will produce a report that changes after publication.</p>
+
+  <h3>Stateful processing, and stream-table duality</h3>
+
+  <p>Anything more interesting than filtering requires <strong>state</strong>: a running count per account, the last balance seen, a join against a slowly changing reference table. Flink holds that state in an embedded store and <strong>checkpoints</strong> it periodically to durable storage, so a failure restores both the state and the input positions consistently. A <strong>savepoint</strong> is the manual equivalent, taken before deploying a new version, and it is what makes upgrading a stateful job something other than a data loss event.</p>
+
+  <p>The <strong>stream-table duality</strong> is the idea worth carrying away, because it dissolves the apparent opposition between this lecture and the rest of the course. A table is the accumulated result of a stream of changes; a stream is the sequence of changes between successive states of a table. Change data capture turns a table into a stream, and a compacted topic or a materialised aggregate turns a stream back into a table. Once you see this, the lakehouse of Lecture 14 and the streaming platform stop being competing architectures and become two projections of one history, which is exactly what modern designs exploit when they let the same table be appended by a stream and queried as a batch.</p>
+
+  <div class="callout insight">
+    <span class="tag">Lambda, Kappa, and what people actually run</span>
+    The <strong>Lambda architecture</strong> runs a batch layer for correctness and a speed layer for latency, and serves a merged view; its acknowledged flaw is that the same logic exists twice, in two languages, and drifts. The <strong>Kappa architecture</strong> proposes one streaming pipeline for everything, reprocessing history by replaying the log; its flaw is that it demands retention of all history and a level of streaming maturity most teams lack. What most banks actually run is neither: a batch platform of record, plus targeted streaming for the handful of decisions that need seconds, reconciled to the batch daily. That is a defensible engineering position rather than a failure to modernise, and the reconciliation is the control that makes it defensible.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: intraday payment outflow monitoring, and its reconciliation to the batch</strong>
+    <p>The requirement: treasury needs to see cumulative payment outflows by currency and counterparty type through the day, with alerts when an intraday limit is approached, updated within a minute. The end-of-day batch remains the book of record for regulatory liquidity reporting. Design it.</p>
+    <p><em>1. The topic and its key.</em> Payments are published to a <code>payments</code> topic keyed by account identifier, which gives per-account ordering, the property a stateful consumer needs. Twenty-four partitions, chosen to exceed the expected consumer parallelism with headroom, since partition count can be increased but not decreased without pain. Retention of thirty days, deliberately longer than the longest plausible outage plus a weekend, so replay is always available. Schemas in a registry with backward compatibility enforced.</p>
+    <p><em>2. Event time, and an honest watermark.</em> Each payment carries the timestamp at which the payment system processed it, not the time it reached Kafka. Measure the observed lag distribution over a fortnight before choosing the watermark: if the ninety-ninth percentile arrival delay is forty seconds, a two-minute bounded-out-of-orderness watermark is defensible and a ten-second one is not. Write the chosen figure and its basis into the contract.</p>
+    <p><em>3. Windows and the aggregation.</em> One-minute tumbling windows keyed by currency and counterparty type, with a running cumulative total maintained as state and reset at the start of the business day in the relevant time zone. Note the deliberate simplicity: the alerting question is about a cumulative position against a limit, so the window is small and the state carries the day.</p>
+    <p><em>4. Late events get a policy, not a default.</em> Payments arriving after the watermark are routed to a side output, written to a dedicated topic, and counted on a dashboard. They update the cumulative state, because a limit monitor must reflect all known outflows, but the per-minute window figures already emitted are not retracted, because downstream alerting cannot handle retractions usefully. That asymmetry is a decision, and it is documented rather than emergent.</p>
+    <p><em>5. Two sinks, two purposes.</em> The alerting sink pushes to treasury's monitoring tool. The archival sink writes every event, exactly as received, to the bronze layer of the lake, partitioned by arrival date, keyed by event identifier so that at-least-once delivery cannot double count. The second sink is what makes the whole thing auditable later, and it is the point at which the streaming world hands over to the rest of this course.</p>
+    <p><em>6. The control that makes it trustworthy.</em> Every night, after the batch payments extract lands, compare the batch's total outflow by currency against the sum of the streamed events for the same business date. Persist both figures and the difference. A persistent non-zero difference means the stream is missing events, double counting, or attributing them to the wrong business date, and any of the three is a finding. Without this reconciliation, an intraday monitor can drift from reality for months and nobody would know, because nobody reconciles a dashboard.</p>
+    <p><em>7. What this deliberately does not do.</em> It does not produce the regulatory liquidity figures. Those come from the batch, computed from the same events plus the balance-sheet data the stream does not carry, on a controlled monthly and daily cycle with the full validation apparatus of Part V. The stream tells treasury something is happening now; the batch tells the supervisor what happened. Keeping those two jobs separate is the single most important design decision in the example, and the reconciliation in step six is what entitles you to make it.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Streaming is what happens when data is unbounded, so no aggregate is ever final and every window needs a stated policy on lateness. Kafka is a replayable partitioned log, and the two decisions that matter most are the partition key, which determines ordering, and the retention, which determines how far back you can recover. Event time is the correct clock for anything with reporting meaning, and the watermark is the explicit trade between completeness and latency. Prefer at-least-once delivery into idempotent writes over pursuing exactly-once end to end. And in a bank, let the stream be fast, let the batch be right, and reconcile them daily. Part III closes here; Part IV turns to transforming what has arrived.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Why does bounded against unbounded data generate every other difference between batch and streaming?</li>
+      <li>Explain why the partition key is a correctness decision rather than a performance one.</li>
+      <li>Distinguish event time from processing time and give a case where using the wrong one misattributes a figure.</li>
+      <li>What does a watermark declare, and what are the three defensible policies for events arriving after it?</li>
+      <li>Contrast time-based retention with log compaction, and say which suits a customer-attributes topic.</li>
+      <li>Why is at-least-once plus idempotent writes usually preferable to end-to-end exactly-once?</li>
+      <li>State the stream-table duality and use it to explain why change data capture and a lakehouse table are two views of one thing.</li>
+      <li>Give the reconciliation that entitles a bank to run a fast stream alongside an authoritative batch, and say what its absence risks.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="10-batch_ingestion.html">Lecture 10</a> introduced change data capture, which is the stream most banks encounter first, and <a href="11-extraction_apis_and_pdfs.html">Lecture 11</a> covered the non-tabular sources.</li>
+      <li><strong>Next:</strong> <a href="13-spark.html">Lecture 13</a> opens Part IV with distributed batch processing, and its Structured Streaming module is the micro-batch alternative to Flink.</li>
+      <li><strong>Cross-link:</strong> Avro and the schema registry rest on <a href="02-data_and_file_formats.html">Lecture 02</a>; the lateness policy belongs in the data contract of <a href="18-observability_and_contracts.html">Lecture 18</a>; <a href="14-lakehouse_table_formats.html">Lecture 14</a> is where a stream lands as a queryable table.</li>
+      <li><strong>Banking link:</strong> intraday liquidity monitoring sits in the <a href="../../application/banking/01_internal_environment/risk_measurement/liquidity_risk/index.html">liquidity risk</a> track, which is where the regulatory figures the batch produces are defined.</li>
+      <li><strong>Further reading:</strong> Kleppmann's <em>Designing Data-Intensive Applications</em> chapter 11 for streams and the duality; the Kafka documentation's design section; Akidau and colleagues on the Dataflow model for the definitive treatment of windows, watermarks, and lateness.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 12 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

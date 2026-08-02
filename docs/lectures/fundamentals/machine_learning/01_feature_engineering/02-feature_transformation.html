@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 2: feature transformation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Feature engineering</a></div>
+  <h1>Feature transformation</h1>
+  <p class="subtitle">Raw columns rarely arrive in a form an algorithm can consume. Scales differ, distributions skew, categoricals are text, outliers distort distances. Transformation is the column-by-column work that converts a database extract into a feature matrix, and the first place in the pipeline where leakage can quietly kill a model.</p>
+  <div class="meta">
+    <span>Lecture 2 of 62</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part I: foundations</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>feature transformation</strong> is a deterministic function $g$ applied to a single column $X_j$ (or a small group of related columns) before the matrix reaches a model. Six families do almost all of the work in practice. <strong>Scaling</strong> (centering, z-score, min-max) puts numeric columns on a common axis so distance-based and gradient-based methods stop being dominated by the column with the largest units. <strong>Binning</strong> turns a continuous variable into a discrete one, which can stabilise a linear model on a non-linear relationship but throws away signal that a tree would have used. <strong>Numerical transforms</strong> (log, Box-Cox, Yeo-Johnson) compress right tails and pull distributions toward Gaussian, which helps any method that assumes constant variance or linearity in $X$. <strong>Categorical encoding</strong> turns text into numbers without inventing fake ordering (one-hot for low cardinality, target or weight-of-evidence for high cardinality, ordinal where the labels really are ordered). <strong>Outlier handling</strong> decides what to do with the long tails after detection. <strong>Missing indicators</strong> preserve the signal that a value was absent. The single rule that ties everything together is the one rule that fails most often in practice: <strong>fit every transformation on the training fold only, apply the fitted object to validation and test without re-fitting.</strong></p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Each column in a database arrives with its own units, its own shape, and its own gaps. A linear regression cannot compare salary in pounds to age in years unless you put them on the same axis, and a logistic regression cannot ingest the string "Greater London" at all. Feature transformation is the unglamorous step where every column is rewritten into a number on a sensible scale, with a sensible distribution, and with missingness made explicit. Once that is done the model can do its job; without it, the model is comparing apples to kilograms.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Textbooks list transformations as a menu of options to try. In credit risk practice the menu is constrained by what a supervisor will accept. Weight of evidence and monotonic binning dominate scorecard work not because they are the most predictive choice (gradient-boosted trees on raw features usually win on AUC) but because the resulting model is auditable: every bin has a documented WoE, every WoE has an information value, and a regulator can ask "why is this segment getting that score" and receive a one-line answer. The choice of transformation is a choice about who can defend the model and to whom.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 1 of the pipeline from <a href="01-the_ml_landscape.html">lecture 1</a>. Lecture 3 on <a href="03-dimensionality_reduction.html">dimensionality reduction</a> assumes the matrix is already scaled (PCA on raw mixed-unit data is nonsense); lecture 4 on <a href="04-feature_selection.html">feature selection</a> assumes encoding is already done (you cannot run mutual information on a string column). Every supervised method in sub-module 03 inherits assumptions from the choices made here. If the wrong transformation is applied, no amount of hyperparameter tuning downstream recovers the signal that was destroyed.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons transformation is more than tidying-up. First, <strong>scale dictates which features the model sees.</strong> A k-nearest-neighbour classifier defines similarity by Euclidean distance; if income is measured in thousands and age in years, the distance between two customers is essentially the distance between their incomes, and age may as well not exist. The same problem afflicts k-means, support vector machines with RBF kernels, principal component analysis, and any regularised linear model (ridge and lasso both penalise coefficients in raw units, so a feature with a small coefficient because its units are large gets under-penalised). Tree-based methods are immune because a split on $X_j > c$ does not change if $X_j$ is multiplied by 100. The question "do I need to scale" reduces to "is the model distance-based or gradient-based".</p>
+
+  <p>Second, <strong>distribution shape dictates which assumptions are violated.</strong> Linear regression assumes the conditional mean is linear in $X$ and the residual variance is constant. A right-skewed feature like income breaks both. A log transformation pulls the long tail in, makes the relationship closer to linear, and stabilises variance; the regression now estimates a multiplicative rather than additive effect, but the estimator is well-behaved. Generalised linear models, logistic regression, and any maximum-likelihood method inherit the same sensitivity. Tree-based and rank-based methods do not.</p>
+
+  <p>Third, <strong>encoding choice dictates what the model can express.</strong> Label-encoding a nominal variable (red = 0, green = 1, blue = 2) tells a linear model that blue is twice green, which is a fiction the model has no way to detect. One-hot encoding fixes this but inflates dimensionality. Target encoding compresses it again but leaks the label unless cross-validated. Weight of evidence imposes a monotonic relationship that a logistic regression can interpret as a single signed effect. Each choice is a different prior about how the categorical signal enters the model.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail PD model was rebuilt by a new analyst who replaced the team's standard WoE encoding of "industry sector" with one-hot encoding plus an L1-regularised logistic regression. Cross-validation AUC improved by 0.4 points. The model was rejected at validation: the regulator could not be told what the model would predict for a new industry code that appeared next quarter, because one-hot creates no representation for unseen levels. The WoE version, applied via a default bin for new levels, had passed three previous reviews. Predictive power without operational resilience is not a model improvement.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. A feature transformation is a decision tree applied to each column. Look at the column's type (numeric or categorical), look at its distribution (symmetric, skewed, heavy-tailed, missing), look at the downstream model's sensitivities (distance-based, linear, tree-based), and the appropriate transform falls out. The same column gets a different treatment depending on what is going to consume it.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Decision tree for choosing a feature transformation">
+      <defs>
+        <marker id="ftArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Choosing a transformation: the column's type and the model's sensitivities</text>
+
+      <!-- Root -->
+      <g>
+        <rect x="340" y="46" width="140" height="44" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="410" y="66" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">RAW COLUMN</text>
+        <text x="410" y="80" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">what type is it?</text>
+      </g>
+
+      <!-- Numeric branch -->
+      <g>
+        <rect x="120" y="130" width="140" height="44" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="190" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">NUMERIC</text>
+        <text x="190" y="164" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">distribution shape?</text>
+      </g>
+
+      <!-- Categorical branch -->
+      <g>
+        <rect x="560" y="130" width="140" height="44" rx="10" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="630" y="150" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#5b21b6">CATEGORICAL</text>
+        <text x="630" y="164" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">ordered? cardinality?</text>
+      </g>
+
+      <line x1="380" y1="90" x2="220" y2="130" stroke="#71717a" stroke-width="1.5" marker-end="url(#ftArrow)"/>
+      <line x1="440" y1="90" x2="600" y2="130" stroke="#71717a" stroke-width="1.5" marker-end="url(#ftArrow)"/>
+
+      <!-- Numeric leaves -->
+      <g>
+        <rect x="20" y="220" width="130" height="56" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+        <text x="85" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">SYMMETRIC</text>
+        <text x="85" y="256" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">z-score for distance</text>
+        <text x="85" y="268" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">or gradient methods</text>
+      </g>
+      <g>
+        <rect x="160" y="220" width="130" height="56" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+        <text x="225" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">SKEWED</text>
+        <text x="225" y="256" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">log, Box-Cox,</text>
+        <text x="225" y="268" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">Yeo-Johnson</text>
+      </g>
+      <g>
+        <rect x="300" y="220" width="130" height="56" rx="8" fill="#FFFFFF" stroke="#0d9488" stroke-width="1"/>
+        <text x="365" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">HEAVY-TAILED</text>
+        <text x="365" y="256" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">winsorise, trim,</text>
+        <text x="365" y="268" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">or flag</text>
+      </g>
+
+      <line x1="170" y1="174" x2="85" y2="220" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="190" y1="174" x2="225" y2="220" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="210" y1="174" x2="365" y2="220" stroke="#0d9488" stroke-width="1" stroke-dasharray="2 2"/>
+
+      <!-- Categorical leaves -->
+      <g>
+        <rect x="450" y="220" width="120" height="56" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="510" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">ORDERED</text>
+        <text x="510" y="256" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">ordinal encoding</text>
+      </g>
+      <g>
+        <rect x="580" y="220" width="120" height="56" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="640" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">LOW CARD.</text>
+        <text x="640" y="256" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">one-hot, drop first</text>
+        <text x="640" y="268" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">for linear models</text>
+      </g>
+      <g>
+        <rect x="710" y="220" width="100" height="56" rx="8" fill="#FFFFFF" stroke="#7c3aed" stroke-width="1"/>
+        <text x="760" y="240" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#5b21b6">HIGH CARD.</text>
+        <text x="760" y="256" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">target, WoE,</text>
+        <text x="760" y="268" text-anchor="middle" font-family="Inter" font-size="9" fill="#7c3aed">rare-label group</text>
+      </g>
+
+      <line x1="610" y1="174" x2="510" y2="220" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="630" y1="174" x2="640" y2="220" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="650" y1="174" x2="760" y2="220" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2"/>
+
+      <!-- Footer rule -->
+      <line x1="40" y1="320" x2="780" y2="320" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="340" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">The single inviolable rule</text>
+      <text x="410" y="358" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">fit the transformer on training data only; apply (without re-fitting) to validation and test</text>
+    </svg>
+    <figcaption>A column's type and shape determine the family of transformation; the downstream model's sensitivities pick the specific member. The amber rule at the bottom is what scikit-learn pipelines exist to enforce: a leak introduced here is invisible at validation time and lethal at deployment.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The numeric and categorical branches do not share methods, but they share a structural question (what shape is the data and what will the model do with it). The leaves on each side are not a menu to try in turn; each is matched to a column profile. The amber bar at the bottom is the rule that converts the rest of the diagram from a list of techniques into a defensible pipeline. Any transformer with parameters fit from data (mean, standard deviation, min, max, WoE table, target mean, lambda for Box-Cox) is a learned object and must be treated like a model component.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Scaling: centering, z-score, min-max</h3>
+
+  <p>Three closely related operations bring a numeric column onto a controlled axis. <strong>Centering</strong> subtracts the mean so the new column has mean zero,</p>
+  $$x'_i = x_i - \bar{x}, \qquad \bar{x} = \frac{1}{n} \sum_{i=1}^{n} x_i.$$
+  <p>Useful on its own when the absolute level is uninformative (a regression intercept will absorb it anyway) but variance still matters. <strong>Standardisation</strong>, also called z-score normalisation, divides by the standard deviation as well,</p>
+  $$z_i = \frac{x_i - \bar{x}}{\sigma_x}, \qquad \sigma_x = \sqrt{\frac{1}{n} \sum_{i=1}^{n}(x_i - \bar{x})^2}.$$
+  <p>The result has mean zero and unit variance. <strong>Min-max normalisation</strong> instead rescales to a fixed interval, conventionally $[0, 1]$,</p>
+  $$x'_i = \frac{x_i - \min(x)}{\max(x) - \min(x)}.$$
+  <p>The choice between them is not about taste. Standardisation is the default for distance-based methods (k-nearest neighbours, k-means, DBSCAN, SVM with RBF kernel, PCA) and for any regularised linear model (ridge, lasso, elastic net), because the penalty term shrinks coefficients in the units they are estimated in. Min-max is preferable when a bounded output is required (image pixel intensities, neural network inputs that feed a sigmoid) and when meaningful zeros must be preserved (a count of zero remains zero after min-max if zero is the minimum). Centering alone is enough when only relative position matters and variance scaling is undesirable, which is rare in practice.</p>
+
+  <p>Tree-based methods (decision trees, random forests, gradient-boosted trees) are scale-invariant. A split on $X_j > c$ produces the same partition if $X_j$ is rescaled to $aX_j + b$, with $c$ rescaled correspondingly. Scaling a tree's inputs is harmless but cosmetic. The boundary case is when a tree-based model is part of a stacked ensemble with a linear meta-learner: the linear stage needs scaled features even if the base learners do not. Min-max has one further weakness worth flagging: it is extremely sensitive to outliers, because a single extreme value sets the maximum and crushes the rest of the distribution into the bottom corner of $[0, 1]$. Standardisation is more robust because the standard deviation is less sensitive to the most extreme observation than the maximum is.</p>
+
+  <div class="callout insight">
+    <span class="tag">Why z-score does not preserve meaningful zeros</span>
+    Z-score subtracts the sample mean, so a count of zero becomes $-\bar{x}/\sigma_x$, not zero. This matters when the absence of an event (no missed payments, no claims, no children) is itself a category and you want it to map to a recognisable value. Min-max preserves the zero if zero happens to be the column minimum. Either keep the raw column alongside the scaled one as a missing-or-zero flag, or use a transformation that respects the zero (square-root with a sign correction, or signed log $\operatorname{sgn}(x) \log(1 + |x|)$).
+  </div>
+
+  <h3>Binning: equal-width, equal-frequency, optimal</h3>
+
+  <p>Binning replaces a numeric column with a discrete one by partitioning the range into intervals. Three strategies cover the practical cases. <strong>Equal-width</strong> binning splits the observed range into $k$ intervals of equal length; simple to explain, but poor on skewed data because most observations land in the first one or two bins. <strong>Equal-frequency</strong> (quantile) binning sets cut-points so each bin contains the same number of observations; robust to skew but the cut-points are dataset-dependent and shift with the sample. <strong>Optimal</strong> binning chooses cut-points to maximise an objective such as the chi-squared statistic against the target, the information value of the resulting WoE table, or the Gini coefficient; this is what credit scorecard tooling actually does and is the basis of the monotonic binning that makes WoE encoding work.</p>
+
+  <p>Binning helps a linear model when the underlying relationship between $X$ and $Y$ is genuinely non-monotonic or has thresholds the linear functional form cannot represent. Replacing age with a five-bin categorical and one-hot encoding the result lets a logistic regression fit a piecewise-constant function in age, which approximates the bathtub-shaped default rate that age usually shows in retail credit. Binning hurts a tree-based model almost always: a tree was going to find the cut-points itself, with the full resolution of the data, and pre-binning discards the variation between cut-points without compensating gain. The exception is when binning is used for interpretability rather than predictive power (regulatory documentation, segment-level reporting), in which case the loss of signal is the cost of admission.</p>
+
+  <p>Information value $\operatorname{IV}$ summarises how strongly a binned variable separates the target,</p>
+  $$\operatorname{IV} = \sum_{i=1}^{k} \left(\operatorname{Good\%}_i - \operatorname{Bad\%}_i\right) \cdot \operatorname{WoE}_i.$$
+  <p>A common rule of thumb in credit scorecards: $\operatorname{IV} < 0.02$ is uninformative, $0.02 \text{ to } 0.1$ is weak, $0.1 \text{ to } 0.3$ is medium, $0.3 \text{ to } 0.5$ is strong, and $\operatorname{IV} > 0.5$ is suspiciously high and often indicates target leakage. The cells from the worked example in the notebook (good/bad counts of 1000/170, 1000/230, 1800/95 across age bins) sum to an $\operatorname{IV}$ of about $0.41$, in the upper end of the "strong" range.</p>
+
+  <h3>Numerical transformations: log, Box-Cox, Yeo-Johnson</h3>
+
+  <p>Right-skewed columns (income, loan amount, claim size, transaction count) break a linear model's linearity-in-$X$ and constant-variance assumptions simultaneously. A monotonic compression of the tail fixes both. The <strong>natural log</strong> is the simplest:</p>
+  $$x'_i = \ln(x_i).$$
+  <p>It requires strictly positive data; the standard trick for non-negative data with zeros is $\ln(1 + x)$ (numpy's <code>log1p</code>), and for data that may be negative, $\operatorname{sgn}(x) \ln(1 + |x|)$. The interpretation changes: in a linear regression on $\ln(x)$, a unit increase in the log-transformed feature corresponds to an $e$-fold multiplicative effect on the outcome, not an additive one.</p>
+
+  <p>The <strong>Box-Cox</strong> transformation is a one-parameter family that includes the log as a special case,</p>
+  $$x'_i(\lambda) = \begin{cases} \dfrac{x_i^{\lambda} - 1}{\lambda} & \text{if } \lambda \ne 0, \\ \ln(x_i) & \text{if } \lambda = 0. \end{cases}$$
+  <p>The parameter $\lambda$ is estimated by maximum likelihood to make the transformed column as close to Gaussian as possible. Box-Cox requires strictly positive input. The <strong>Yeo-Johnson</strong> transformation extends Box-Cox to handle zero and negative values by switching formula on the sign of $x$,</p>
+  $$x'_i(\lambda) = \begin{cases} \dfrac{(x_i + 1)^{\lambda} - 1}{\lambda} & x_i \ge 0,\, \lambda \ne 0, \\ \ln(x_i + 1) & x_i \ge 0,\, \lambda = 0, \\ -\dfrac{(-x_i + 1)^{2 - \lambda} - 1}{2 - \lambda} & x_i < 0,\, \lambda \ne 2, \\ -\ln(-x_i + 1) & x_i < 0,\, \lambda = 2. \end{cases}$$
+  <p>Both Box-Cox and Yeo-Johnson are learned transformations: $\lambda$ is fit on the training set and the same $\lambda$ is applied to validation and test. A common mistake is to re-fit Yeo-Johnson on the test set, which produces a different transformation and a different model evaluation. None of these transformations help a tree-based method: monotonic compositions of a feature do not change which split a tree chooses.</p>
+
+  <h3>Categorical encoding</h3>
+
+  <p>The categorical-encoding family is the largest and the one with the most subtle traps. The choices depend on whether the variable is ordered, how many distinct levels it has, and what the downstream model treats numbers as.</p>
+
+  <p><strong>Ordinal encoding</strong> maps an ordered categorical (loan grade A through G, education level, satisfaction rating) to a sequence of integers preserving the order. Use it only when the order is real and the spacing between adjacent levels is approximately meaningful. If the spacing is uneven (the gap between loan grade A and B is not the same as between F and G in default risk), ordinal encoding distorts the relationship and one-hot is safer.</p>
+
+  <p><strong>Label encoding</strong> applies arbitrary integers to nominal categories. It is technically convenient (most scikit-learn estimators want numeric inputs) but it injects a fake order. A linear regression or neural network will read those integers as a continuous feature and assume the difference between red (0) and green (1) is the same as between green (1) and blue (2). Tree-based methods do not assume continuous order and are unbothered, which is why label encoding is sometimes used as a compact alternative to one-hot when the downstream model is a tree.</p>
+
+  <p><strong>One-hot encoding</strong> replaces a $k$-level nominal variable with $k$ binary columns, one per level. No order is imposed. The price is dimensionality: a column with a hundred levels becomes a hundred columns. The standard refinement is to drop one column to avoid the <strong>dummy variable trap</strong>. With all $k$ columns and an intercept, the columns are linearly dependent (they sum to one for every row), the design matrix is rank-deficient, and OLS has no unique solution; the same issue affects any linear model with an unregularised intercept. Dropping one level (the reference category) breaks the dependence; ridge and lasso are not affected because the L1 or L2 penalty makes the solution unique even when the design matrix is rank-deficient, so the drop is often skipped when a regulariser is in play. Tree-based methods are unaffected either way.</p>
+
+  <p><strong>Target encoding</strong>, also called mean encoding, replaces each level of a categorical with the mean of the target variable for that level (in classification, the conditional probability of the positive class). For a categorical with hundreds of levels this is a single column rather than hundreds. The risk is leakage: if the encoding is computed on the same rows the model is then fit to, the encoded value contains information about the target in those rows. The standard fix is out-of-fold encoding: for each row, compute its encoded value using only the other folds. Bayesian smoothing toward the global mean is a further refinement for levels with few observations,</p>
+  $$\operatorname{enc}(c) = \frac{n_c \cdot \bar{y}_c + m \cdot \bar{y}}{n_c + m},$$
+  <p>where $n_c$ is the count at level $c$, $\bar{y}_c$ is the mean target at level $c$, $\bar{y}$ is the global mean, and $m$ is a smoothing parameter. Without smoothing, a level with one observation gets encoded as either 0 or 1 (in binary classification) and the model treats that single point as definitive.</p>
+
+  <p><strong>Weight of evidence (WoE)</strong> is target encoding's older, more disciplined cousin, native to credit risk and structured around a binary target. For a binned variable, each bin $i$ has a WoE,</p>
+  $$\operatorname{WoE}_i = \ln\!\left(\frac{\operatorname{distribution of goods}_i}{\operatorname{distribution of bads}_i}\right) = \ln\!\left(\frac{\operatorname{good count}_i / \operatorname{total goods}}{\operatorname{bad count}_i / \operatorname{total bads}}\right).$$
+  <p>Positive WoE means the bin is over-represented with goods (lower-than-average default risk for that segment), negative WoE the opposite. Substituting WoE values for the original column produces a numeric feature on a log-odds scale, which slots directly into logistic regression: the resulting coefficient is interpretable as the contribution of that feature to the log-odds of default, and the model is additive in WoE values across features. The information value $\operatorname{IV}$ derived above is the natural scalar summary of a WoE-encoded feature's predictive strength. Two practical conditions make WoE the regulator-preferred encoding: bins are chosen so WoE is monotonic in the underlying variable (no inverted U-shapes that defy economic intuition), and missingness is handled as its own bin rather than imputed, preserving the signal that the value was absent.</p>
+
+  <p><strong>Datetime encoding</strong> extracts components from a timestamp (year, month, day, day-of-week, hour) and treats each as a separate categorical or ordinal feature. The trap is that cyclical components (month of year, day of week, hour of day) wrap: December is adjacent to January but their integer codes are 12 and 1. The standard fix is a sine-cosine pair,</p>
+  $$x'_{\sin} = \sin\!\left(2\pi \cdot \frac{x}{P}\right), \quad x'_{\cos} = \cos\!\left(2\pi \cdot \frac{x}{P}\right),$$
+  <p>where $P$ is the period (12 for months, 7 for days of week). The two columns together encode the cyclical position without any artificial discontinuity.</p>
+
+  <p><strong>Missing indicator encoding</strong> adds a binary column flagging whether the value was missing in the original column, in addition to (not instead of) any imputation. The signal that a value was missing is often predictive in itself (a borrower who declined to state their employment length is not a random sample of borrowers), and the indicator preserves that signal in a form the model can use.</p>
+
+  <p><strong>Rare-label encoding</strong> groups all levels with a frequency below a threshold (commonly one to five per cent of the sample) into a single "rare" bucket before any further encoding. It controls dimensionality after one-hot, stabilises target encoding against levels with few observations, and produces a defined fallback for levels that appear in test or production but not training. Combined with one-hot encoding's <code>handle_unknown="infrequent_if_exist"</code> option, it gives a deployment-safe pipeline.</p>
+
+  <p><strong>Decision-tree encoding</strong> fits a shallow tree per categorical feature against the target and replaces each level with the tree's predicted value or leaf index. It captures non-monotonic interactions between the categorical and the target that a single mean encoding cannot, at the cost of one additional model object per feature in the pipeline. It is rarely used in regulated settings because the per-feature trees are extra artefacts to document, but it is a sensible choice when the downstream model is itself a tree ensemble and the categorical's relationship with the target is highly non-monotonic.</p>
+
+  <h3>Outlier detection and handling</h3>
+
+  <p>Outliers are values far enough from the bulk of the distribution that they exert disproportionate influence on any statistic computed from the column. Detection depends on the distribution. <strong>Three-sigma</strong> rules flag any observation with $|z_i| > 3$ as an outlier; valid for approximately Gaussian data, hopeless for skewed data where the right tail naturally has high z-scores. <strong>Tukey fences</strong> (the IQR rule) flag observations below $Q_1 - 1.5 \cdot \operatorname{IQR}$ or above $Q_3 + 1.5 \cdot \operatorname{IQR}$, where $\operatorname{IQR} = Q_3 - Q_1$; robust to skew because the quartiles are not driven by the extreme values themselves. A stricter version uses $3 \cdot \operatorname{IQR}$ for "far out" outliers. For arbitrary distributions, percentile rules (flag everything below the 1st or above the 99th) provide a defensible cap without distributional assumptions.</p>
+
+  <p>Once flagged, four treatments are available. <strong>Winsorise</strong> caps the offending values at the chosen percentile boundary (so the 100th-percentile observation becomes the 99th-percentile value); preserves sample size and exact ordering for everything except the extremes. <strong>Trim</strong> removes the outlier rows entirely; reduces sample size and risks systematic bias if the outliers are not random. <strong>Transform</strong> applies a log or other compression that brings the tail in without flagging anything explicitly; preferable when the extreme values are real but their influence needs to be moderated. <strong>Flag</strong> creates a binary indicator (<code>is_outlier</code>) and leaves the original value in place; the model can then learn whether outlier status carries signal.</p>
+
+  <p>The choice depends on whether the outliers are errors or rare-but-real observations. A data-entry typo of person_age = 144 is an error and should be trimmed or imputed. A self-reported income of two million pounds on a retail credit application is real but rare and is better winsorised (so it influences the model less) or transformed (so it influences the model on the right scale) than removed. Tree-based methods are largely immune to outliers in the input features (a split on $X_j > c$ is unaffected by how much further than $c$ the outliers are); they are not immune to outliers in the target, which still influence the loss.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every transformation-related production incident. Each is invisible at validation time and obvious in retrospect.</p>
+
+  <div class="callout warn">
+    <span class="tag">Fit-on-everything leakage</span>
+    Compute the mean, standard deviation, min, max, WoE table, target mean, or Box-Cox lambda on the full dataset before splitting into train and test. The test set's contribution to those statistics is information from the future leaking into training. Test performance is biased upward; production performance reverts to whatever the unleaked model would have produced. The fix is structural: wrap every transformer in a scikit-learn pipeline, call <code>fit</code> on the training fold only, call <code>transform</code> on the test fold without re-fitting.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Target encoding without cross-fold</span>
+    Plain target encoding (replace each level with the mean target for that level on the same rows the model is fit on) leaks the target directly into the feature. A categorical with one level per row trivially achieves perfect training accuracy. The leakage is graded: rare levels leak more than common levels, but every level leaks something. The fix is out-of-fold encoding (the row's encoded value uses other folds only) combined with Bayesian smoothing toward the global mean. Without both, target encoding is a leak, not a transformation.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">One-hot at deployment with unseen levels</span>
+    A categorical encoded with one-hot on training data has $k$ columns, one per level seen in training. A new level appearing in production has no column and is either silently dropped or causes the pipeline to error. The fix is to combine rare-label encoding (group infrequent levels into a "rare" bucket before one-hot) with an explicit unknown-handling strategy (<code>handle_unknown="infrequent_if_exist"</code> in scikit-learn). Without one of these, the model is brittle to any future expansion of the category set.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Outlier capping in training that ages badly</span>
+    Winsorising at the 99th percentile of training data caps a feature at a value computed at training time. If the underlying distribution drifts (a growing segment whose true values rise), the cap will silently truncate that segment in production while leaving training unchanged. The model sees no variation in that segment and predicts the cap value for all of them. The vignette in lecture 1 about months-since-incorporation is exactly this failure. The fix is to monitor the proportion of observations hitting the cap as part of stage 5 and re-fit when the proportion drifts above a tolerance.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Feature transformation is the first stage of the pipeline from <a href="01-the_ml_landscape.html">lecture 1</a> and the place most production failures originate. Six families do almost all the work. Scaling reconciles units for distance-based and gradient-based methods, and is harmless but unnecessary for trees. Binning trades resolution for stability and interpretability and earns its keep only where the model class genuinely benefits. Numerical transformations fix skew and stabilise variance for any method that assumes linearity in $X$ or constant residual variance. Categorical encoding is the largest family and the one with the most leakage-prone choices: ordinal where the order is real, one-hot for low cardinality, target or WoE for high cardinality, with rare-label and missing-indicator encoding as the operational safety nets. Outlier handling decides whether the long tails are errors to remove, signals to flag, or extremes to compress. Underneath all of this is one rule: any transformer with parameters learned from data is a model component, fit on training data only, applied without re-fitting to everything else.</p>
+
+  <p>What this lecture deliberately did not do. It did not introduce dimensionality reduction (PCA, factor analysis), which produces new features from combinations of existing ones rather than transforming columns one at a time; that is <a href="03-dimensionality_reduction.html">lecture 3</a>. It did not introduce feature selection (filter, wrapper, embedded methods), which decides which features to keep rather than how to rewrite them; that is <a href="04-feature_selection.html">lecture 4</a>. It did not derive any model; algorithms start in sub-module 03. The matrix that emerges from this stage is the input to everything that follows.</p>
+
+  <p>Lecture 3, <a href="03-dimensionality_reduction.html">dimensionality reduction</a>, picks up where this lecture ends. Once every column has been transformed to a numerical value on a sensible scale, the next question is whether the resulting matrix has too many columns to model stably (the curse of dimensionality, redundant correlated features, the computational cost of high-dimensional optimisation). PCA, LDA, and t-SNE are three answers to that question, each with a different objective and a different position on the bias-variance axis.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the formula for z-score standardisation and explain why a k-nearest-neighbour classifier needs it but a random forest does not.</li>
+      <li>A retail PD scorecard bins age into five groups with the following good/bad counts: (1000, 170), (1000, 230), (1800, 95), (1602, 106), (1900, 92). Compute the WoE of the third bin (totals: 7302 goods, 693 bads). Use $\operatorname{WoE} = \ln(\operatorname{good\%} / \operatorname{bad\%})$ and report to two decimal places.</li>
+      <li>Why is target encoding without cross-fold computation a form of label leakage, and what is the standard fix?</li>
+      <li>You apply one-hot encoding to a region variable with 200 levels and feed the result into an unregularised logistic regression with an intercept. The fit fails with a singular matrix error. Name the problem and the standard remedy.</li>
+      <li>A right-skewed income column is fed into a linear regression. Without transformation, residual variance grows with fitted value (heteroscedasticity). Explain why $\ln(\text{income})$ helps, and state how the regression coefficient is interpreted after the log transform.</li>
+      <li>You winsorise loan amount at the 99th percentile of training data. Six months later, the proportion of new applications hitting the cap rises from one to seven per cent. Why is this a problem, and at which pipeline stage would it be caught?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 3 (<a href="03-dimensionality_reduction.html">dimensionality reduction</a>) takes the transformed matrix and reduces its column count by constructing new features from linear or non-linear combinations of existing ones.</li>
+      <li><strong>Previous:</strong> Lecture 1 (<a href="01-the_ml_landscape.html">the machine learning landscape</a>) introduced the six-stage pipeline; this lecture is the first concrete stage and the place where the leakage failure mode is most often introduced.</li>
+      <li><strong>Prerequisite:</strong> Statistics lecture 1 (<a href="../../statistics/01-descriptive_statistics.html">descriptive statistics</a>) covers the variable types (nominal, ordinal, interval, ratio) and the distributional shapes (skew, kurtosis, central tendency, dispersion) that this lecture's choices depend on.</li>
+      <li><strong>Outside this course:</strong> Weight of evidence and information value are the workhorse encoding in credit scorecard practice. The application-scoring track at <a href="../../../application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/index.html">application/banking/01_internal_environment/risk_measurement/credit_risk/application_scoring/</a> develops WoE-based scorecards end-to-end with the regulatory documentation that accompanies them.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Feature engineering course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 2 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

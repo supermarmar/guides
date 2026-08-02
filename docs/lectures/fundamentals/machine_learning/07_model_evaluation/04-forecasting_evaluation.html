@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 38: forecasting evaluation and model-agnostic diagnostics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Model evaluation</a></div>
+  <h1>Forecasting evaluation and model-agnostic diagnostics</h1>
+  <p class="subtitle">Time-series models need their own evaluation playbook because the IID assumption fails. Autocorrelation tests catch missed structure, walk-forward backtesting catches future leakage, and the KS and lift metrics close the model-agnostic toolkit.</p>
+  <div class="meta">
+    <span>Lecture 38 of 62</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Regression and classification metrics share a hidden premise: the rows of the test set are independent draws from the same distribution as training. Time-series models break that premise twice. Observations are dependent through time, so residuals carry information about other residuals. And the test set lives in the future, so any procedure that shuffles or randomly splits is a leak. <strong>Forecasting evaluation</strong> is the set of diagnostics that survive those failures. <strong>Residual autocorrelation tests</strong> (visual ACF, Durbin-Watson, Ljung-Box) catch the case where the model has fit the level of the series but missed a lag effect or a seasonality, leaving structure in the residuals that should not be there. <strong>Walk-forward backtesting</strong> evaluates the model the way it will actually be used: fit on $[1, T]$, predict $T+1$, advance one step, refit, repeat. Outside the time-series setting, two further tools work across model classes. The <strong>Kolmogorov-Smirnov test</strong> measures the maximum vertical gap between two empirical CDFs and, applied to model scores split by class, gives a complement to Gini that flags where on the score range the model discriminates best. The <strong>lift ratio</strong> and the <strong>cumulative lift curve</strong> express the model's value over the population base rate at any chosen cut-off, which is the form a commercial user actually wants. With those four, plus a closing recap of the bias-variance trade-off as it runs through every previous stage, the evaluation toolkit is complete.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A regression model predicts loan amount and a classification model predicts default; both can be checked because the rows are unordered. A forecasting model predicts next quarter's default rate from last quarter's, and the order matters. If you split that series at random, the model has already seen the future when it predicts the past, and the test score is fiction. The cure is to evaluate the model exactly the way it will be used in production: train only on history, score only on the next observation, then add that observation to history and repeat. The autocorrelation checks then ask a separate question: once the model has done its best, is there any pattern left in the residuals that a better model would have captured?
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Textbooks present the KS statistic as a normality test on residuals. In credit risk practice the same statistic does heavier work: applied to model scores conditional on the binary outcome (goods versus bads), it produces the two CDFs whose maximum vertical gap is the KS bands metric, regulatory cousin to Gini. Gini compresses the whole curve to a single number; KS bands tells you where on the score range the model separates best, which is the question portfolio managers actually ask when they pick a cut-off. The same logic generalises beyond credit: KS bands gives a decile-by-decile complement to AUC whenever the operating point is part of the decision.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Final lecture in <a href="index.html">model evaluation</a>. Builds on the regression diagnostics of <a href="02-regression_diagnostics.html">lecture 36</a> (the residual machinery) and the classification metrics of <a href="03-classification_metrics.html">lecture 37</a> (Gini, ROC, decile reasoning). Replaces the train-test split of <a href="../02_train_test_split/01-train_test_validation.html">lecture 6</a> with a walk-forward scheme when the data are temporal. The underlying time-series machinery lives in <a href="../../statistics/06-time_series.html">statistics lecture 6</a>. After this lecture, sub-module 08 on <a href="../08_model_interpretation/01-explaining_models.html">interpretation</a> takes the validated model and asks how to explain it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons forecasting evaluation needs its own machinery. First, <strong>residuals from a time-series model are not exchangeable.</strong> Under a correctly specified model with IID errors, the residuals should themselves be uncorrelated; that is the same condition standard regression diagnostics assume, transplanted to the time domain. When residuals show significant autocorrelation, the model has fit the conditional mean wrong: it has missed a lag effect (an AR term the model class did not include), a seasonality (a quarterly or annual cycle), or a level shift (a regime change the model treats as noise). The standard MSE and $R^2$ on a hold-out are silent on this; both can look healthy while the residual ACF screams that there is structure left on the table. Without an autocorrelation diagnostic, the model passes evaluation and fails the moment it has to forecast the cycle it has not learned.</p>
+
+  <p>Second, <strong>random train-test splits leak the future into training.</strong> A random split on a temporal dataset puts February 2024 in training and January 2024 in test, then asks the model to predict January 2024 having seen February 2024. The test score that comes out is biased upward by however much the dependent series is autocorrelated, which on macroeconomic and credit series is a lot. Walk-forward backtesting is not a refinement of the random split; it is a different evaluation procedure that asks the only honest question, namely how the model would have performed if deployed at each historical point in time. Every metric the model is judged on (RMSE, MAE, MAPE, Gini on a forecast horizon) is recomputed on out-of-sample one-step-ahead predictions assembled across the backtest. The result is what the model would have done in production; the random-split result is what the model would have done if it could time-travel.</p>
+
+  <p>Third, <strong>some diagnostics need to work across model classes.</strong> The KS test compares two empirical distributions without assuming what they look like, which makes it portable: residual normality for a regression, score separation for a classifier, distribution shift between training and production. Lift and cumulative lift translate any model's score into the commercial language of "how much better than random at the top decile", which is what a customer manager, a fraud reviewer, or a credit officer actually needs. These are not extras; they are the diagnostics that survive when the model class changes from linear regression to gradient-boosted tree to neural network and the metrics have to remain comparable.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A retail PD model was extended to forecast portfolio default rate one quarter ahead, with the same logistic specification re-fitted on the latest snapshot. The team reported a hold-out $R^2$ of 0.71 from a random 80-20 split on the historical panel. At go-live the quarter-ahead forecasts missed the actual default rate by a factor of two and the supervisor asked for the backtest. The walk-forward exercise (refit each quarter on history only, predict the next quarter, advance) produced an $R^2$ of 0.08. The random split had silently used 2023 data to predict 2022 and 2021. The residual ACF on the original specification showed a significant spike at lag one that no one had checked. The two diagnostics together would have caught the problem six months earlier.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. A walk-forward backtest moves a window through time, refitting the model at each step and predicting the next observation. The series of one-step-ahead predictions, never having seen its own future, is then scored with whatever metric is appropriate (RMSE for a continuous target, Gini for a binary one). Autocorrelation tests run alongside, checking that each refit produces residuals with no leftover structure. The KS and lift diagnostics close the toolkit by reporting the model in the form a commercial user reads.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Walk-forward backtest with rolling train and predict windows">
+      <defs>
+        <marker id="wfArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Walk-forward backtest: fit on history, predict one step, advance, refit</text>
+
+      <!-- Time axis -->
+      <line x1="60" y1="270" x2="780" y2="270" stroke="#37352F" stroke-width="1.2"/>
+      <line x1="60" y1="270" x2="60" y2="266" stroke="#37352F" stroke-width="1"/>
+      <line x1="780" y1="270" x2="780" y2="266" stroke="#37352F" stroke-width="1"/>
+      <text x="60" y="288" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">t = 1</text>
+      <text x="780" y="288" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">t = T (today)</text>
+      <text x="420" y="304" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">time</text>
+
+      <!-- Iteration 1 -->
+      <text x="40" y="64" text-anchor="end" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">iter 1</text>
+      <rect x="60" y="52" width="240" height="22" rx="3" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+      <text x="180" y="67" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">train on [1, T0]</text>
+      <rect x="300" y="52" width="40" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+      <text x="320" y="67" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">predict</text>
+      <line x1="320" y1="74" x2="320" y2="78" stroke="#7c3aed" stroke-width="1"/>
+      <text x="320" y="90" text-anchor="middle" font-family="Inter" font-size="8" fill="#5b21b6">T0+1</text>
+
+      <!-- Iteration 2 -->
+      <text x="40" y="124" text-anchor="end" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">iter 2</text>
+      <rect x="60" y="112" width="280" height="22" rx="3" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+      <text x="200" y="127" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">train on [1, T0+1]</text>
+      <rect x="340" y="112" width="40" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+      <text x="360" y="127" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">predict</text>
+      <text x="360" y="150" text-anchor="middle" font-family="Inter" font-size="8" fill="#5b21b6">T0+2</text>
+
+      <!-- Iteration 3 -->
+      <text x="40" y="184" text-anchor="end" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">iter 3</text>
+      <rect x="60" y="172" width="320" height="22" rx="3" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+      <text x="220" y="187" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">train on [1, T0+2]</text>
+      <rect x="380" y="172" width="40" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+      <text x="400" y="187" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">predict</text>
+      <text x="400" y="210" text-anchor="middle" font-family="Inter" font-size="8" fill="#5b21b6">T0+3</text>
+
+      <!-- ellipsis -->
+      <text x="500" y="187" text-anchor="middle" font-family="Inter" font-size="14" font-weight="700" fill="#71717a">. . .</text>
+
+      <!-- Iteration k -->
+      <text x="40" y="244" text-anchor="end" font-family="Inter" font-size="10" font-weight="600" fill="#18181b">iter k</text>
+      <rect x="60" y="232" width="680" height="22" rx="3" fill="#ECFEF6" stroke="#0d9488" stroke-width="1"/>
+      <text x="400" y="247" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">train on [1, T-1]</text>
+      <rect x="740" y="232" width="40" height="22" rx="3" fill="#F5F3FF" stroke="#7c3aed" stroke-width="1"/>
+      <text x="760" y="247" text-anchor="middle" font-family="Inter" font-size="10" fill="#5b21b6">predict T</text>
+
+      <!-- Legend -->
+      <rect x="540" y="48" width="14" height="10" fill="#ECFEF6" stroke="#0d9488"/>
+      <text x="558" y="58" font-family="Inter" font-size="9" fill="#115e59">training window (refit each step)</text>
+      <rect x="540" y="64" width="14" height="10" fill="#F5F3FF" stroke="#7c3aed"/>
+      <text x="558" y="74" font-family="Inter" font-size="9" fill="#5b21b6">one-step-ahead forecast (scored)</text>
+      <rect x="540" y="80" width="14" height="10" fill="#FFFFFF" stroke="#b45309"/>
+      <text x="558" y="90" font-family="Inter" font-size="9" fill="#92400e">never used before the predict step</text>
+    </svg>
+    <figcaption>Each row is one iteration of the backtest. The teal block is the training window, which grows (or rolls, depending on the variant) at each step; the violet block is the single observation the refitted model is asked to predict. The collection of violet predictions, scored against actuals, is the honest evaluation. Nothing to the right of any teal block was visible to the model that made the prediction immediately following it.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The training window in each row stops strictly before the prediction it produces; that is the no-leakage property. The collection of violet predictions is the only data scored, and it is scored with the same metrics used elsewhere in this module (RMSE, MAE, MAPE for continuous; accuracy, F1, Gini for binary). The choice between an expanding window (each iteration grows training) and a rolling window (each iteration drops the oldest observation as well as adding the newest) is a separate decision about whether old observations remain representative; for slowly-drifting series the expanding window uses more data, and for fast-drifting series the rolling window adapts more quickly.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Autocorrelation of residuals</h3>
+
+  <p>Under a correctly specified model with IID errors, the residuals $r_t = y_t - \hat{y}_t$ should themselves be a white-noise sequence: zero mean, constant variance, and zero autocorrelation at every non-zero lag. Significant autocorrelation in the residuals means the model has not extracted all the signal: an AR or MA term has been omitted, a seasonal cycle has been missed, or a level shift has been treated as noise. The diagnostic is the same whether the model is a regression with a time index, an exponential smoothing model, or an ARIMA fit; the residuals are the place to look.</p>
+
+  <p>Three tools cover the practical cases. The <strong>autocorrelation function plot</strong> (ACF plot) shows the sample autocorrelation $\hat{\rho}(k)$ of the residuals at each lag $k$, with confidence bands around zero; any spike outside the band is evidence of leftover structure at that lag. A spike at lag 1 indicates an omitted AR(1) component; spikes at lags 12 (monthly data) or 4 (quarterly) indicate seasonality. The <strong>Durbin-Watson statistic</strong> is a single-number summary aimed specifically at first-order autocorrelation,</p>
+
+  $$DW = \frac{\sum_{t=2}^{T}(r_t - r_{t-1})^2}{\sum_{t=1}^{T} r_t^2}.$$
+
+  <p>The statistic is approximately equal to $2(1 - \hat{\rho}_1)$ where $\hat{\rho}_1$ is the lag-1 residual autocorrelation, so $DW$ ranges between 0 and 4. A value near 2 means $\hat{\rho}_1$ is near zero and there is no first-order autocorrelation. Values close to 0 indicate strong positive autocorrelation (residuals of the same sign cluster together, the model is systematically under- or over-shooting in runs); values close to 4 indicate strong negative autocorrelation (residuals flip sign at each step). The usual rule of thumb is that values between 1.5 and 2.5 are unproblematic; values outside this range warrant investigation. The OLS regression in the notebook on credit data reports $DW = 1.996$, comfortably inside the safe range for a cross-sectional fit (and not very informative for a model that was not temporal in the first place; the test is most useful when the rows really are ordered in time).</p>
+
+  <p>The <strong>Ljung-Box test</strong> generalises the question to joint autocorrelation up to lag $h$,</p>
+
+  $$Q(h) = T(T+2) \sum_{k=1}^{h} \frac{\hat{\rho}_k^2}{T - k},$$
+
+  <p>where $T$ is the sample size and $\hat{\rho}_k$ is the sample autocorrelation at lag $k$. Under the null that the residuals are independently distributed up to lag $h$, $Q(h)$ is approximately $\chi^2$ with $h$ degrees of freedom (adjusted downward by the number of fitted ARIMA parameters when applied to residuals). A small p-value rejects independence and indicates significant autocorrelation at one or more of the lags from 1 to $h$. Ljung-Box is the standard portmanteau test reported in time-series software (Python's <code>statsmodels.stats.diagnostic.acorr_ljungbox</code>, R's <code>Box.test</code> with <code>type = "Ljung-Box"</code>) and is the workhorse residual check for ARIMA, exponential smoothing, and state-space models.</p>
+
+  <p>When autocorrelation is detected, the corrective action depends on the pattern. Positive serial correlation at low lags suggests adding lagged dependent or independent variables to the specification. Negative serial correlation often signals overdifferencing (the model has applied $\Delta$ one more time than the series required). Spikes at seasonal lags call for seasonal dummies or a seasonal differencing term. A model with residual autocorrelation has not been falsified outright, but it has been told there is signal it failed to extract; the only honest response is to extend the specification and refit.</p>
+
+  <h3>Backtesting: walk-forward evaluation</h3>
+
+  <p>The standard train-test split assumes rows are exchangeable. Time-series rows are not, and a random split puts later observations into training and earlier ones into test, which is leakage of the future into the past. Backtesting replaces the split with a walk-forward scheme that mimics how the model would have been used at each historical point. Fix an initial training window $[1, T_0]$ that is large enough to fit the model. Fit the model on that window. Predict the next observation, $T_0 + 1$. Record the residual. Now extend (or roll) the training window by one step to $[1, T_0 + 1]$ (or $[2, T_0 + 1]$ for a rolling window), refit the model, and predict $T_0 + 2$. Continue until the present. The collection of one-step-ahead residuals is the backtest output, scored with the usual regression or classification metrics (RMSE, MAE, MAPE, Gini, AUC, F1, depending on the target).</p>
+
+  <p>Two variants matter. An <strong>expanding-window backtest</strong> grows the training set by one observation at each step, using every observation that exists at forecast time; it uses the most data and is appropriate when the data-generating process is stationary or slowly drifting. A <strong>rolling-window backtest</strong> keeps the training window at a fixed length, dropping the oldest observation as the newest arrives; it adapts faster to regime change and is appropriate when older observations are no longer representative (interest-rate regimes, COVID-era data, post-Basel-IV portfolios). The choice is empirical: run both, compare backtest error, pick the one that wins on stability and on metric.</p>
+
+  <p>Two extensions are common enough to deserve names. <strong>Multi-step backtests</strong> predict $h$ steps ahead rather than one, which is what the model will actually do in production for any horizon longer than the data frequency; the same walk-forward logic applies, with the prediction taken at step $T_0 + h$ instead of $T_0 + 1$. <strong>Time-series cross-validation</strong> (scikit-learn's <code>TimeSeriesSplit</code>) is an automated version of the expanding-window backtest with a fixed number of folds, useful for hyperparameter tuning when a full step-by-step walk is too expensive. Both are walk-forward in spirit; both preserve the no-leakage property; both score the model on observations strictly later than the training window that produced the prediction.</p>
+
+  <p>The metric reported from a backtest is the same as the metric reported from a hold-out: RMSE on a continuous forecast, MAPE when the operating user thinks in percentages, Gini or AUC on a binary forecast, accuracy or F1 on a classified outcome. The numerical value typically degrades compared to the random split, sometimes dramatically; that is the cost of removing the leakage. A model whose backtest score is materially worse than its random-split score has been overfitting to features that include information about the future, and the backtest score is the one that matters.</p>
+
+  <h3>Kolmogorov-Smirnov test and KS bands</h3>
+
+  <p>The Kolmogorov-Smirnov statistic measures the largest vertical gap between two empirical cumulative distribution functions. Given samples with empirical CDFs $F_1(x)$ and $F_2(x)$,</p>
+
+  $$D = \sup_{x} |F_1(x) - F_2(x)|.$$
+
+  <p>The two-sample KS test rejects the null hypothesis that the samples come from the same distribution when $D$ is large; the one-sample version replaces $F_2$ with a hypothesised distribution $F_0(x)$. The test is non-parametric: it makes no assumption about the shape of either distribution.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two empirical CDFs of good and bad scores with KS statistic marked as the maximum vertical gap">
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">KS bands: maximum vertical gap between the good and bad score CDFs</text>
+
+      <!-- Axes -->
+      <line x1="80" y1="280" x2="760" y2="280" stroke="#37352F" stroke-width="1.2"/>
+      <line x1="80" y1="60" x2="80" y2="280" stroke="#37352F" stroke-width="1.2"/>
+      <text x="420" y="306" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">model score (low to high)</text>
+      <text x="40" y="170" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a" transform="rotate(-90 40 170)">cumulative proportion</text>
+
+      <!-- y gridlines -->
+      <line x1="80" y1="60" x2="760" y2="60" stroke="#e4e4e7" stroke-width="0.8" stroke-dasharray="2 2"/>
+      <text x="74" y="63" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">1.0</text>
+      <line x1="80" y1="170" x2="760" y2="170" stroke="#e4e4e7" stroke-width="0.8" stroke-dasharray="2 2"/>
+      <text x="74" y="173" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">0.5</text>
+      <text x="74" y="283" text-anchor="end" font-family="Inter" font-size="9" fill="#71717a">0.0</text>
+
+      <!-- Bad CDF: rises steeply at low scores (most bads have low scores) -->
+      <path d="M 80 280 Q 200 280 260 200 T 420 90 T 760 60" fill="none" stroke="#dc2626" stroke-width="2.2"/>
+      <text x="260" y="180" font-family="Inter" font-size="10" font-weight="600" fill="#dc2626">bads CDF</text>
+
+      <!-- Good CDF: rises slowly at low scores, steeply at high scores -->
+      <path d="M 80 280 Q 320 278 480 240 T 700 110 T 760 60" fill="none" stroke="#0d9488" stroke-width="2.2"/>
+      <text x="540" y="260" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">goods CDF</text>
+
+      <!-- KS gap marker at approx x = 380 -->
+      <line x1="380" y1="118" x2="380" y2="252" stroke="#b45309" stroke-width="2" stroke-dasharray="4 3"/>
+      <circle cx="380" cy="118" r="3" fill="#b45309"/>
+      <circle cx="380" cy="252" r="3" fill="#b45309"/>
+      <text x="395" y="190" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">KS = max |F_good - F_bad|</text>
+      <text x="395" y="206" font-family="Inter" font-size="9" fill="#b45309">measured at the score where the gap is largest</text>
+    </svg>
+    <figcaption>Each curve is the empirical CDF of model scores conditional on the binary outcome (bads in red, goods in teal). Bads accumulate quickly at low scores; goods accumulate quickly at high scores; the larger the vertical gap between the curves, the better the model separates them. The KS statistic is the height of the amber dashed segment at the score where the gap is maximised; in credit risk this is the regulator-facing complement to Gini, which compresses the same separation into a single area-under-the-curve number.</figcaption>
+  </figure>
+
+  <p>Three uses of KS recur. First, as a residual check: applied to the residuals of a regression against a normal reference, KS tests normality without the parametric structure of a Shapiro-Wilk; it is robust on large samples where Shapiro-Wilk's significance becomes uninformative. Second, as a distribution-shift check: applied to a feature in training versus the same feature in production, a significant KS warns that the distribution has drifted, which is what a monitoring pipeline (stage 5 of the pipeline) reports. Third, the credit-risk use just illustrated: applied to model scores conditional on outcome, $F_1(x)$ is the CDF of scores for goods and $F_2(x)$ is the CDF for bads; the KS statistic is then the maximum cumulative separation between them as the score ranges. Higher KS means the model concentrates more bads at low scores and more goods at high scores; KS bands of 0.3 to 0.5 are typical for retail PD scorecards, and Gini and KS bands are reported together because they measure complementary aspects of the same ROC.</p>
+
+  <h3>Lift ratio and cumulative lift</h3>
+
+  <p>Most operational uses of a classification model rank observations by score and apply a decision to the top fraction (the top decile gets a marketing call, the top quintile gets manual underwriting, the bottom 5 per cent gets auto-decline). The metric that matches this use is <strong>lift</strong>: how much more concentrated are positives in the top fraction than in the population as a whole. For a chosen group (often a score decile),</p>
+
+  $$\text{Lift} = \frac{\text{positive rate in the group}}{\text{positive rate in the whole population}}.$$
+
+  <p>A lift of 1 means the group is no better than random; a lift of 3 means three times the base rate of positives lands in the group, so the model has triple the precision of a random selection at that volume. Lift is the metric a commercial user asks for unprompted: "if I act on the top 10 per cent of scores, how much better than random am I". It is fully determined by the ROC curve, but it presents the same information in the units of decision-making rather than the units of probability theory.</p>
+
+  <p><strong>Cumulative lift</strong> extends the single-decile number to a curve. Sort observations in descending order of score; for the top $k\%$ of the population, the cumulative lift is the proportion of all positives captured in that top $k\%$ divided by $k\%$ itself. Plotting cumulative lift on the y-axis against population fraction on the x-axis gives the <strong>lift curve</strong>: a horizontal line at 1 is the random model; a model with discriminatory power starts high (positives are concentrated in the top scores) and decays toward 1 as the cumulative fraction approaches 100 per cent (at the whole population, every model captures every positive). The area between the curve and the random line is a Gini-equivalent summary, and the y-intercept of the lift curve (lift at the smallest decile) is the headline number for tight cut-offs (top 1 per cent fraud queues, top decile collection calls).</p>
+
+  <p>A small worked example makes the calculation concrete. Suppose a binary target has 30 per cent positives overall, and the top decile of model scores contains 75 per cent positives. The lift at the top decile is $0.75 / 0.30 = 2.5$; the model is 2.5 times better than random at that operating point. The notebook's <code>cumulative_classification_lift</code> implementation reproduces this construction: it sorts by predicted probability, computes the running positive rate, and divides by the overall positive rate; the first array element is the lift at the top observation, the last element is exactly 1 (the lift over the whole population is, by construction, the population rate divided by itself).</p>
+
+  <h3>Closing the bias-variance loop</h3>
+
+  <p>This is the final lecture of the assessment block and the appropriate place to recap the bias-variance trade-off as it has run through every earlier stage of the pipeline. The trade-off is not local to model fitting; it appears at every decision point, and overfitting can be introduced at each of them.</p>
+
+  <p>At <strong>features</strong> (sub-module 01), selecting too many features inflates variance: every additional feature is a parameter to estimate, and the model fits noise in the training rows. Sub-module 01 lecture 4 on feature selection is the bias-variance trade-off in column space: keep too few features and the model underfits (bias); keep too many and it overfits (variance). At <strong>split</strong> (sub-module 02), repeatedly choosing hyperparameters on the validation set leaks validation information into the model and turns validation into a second training set; the test set then plays the role validation was supposed to. At <strong>fit</strong> (sub-module 03), model capacity is the direct lever on bias and variance: a linear model is high bias and low variance, a fully-grown decision tree is the opposite, an ensemble averages many low-bias high-variance models toward a lower-variance result. At <strong>tune</strong> (sub-module 06), hyperparameter search traces the U-shaped curve of test error against model complexity and picks the minimum; the standard mistake is to read the training-error curve instead, which is monotonically decreasing and never picks anything. At <strong>evaluate</strong> (this sub-module), the test set is the only honest read on the model's true generalisation; touching it before the final report converts it into validation, and the model loses its unbiased estimate. At <strong>interpret</strong> (sub-module 08), the choice between white-box and black-box methods is the bias-variance trade-off applied to <em>explanations</em>: a linear-regression coefficient is a high-bias, low-variance interpretation of the effect (it forces linearity in $X$ but is stable across resamples); a SHAP value on a tree ensemble is a low-bias, high-variance interpretation (it can capture any shape of effect but moves around between resamples). The whole course is the same trade-off applied at six different scales.</p>
+
+  <div class="callout insight">
+    <span class="tag">The bias-variance identity</span>
+    Under squared-error loss, the expected test error at a point $x_0$ decomposes exactly into three components: $\mathbb{E}[(y_0 - \hat{f}(x_0))^2] = \operatorname{Var}(\hat{f}(x_0)) + \operatorname{Bias}(\hat{f}(x_0))^2 + \sigma^2$, where $\sigma^2$ is the irreducible noise in $y_0$. The first two are model-dependent and trade off against each other; the third is a property of the data and no model can reduce it. Every choice in the pipeline shifts the first two; no choice touches the third. Evaluation reports the sum.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every forecasting and model-agnostic evaluation incident. Each looks fine in a notebook and breaks in production.</p>
+
+  <div class="callout warn">
+    <span class="tag">Random split on temporal data</span>
+    The default <code>train_test_split</code> with <code>shuffle=True</code> randomly permutes the rows, which on a time series puts later observations in training and earlier ones in test. The reported test error is biased downward by however much the series is autocorrelated. The fix is structural: use a walk-forward backtest or <code>TimeSeriesSplit</code> for cross-validation; never shuffle when the rows have a time index. The diagnostic that catches the symptom afterwards is a comparison of backtest score against random-split score, which on a leaked model differ by an order of magnitude.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Refitting the model only once</span>
+    A common shortcut is to fit on $[1, T_0]$, predict every observation from $T_0 + 1$ to $T$ without refitting, and call the resulting errors a backtest. This is a hold-out, not a walk-forward backtest, and it underestimates the model the further into the future the predictions go (the model never sees the more recent observations). The fix is to refit at each step (or at a regular cadence shorter than the prediction horizon); the cost is computational and is the price of an honest forecast.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Ljung-Box without degrees-of-freedom correction</span>
+    Applied to raw observations, Ljung-Box is $\chi^2$ with $h$ degrees of freedom. Applied to residuals from an ARIMA$(p, d, q)$ fit, the effective degrees of freedom are $h - p - q$, because the model has already used $p + q$ parameters to remove autocorrelation. Software that defaults to the wrong degrees of freedom understates the p-value and over-accepts the null of no autocorrelation. In Python, <code>acorr_ljungbox</code> takes a <code>model_df</code> argument for this correction; in R, the <code>fitdf</code> argument on <code>Box.test</code> does the same.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Lift at a single decile reported without the curve</span>
+    A headline "lift of 3 at the top decile" sounds impressive but says nothing about behaviour at other operating points. A model with a sharp top-decile lift and a flat curve elsewhere is useful only for cut-offs at exactly the top decile; a model with a smooth decay across deciles is robust to changes in operating point. The fix is to report the cumulative lift curve alongside any single-decile number, and to choose the operating point before reporting lift rather than after (otherwise the chosen decile is itself an overfit to the validation set).
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Forecasting evaluation extends the regression and classification toolkits to the case where rows are ordered in time. Residual autocorrelation diagnostics (ACF, Durbin-Watson, Ljung-Box) ask whether the conditional mean has been fully captured; significant autocorrelation means structure remains, and the specification must be extended. Walk-forward backtesting replaces the random train-test split with a procedure that never shows the model its own future; the resulting score is what the model would have produced in production, and it is the only score that matters for a deployed forecaster. The Kolmogorov-Smirnov statistic measures the maximum vertical gap between two empirical CDFs and serves as a normality check, a distribution-shift check, and (applied to good and bad score distributions) the regulator-facing KS bands metric. The lift ratio and the cumulative lift curve translate model scores into the commercial language of "how much better than random at the top fraction", which is the form decisions are actually made in.</p>
+
+  <p>What this lecture deliberately did not do. It did not derive an ARIMA or state-space model; that is the job of <a href="../../statistics/06-time_series.html">statistics lecture 6</a>. It did not introduce probabilistic forecasting (prediction intervals, fan charts, scoring rules like the CRPS); those are extensions of the same machinery and are covered in the time-series sub-module. It did not address structural breaks or regime-switching models, where the residual diagnostics will fail in a different way (the model is stable within each regime but not across them); those need their own evaluation framework. The four tools introduced here, applied alongside the regression and classification metrics of the previous two lectures, cover the F107-level requirement and the day-to-day commercial requirement.</p>
+
+  <p>Lecture 39 begins sub-module 08 on <a href="../08_model_interpretation/01-explaining_models.html">model interpretation</a>. Having validated the model on every metric the pipeline supports, the next question is what the model is actually doing: which features matter, how do they combine, where does the prediction come from for a given row. The interpretation toolkit (white-box reading of coefficients and feature importances, black-box methods like LIME and SHAP, partial dependence and ICE plots) is the bridge between a validated model and a deployed one, because no production user, regulator, or business stakeholder will accept a number they cannot explain.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the Durbin-Watson formula and explain what a value of 0.3 indicates about the residuals of a time-series regression.</li>
+      <li>You fit an ARIMA(1, 0, 1) model and want to test residual autocorrelation up to lag 10 using Ljung-Box. How many degrees of freedom should the chi-square reference distribution have, and why is this different from applying the same test to raw observations?</li>
+      <li>An analyst splits a 10-year monthly default-rate series at random (80-20) and reports a hold-out RMSE of 0.5 percentage points. The walk-forward backtest of the same model gives RMSE of 2.1 percentage points. Explain in one sentence why the two differ.</li>
+      <li>Define the Kolmogorov-Smirnov statistic for two samples, and describe how it is interpreted in a credit scorecard context where the two samples are the model scores for goods and bads.</li>
+      <li>A binary classifier scores 30 per cent positives in the overall population. The top decile by score contains 75 per cent positives. Compute the lift at the top decile and state how you would extend the calculation to a cumulative lift curve.</li>
+      <li>Recap the bias-variance trade-off as it appears at three different pipeline stages of your choice, with one sentence per stage explaining how a wrong choice at that stage causes either bias or variance to dominate.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 39 (<a href="../08_model_interpretation/01-explaining_models.html">explaining models</a>) opens sub-module 08 by taking the validated model and asking how its predictions can be made auditable, both globally (which features drive the model overall) and locally (why this row got this prediction).</li>
+      <li><strong>Previous:</strong> Lecture 37 (<a href="03-classification_metrics.html">classification metrics</a>) introduced ROC, AUC, Gini, and the confusion-matrix family; this lecture extends the toolkit to time series and adds the model-agnostic diagnostics that work across regression and classification.</li>
+      <li><strong>Prerequisite:</strong> Sub-module 02 lecture 6 (<a href="../02_train_test_split/01-train_test_validation.html">train, test, validation</a>) introduced the split that fails on temporal data; the walk-forward backtest in this lecture is the replacement.</li>
+      <li><strong>Cross-discipline:</strong> Statistics lecture 6 (<a href="../../statistics/06-time_series.html">time series</a>) supplies the underlying ARIMA and state-space machinery whose residuals are checked with the autocorrelation tests in this lecture.</li>
+      <li><strong>Earlier this course:</strong> Sub-module 01 lecture 1 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the ML landscape</a>) introduced the six-stage pipeline; the bias-variance recap in section 4 closes the loop by tracing the trade-off through every stage of that pipeline.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Model evaluation course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 38 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

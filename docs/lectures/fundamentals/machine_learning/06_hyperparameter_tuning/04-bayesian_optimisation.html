@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 33: Bayesian optimisation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Hyperparameter tuning</a></div>
+  <h1>Bayesian optimisation</h1>
+  <p class="subtitle">Model the score function with a surrogate and let it choose where to sample next. Bayesian optimisation is what you reach for when each evaluation costs minutes and you want every minute to count.</p>
+  <div class="meta">
+    <span>Lecture 33 of 62</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part V: tuning and assessment</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Bayesian optimisation</strong> is a sequential strategy for finding the input that maximises an expensive, black-box function. In hyperparameter tuning the function is the cross-validated score $f(x)$ as a function of the hyperparameter vector $x$, and "expensive" means a single evaluation takes minutes or hours because the model has to be refit and rescored. Two ingredients make the method work. A <strong>surrogate model</strong> approximates $f$ as a probability distribution over functions, conditioned on the trials run so far; the canonical choice is a Gaussian process, but tree-based alternatives (the tree-structured Parzen estimator used by Optuna, the random forest surrogate used by SMAC) dominate practical tooling. An <strong>acquisition function</strong> turns the surrogate's posterior mean and uncertainty into a scalar score over the search space; maximising it picks the next $x$ to evaluate. The loop fits the surrogate to observed pairs, maximises the acquisition function, evaluates the true score at the chosen $x$, adds the pair to the dataset, and repeats. Compared to grid or random search, Bayesian optimisation typically reaches a competitive score in five to ten times fewer evaluations on continuous and integer search spaces of moderate dimensionality, which is the regime where deep networks and large ensembles live.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You have a knob with a hundred positions. Turning it and reading the resulting score takes an hour. Random search turns the knob to a uniformly chosen position every hour, ignoring what it has just learned. Bayesian optimisation builds a sketch of "the score curve so far": where it has measured (high confidence) and where it has not (high uncertainty). It then turns the knob next to the position that combines two ideas: somewhere the sketch predicts a high score, or somewhere the sketch is most uncertain so the next measurement will sharpen it. After every new reading the sketch is updated and the choice is repeated. The cost is the bookkeeping; the saving is the hours of useless trials skipped.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Beyond the source</span>
+    The wiki source for this topic is a 22-line stub. This lecture is written to fill the gap. Bayesian optimisation has become the dominant approach to tuning expensive models (deep networks, gradient-boosted ensembles with hundreds of trees, transformer fine-tuning) and the tooling is now mature: Optuna for TPE-based tuning at scale, scikit-optimize for a GP-based scikit-learn-style API, BoTorch and Ax for research-grade GP work in PyTorch. Treating Bayesian optimisation as an advanced footnote underestimates how much industrial tuning runs on it.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Stage 6 of the pipeline. <a href="01-tuning_principles.html">Lecture 30</a> set out the cost equation that determines when a smarter search is worth its overhead; <a href="03-random_search.html">lecture 32</a> covered random search, the default baseline that Bayesian optimisation has to beat. <a href="05-genetic_algorithms.html">Lecture 34</a> covers genetic algorithms, the other population-based alternative for spaces where surrogates struggle (highly discrete, conditional, or non-numeric). The statistics dependency lives in <a href="../../statistics/09-bayesian_statistics.html">statistics lecture 9</a>: prior, likelihood, posterior, and the idea that a Gaussian process is a prior over functions rather than a prior over parameters.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons Bayesian optimisation matters more in 2026 than in 2016. First, <strong>model fits got expensive.</strong> A gradient-boosted tree on a million rows with five hundred trees takes minutes per fit; a transformer fine-tune takes hours per epoch on a single GPU. Random search treats every trial as worth the same time, but a budget of fifty trials at one hour each is a working week per experiment. Cutting that to ten trials by spending compute on smarter selection instead is the difference between "tune over the weekend" and "tune over the quarter".</p>
+
+  <p>Second, <strong>random search is information-blind.</strong> Every sample from a random search is independent of every other sample. If the first nineteen trials reveal that low learning rates and high tree counts are the productive corner of the space, the twentieth trial does not use that information; it draws independently from the same prior distribution as the first. Bayesian optimisation conditions every choice on every prior result. The cost is that the choice is no longer parallelisable across the full budget at once (parallel BO exists but is harder to reason about); the gain is that every evaluation reduces the uncertainty over $f$ in a region the algorithm cares about.</p>
+
+  <p>Third, <strong>the surrogate is reusable artefact.</strong> After tuning finishes, the fitted surrogate is itself a model of how the cross-validated score varies with hyperparameters. It can be queried to plot one-dimensional or two-dimensional slices, to identify which hyperparameters matter most (the surrogate's variance is small in those dimensions because they are sampled densely), and to choose a robust optimum rather than a brittle peak. Random search produces a flat table of trials with no equivalent post-hoc analysis.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team tuning a credit-risk gradient-boosted PD model ran a hundred-trial random search over learning rate, max depth, subsample, min child weight, and L2 regularisation. Three runs of the same search produced three different "best" configurations with AUC within 0.001 of each other but with structurally different hyperparameters (one favoured shallow deep trees, another favoured shallow wide trees). The validation team flagged the instability and asked which configuration was actually best. The team switched to Optuna with TPE for the next round, reached the same AUC in twenty-five trials, and the resulting Optuna study allowed a sensitivity analysis showing that learning rate and max depth dominated and the other three hyperparameters were nearly indifferent in the productive region. The model was passed with the smaller, defensible hyperparameter footprint.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. The search space is a one-dimensional axis; the unknown true score function is a curve over it; you have evaluated the function at a handful of points; the surrogate is a posterior distribution over what the curve might be, narrow near observed points and wide in between. Below the surrogate sits an acquisition function, a derived curve whose peak is the algorithm's next choice. The two-panel picture is the canonical mental model and almost every Bayesian optimisation diagram in the literature is some version of it.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gaussian process posterior with acquisition function panel below">
+      <defs>
+        <linearGradient id="bandFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.05"/>
+        </linearGradient>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A Gaussian process surrogate and its acquisition function on a 1D search space</text>
+
+      <!-- Upper panel: GP posterior -->
+      <g>
+        <rect x="60" y="46" width="720" height="230" fill="#FFFFFF" stroke="#e4e4e7" stroke-width="1"/>
+        <text x="64" y="60" font-family="Inter" font-size="10" font-weight="600" fill="#71717a">score f(x)</text>
+
+        <!-- Uncertainty band (mean +/- 2 sigma) -->
+        <path d="M 80 180 Q 140 100 200 140 Q 260 175 320 120 Q 380 80 440 110 Q 500 130 560 170 Q 620 200 680 165 Q 720 145 760 180 L 760 245 Q 720 220 680 230 Q 620 250 560 230 Q 500 200 440 175 Q 380 155 320 195 Q 260 230 200 220 Q 140 200 80 240 Z"
+              fill="url(#bandFill)" stroke="#7c3aed" stroke-width="0.5" opacity="0.9"/>
+
+        <!-- Posterior mean -->
+        <path d="M 80 210 Q 140 150 200 180 Q 260 200 320 158 Q 380 118 440 142 Q 500 165 560 200 Q 620 225 680 198 Q 720 178 760 215"
+              fill="none" stroke="#7c3aed" stroke-width="2"/>
+
+        <!-- True (unknown) function, dashed -->
+        <path d="M 80 195 Q 140 130 200 165 Q 260 195 320 140 Q 380 95 440 125 Q 500 155 560 195 Q 620 225 680 185 Q 720 165 760 200"
+              fill="none" stroke="#71717a" stroke-width="1" stroke-dasharray="4 3"/>
+
+        <!-- Observed points -->
+        <circle cx="120" cy="172" r="4" fill="#0d9488" stroke="#FFFFFF" stroke-width="1"/>
+        <circle cx="250" cy="200" r="4" fill="#0d9488" stroke="#FFFFFF" stroke-width="1"/>
+        <circle cx="320" cy="140" r="4" fill="#0d9488" stroke="#FFFFFF" stroke-width="1"/>
+        <circle cx="500" cy="170" r="4" fill="#0d9488" stroke="#FFFFFF" stroke-width="1"/>
+        <circle cx="640" cy="210" r="4" fill="#0d9488" stroke="#FFFFFF" stroke-width="1"/>
+        <circle cx="720" cy="180" r="4" fill="#0d9488" stroke="#FFFFFF" stroke-width="1"/>
+
+        <!-- Current best marker on best observed point -->
+        <line x1="320" y1="140" x2="320" y2="265" stroke="#b45309" stroke-width="0.8" stroke-dasharray="2 2"/>
+        <text x="328" y="135" font-family="Inter" font-size="9" font-weight="600" fill="#b45309">f*</text>
+
+        <!-- Legend -->
+        <rect x="600" y="60" width="170" height="68" rx="6" fill="#FFFFFF" stroke="#e4e4e7" stroke-width="1"/>
+        <circle cx="612" cy="72" r="3" fill="#0d9488"/>
+        <text x="620" y="75" font-family="Inter" font-size="9" fill="#18181b">observed (x, score) trials</text>
+        <line x1="606" y1="89" x2="620" y2="89" stroke="#7c3aed" stroke-width="2"/>
+        <text x="624" y="92" font-family="Inter" font-size="9" fill="#18181b">posterior mean</text>
+        <rect x="606" y="100" width="14" height="6" fill="url(#bandFill)" stroke="#7c3aed" stroke-width="0.5"/>
+        <text x="624" y="106" font-family="Inter" font-size="9" fill="#18181b">+/- 2 sigma uncertainty</text>
+        <line x1="606" y1="118" x2="620" y2="118" stroke="#71717a" stroke-width="1" stroke-dasharray="3 2"/>
+        <text x="624" y="121" font-family="Inter" font-size="9" fill="#18181b">true f (unknown)</text>
+      </g>
+
+      <!-- Lower panel: acquisition function -->
+      <g>
+        <rect x="60" y="296" width="720" height="130" fill="#FFFFFF" stroke="#e4e4e7" stroke-width="1"/>
+        <text x="64" y="310" font-family="Inter" font-size="10" font-weight="600" fill="#71717a">expected improvement EI(x)</text>
+
+        <!-- EI curve: low near observed points, higher near uncertain regions with good predicted mean -->
+        <path d="M 80 415 Q 140 405 200 395 Q 260 380 320 410 Q 380 340 440 320 Q 500 380 560 405 Q 620 405 680 408 Q 720 410 760 415"
+              fill="none" stroke="#b45309" stroke-width="2"/>
+
+        <!-- Peak marker -->
+        <circle cx="440" cy="320" r="5" fill="#b45309" stroke="#FFFFFF" stroke-width="1"/>
+        <line x1="440" y1="320" x2="440" y2="270" stroke="#b45309" stroke-width="1" stroke-dasharray="2 2"/>
+        <text x="446" y="316" font-family="Inter" font-size="10" font-weight="700" fill="#b45309">x_next</text>
+
+        <!-- x axis label -->
+        <line x1="80" y1="425" x2="760" y2="425" stroke="#a1a1aa" stroke-width="0.5"/>
+        <text x="420" y="445" text-anchor="middle" font-family="Inter" font-size="10" fill="#71717a">hyperparameter x (1D for the diagram; in practice up to ~20D)</text>
+      </g>
+    </svg>
+    <figcaption>The surrogate panel shows the posterior over the unknown score function: the mean is the algorithm's best guess, the band is its uncertainty, narrow at the six observed trials and wide in between. The acquisition panel converts the surrogate into a single scalar per point. The next trial sits at the acquisition peak, which here is in a moderately uncertain region whose posterior mean is also high. Different acquisition functions weight uncertainty and predicted score differently.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The band is narrow on top of every green dot because the surrogate has been told the value there; it widens away from data, encoding the algorithm's ignorance. The next sample is not at the highest posterior mean (that point is already evaluated and labelled $f^*$ around $x \approx 320$) and not at the highest uncertainty (the gaps between points have wider bands than the chosen point); it is at the location where the trade-off between predicted score and uncertainty, encoded in the acquisition function, is maximised. The choice of acquisition function moves that peak. Expected improvement is conservative and tends to exploit; upper confidence bound with a large kappa explores more aggressively.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The surrogate: Gaussian processes and the alternatives</h3>
+
+  <p>A <strong>Gaussian process</strong> is a probability distribution over functions, fully specified by a mean function $m(x)$ and a covariance kernel $k(x, x')$. The kernel encodes how similar the function values at two inputs are expected to be: nearby inputs produce correlated outputs, distant inputs are approximately independent. The standard choice is the squared-exponential (RBF) kernel,</p>
+  $$k(x, x') = \sigma_f^2 \exp\!\left(-\frac{\lVert x - x' \rVert^2}{2\ell^2}\right),$$
+  <p>with signal variance $\sigma_f^2$ and length scale $\ell$. Given a set of observations $\{(x_i, y_i)\}_{i=1}^{n}$ with $y_i = f(x_i) + \varepsilon$ and Gaussian noise $\varepsilon \sim \mathcal{N}(0, \sigma_n^2)$, the posterior over $f$ at any test point $x_*$ is itself Gaussian,</p>
+  $$f(x_*) \mid \mathcal{D} \sim \mathcal{N}\!\left(\mu(x_*), \sigma^2(x_*)\right),$$
+  <p>with closed-form mean and variance in terms of the kernel matrix. This is the property that makes GPs the natural surrogate: every prediction comes with a calibrated uncertainty, and the acquisition function below is computable in closed form. The hyperparameters of the kernel itself ($\sigma_f$, $\ell$, $\sigma_n$) are fit by maximising the marginal likelihood, which is also closed-form in the Gaussian case.</p>
+
+  <p>Two weaknesses of vanilla GP-based Bayesian optimisation push practitioners toward alternatives. <strong>Scaling.</strong> Inverting the kernel matrix is $O(n^3)$ in the number of trials; beyond a few thousand trials the surrogate becomes the bottleneck. <strong>Mixed and conditional spaces.</strong> The RBF kernel is defined on a continuous Euclidean space. Integer hyperparameters can be handled by rounding the GP's continuous input, but categorical and conditional hyperparameters (the choice of optimiser, with its own conditional learning-rate range) do not have a natural distance and break the kernel's assumption.</p>
+
+  <p>The <strong>tree-structured Parzen estimator (TPE)</strong>, the default surrogate in Optuna, side-steps both problems. Instead of modelling $p(y \mid x)$ as a GP, TPE models the conditional density $p(x \mid y)$ as two separate kernel density estimates, one for "good" trials whose score sits above a quantile threshold $y^*$ and one for "bad" trials below it. The acquisition signal is the ratio $\ell(x) / g(x)$, where $\ell$ is the density of good trials and $g$ is the density of bad trials at $x$. Maximising the ratio picks an $x$ that is more typical of good trials than of bad ones. The two KDEs decompose over hyperparameters and accommodate conditional structure, which is why Optuna's <code>suggest_categorical</code> and conditional <code>suggest_int</code>/<code>suggest_float</code> calls integrate cleanly into the same study.</p>
+
+  <p>The <strong>random forest surrogate</strong> used by SMAC (sequential model-based algorithm configuration) is a third option. Each tree in the forest predicts a value at $x$; the mean and variance across trees serve as the surrogate's posterior. Random forests handle discrete and conditional inputs natively (a categorical split is just a partition on level identity) and scale linearly with the number of trials, at the cost of a less smooth surrogate and less principled uncertainty estimates than a GP. SMAC remains common in the algorithm-configuration community where the search spaces are heavily structured (compilers, SAT solvers); in machine-learning hyperparameter tuning, TPE has taken over.</p>
+
+  <h3>The acquisition function</h3>
+
+  <p>The acquisition function $\alpha(x)$ converts the surrogate's posterior at $x$ into a scalar quantifying how attractive $x$ is as the next sample. Three canonical choices.</p>
+
+  <p><strong>Expected improvement (EI).</strong> Improvement over the current best observed score $f^*$ is the random variable $I(x) = \max(f(x) - f^*, 0)$. EI is its expectation under the surrogate's posterior,</p>
+  $$\operatorname{EI}(x) = \mathbb{E}\!\left[\max(f(x) - f^*, 0)\right].$$
+  <p>For a Gaussian posterior $f(x) \sim \mathcal{N}(\mu(x), \sigma^2(x))$ this has a closed form,</p>
+  $$\operatorname{EI}(x) = (\mu(x) - f^*) \Phi(z) + \sigma(x) \phi(z), \qquad z = \frac{\mu(x) - f^*}{\sigma(x)},$$
+  <p>with $\Phi$ and $\phi$ the standard normal CDF and PDF. EI is the most widely used acquisition function and the default in scikit-optimize, BoTorch, and most teaching expositions. It naturally balances exploration (large $\sigma$ inflates EI for any $\mu$) and exploitation (large $\mu - f^*$ inflates EI even at low $\sigma$).</p>
+
+  <p><strong>Probability of improvement (PI).</strong> The simpler relative,</p>
+  $$\operatorname{PI}(x) = P(f(x) > f^*) = \Phi(z), \qquad z = \frac{\mu(x) - f^*}{\sigma(x)}.$$
+  <p>PI rewards any chance of beating the current best, but does not weight by how much it is beaten. A point with a tiny posterior mean above $f^*$ and a tiny variance can have PI close to one and still represent a microscopic improvement. PI tends to over-exploit (sample close to the current best repeatedly) unless modified with an exploration buffer $f^* + \xi$ replacing $f^*$.</p>
+
+  <p><strong>Upper confidence bound (UCB).</strong> A direct trade-off,</p>
+  $$\operatorname{UCB}(x) = \mu(x) + \kappa \, \sigma(x),$$
+  <p>with $\kappa$ a tunable exploration coefficient. Small $\kappa$ exploits (close to greedy on the posterior mean); large $\kappa$ explores (close to greedy on uncertainty). UCB has theoretical regret guarantees (the GP-UCB result of Srinivas et al.) and is the default in many bandit-flavoured analyses; in practice the choice of $\kappa$ matters and is often scheduled to decay over time as the surrogate sharpens.</p>
+
+  <p>In practice the difference between EI and UCB on a well-behaved problem is small. The choice matters more when the surrogate is uncertain about whether to explore far from data; EI's curvature handles this gracefully and is the safer default for users who do not want to tune $\kappa$.</p>
+
+  <h3>The loop</h3>
+
+  <p>The full Bayesian optimisation loop. Initial design: evaluate $f$ at $n_0$ points chosen by Latin hypercube sampling or quasi-random Sobol sequences, typically $n_0$ between five and twenty. This bootstrap is needed because the surrogate has nothing to learn from before observations exist. Iteration: fit the surrogate to the current dataset $\mathcal{D}_t = \{(x_i, y_i)\}_{i=1}^{t}$, optimise the acquisition function $\alpha(x; \mathcal{D}_t)$ over the search space to find $x_{t+1}$, evaluate $y_{t+1} = f(x_{t+1})$ at the chosen point (this is the expensive step), append the new pair to $\mathcal{D}_{t+1}$, repeat until budget is exhausted. Return the best observed pair, optionally with the surrogate itself as an auxiliary artefact.</p>
+
+  <p>Two implementation details matter. The inner acquisition optimisation is itself an optimisation problem (multimodal, often non-convex), solved by L-BFGS-B with random restarts, by sampling and refining, or by gradient-free methods on a coarse grid. It is cheap compared to a true model fit (the surrogate evaluation is microseconds, not minutes), so spending compute here is essentially free. Pruning of unpromising trials before they finish (Optuna's median pruner, Hyperband-style successive halving) is orthogonal to the surrogate choice and combines productively with it: BOHB (Bayesian optimisation HyperBand) couples a TPE surrogate with Hyperband's multi-fidelity scheduling to skip bad configurations early without wasting full evaluations on them.</p>
+
+  <h3>When Bayesian optimisation beats random search, and when it does not</h3>
+
+  <p>Bayesian optimisation wins decisively when three conditions hold together. <strong>Evaluations are expensive</strong> (minutes to hours per trial), so the surrogate's bookkeeping cost is negligible against the saving from fewer trials. <strong>Dimensionality is moderate</strong> (up to roughly twenty hyperparameters); above that, GP-based methods suffer from the curse of dimensionality in the kernel (length scales become ill-determined, every point looks far from every other) and TPE's density estimates become unreliable. <strong>The space is continuous or integer</strong>, with optional categorical dimensions; smooth surrogates over these inputs are well-defined and the kernel or density estimator can interpolate sensibly.</p>
+
+  <p>Bayesian optimisation does not justify its overhead when the conditions invert. <strong>Cheap evaluations</strong> (sub-second per trial) favour random search or even exhaustive grid because the surrogate fit and acquisition optimisation become the bottleneck. <strong>Highly discrete or conditional spaces</strong> (architecture search with categorical layer types, conditional branches selecting different hyperparameter subsets) defeat GP-BO; TPE handles conditionality and SMAC handles full discreteness, but vanilla GP-BO does not. <strong>Very high dimensionality</strong> (above forty or fifty hyperparameters) requires either dimensionality-reduction tricks (REMBO, ALEBO), trust-region methods (TuRBO), or a switch to a fundamentally different strategy. The honest answer in that regime is often "random search is competitive and easier to parallelise"; the academic results showing Bayesian optimisation winning are mostly in the moderate-dimensional regime where it is genuinely well-suited.</p>
+
+  <h3>Tooling: Optuna and scikit-optimize</h3>
+
+  <p>Two libraries cover the great majority of practical use. <strong>Optuna</strong> uses TPE by default, integrates pruning (median pruner, successive halving, Hyperband), supports conditional and categorical search spaces natively, and scales to distributed studies via a shared database. <strong>Scikit-optimize</strong> uses GP-based surrogates with EI by default, offers a drop-in replacement for <code>GridSearchCV</code> via <code>BayesSearchCV</code>, and is the natural choice when the rest of the pipeline is scikit-learn and the search space is straightforwardly continuous.</p>
+
+  <p>An Optuna study tuning a gradient-boosted classifier with pruning.</p>
+
+  <pre><code class="language-python">import optuna
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import GradientBoostingClassifier
+
+X, y = load_breast_cancer(return_X_y=True)
+
+def objective(trial):
+    params = {
+        "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
+        "n_estimators":  trial.suggest_int("n_estimators", 50, 500),
+        "max_depth":     trial.suggest_int("max_depth", 2, 8),
+        "subsample":     trial.suggest_float("subsample", 0.5, 1.0),
+        "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 20),
+    }
+    model = GradientBoostingClassifier(random_state=0, **params)
+    scores = cross_val_score(model, X, y, cv=5, scoring="roc_auc", n_jobs=-1)
+    return scores.mean()
+
+sampler = optuna.samplers.TPESampler(seed=0, n_startup_trials=10)
+pruner  = optuna.pruners.MedianPruner(n_startup_trials=10, n_warmup_steps=20)
+study   = optuna.create_study(direction="maximize", sampler=sampler, pruner=pruner)
+study.optimize(objective, n_trials=50, show_progress_bar=False)
+
+print(study.best_value, study.best_params)
+</code></pre>
+
+  <p>Three things to read off the script. The search space is declared inside the objective via <code>trial.suggest_*</code> calls, which lets Optuna handle conditional spaces transparently (a <code>suggest_categorical("optimiser", ["adam", "sgd"])</code> followed by a conditional <code>suggest_float</code> for an optimiser-specific learning rate would integrate without extra plumbing). The TPE sampler is configured to spend the first ten trials on the prior (essentially random initialisation) before switching to TPE; this is the initial design step. The pruner stops trials whose intermediate score is below the median, although the objective above is single-shot (no intermediate reporting) so the pruner is dormant; reporting cross-validation fold scores via <code>trial.report(score, step=fold)</code> would activate it.</p>
+
+  <p>The scikit-optimize equivalent is closer to the scikit-learn idiom and replaces the explicit objective function with a search-space dictionary.</p>
+
+  <pre><code class="language-python">from skopt import BayesSearchCV
+from skopt.space import Real, Integer
+from sklearn.ensemble import GradientBoostingClassifier
+
+search_space = {
+    "learning_rate":  Real(1e-3, 0.3, prior="log-uniform"),
+    "n_estimators":   Integer(50, 500),
+    "max_depth":      Integer(2, 8),
+    "subsample":      Real(0.5, 1.0),
+    "min_samples_leaf": Integer(1, 20),
+}
+
+bayes_cv = BayesSearchCV(
+    estimator=GradientBoostingClassifier(random_state=0),
+    search_spaces=search_space,
+    n_iter=50,
+    cv=5,
+    scoring="roc_auc",
+    n_jobs=-1,
+    random_state=0,
+)
+bayes_cv.fit(X, y)
+print(bayes_cv.best_score_, bayes_cv.best_params_)
+</code></pre>
+
+  <p><code>BayesSearchCV</code> is the drop-in for <code>GridSearchCV</code> and <code>RandomizedSearchCV</code>: same interface, GP-based surrogate underneath. For continuous low-to-moderate-dimensional spaces with no conditional structure, this is often the path of least resistance.</p>
+
+  <h3>Multi-fidelity methods: BOHB and Hyperband</h3>
+
+  <p><strong>Hyperband</strong> is a bandit-style strategy that does not model the score function at all; instead it allocates a small budget to many random configurations, kills the bottom half, doubles the budget on the survivors, and repeats. The intuition is that a configuration that is hopeless after one epoch is unlikely to become competitive after fifty. <strong>BOHB</strong> (Bayesian optimisation HyperBand) replaces Hyperband's random sampling at each rung with TPE-based sampling, so the configurations entering the bracket are themselves chosen by a surrogate. The two strategies together hit the strengths of both: BO concentrates samples in promising regions, Hyperband concentrates compute on configurations that are still competitive at higher fidelities. For deep learning and any training that produces a meaningful intermediate score (loss after $k$ epochs), multi-fidelity methods routinely outperform single-fidelity BO by an order of magnitude in wall-clock time. The corresponding implementations in 2026 are Optuna's Hyperband pruner combined with the TPE sampler, and the standalone <code>HpBandSter</code> library for research-grade BOHB.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Five failure modes show up reliably in production Bayesian optimisation runs. Each is invisible at study time and obvious from the resulting trial table.</p>
+
+  <div class="callout warn">
+    <span class="tag">Too small an initial design</span>
+    A TPE study with three startup trials and a forty-dimensional space spends its first dozen acquisitions essentially extrapolating from three points. The surrogate is dominated by the prior and the choices look random; once the prior is overwhelmed the algorithm finally starts learning, but by then a third of the budget is gone. The fix is to size the initial design relative to the dimensionality: a useful rule of thumb is $n_0 \approx 5d$ for a $d$-dimensional space, sampled by Sobol or Latin hypercube to spread coverage.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting log-scale priors on scale-sensitive hyperparameters</span>
+    Learning rates, regularisation strengths, and any hyperparameter spanning several orders of magnitude need a log-uniform prior, not a uniform one. A uniform sample over $[10^{-4}, 10^{-1}]$ puts ninety per cent of its mass above $10^{-2}$, which is the wrong region of the space for most deep networks. Optuna's <code>suggest_float(..., log=True)</code> and scikit-optimize's <code>Real(prior="log-uniform")</code> handle this; the failure mode is silently using the linear-uniform default and wondering why the surrogate cannot find a good learning rate.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Non-stationary objective from a moving cross-validation split</span>
+    The surrogate assumes $f(x)$ is a (noisy) deterministic function of $x$. Re-splitting the cross-validation folds on every trial injects noise into $f$ that the surrogate has no model for; the same hyperparameters return different scores on different trials and the GP kernel cannot distinguish "noisy estimate of the same point" from "true variation across the space". The fix is to fix the CV random seed for the study, or to use a noisy-observation variant of the surrogate (most libraries have a noise parameter; raising it stabilises the fit but blunts the acquisition signal).
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Premature exploitation with a small budget</span>
+    EI and PI both reduce to pure exploitation once the surrogate becomes confident, which on a small budget can happen before the interesting region of the space has been sampled at all. The study converges to a local optimum near the initial design and the trial table shows the same configuration evaluated twenty times in a row with marginally different rounding. The fix is to use UCB with a non-trivial $\kappa$, or to add a small exploration buffer to EI (the $\xi$ in EI($\mu - f^* - \xi$)), or to switch to a multi-fidelity method that keeps a population of diverse candidates alive.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Trusting the surrogate's optimum without re-evaluating</span>
+    The surrogate's predicted optimum (the $x$ at which $\mu(x)$ is maximised) is not the same as the best observed trial. The surrogate can over-fit, especially with few points and a flexible kernel, and the predicted optimum can sit in a region that has not been evaluated at all. The defensible reported optimum is always the best observed pair $(x^*, y^*)$, not the surrogate's prediction. Some libraries return the surrogate's argmax by default; check the documentation and override if necessary.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Bayesian optimisation is the response to the cost equation laid out in <a href="01-tuning_principles.html">lecture 30</a>: when every evaluation costs minutes or hours, spending compute on choosing where to sample next is a better use of compute than running another uninformed trial. A surrogate models the score function as a posterior over functions, a Gaussian process when the space is continuous and well-behaved, a TPE or random forest when it is mixed or conditional. An acquisition function turns posterior mean and uncertainty into a scalar; expected improvement is the safe default, upper confidence bound and probability of improvement are the alternatives. The loop alternates surrogate fit and acquisition maximisation with true evaluations of the expensive function. Optuna with TPE is the practical default in 2026; scikit-optimize is the GP-based scikit-learn-native alternative. Multi-fidelity methods (BOHB, Hyperband) couple BO with successive halving for problems where intermediate scores are meaningful.</p>
+
+  <p>What this lecture deliberately did not do. It did not derive the GP posterior or the EI closed form in full algebraic detail; that level lives in the statistics track at <a href="../../statistics/09-bayesian_statistics.html">statistics lecture 9</a> and beyond. It did not cover trust-region or high-dimensional variants (TuRBO, REMBO, ALEBO), which are research topics rather than standard tooling. It did not cover multi-objective Bayesian optimisation (ParEGO, EHVI), which generalises EI to Pareto fronts and is relevant when the score is a vector rather than a scalar. The single-objective single-fidelity case covered here handles the great majority of hyperparameter tuning in practice.</p>
+
+  <p>Lecture 34, <a href="05-genetic_algorithms.html">genetic algorithms</a>, covers the population-based alternative. Where Bayesian optimisation builds a single global surrogate and queries it sequentially, a genetic algorithm maintains a population of candidates and evolves them by crossover and mutation. Genetic algorithms handle highly discrete and conditional spaces (architecture search, feature subset selection) where surrogates struggle, at the cost of less sample efficiency. The two methods are complementary rather than competing: the choice depends on the structure of the space, not on a universal superiority.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the two ingredients of Bayesian optimisation and explain in one sentence what each does.</li>
+      <li>Write the closed-form expression for expected improvement under a Gaussian posterior $f(x) \sim \mathcal{N}(\mu, \sigma^2)$ with current best $f^*$, and identify which term encodes exploitation and which exploitation.</li>
+      <li>Why is the tree-structured Parzen estimator a more practical surrogate than a vanilla Gaussian process for an Optuna study tuning a model with categorical and conditional hyperparameters?</li>
+      <li>A study runs fifty trials of TPE on a forty-dimensional hyperparameter space with three startup trials. The trial table shows the first fifteen trials look like random draws and the next thirty-five barely move. Diagnose the failure and state the fix.</li>
+      <li>You are tuning a logistic regression on a small dataset; each cross-validated fit takes 0.3 seconds. Should you use Bayesian optimisation or random search, and why?</li>
+      <li>BOHB couples Bayesian optimisation with Hyperband. In one sentence each, explain what each component contributes and why combining them outperforms either alone on a deep-network tuning problem.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 34 (<a href="05-genetic_algorithms.html">genetic algorithms</a>) covers the population-based alternative for highly discrete and conditional spaces where surrogate-based methods struggle.</li>
+      <li><strong>Previous:</strong> Lecture 32 (<a href="03-random_search.html">random search</a>) introduced the uninformed baseline that Bayesian optimisation has to beat; the comparison runs throughout this lecture.</li>
+      <li><strong>Prerequisite:</strong> Lecture 30 (<a href="01-tuning_principles.html">tuning principles</a>) set out the cost equation that determines when a smarter search is worth its overhead.</li>
+      <li><strong>Statistics dependency:</strong> Statistics lecture 9 (<a href="../../statistics/09-bayesian_statistics.html">Bayesian statistics</a>) covers the prior-likelihood-posterior framework and the Gaussian process as a prior over functions; understanding the GP posterior in this lecture rests on it.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Hyperparameter tuning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 33 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

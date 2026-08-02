@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EAD risk differentiation: segmentation and the GLM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>EAD risk differentiation: segmentation and the GLM</h1>
+  <p class="subtitle">Fit a Generalised Linear Model on the EADF target per segment. The model class is GLM (Gaussian distribution with Identity link in the standard retail build, alternatives Gamma + Log or Beta + Logit tested and rejected); segmentation is hierarchical and utilisation-driven; variable selection runs the five-criterion iterative refinement adapted for continuous targets. The output is a PiT EADF per facility that ranks exposure-intensity risk; calibration to LRA and downturn happens in the next lecture.</p>
+  <div class="meta">
+    <span>A-IRB 27 of n &mdash; EAD 5 of 7</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Sources: <code>05_modelling/ead/02-model-design.md</code>, <code>03-risk-differentiation.md</code>, <code>06-pit-model.md</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">EAD risk differentiation is the rank-ordering stage of the EAD build. The development team segments the portfolio into homogeneous risk groups (typically 8 to 15, dominated by utilisation bands), fits a <strong>Generalised Linear Model</strong> in each segment with the EADF as the target, and tests every coefficient against five criteria adapted from PD (statistical significance, low collinearity, intuitive sign, meaningful incremental discrimination, coverage across data sources). The standard model specification is <strong>Gaussian distribution with Identity link</strong>: predicted EADF is a linear function of the features, with coefficients interpretable in raw EADF units.</p>
+
+  <p>Three architectural choices shape the lecture. First, <strong>segmentation cascades hierarchically</strong>: delinquency status (current vs delinquent), then seasoning (early MOB vs seasoned), then limit (under £1,000 vs higher), then activity (active vs inactive), then internal utilisation bands (decision-tree splits at typically 10%, 20%, 50%, 60%, 90%), then external bureau utilisation. Each split is driven by R-squared / Gini / Lift on the EADF target and decision-tree analysis on the data. Second, the <strong>GLM choice is empirical</strong>: Gaussian + Identity is the wiki's reference choice, but Gamma + Log and Beta + Logit are tested as alternatives; the choice depends on the empirical EADF distribution within the segment. Third, the <strong>limit-change feature is implicit, not explicit</strong>: limit increases and decreases are reflected in historical EADFs that the model is fitted on, but no "future limit change" feature enters the model directly (which would be a leakage).</p>
+
+  <p>This lecture is one half of the EAD modelling phase. Risk differentiation produces an EADF ranking; risk quantification (lecture 28) anchors the ranking to LRA and downturn levels. The two phases run sequentially; the GLM choice in this lecture feeds the calibration choices in the next.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The GLM is the generalisation of OLS that handles non-normal targets via a link function. Pick Gaussian + Identity and you have OLS. Pick Gamma + Log and you have a regression that handles right-skewed targets. Pick Beta + Logit and you have a regression that respects the [0, 1] bound. The empirical EADF distribution decides which one to pick; in retail the answer is usually Gaussian + Identity because EADF is approximately symmetric within most segments after the triple-cap from lecture 26 has cleaned the tails.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The choice of GLM specification matters because it determines how coefficients are interpreted, which feature transformations make sense, and what stability properties the model has. Gaussian + Identity gives the most interpretable coefficients (a one-unit change in feature x produces a beta-unit change in predicted EADF) at the cost of allowing predictions outside [0, 1] (handled by the triple cap from lecture 26). Gamma + Log handles right-skewed targets natively but requires log-space interpretation of coefficients. Beta + Logit respects the [0, 1] bound but is more complex to fit and validate. The empirical literature (Tong 2016 and others) and the wiki's reference build both land on Gaussian + Identity for retail card portfolios; modellers should be able to articulate why this is the empirically supported choice rather than treating it as a default.</p>
+
+  <p>Segmentation is even more consequential. EAD's dominant risk driver (utilisation) varies enormously across the portfolio: a transactor at 5% utilisation has a fundamentally different EADF distribution from a revolver at 90% utilisation. A single regression over the pooled portfolio would average these distributions and produce a model that fits no segment well. The utilisation-band-driven segmentation cascade is what lets each segment have its own GLM coefficients on a homogeneous-EADF population.</p>
+
+  <p>The implicit treatment of limit changes is the third decision worth understanding. A limit increase between observation and default raises the customer's available headroom and (sometimes) raises EADF; a limit decrease does the opposite. The temptation is to include "limit change in window" as a feature; the problem is that at the time of prediction (observation t) the model does not know what future limit changes will occur. Including future limit changes as a feature is a data-leakage violation. The standard practice is therefore to let limit-change effects flow through the historical training data implicitly: the LRA and downturn calibration in lecture 28 reflect averaged limit-management patterns over the historical window.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The EAD risk-differentiation architecture mirrors PD's two-phase pipeline (and matches the LGD analogue). The diagram below shows the segmentation cascade plus the GLM fit per segment.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EAD risk differentiation: segmentation cascade and GLM">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">EAD risk differentiation: hierarchical segmentation and per-segment GLM</text>
+
+      <!-- Segmentation cascade -->
+      <text x="200" y="58" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Segmentation cascade (decision-tree driven)</text>
+
+      <!-- Cascade rectangles -->
+      <g font-family="Inter" font-size="10" fill="#1e3a8a">
+        <rect x="60" y="80" width="290" height="32" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="205" y="100" text-anchor="middle" font-weight="600">1. Delinquency: current vs delinquent</text>
+
+        <rect x="60" y="120" width="290" height="32" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="205" y="140" text-anchor="middle" font-weight="600">2. Seasoning: EMOB vs seasoned</text>
+
+        <rect x="60" y="160" width="290" height="32" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="205" y="180" text-anchor="middle" font-weight="600">3. Limit: low (&lt;&pound;1k) vs higher</text>
+
+        <rect x="60" y="200" width="290" height="32" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="205" y="220" text-anchor="middle" font-weight="600">4. Activity: active vs inactive</text>
+
+        <rect x="60" y="240" width="290" height="32" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="205" y="260" text-anchor="middle" font-weight="600">5. Internal utilisation bands (10/20/50/60/90%)</text>
+
+        <rect x="60" y="280" width="290" height="32" fill="#eff6ff" stroke="#1e3a8a"/>
+        <text x="205" y="300" text-anchor="middle" font-weight="600">6. External (bureau) utilisation</text>
+      </g>
+
+      <!-- Arrow to GLM block -->
+      <line x1="350" y1="200" x2="420" y2="200" stroke="#475569" stroke-width="2"/>
+      <polygon points="420,200 412,196 412,204" fill="#475569"/>
+
+      <!-- GLM block -->
+      <g>
+        <rect x="430" y="80" width="430" height="240" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+        <text x="645" y="104" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">GLM per segment</text>
+
+        <rect x="450" y="120" width="390" height="34" fill="#fff" stroke="#0f766e"/>
+        <text x="645" y="140" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">Gaussian + Identity (standard); Gamma + Log or Beta + Logit if needed</text>
+
+        <rect x="450" y="160" width="390" height="34" fill="#fff" stroke="#0f766e"/>
+        <text x="645" y="180" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">g(E[EADF]) = &beta;_0 + &beta;_1 x_1 + ... + &beta;_k x_k</text>
+
+        <rect x="450" y="200" width="390" height="34" fill="#fff" stroke="#0f766e"/>
+        <text x="645" y="220" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">MLE estimation; 5-criterion iterative refinement</text>
+
+        <rect x="450" y="240" width="390" height="34" fill="#fff" stroke="#0f766e"/>
+        <text x="645" y="260" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">5 criteria: p &lt; 1%, VIF &lt; 2, intuitive sign, &Delta;R&sup2;, coverage</text>
+
+        <rect x="450" y="280" width="390" height="34" fill="#fff" stroke="#0f766e"/>
+        <text x="645" y="300" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#134e4a">Direction-of-risk table verified (Limit&minus;, Util+, Revolver+, ...)</text>
+      </g>
+
+      <!-- Output strip -->
+      <rect x="60" y="350" width="800" height="50" fill="#fef9c3" stroke="#92400e"/>
+      <text x="460" y="372" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">Output: PiT EADF per facility (uncalibrated)</text>
+      <text x="460" y="388" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">ranks exposure-intensity risk; calibration to LRA and downturn happens in lecture 28</text>
+    </svg>
+    <figcaption>EAD risk differentiation. The portfolio passes through a hierarchical segmentation cascade (six levels, dominated by utilisation bands), with each leaf segment getting its own GLM fit. The GLM specification is Gaussian + Identity by default; alternatives are tested when the within-segment EADF distribution is materially non-normal or skewed. The output is a PiT EADF per facility.</figcaption>
+  </figure>
+
+  <p>Three properties of the architecture to internalise. First, the <strong>segmentation cascade is empirical, not theoretical</strong>: each split is driven by decision-tree analysis on R-squared / Lift against the EADF target. The wiki's six-level cascade produces typically 8 to 15 leaf segments for retail unsecured. Second, <strong>within each leaf segment, the GLM is the same machinery</strong>: same link function, same target, same five-criterion variable selection. The segmentation produces homogeneous-EADF populations; the GLM produces accurate within-segment predictions. Third, the <strong>direction-of-risk table is the operational check</strong> on coefficient signs (analogous to PD's directionality table); coefficients with the wrong sign are investigated as in PD.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The GLM specification</h3>
+
+  <p>The Generalised Linear Model framework relaxes two restrictive assumptions of linear regression:</p>
+
+  <ul>
+    <li>It allows non-normal distributions for the dependent variable (Gamma, Beta, Poisson, etc.).</li>
+    <li>It permits flexible link functions g(.) between the linear predictor and the expected response.</li>
+  </ul>
+
+  <p>The general form:</p>
+
+  <pre><code>g( E[y_i] )  =  beta_0  +  beta_1 * x_i1  +  ...  +  beta_k * x_ik
+
+       where  y_i      = realised EADF for facility i in this segment
+              g(.)     = link function (identity, log, logit)
+              x_ij     = feature j for facility i (engineered per lecture 26)
+              beta_j   = coefficients, estimated by MLE
+</code></pre>
+
+  <p>Three GLM specifications are tested empirically:</p>
+
+  <table>
+    <thead>
+      <tr><th>GLM specification</th><th>Link function g(.)</th><th>Distribution</th><th>When chosen</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Gaussian + Identity (standard)</td><td>identity</td><td>Normal</td><td>EADF approximately symmetric within segment; the wiki's reference choice and the retail standard</td></tr>
+      <tr><td>Gamma + Log</td><td>log</td><td>Gamma (right-skewed, positive support)</td><td>EADF right-skewed within segment; loss-rate framing more natural than recovery-rate framing</td></tr>
+      <tr><td>Beta + Logit</td><td>logit</td><td>Beta (bounded in [0, 1])</td><td>EADF strictly in (0, 1) within segment with bimodal tails; less common in retail</td></tr>
+    </tbody>
+  </table>
+
+  <p>The standard retail-card answer is Gaussian + Identity after diagnostic testing. The wiki's documentation: "Following diagnostic testing, all final models were specified as Gaussian distribution with Identity link, as this combination provided the best fit and interpretability across portfolios." MLE estimation is performed in Python (statsmodels), R (glm or betareg) or equivalent; standard convergence diagnostics apply.</p>
+
+  <h3>The hierarchical segmentation cascade</h3>
+
+  <p>Segmentation precedes GLM fitting and produces homogeneous EADF populations within each leaf segment. The wiki's six-level cascade for retail card portfolios:</p>
+
+  <ol>
+    <li><strong>Delinquency status at observation</strong>: current vs delinquent. A delinquent facility is closer to default by construction and has a different EADF dynamic.</li>
+    <li><strong>Seasoning</strong>: early month-on-book (EMOB) vs seasoned. EMOB facilities have limited behavioural data and rely more on application-form features; the cut-off is determined empirically via decision-tree analysis (typically MOB &le; 3 to 6).</li>
+    <li><strong>Limit banding</strong>: low limit (under £1,000) vs higher. Low-limit facilities have a different drawdown-to-limit dynamic than typical accounts.</li>
+    <li><strong>Activity</strong>: active vs inactive accounts. Inactive accounts (no activity in last 4 months) rarely show large EADF moves and benefit from a dedicated segment.</li>
+    <li><strong>Internal utilisation bands</strong>: 10%, 20%, 50%, 60%, 90% cut-offs determined by decision-tree analysis with EADF as target. The dominant differentiator; produces 5 to 6 sub-segments.</li>
+    <li><strong>External (bureau) utilisation</strong>: a further split on the obligor's utilisation across other lenders' lines, where data is available.</li>
+  </ol>
+
+  <p>The cascade produces 8 to 15 leaf segments for retail unsecured; each gets its own GLM. The split criteria (R-squared / Gini / Lift on EADF target) determine the cut-offs; decision trees identify the optimal split points within each level.</p>
+
+  <h3>Variable selection: five criteria adapted for EAD</h3>
+
+  <p>Within each segment, candidate features (from the engineered set in lecture 26) are tested against five criteria. The criteria mirror PD's iterative refinement but with continuous-target metrics:</p>
+
+  <table>
+    <thead>
+      <tr><th>Criterion</th><th>Threshold</th><th>Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Statistical significance</td><td>p-value &lt; 1%</td><td>Same as PD; each feature must add meaningful explanatory power</td></tr>
+      <tr><td>Collinearity</td><td>VIF &lt; 2</td><td>Tighter than PD (which uses VIF &lt; 3) because of the smaller EAD sample; matches the LGD threshold</td></tr>
+      <tr><td>Intuitive sign and shape</td><td>Direction-of-risk table compliance (see below)</td><td>Same idea as PD's directionality table; specific signs differ for EAD features</td></tr>
+      <tr><td>Marginal discrimination</td><td>Incremental R-squared and / or Lift contribution</td><td>Continuous-target analogue of PD's incremental Gini criterion; threshold typically &Delta;R-squared &ge; 0.005 or &Delta;Lift &ge; 0.05</td></tr>
+      <tr><td>Coverage across data sources</td><td>&ge; 5 predictors per segment, mix of internal and external</td><td>Same as PD; resilience against single-data-source failure</td></tr>
+    </tbody>
+  </table>
+
+  <h3>The direction-of-risk table</h3>
+
+  <p>The wiki's reference signs for EAD features (all expressed in terms of EADF; positive means higher EADF, negative means lower):</p>
+
+  <table>
+    <thead>
+      <tr><th>Variable category</th><th>Expected sign</th><th>Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Limit</td><td>&minus;</td><td>Higher limit means more headroom (denominator effect); EADF as a fraction of limit decreases</td></tr>
+      <tr><td>Credit history (length / clean history)</td><td>&minus;</td><td>Longer or cleaner history correlates with better borrower behaviour and lower drawdown intensity</td></tr>
+      <tr><td>Purchase behaviour (recent purchases)</td><td>+</td><td>Higher recent purchasing intensity correlates with higher EADF</td></tr>
+      <tr><td>Utilisation at observation</td><td>+</td><td>Already-drawn customers stay drawn; EADF rises monotonically with starting utilisation</td></tr>
+      <tr><td>Number of accounts</td><td>+</td><td>More credit relationships correlates with higher drawdown across the system</td></tr>
+      <tr><td>Revolver flag</td><td>+</td><td>Revolvers (carry balance) have higher EADF than transactors (pay in full)</td></tr>
+      <tr><td>Debit activity</td><td>+</td><td>Active drawing on the line</td></tr>
+    </tbody>
+  </table>
+
+  <p>Coefficients with signs opposite to the table are investigated. The remediation hierarchy is the same as PD: check for multicollinearity, re-examine transformation, consider segmentation, document the sign-flip with explicit justification if retained. The supervisor will probe any retained sign-flips at SREP.</p>
+
+  <h3>Limit changes: implicit treatment</h3>
+
+  <p>Limit increases and decreases between observation and default materially affect the realised EADF: a limit-up increases available headroom and (sometimes) increases EADF; a limit-down does the opposite. The temptation is to include "future limit change" as a feature. The problem is that at observation time t the model cannot know what future limit changes will occur; including them would be a leakage.</p>
+
+  <p>The standard treatment is <strong>implicit capture</strong>: the historical training data contains facilities that experienced limit changes between observation and default, so the realised EADFs reflect averaged limit-management patterns. The LRA EADF calibration in lecture 28 then provides the long-run average over the cycle, which absorbs the cycle effect on limit-management.</p>
+
+  <p>The alternative explicit treatment (including a "limit-management policy" indicator as a feature) is sometimes used by banks with stable limit-management strategies; the indicator captures whether the customer's segment is in a proactive-CLI programme. This is operationally defensible but adds policy dependency to the model that complicates monitoring.</p>
+
+  <h3>Sub-population testing</h3>
+
+  <p>Once the segment-level GLMs have converged, the composite EAD model is tested across sub-populations:</p>
+
+  <ul>
+    <li>Utilisation bands at observation</li>
+    <li>Credit limit bands</li>
+    <li>Product / partner type</li>
+    <li>External score bands</li>
+    <li>Origination cohort (vintage)</li>
+  </ul>
+
+  <p>The diagnostics are MAE / RMSE / MPE per sub-population. Sub-populations with materially weaker performance trigger either segment-specific re-modelling, a partner / product flag, or an MoC overlay (lecture 30).</p>
+
+  <h3>Overall model performance</h3>
+
+  <p>For a well-built retail card EAD model:</p>
+
+  <ul>
+    <li>R-squared per segment: 0.2 to 0.5 (lower than for PD because utilisation alone explains so much that within-segment, after segmenting on utilisation, the residual signal is limited).</li>
+    <li>Overall portfolio MAE: 5 to 10 percentage points on the development sample, similar on OOS, up to 3 pp of decay on OOT.</li>
+    <li>Spearman rho on realised vs predicted EADF: 0.5 to 0.7 overall.</li>
+  </ul>
+
+  <p>The metric levels are similar in spirit to LGD's discrimination metrics (both are continuous-target models); the supervisor's framing for EAD validation reads at the same scale.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the segmentation cascade does most of the discrimination work</strong>. A model with no segmentation (single GLM over the pooled portfolio) typically achieves R-squared of 0.35 on EADF; the same model with hierarchical segmentation achieves overall R-squared of 0.6 to 0.7 once segment-level fits are weighted appropriately. The within-segment GLM coefficients then add incremental signal but rarely dominate. Modellers who under-invest in segmentation and over-invest in within-segment features produce models that underperform OOT.</p>
+
+  <p>The second lesson is on <strong>Gaussian + Identity</strong>. The choice is mildly counter-intuitive at first (the EADF distribution does not look perfectly normal, especially with the spike near 1 from full-drawdown customers), but after the triple-cap from lecture 26 the within-segment distribution is close enough to symmetric that Gaussian + Identity gives the best fit. Gamma + Log is the natural-looking alternative for the right-skewed segments; Beta + Logit is the bounded-in-[0,1] alternative. Empirically neither beats Gaussian + Identity by enough to justify the loss of coefficient interpretability and the added validation complexity. The wiki's choice is supported by industry literature.</p>
+
+  <p>The third lesson is on <strong>the limit-change debate</strong>. The temptation to include limit-change features is real because they are strongly correlated with realised EADF. The supervisor's pushback is real because they create a leakage. The right answer is the implicit treatment: let limit-management patterns flow through the historical training data and rely on the LRA / downturn calibration to absorb cycle effects on limit-management. Banks that try clever explicit treatments (using lagged limit changes as features, for instance) sometimes find them works on the development sample but fail on OOS because the cycle changes the pattern.</p>
+
+  <p>The fourth lesson is structural: the <strong>EAD GLM is the simplest of the three modelling steps in this track</strong>. PD requires logistic regression plus mixture-stratification within retail, LGD requires three regressions plus closed-form aggregation, EAD requires one regression per segment. The discipline is the same but the moving parts are fewer. Modellers should not let the structural simplicity tempt them into over-feature work; the calibration in lecture 28 will catch over-feature artefacts on OOT.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>State the general GLM form and identify the link function, the distribution and the coefficient-estimation method.</li>
+    <li>Three GLM specifications were tested for EAD. State the link function and distribution for each, and explain why Gaussian + Identity is the standard retail choice.</li>
+    <li>Name the six levels of the segmentation cascade in order. Which level produces the most segments, and what method determines its cut-offs?</li>
+    <li>Why is the EAD VIF threshold (&lt; 2) tighter than the PD threshold (&lt; 3)? What does this tell you about the EAD sample?</li>
+    <li>Write the EAD direction-of-risk table for at least five variable categories.</li>
+    <li>Why is "future limit change" not included as a feature in the EAD model? What is the implicit treatment?</li>
+    <li>State the four EAD variable selection criteria that differ from PD's analogous criteria. For each, give the EAD-specific threshold.</li>
+    <li>A coefficient on a feature labelled "External utilisation" comes out negative when the direction-of-risk table predicts positive. What is the diagnosis hierarchy, and what is the remediation?</li>
+    <li>Why does segmentation in EAD do most of the discrimination work? Compare with PD's logistic regression where coefficients carry more weight.</li>
+    <li>State typical retail benchmarks for R-squared per segment, overall portfolio MAE, and overall Spearman rho for a well-built EAD model.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/ead/02-model-design.md</code> &mdash; the GLM design framework (stub).</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/ead/03-risk-differentiation.md</code> &mdash; GLM formulation, Tong (2016) literature, segmentation cascade.</li>
+      <li><code>docs/wiki/.../a-irb_capital/05_modelling/ead/06-pit-model.md</code> &mdash; PiT EADF estimation, direction-of-risk table, limit-change treatment.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="13-pd_risk_differentiation.html">PD risk differentiation</a> &mdash; the two-phase architecture and segmentation pattern this lecture adapts; logistic regression machinery as a comparison case.</li>
+      <li><a href="20-lgd_risk_differentiation.html">LGD risk differentiation</a> &mdash; the GLM machinery in the continuous-target context.</li>
+      <li><a href="23-ead_concept.html">EAD concept</a> &mdash; the EADF target and PiT / LRA / DT / Regulatory architecture.</li>
+      <li><a href="24-ead_target_and_data.html">EAD target and data</a> &mdash; the 12-month horizon and feature families.</li>
+      <li><a href="25-ead_sampling_and_representativeness.html">EAD sampling and representativeness</a> &mdash; the development sample (12 monthly 2023 cohorts).</li>
+      <li><a href="26-ead_feature_engineering.html">EAD feature engineering</a> &mdash; the engineered feature set this lecture's GLMs consume.</li>
+    </ul>
+
+    <p><strong>Forward references inside the EAD sequence:</strong></p>
+    <ul>
+      <li>28-ead_risk_quantification (next) &mdash; LRA EADF, downturn EADF, regulatory EADF.</li>
+      <li>29-ead_testing (planned) &mdash; back-tests on OOS and OOT.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>McCullagh and Nelder (1989), <em>Generalized Linear Models</em>. The canonical reference for GLM theory and MLE.</li>
+      <li>Tong, E. (2016), "A comparison of EAD models in the credit card industry". Direct EAD versus CCF comparison; supports Gaussian + Identity for retail cards.</li>
+      <li>EBA/GL/2017/16 paragraphs 154 to 188. The European authority's interpretation of EAD modelling.</li>
+      <li>BCBS CRE36.93, CRE36.95. International anchors for EAD modelling methodology.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 27 of n &middot; EAD 5 of 7.</span>
+  <span><a href="26-ead_feature_engineering.html">Previous: feature engineering</a> &middot; <a href="28-ead_risk_quantification.html">Next: risk quantification</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

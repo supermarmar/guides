@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 13: distributed processing with Spark</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Data engineering</a></div>
+  <h1>Distributed processing with Spark</h1>
+  <p class="subtitle">Ten million ballots and one counter takes forever, so you hire a hundred counters and give each a pile. Then someone asks for the result by constituency, and the hundred piles must be re-sorted and physically carried across the hall to the right counter. The counting was never the expensive part. The carrying is, and it has a name: the shuffle.</p>
+  <div class="meta">
+    <span>Lecture 13 of 20</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Part IV: transformation at scale</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Apache Spark</strong> is a distributed engine for computing over data that does not fit, or does not fit comfortably, on one machine. A <strong>driver</strong> process plans the work and a set of <strong>executor</strong> processes on other machines do it, each on its own slice of the data. The unit of that slicing is a <strong>partition</strong>, and the number of partitions is the amount of parallelism available.</p>
+
+  <p>Two properties shape everything you write. Spark is <strong>lazy</strong>: <em>transformations</em> such as filter, select, and join build a plan and compute nothing, and only an <em>action</em> such as writing, counting, or collecting triggers execution. That laziness is what lets the optimiser rearrange your work, push filters down to the file reader, and fuse steps together. And transformations divide into <strong>narrow</strong> ones, where each output partition depends on one input partition and no data moves, and <strong>wide</strong> ones, where output partitions draw from many input partitions, which forces a <strong>shuffle</strong>: writing intermediate data to disk and moving it across the network.</p>
+
+  <p>Almost all Spark performance work is shuffle work. Group by, join, distinct, and window functions with a partition clause are the wide operations, and the craft consists of avoiding them, shrinking them, or fixing the cases where one partition is far larger than the rest.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A hundred counters, each with a pile of ballots. "How many ballots in total?" is easy: each counter counts their own pile and you add up a hundred numbers. That is a narrow operation followed by a tiny combine. "How many for each constituency?" is different: ballots for one constituency are scattered across all hundred piles, so either everyone shouts partial tallies (which works, because addition is associative) or the ballots must be re-sorted and carried. Joining two different stacks of paper by voter name is the hard case: nothing can be matched until the two stacks are re-piled so that the same names are in the same hands. That re-piling is the shuffle, and it is why joins cost what they cost.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">First, check that you need it</span>
+    Spark carries real overhead: a cluster to run and pay for, a JVM to configure, serialisation between Python and the executors, and a minimum job latency measured in seconds. Below roughly the scale of a few hundred gigabytes, and especially where the query prunes well, the single-node engine of Lecture 09 is usually faster in wall-clock terms and always faster to iterate on. Reach for Spark when the data genuinely does not fit after pruning, when a join between two very large tables needs distributed shuffling, or when you are already in a platform such as Databricks where it is the native execution engine. "We might grow into it" is not a reason.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p><strong>The three Vs still describe when distribution becomes necessary.</strong> <em>Volume</em>: more data than one machine's disk or memory can handle. <em>Velocity</em>: arrival faster than one machine can absorb. <em>Variety</em>: enough different shapes that a single schema and engine will not serve. In banking, volume arrives with transaction-level histories, card authorisations, and market data; portfolio-level monthly snapshots usually do not reach it. Being honest about which of the three you actually have is the difference between a cluster that earns its cost and one that exists because a diagram said so.</p>
+
+  <p><strong>Skew turns a hundred machines into one.</strong> A job is only finished when its slowest task is finished. If you group payments by counterparty and one counterparty holds forty per cent of the rows, that partition's task runs alone for most of the job's duration while ninety-nine executors idle. Skew is endemic in financial data, because concentration is a real property of portfolios rather than an accident of loading, so it must be designed for rather than discovered.</p>
+
+  <p><strong>Understanding the plan is the whole skill.</strong> Spark will run almost anything you write, and the difference between a query that takes four minutes and the same query taking four hours is usually one broadcast hint, one repartition, or one filter moved earlier. Since the engine tells you exactly what it did, in the query plan and the web interface, performance work here is diagnosis rather than guesswork, and a practitioner who reads plans will consistently outperform one who tunes configuration flags.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <figure>
+    <svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spark architecture and the shuffle boundary">
+      <defs>
+        <marker id="ar-sp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Driver, executors, and the stage boundary that costs the money</text>
+
+      <!-- driver -->
+      <rect x="30" y="38" width="140" height="60" rx="8" fill="#F5F3FF" stroke="#7c3aed" stroke-width="2"/>
+      <text x="100" y="58" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#5b21b6">DRIVER</text>
+      <text x="100" y="74" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">plans, optimises,</text>
+      <text x="100" y="86" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#7c3aed">schedules tasks</text>
+
+      <!-- executors -->
+      <g>
+        <rect x="230" y="34" width="110" height="34" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.8"/>
+        <text x="285" y="55" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">executor 1</text>
+        <rect x="230" y="72" width="110" height="34" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.8"/>
+        <text x="285" y="93" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">executor 2</text>
+        <rect x="230" y="110" width="110" height="34" rx="6" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.8"/>
+        <text x="285" y="131" text-anchor="middle" font-family="Inter" font-size="9" fill="#115e59">executor 3</text>
+      </g>
+      <line x1="173" y1="68" x2="226" y2="55" stroke="#71717a" stroke-width="1.2" marker-end="url(#ar-sp)"/>
+      <line x1="173" y1="68" x2="226" y2="90" stroke="#71717a" stroke-width="1.2" marker-end="url(#ar-sp)"/>
+      <line x1="173" y1="68" x2="226" y2="126" stroke="#71717a" stroke-width="1.2" marker-end="url(#ar-sp)"/>
+
+      <text x="400" y="46" font-family="Inter" font-size="9" fill="#3f3f46">each executor holds several</text>
+      <text x="400" y="58" font-family="Inter" font-size="9" fill="#3f3f46">partitions and runs one task</text>
+      <text x="400" y="70" font-family="Inter" font-size="9" fill="#3f3f46">per partition per core</text>
+
+      <!-- stage 1 -->
+      <rect x="30" y="170" width="310" height="110" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="185" y="192" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">STAGE 1: NARROW</text>
+      <g font-family="JetBrains Mono" font-size="9" fill="#115e59">
+        <text x="46" y="214">read_parquet(...)</text>
+        <text x="46" y="230">.filter(date &gt;= ...)</text>
+        <text x="46" y="246">.select(five columns)</text>
+        <text x="46" y="262">.withColumn(...)</text>
+      </g>
+      <text x="185" y="276" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#0d9488">no data moves; fused into one pass</text>
+
+      <!-- shuffle -->
+      <rect x="350" y="170" width="60" height="110" rx="6" fill="#FEE2E2" stroke="#DC2855" stroke-width="2"/>
+      <text x="380" y="214" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#991b1b">SHUF</text>
+      <text x="380" y="228" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#991b1b">FLE</text>
+      <text x="380" y="250" text-anchor="middle" font-family="Inter" font-size="8" fill="#b91c1c">write to</text>
+      <text x="380" y="260" text-anchor="middle" font-family="Inter" font-size="8" fill="#b91c1c">disk, then</text>
+      <text x="380" y="270" text-anchor="middle" font-family="Inter" font-size="8" fill="#b91c1c">network</text>
+
+      <!-- stage 2 -->
+      <rect x="420" y="170" width="310" height="110" rx="10" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="575" y="192" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">STAGE 2: AFTER THE WIDE OP</text>
+      <g font-family="JetBrains Mono" font-size="9" fill="#92400e">
+        <text x="436" y="214">.groupBy(product)</text>
+        <text x="436" y="230">.agg(sum(balance))</text>
+        <text x="436" y="246">.join(large_other, on=key)</text>
+        <text x="436" y="262">.write.parquet(...)</text>
+      </g>
+      <text x="575" y="276" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#b45309">rows regrouped by key across the cluster</text>
+
+      <!-- skew -->
+      <rect x="30" y="300" width="700" height="104" rx="10" fill="#F4F4F5" stroke="#52525b" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="380" y="322" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#27272a">SKEW: THE JOB ENDS WHEN THE SLOWEST TASK ENDS</text>
+      <g>
+        <rect x="90" y="334" width="30" height="14" fill="#0d9488"/><text x="105" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">t1</text>
+        <rect x="130" y="334" width="26" height="14" fill="#0d9488"/><text x="143" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">t2</text>
+        <rect x="166" y="334" width="32" height="14" fill="#0d9488"/><text x="182" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">t3</text>
+        <rect x="208" y="334" width="28" height="14" fill="#0d9488"/><text x="222" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">t4</text>
+        <rect x="246" y="334" width="420" height="14" fill="#DC2855"/><text x="456" y="362" text-anchor="middle" font-family="Inter" font-size="8" fill="#991b1b">t5: the counterparty holding 40% of the rows</text>
+      </g>
+      <text x="380" y="382" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#3f3f46">Ninety-nine executors idle while one finishes. Fixes: salt the key, split the heavy key out,</text>
+      <text x="380" y="396" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#3f3f46">broadcast the small side instead of shuffling, or let adaptive execution split the skewed partition.</text>
+    </svg>
+    <figcaption>The architecture and the two things that determine runtime. Stage boundaries are shuffles: everything within a stage is fused and streams through memory, and everything between stages is written to disk and moved. The skew bar is the reason a hundred-node cluster can perform like one node.</figcaption>
+  </figure>
+
+  <h3>The layers, and why the DataFrame API won</h3>
+
+  <p>Spark's original abstraction was the <strong>resilient distributed dataset</strong>: an immutable, partitioned collection with a recorded <em>lineage</em> of the operations that produced it, so a lost partition can be recomputed rather than replicated. Lineage is why the R in the name is resilient, and it remains the recovery mechanism underneath everything.</p>
+
+  <p>The problem with the low-level interface is that the engine cannot see inside your functions. A <code>map</code> containing arbitrary Python is opaque, so nothing can be optimised, reordered, or pushed down. <strong>DataFrames</strong> replaced it with a declarative interface over named, typed columns, which the <strong>Catalyst</strong> optimiser can analyse: it reorders filters, prunes columns, chooses join strategies, and generates efficient code. The practical rule is therefore unambiguous: express work in DataFrame operations or Spark SQL, and drop to the lower level only for the rare case they cannot express. The two are the same engine, so mixing SQL and DataFrame calls in one pipeline costs nothing.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Session, reading, and the two equivalent interfaces</h3>
+
+  <pre><code>from pyspark.sql import SparkSession, functions as F
+
+spark = (SparkSession.builder
+         .appName("risk_monthly")
+         .config("spark.sql.shuffle.partitions", 200)     # tune to data size, not left at default
+         .config("spark.sql.adaptive.enabled", True)      # on by default in recent versions
+         .getOrCreate())
+
+snapshots = (spark.read
+             .parquet("s3://lake/silver/loans/")          # partition columns are discovered
+             .filter(F.col("reporting_date") &gt;= "2025-01-31"))
+
+# the same aggregation, two ways, one engine
+by_product = (snapshots
+              .groupBy("product")
+              .agg(F.count("*").alias("accounts"),
+                   F.sum("balance").alias("exposure"),
+                   F.sum(F.when(F.col("arrears_months") &gt;= 3, F.col("balance"))
+                          .otherwise(0)).alias("defaulted_exposure")))
+
+snapshots.createOrReplaceTempView("snapshots")
+by_product_sql = spark.sql("""
+    SELECT product,
+           COUNT(*)  AS accounts,
+           SUM(balance) AS exposure,
+           SUM(CASE WHEN arrears_months &gt;= 3 THEN balance ELSE 0 END) AS defaulted_exposure
+    FROM   snapshots
+    GROUP BY product
+""")</code></pre>
+
+  <p>Nothing has executed yet. Both objects are plans. An action, <code>write</code>, <code>count</code>, <code>show</code>, <code>toPandas</code>, triggers the whole chain, and the optimiser sees the filter, the projection, and the aggregation together, so it reads only the needed partitions and columns from Parquet, exactly as Lecture 02 described.</p>
+
+  <h3>Joins: the one decision that matters most</h3>
+
+  <pre><code># SHUFFLE HASH / SORT MERGE JOIN: both sides shuffled by key. Unavoidable when both are large.
+result = payments.join(accounts, on="account_id", how="left")
+
+# BROADCAST JOIN: ship the small side to every executor; no shuffle of the large side at all.
+result = payments.join(F.broadcast(product_reference), on="product_code", how="left")</code></pre>
+
+  <p>If one side of a join is small enough to fit in each executor's memory, a few tens of megabytes to a couple of hundred, broadcasting it eliminates the shuffle of the large side entirely. In banking this covers a large share of real joins, because reference data (products, currencies, branches, risk grades, mappings) is small and the fact tables are large. Spark broadcasts automatically when it can see that a side is small, which requires accurate statistics; the explicit hint is worth adding when it cannot, for instance when the small side is itself the result of an earlier computation whose size the planner has to guess.</p>
+
+  <p>The other join hazard is the fan-out of Lecture 05, at scale: joining to a table with duplicate keys multiplies rows across a distributed dataset, which turns a modest job into an enormous one and produces a wrong total. Deduplicate the right side first, and check the row count before and after; both are cheap compared with the alternative.</p>
+
+  <h3>Partitions, repartitioning, and caching</h3>
+
+  <p>Partition count is the parallelism. Too few and cores sit idle and individual tasks may spill or fail; too many and the scheduler overhead and tiny output files dominate, which is the small files problem from Lecture 02 arriving from the write side. A useful starting point is partitions sized in the low hundreds of megabytes each, with the shuffle partition count set accordingly rather than left at whatever the default happens to be.</p>
+
+  <pre><code>df.repartition(400, "account_id")   # full shuffle, gives even distribution and co-locates by key
+df.coalesce(20)                     # no shuffle, only merges existing partitions; use before writing
+df.write.partitionBy("reporting_date").parquet(path)   # physical layout for downstream pruning
+
+reused = expensive_transformation.cache()   # or .persist(StorageLevel...)
+reused.count()                              # materialise it once
+# ... several actions that read `reused` ...
+reused.unpersist()</code></pre>
+
+  <p><code>repartition</code> shuffles and can increase or decrease the count evenly; <code>coalesce</code> only decreases and avoids the shuffle by merging neighbours, which makes it the right choice immediately before writing to avoid thousands of small files. Caching pays only when a dataset is genuinely read more than once by separate actions: because Spark is lazy, an uncached DataFrame referenced by three actions is computed three times, which is the most common source of surprise in Spark performance.</p>
+
+  <h3>Skew, and what to do about it</h3>
+
+  <p>Adaptive query execution, on by default in current versions, detects skewed shuffle partitions at runtime and splits them, which handles many cases without intervention. When it does not, three manual techniques apply. <strong>Salting</strong> adds a random suffix to the hot key so that it spreads across several partitions, aggregates partially, and combines in a second pass. <strong>Splitting</strong> processes the heavy keys as a separate job with a different strategy, often a broadcast, and unions the results. And <strong>pre-aggregation</strong> reduces the volume before the wide operation, which is the cheapest fix when it applies: if you are joining payments to accounts only to sum by account, aggregate the payments by account first, then join the much smaller result.</p>
+
+  <h3>Python functions, and why they are slow</h3>
+
+  <p>A row-at-a-time Python user-defined function forces every row to cross from the JVM to a Python process and back, serialised in both directions, and is invisible to the optimiser. Costs of an order of magnitude are normal. Three preferences, in order. Use built-in Spark functions, which are compiled and optimised, and they cover far more than people expect, including date arithmetic, regular expressions, JSON parsing, and window functions. Where you must write Python, use a <strong>pandas user-defined function</strong>, which passes Arrow batches rather than individual rows and recovers most of the loss. Only as a last resort use a plain Python function, and then measure it.</p>
+
+  <div class="callout insight">
+    <span class="tag">Reading the web interface</span>
+    Four numbers answer most performance questions. <em>Task duration distribution</em> within a stage: a long tail means skew. <em>Shuffle read and write bytes</em>: the size of the carrying, and the thing to reduce. <em>Spill to disk and to memory</em>: an indication that partitions are too large for the memory available, so increase the partition count rather than the cluster. And <em>input size against the total dataset</em>: if a query over sixty partitions reads all sixty when it should read three, pruning is not happening and the cause is usually a filter the optimiser cannot push down, such as one wrapped in a Python function or applied to a computed column.
+  </div>
+
+  <div class="worked">
+    <strong>Worked example: monthly exposure and default rates, joined to payments, at a scale that justifies a cluster</strong>
+    <p>The data: sixty monthly snapshots of two million accounts (silver, Parquet, partitioned by reporting date), a payments table of 400 million rows, and a small product reference table of about two hundred rows. The task: monthly exposure and default rate by product, plus each account's payment count in the month. The payments table is what pushes this past a single machine.</p>
+    <pre><code>from pyspark.sql import functions as F
+
+snapshots = spark.read.parquet("s3://lake/silver/loans/") \
+                 .filter(F.col("reporting_date") &gt;= "2021-06-30") \
+                 .select("account_id", "reporting_date", "product_code",
+                         "balance", "arrears_months", "unlikely_to_pay")
+
+# 1. pre-aggregate the large side BEFORE joining: 400m rows become ~120m
+payments_monthly = (spark.read.parquet("s3://lake/silver/payments/")
+                    .filter(F.col("value_date") &gt;= "2021-06-01")
+                    .withColumn("reporting_date", F.last_day("value_date"))
+                    .groupBy("account_id", "reporting_date")
+                    .agg(F.count("*").alias("payment_count"),
+                         F.sum("amount").alias("payment_amount")))
+
+# 2. broadcast the tiny reference table: no shuffle of the big side
+enriched = (snapshots
+            .join(F.broadcast(product_reference), on="product_code", how="left")
+            .join(payments_monthly, on=["account_id", "reporting_date"], how="left"))
+
+# 3. aggregate, computing the rate from summed numerator and denominator
+monthly = (enriched
+           .groupBy("reporting_date", "product_family")
+           .agg(F.count("*").alias("accounts"),
+                F.sum("balance").alias("exposure"),
+                F.sum(F.when((F.col("arrears_months") &gt;= 3) | F.col("unlikely_to_pay"), 1)
+                       .otherwise(0)).alias("defaults"),
+                F.sum(F.coalesce(F.col("payment_count"), F.lit(0))).alias("payments"))
+           .withColumn("default_rate", F.col("defaults") / F.col("accounts")))
+
+monthly.coalesce(1).write.mode("overwrite").parquet("s3://lake/gold/monthly_by_product/")</code></pre>
+    <p><em>Why it is written in this order.</em> Step one is the single largest saving: aggregating payments to the account-month grain before the join reduces the shuffled volume by roughly a factor of three and, more importantly, removes the fan-out risk entirely, since the aggregated side has exactly one row per key. Step two removes the second shuffle by broadcasting two hundred rows instead of redistributing tens of millions. Step three computes the rate from summed components rather than averaging rates, per Lecture 08. The final <code>coalesce(1)</code> is appropriate only because the output is a few thousand rows; applying it to a large output would serialise the write through one task.</p>
+    <p><em>What to verify in the interface.</em> Confirm two shuffles at most, one for the payments aggregation and one for the final grouping, and none for the reference join. Confirm the snapshot read touched only the partitions from June 2021 onward. Check the task duration distribution in the payments aggregation: if a handful of tasks take many times the median, some accounts have pathologically many payments, and the fix is salting that key rather than enlarging the cluster.</p>
+    <p><em>The question to ask before running any of it.</em> Would DuckDB do this? The snapshots alone, five columns of sixty partitions, are comfortably single-node. The payments table at 400 million rows is borderline: aggregated to account-month it is not, and a single large machine reading Parquet with pruning may well finish faster than a cluster starts. The honest answer is to measure both once, on a month of data, and let the numbers decide, because the wrong answer here costs either an unnecessary cluster or an unnecessary rewrite. What tips it towards Spark in practice is not the snapshot query but the payments pre-aggregation over the full history, and if that is run once and stored, the rest of the pipeline may not need a cluster at all.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Spark distributes work across executors by partitioning data, builds a lazy plan that the Catalyst optimiser rearranges, and pays its costs at shuffle boundaries created by wide operations. Performance work is therefore shuffle work: pre-aggregate before joining, broadcast small sides, size partitions deliberately, cache only what is genuinely reused, and treat skew as an expected property of financial data rather than an anomaly. Use DataFrames and SQL rather than the low-level interface so the optimiser can see what you mean, and avoid row-wise Python. Before any of it, confirm the data justifies a cluster, because below a few hundred gigabytes the single-node engine of Lecture 09 usually wins.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Distinguish a transformation from an action, and explain what laziness buys the optimiser.</li>
+      <li>Define narrow and wide transformations, and name four operations that force a shuffle.</li>
+      <li>Why did the DataFrame API displace the low-level interface for almost all work?</li>
+      <li>When does a broadcast join apply, why is it so effective, and why is banking reference data the ideal case?</li>
+      <li>Contrast <code>repartition</code> with <code>coalesce</code>, and say which belongs immediately before a write.</li>
+      <li>An uncached DataFrame is used by three actions. How many times is it computed, and what is the fix?</li>
+      <li>Give three techniques for handling a skewed key, and say which is cheapest when it applies.</li>
+      <li>Name the four numbers in the Spark web interface that answer most performance questions, and what each indicates.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="12-streaming.html">Lecture 12</a> closed Part III; Spark's Structured Streaming is the micro-batch alternative to Flink discussed there.</li>
+      <li><strong>Next:</strong> <a href="14-lakehouse_table_formats.html">Lecture 14</a> adds transactions, schema evolution, and time travel to the Parquet files Spark reads and writes.</li>
+      <li><strong>Then:</strong> <a href="15-dbt_analytics_engineering.html">Lecture 15</a> puts transformation logic under version control with tests, whichever engine executes it.</li>
+      <li><strong>Cross-link:</strong> pruning and file layout are <a href="02-data_and_file_formats.html">Lecture 02</a>; the single-node alternative is <a href="09-duckdb.html">Lecture 09</a>; the fan-out risk is <a href="05-sql_queries.html">Lecture 05</a>.</li>
+      <li><strong>Further reading:</strong> Zaharia and colleagues' 2012 paper on resilient distributed datasets for the original design; Chambers and Zaharia's <em>Spark: The Definitive Guide</em> for practice; the Spark SQL performance tuning documentation for the configuration surface.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Data engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 13 of 20</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

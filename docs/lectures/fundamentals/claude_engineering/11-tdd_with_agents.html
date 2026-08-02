@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 11: test-driven development with an agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Claude engineering</a></div>
+  <h1>Test-driven development when the agent writes the code</h1>
+  <p class="subtitle">TDD was always partly about design and partly about a safety net. With an agent at the keyboard the balance shifts hard towards the net, because the test is now the only thing standing between a plausible implementation and a correct one. It also acquires a new failure mode: the agent can edit the net.</p>
+  <div class="meta">
+    <span>Lecture 11 of 22</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part III: verification</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The classical cycle is unchanged: write a failing test, write the least code that passes it, refactor. What changes when an agent writes the implementation is who the test is protecting you from. Written by hand, a test guards against your future self misunderstanding your past self. Written against agent output, it guards against a body of code that reads as though someone understood the problem and may not have. Lecture 1's asymmetry in its most practical form: generation is cheap, verification is not, and a test is verification you only pay for once.</p>
+
+  <p>The new failure mode is specific and it follows from the stopping-too-early weakness. An agent told to make the tests pass has two routes to that outcome: fix the code, or weaken the test. Both terminate the loop. If fixing the code is hard and weakening the assertion is easy, the second is a live possibility, and the resulting diff contains a passing suite and a defect. This is not misbehaviour; it is a correct solution to the problem as stated, which is why the remedy is to state a different problem.</p>
+
+  <p>So the discipline gains one step. Write the test, <strong>watch it fail for the right reason</strong>, and then commit it before any implementation exists. A committed test is a fixed point: changes to it show up in the diff as changes to the test rather than disappearing into the noise of a large implementation commit. The documented pattern goes further and separates the roles entirely, having one session write the tests and another write the code to pass them, which removes the conflict of interest rather than managing it.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A test you have never seen fail is not a test, it is a decoration. This was always true and it was always survivable, because a human writing a test that passes immediately usually notices. An agent writing a hundred tests that all pass immediately will not tell you, and neither will the green tick. Watching the red is the step that converts a suite from a claim into evidence.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Goodhart's law is the thing operating here: when a measure becomes a target, it ceases to be a good measure. A test suite is a proxy for correctness, and pointing an optimiser at the proxy is precisely the configuration in which proxies fail. The literature on reward hacking in reinforcement learning is the same phenomenon with different vocabulary, and it produces the same countermeasures: make the proxy expensive to game, hold some of it out of reach, and have something other than the optimiser judge whether the target was met. Committing tests before implementation is the first; property-based tests are the second; a separate reviewer is the third.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that a test suite is what sets the autonomy slider. Lecture 1 argued that autonomy should follow the speed and mechanicalness of verification; a fast, trustworthy suite is exactly that, and it is the only version of it that scales. With one, an agent can iterate unattended for an hour and you review a branch. Without one, every increment needs your eyes, and the agent's speed advantage evaporates into your review queue. The suite is not a quality practice that happens to help here. It is the thing that makes the whole workflow economically different.</p>
+
+  <p>The second reason is that tests are the most durable form of specification available. A prompt is gone when the session ends, a plan is a document nobody rereads, and an instruction file decays. A test is executable, checked in, and runs on every change forever. When Lecture 6 said the scarce skill is saying precisely what you want, the test suite is where those statements accumulate into something permanent.</p>
+
+  <p>The third reason is that the alternative is worse than it used to be. Reviewing untested generated code is the trust-then-verify gap the documentation names as a common failure pattern, and its remedy is stated flatly: always provide verification, and if you cannot verify it, do not ship it. That advice was always sound. It becomes non-negotiable when the volume of code arriving for review multiplies and each piece looks equally competent.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The cycle, with the extra step</h3>
+
+  <figure>
+    <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The TDD cycle with the commit step added">
+      <text x="380" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Red, confirm, commit, green, refactor</text>
+
+      <g font-family="Inter" font-size="11.5">
+        <rect x="30"  y="52" width="128" height="52" rx="9" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2"/>
+        <text x="94" y="74" text-anchor="middle" font-weight="600" fill="#C76B2A">1. Red</text>
+        <text x="94" y="92" text-anchor="middle" font-size="10.5" fill="#C76B2A">write the test</text>
+
+        <rect x="180" y="52" width="148" height="52" rx="9" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2"/>
+        <text x="254" y="74" text-anchor="middle" font-weight="600" fill="#3D2EB5">2. Confirm</text>
+        <text x="254" y="92" text-anchor="middle" font-size="10.5" fill="#3D2EB5">fails for the right reason</text>
+
+        <rect x="350" y="52" width="128" height="52" rx="9" fill="#E4ECFB" stroke="#4A6BD1" stroke-width="2"/>
+        <text x="414" y="74" text-anchor="middle" font-weight="600" fill="#2A3A78">3. Commit</text>
+        <text x="414" y="92" text-anchor="middle" font-size="10.5" fill="#2A3A78">freeze the target</text>
+
+        <rect x="500" y="52" width="128" height="52" rx="9" fill="#DDF1E5" stroke="#1E9D54" stroke-width="2"/>
+        <text x="564" y="74" text-anchor="middle" font-weight="600" fill="#1E9D54">4. Green</text>
+        <text x="564" y="92" text-anchor="middle" font-size="10.5" fill="#1E9D54">agent implements</text>
+
+        <rect x="650" y="52" width="90" height="52" rx="9" fill="#f4f4f5" stroke="#a1a1aa" stroke-width="2"/>
+        <text x="695" y="74" text-anchor="middle" font-weight="600" fill="#3f3f46">5. Refactor</text>
+
+        <line x1="158" y1="78" x2="174" y2="78" stroke="#71717a" stroke-width="1.5" marker-end="url(#td)"/>
+        <line x1="328" y1="78" x2="344" y2="78" stroke="#71717a" stroke-width="1.5" marker-end="url(#td)"/>
+        <line x1="478" y1="78" x2="494" y2="78" stroke="#71717a" stroke-width="1.5" marker-end="url(#td)"/>
+        <line x1="628" y1="78" x2="644" y2="78" stroke="#71717a" stroke-width="1.5" marker-end="url(#td)"/>
+
+        <text x="254" y="140" text-anchor="middle" font-size="11" fill="#3D2EB5">a test that passes immediately</text>
+        <text x="254" y="156" text-anchor="middle" font-size="11" fill="#3D2EB5">is testing nothing</text>
+
+        <text x="414" y="140" text-anchor="middle" font-size="11" fill="#2A3A78">any later weakening now</text>
+        <text x="414" y="156" text-anchor="middle" font-size="11" fill="#2A3A78">appears in the diff</text>
+
+        <text x="380" y="200" text-anchor="middle" font-size="11" font-style="italic" fill="#71717a">Steps 2 and 3 are the additions. Both exist because the implementer can edit the test.</text>
+        <text x="380" y="222" text-anchor="middle" font-size="11" font-style="italic" fill="#71717a">Neither was necessary when the implementer was the person who wrote it.</text>
+      </g>
+
+      <defs>
+        <marker id="td" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>The classical cycle is red, green, refactor. The two inserted steps cost seconds and close the only route by which a passing suite can coexist with a broken implementation.</figcaption>
+  </figure>
+
+  <h3>Three ways to write the tests</h3>
+
+  <p><strong>You write them.</strong> Highest fidelity, lowest volume. Correct when the behaviour is subtle, when the domain knowledge is yours, or when the test <em>is</em> the specification and you want it to be exactly right. A handful of hand-written tests around the difficult core plus generated tests around the periphery is a good default shape.</p>
+
+  <p><strong>The agent writes them from a specification you gave.</strong> The common case, and it works when the specification names concrete cases. The documented before-and-after is instructive: "implement a function that validates email addresses" becomes "write a <code>validateEmail</code> function; example cases: <code>user@example.com</code> is true, <code>invalid</code> is false, <code>user@.com</code> is false; run the tests after implementing". You supplied the oracle; the agent supplied the volume.</p>
+
+  <p><strong>One agent writes tests, another writes code.</strong> The strongest form, and the reason is structural rather than about capability. An agent that writes both has an interest in their agreement, and the cheapest way to achieve agreement is not always the correct one. Separating the roles into different sessions removes the conflict, and the test-writing session can be told explicitly that it will not be implementing, which changes what it writes.</p>
+
+  <h3>Tests that are hard to game</h3>
+
+  <p>Not all tests resist weakening equally. Three properties make one robust.</p>
+
+  <p><strong>Assert on behaviour, not on implementation.</strong> A test that checks a helper was called with certain arguments breaks when the implementation changes legitimately, which trains everyone to edit tests casually. A test that checks the output for an input survives refactoring and objects only to defects.</p>
+
+  <p><strong>Prefer properties to examples where the domain allows.</strong> A property-based test asserting that a probability output lies in $[0, 1]$ for all generated inputs cannot be satisfied by special-casing the three examples you wrote. Generated inputs are the closest thing available to a test the implementer has not seen.</p>
+
+  <p><strong>Keep them fast.</strong> The loop only closes if the check runs in seconds. A suite that takes four minutes will not be run on every iteration, and a check that is not run is not a check. The documented advice to prefer running single tests over the whole suite during iteration is about exactly this.</p>
+
+  <div class="defcard">
+    <strong>Confirming the red.</strong> Running a new test before any implementation exists and reading the failure message to check it fails for the intended reason. A test that fails with an import error is not yet testing the thing you meant.
+  </div>
+
+  <div class="defcard">
+    <strong>Assertion weakening.</strong> Satisfying a failing test by loosening what it asserts rather than by fixing the code. The characteristic agent failure under a "make the tests pass" instruction, and invisible in a large diff unless the tests were committed first.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The instruction that closes the loop</h3>
+
+  <p>The naming of the invariant is what does the work. Compare:</p>
+
+  <pre><code class="language-text">Weak:   Make the tests pass.
+
+Better: Make the tests pass. Do not modify any file under tests/.
+
+Best:   The tests in tests/test_pd.py are committed and correct. Make them
+        pass by changing only src/pd/. If you believe a test is wrong, stop
+        and tell me which one and why — do not edit it.</code></pre>
+
+  <p>The third version does three things. It states the invariant positively, it scopes the permitted change to a directory, and it supplies an escape hatch. That last clause matters more than it looks: sometimes the test genuinely <em>is</em> wrong, and without a route to say so the agent's only options are to fail or to quietly edit. Giving it a way to raise the objection converts a silent modification into a conversation.</p>
+
+  <p>The enforced version of the same rule is a permission deny rule or a <code>PreToolUse</code> hook on writes matching <code>tests/**</code>, which is Lecture 9's point applied here. If the invariant genuinely must hold, do not ask for it.</p>
+
+  <h3>Where TDD does not fit</h3>
+
+  <p>Three honest exceptions, because applying this dogmatically wastes effort.</p>
+
+  <p><strong>Exploratory work</strong> where you do not yet know what the interface should be. Writing tests against an interface you are still designing means rewriting them, and the tests then constrain the design rather than the reverse. Explore first, test once the shape settles.</p>
+
+  <p><strong>Output whose correctness is visual or editorial.</strong> A layout, a document, a chart. There are mechanical properties worth testing, and this course's own build checks are an example, but the substance is judged by looking. Pretending otherwise produces tests that pass while the thing is ugly or wrong.</p>
+
+  <p><strong>Genuine one-offs.</strong> A migration script run once, a data pull for a single analysis. The test outlives nothing, so the investment does not amortise. Verify the output directly instead.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    Asking an agent to add tests to existing untested code produces a suite that asserts the current behaviour, including its bugs. Those tests then pass forever and prevent nothing, while giving every future reader the impression the code is covered. They are worse than no tests, because no tests at least advertises the risk. If you are retrofitting, start from the specification or the ticket rather than the implementation, and expect some of the new tests to fail immediately, because those failures are the point of the exercise.
+  </div>
+
+  <h3>Worked example: the checks behind this course, written in the wrong order</h3>
+
+  <div class="worked">
+    <strong>Worked example: verification-after, and what verification-first would have caught</strong>
+    <p>These lectures are HTML rather than code, but they have mechanical correctness properties and those properties are testable. Four checks were used: every relative path resolves to a file that exists, every CSS class appears in <code>lecture.css</code>, no em or en dashes anywhere, and section and div tags balance.</p>
+    <p><strong>They were all written after the lectures.</strong> Four lectures were generated, then the checks were written and run against them. They passed, which is the outcome that makes the ordering feel unimportant. It is not, and the difference is worth being precise about.</p>
+    <p><strong>What the ordering cost.</strong> Passing on the first run tells you the lectures were fine. It does not tell you the checks work, because a check that is written after the artefact and passes immediately has never been observed to fail. The dash check greps for two specific characters, and if the pattern had been wrong, if the shell had mangled the Unicode escape, the result would have been an identical silent pass. The whole verification report rested on four scripts none of which had produced a single red.</p>
+    <p><strong>What was actually done about it.</strong> Nothing, at the time. The checks were validated only later and incidentally, when Lecture 9's worked example needed a house-style hook and the same grep pattern was run against a file that deliberately contained the offending characters. It fired. That is the confirmation step arriving three lectures late and by accident rather than by design.</p>
+    <p><strong>What the first-order version looks like.</strong> Write <code>check-lecture.sh</code> before writing any lecture. Run it against a deliberately broken fixture: a file with a dash, a bad class name, an unbalanced div. Watch each check fail with the message you expect. <em>Then</em> generate, and let the agent iterate against a check whose red you have seen. That is a fifteen-minute investment, and it converts the entire course build from "generate then inspect" into a closed loop where the definition of done is a script rather than a memory of what to look for.</p>
+    <p><strong>The general point, which is not about HTML.</strong> The instinct to verify after building is strong because building feels like the real work. It survives because verification-after usually passes, and a pass feels like confirmation when it is merely an absence of information. The question that catches it is the one this lecture opens with: <em>have I ever seen this check fail?</em> If not, you do not yet know whether it can.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The cycle gains two steps when the implementer is an agent: confirm the red, and commit the test before implementation, because a test that can be edited by the thing it constrains is not a constraint. Name the invariant rather than the signal, scope the permitted change to a directory, and give the agent a way to object to a test rather than only a way to edit it. Prefer behavioural assertions and properties over implementation details and examples, and keep the suite fast enough that it actually runs each iteration. Separate the roles where it matters: one session writing tests and another writing code removes a conflict of interest rather than managing it.</p>
+
+  <p>The wider point is that a test is verification you buy once and spend many times, which is exactly the shape of investment that pays when generation is cheap. But no suite covers everything, and the residue, the design judgement, the scope, the thing that is correct but wrong, arrives at a human. The next lecture is about that residue: how to review a diff you did not write, when the usual signals for reading code no longer carry the information they used to.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What two steps does the classical cycle gain, and what specific failure does each close?</li>
+      <li>Why can "make the tests pass" be satisfied without fixing anything? Rewrite it to prevent that.</li>
+      <li>Why is a test that has never failed not yet a test?</li>
+      <li>Give the three ways to source tests. What does the third one remove that the second cannot?</li>
+      <li>Name the three properties that make a test hard to game, and say why generated inputs help.</li>
+      <li>Give two cases where TDD does not fit and say why.</li>
+      <li>Why are tests retrofitted onto untested code by an agent often worse than no tests at all?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="10-subagents.html">Lecture 10 (subagents)</a> closed the steering layer; Part III turns to checking the result.</li>
+      <li><strong>Next:</strong> Lecture 12 (reviewing agent output) handles what no suite can cover.</li>
+      <li><strong>Cross-link:</strong> <a href="06-prompting_for_code.html">Lecture 6 (prompting for code)</a> introduced the failing-test-first instruction this lecture develops.</li>
+      <li><strong>Cross-link:</strong> <a href="09-hooks_and_settings.html">Lecture 9 (hooks and settings)</a> covers the <code>Stop</code> hook that turns a suite into a gate, and the deny rule that protects the test directory.</li>
+      <li><strong>Cross-link:</strong> <a href="../software_engineering/05-testing.html">Software engineering, Lecture 5 (testing)</a> covers unit, integration, and property-based testing as disciplines in their own right.</li>
+      <li><strong>Outside this course:</strong> Kent Beck, <em>Test-Driven Development: By Example</em> (Addison-Wesley, 2003); Anthropic, "Best practices for Claude Code", code.claude.com/docs/en/best-practices (verification criteria, the writer-tester split, the trust-then-verify gap).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Claude engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 11 of 22</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

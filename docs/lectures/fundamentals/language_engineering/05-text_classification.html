@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 5: text classification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Text classification</h1>
+  <p class="subtitle">One task, one dataset, five ways to solve it, and a scoreboard at the end. Classification is the right place to start Part II because it's the task where the representation-versus-generative choice has the sharpest consequences, and because the five approaches span the entire cost-and-control axis from a frozen model you download and call once to a hosted model you pay per document. The scoreboard contains a mild surprise and one number you should refuse to believe.</p>
+  <div class="meta">
+    <span>Lecture 5 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part II: using pretrained models</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Text classification assigns a label to a passage, and five distinct routes to it are worth knowing. A <strong>task-specific model</strong> is a representation model somebody already fine-tuned for your task; you download it and call it, and it needs no labels from you. <strong>Embeddings plus a classifier</strong> freezes an embedding model, turns each document into a vector, and trains an ordinary logistic regression on top; this needs labels but trains on a CPU in seconds and is often the best answer nobody tries. <strong>Zero-shot classification by embedding</strong> writes a short description of each label, embeds the descriptions alongside the documents, and assigns whichever label sits closest by <strong>cosine similarity</strong>, needing no labels at all. Both <strong>generative</strong> routes, an open encoder-decoder such as Flan-T5 and a hosted decoder-only model, instead take a written instruction and produce the label as text, which you then have to parse. On the Rotten Tomatoes sentiment benchmark these score 0.80, 0.85, 0.78, 0.84 and 0.91 weighted F1 respectively. The ordering is less useful than what it costs to reach each one, and the highest number is the least trustworthy on the board.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You need a thousand letters sorted into complaints and compliments. You could hire someone who already sorts complaints for a living and hand them the pile, which is the task-specific model: no training, but they've been sorting a slightly different kind of letter. You could pay a clerk to read a few thousand letters you've already sorted yourself, learn your rule, and apply it, which is embeddings plus a classifier: it needs your labelled examples, and it learns exactly your definition. You could write two index cards saying "this is what a complaint looks like" and "this is what a compliment looks like" and have someone match each letter to the nearer card, which is zero-shot: free, and only as good as the cards. Or you could describe the job in a paragraph to a very well-read generalist and read their answer back, which is the generative route: flexible, expensive per letter, and you have to interpret the reply.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the track</span>
+    Part I explained the machinery. This lecture is the first time the machinery is put to work, and it deliberately uses the simplest possible task so the comparison is legible. Two of the five approaches keep the model frozen and let you train something small on top, which is the pattern lecture 6 reuses for clustering. Lecture 16 returns to the same dataset and actually unfreezes the model.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this comparison earns a lecture rather than a paragraph.</p>
+
+  <p>First, <strong>classification is the most common language task in commercial use, and the default choice is usually wrong</strong>. Routing tickets, triaging complaints, flagging documents for review, detecting intent, tagging free-text fields: all classification. The reflex in 2024 and since has been to reach for a hosted generative model, and the scoreboard below shows what that reflex costs relative to a 110-million-parameter model running on the machine you already own.</p>
+
+  <p>Second, <strong>the zero-shot route tells you whether the task is feasible before you spend anything on labelling</strong>. Labelling is the expensive part of any classification project, often the only expensive part, and it is committed to before anyone knows whether the task is learnable. Running the zero-shot approach first costs an afternoon and answers the question. A zero-shot score near chance means your categories probably aren't separable from the text alone, and no amount of labelling will rescue that.</p>
+
+  <p>Third, <strong>the highest score on the board cannot be trusted, and understanding why is a transferable skill</strong>. The hosted model scores 0.91 on a public benchmark that has been on the internet for two decades. Nobody outside the provider knows what it was trained on. That is <strong>benchmark contamination</strong>, and it makes the number uninterpretable rather than merely uncertain. Any evaluation of a closed model on a public dataset carries this problem, and lecture 18 returns to it properly.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team classifying inbound correspondence into eleven categories evaluated a hosted generative model against a fine-tuned encoder and found the hosted model ahead by four points of macro F1. They chose it. Six months later the categories changed, as categories do, and two of the eleven were split into four. Adjusting the encoder meant relabelling a few hundred examples and rerunning a training script overnight. Adjusting the hosted model meant rewriting the prompt, which took an afternoon, and then discovering that the rewrite had shifted behaviour on three of the nine unchanged categories in ways nobody predicted. The four-point advantage had been real; what nobody had priced was that a prompt is a global object with no locality, so a change intended for one category can perturb all of them, whereas a trained classifier's decision boundary moves only where the new labels move it. The lesson is not that prompting is bad. It's that maintainability under changing requirements is a selection criterion, and it does not appear on a scoreboard.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: two questions you can answer before writing any code, which between them pick your approach.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A decision chart selecting between five classification approaches based on whether labelled data exists and whether a task-specific model exists">
+      <defs>
+        <marker id="clsArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Two questions choose the approach; the scoreboard only breaks ties</text>
+
+      <!-- Q1 -->
+      <rect x="330" y="36" width="220" height="42" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="440" y="54" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#713f12">Do you have labelled data?</text>
+      <text x="440" y="70" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#a16207">a few thousand examples is plenty</text>
+
+      <!-- no branch -->
+      <path d="M 330 57 L 240 57 L 240 100" fill="none" stroke="#71717a" stroke-width="1.8" marker-end="url(#clsArrow)"/>
+      <text x="272" y="52" font-family="Inter" font-size="10" font-weight="600" fill="#9f1239">no</text>
+
+      <rect x="110" y="104" width="260" height="42" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="2"/>
+      <text x="240" y="122" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#713f12">Has someone published a model</text>
+      <text x="240" y="138" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#713f12">for exactly your task?</text>
+
+      <path d="M 175 146 L 130 146 L 130 176" fill="none" stroke="#71717a" stroke-width="1.8" marker-end="url(#clsArrow)"/>
+      <text x="140" y="164" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">yes</text>
+      <path d="M 305 146 L 350 146 L 350 176" fill="none" stroke="#71717a" stroke-width="1.8" marker-end="url(#clsArrow)"/>
+      <text x="356" y="164" font-family="Inter" font-size="10" font-weight="600" fill="#9f1239">no</text>
+
+      <rect x="20" y="180" width="215" height="76" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="127" y="200" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">1. TASK-SPECIFIC MODEL</text>
+      <text x="127" y="216" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">download, call, done</text>
+      <text x="127" y="232" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">F1 0.80</text>
+      <text x="127" y="248" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">but trained on somebody else's domain</text>
+
+      <rect x="245" y="180" width="215" height="76" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="352" y="200" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">3. ZERO-SHOT BY EMBEDDING</text>
+      <text x="352" y="216" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">write a description per label</text>
+      <text x="352" y="232" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#115e59">F1 0.78</text>
+      <text x="352" y="248" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">run this first, always: it costs an afternoon</text>
+
+      <!-- yes branch -->
+      <path d="M 550 57 L 660 57 L 660 100" fill="none" stroke="#71717a" stroke-width="1.8" marker-end="url(#clsArrow)"/>
+      <text x="596" y="52" font-family="Inter" font-size="10" font-weight="600" fill="#115e59">yes</text>
+
+      <rect x="475" y="180" width="215" height="76" rx="8" fill="#DEEAFB" stroke="#2A3A78" stroke-width="2"/>
+      <text x="582" y="200" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#2A3A78">2. EMBEDDINGS + CLASSIFIER</text>
+      <text x="582" y="216" text-anchor="middle" font-family="Inter" font-size="9" fill="#2A3A78">frozen encoder, trainable head</text>
+      <text x="582" y="232" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#2A3A78">F1 0.85</text>
+      <text x="582" y="248" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">CPU, seconds to train, fully deterministic</text>
+      <path d="M 660 104 L 660 160 L 582 160 L 582 180" fill="none" stroke="#71717a" stroke-width="1.8" marker-end="url(#clsArrow)"/>
+
+      <rect x="700" y="180" width="165" height="76" rx="8" fill="#FCE7F3" stroke="#be185d" stroke-width="2"/>
+      <text x="782" y="200" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#831843">4 &amp; 5. GENERATIVE</text>
+      <text x="782" y="216" text-anchor="middle" font-family="Inter" font-size="9" fill="#be185d">instruct and parse the reply</text>
+      <text x="782" y="232" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#831843">F1 0.84 / 0.91</text>
+      <text x="782" y="248" text-anchor="middle" font-family="Inter" font-size="8.5" font-style="italic" fill="#71717a">most flexible, least reproducible</text>
+      <path d="M 660 104 L 660 160 L 782 160 L 782 180" fill="none" stroke="#71717a" stroke-width="1.8" marker-end="url(#clsArrow)"/>
+
+      <text x="440" y="284" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#5b21b6">Two constraints override all of the above.</text>
+      <text x="440" y="302" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">If the text cannot leave your infrastructure, routes 4 and 5 collapse to Flan-T5 and other open models only.</text>
+      <text x="440" y="318" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">If the labels will change, prefer a trained boundary you can move locally over a prompt you must rewrite globally.</text>
+      <text x="440" y="334" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#71717a">And whichever you pick, run TF-IDF plus logistic regression alongside it. It is twenty minutes and it is frequently competitive.</text>
+    </svg>
+    <figcaption>Whether you have labels is the first fork and it is not a soft preference: with labels, a trainable classifier on frozen embeddings is available and it is the strongest cheap option on this board. Without them, either somebody has published a model for your exact task, or you fall back on describing the labels in words, which either an embedding model or a generative model can act on. The scoreboard figures come from the worked comparison below and should be read as an ordering under one benchmark, not as constants.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Freezing the big model and training a small thing on top is the highest-return pattern in this track.</strong> It appears here as embeddings plus logistic regression, in lecture 6 as clustering over embeddings, in lecture 11 as retrieval, and in lecture 16 as SetFit. <strong>A benchmark number without a cost and a maintenance story is not a decision.</strong> Every one of the five approaches wins on some axis, and F1 is only one of them.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The task and the data</h3>
+
+  <p>All five approaches are run on <code>rotten_tomatoes</code>, a standard binary sentiment dataset of 5,331 positive and 5,331 negative one-sentence film reviews, split into 8,530 training, 1,066 validation and 1,066 test examples. Binary sentiment is deliberately unglamorous: it keeps the comparison readable.</p>
+
+  <pre><code>from datasets import load_dataset
+
+data = load_dataset("rotten_tomatoes")
+data["train"][0]
+# {'text': 'the rock is destined to be the 21st century\'s new " conan " ...',
+#  'label': 1}</code></pre>
+
+  <p>Every result below is weighted F1 on the test split, and every model is <strong>frozen</strong>: nothing is fine-tuned anywhere in this lecture. What varies is the strategy for extracting an answer from a model somebody else trained.</p>
+
+  <h3>Choosing a model at all</h3>
+
+  <p>Before the approaches, the problem underneath them. The Hugging Face Hub carries more than 60,000 text classification models and more than 8,000 embedding models, and you cannot try them. Two practical narrowings help.</p>
+
+  <p>For task-specific and embedding work, the encoder-only BERT family is where to look, and its variants differ in ways that matter. <strong>RoBERTa</strong> is BERT retrained with a better recipe and generally the stronger default. <strong>DistilBERT</strong> is a compressed BERT, roughly 40% smaller and 60% faster for a small quality cost, which is frequently the right trade in production. <strong>ALBERT</strong> shares parameters across layers to shrink the model. <strong>DeBERTa</strong> improves the attention mechanism itself and tends to top quality comparisons at a given size. Any of these, plus plain BERT and the very small <code>bert-tiny</code>, makes a legitimate baseline.</p>
+
+  <p>For embedding models specifically, the MTEB leaderboard benchmarks open and closed models across many tasks and is the right starting point. Read it with inference speed in view and not just the score: a model twice as good on the leaderboard and ten times slower is usually the wrong choice for a pipeline processing millions of documents. The examples here use <code>all-mpnet-base-v2</code>, which is small and strong.</p>
+
+  <div class="callout insight">
+    <span class="tag">Run the boring baseline</span>
+    Before any of the five, represent the documents with TF-IDF and fit a logistic regression. It takes twenty minutes, it runs anywhere, it's completely interpretable, and on tasks driven by vocabulary rather than nuance it is startlingly hard to beat. If it comes within a point or two of your language model, you have learned something important about the task and possibly saved yourself a deployment. The <a href="../machine_learning/03_supervised_learning/index.html">supervised learning</a> sub-module of the machine learning track covers the classifier side of this properly.
+  </div>
+
+  <h3>Approach 1: a task-specific model</h3>
+
+  <p>Someone has already fine-tuned a representation model for sentiment; use theirs. The model here is <code>twitter-roberta-base-sentiment-latest</code>, a RoBERTa fine-tuned on tweets, which makes it a deliberately imperfect fit for film reviews and therefore an honest test of how such models generalise.</p>
+
+  <pre><code>from transformers import pipeline
+
+pipe = pipeline(model="cardiffnlp/twitter-roberta-base-sentiment-latest",
+                return_all_scores=True, device="cuda:0")
+
+# the model emits a score per class; take the argmax over negative and positive
+y_pred = [np.argmax([out[0]["score"], out[2]["score"]])
+          for out in pipe(KeyDataset(data["test"], "text"))]</code></pre>
+
+  <p><strong>Weighted F1: 0.80.</strong> For a model trained on a different genre of text entirely, with zero effort and zero labels from you, that is a strong result and a fair baseline for everything that follows. The obvious improvement is to find a model trained closer to your domain; a DistilBERT fine-tuned on SST-2, which is film-review sentiment, would be the natural next try.</p>
+
+  <p>Reading the classification report it produces is assumed knowledge here. Precision is how many of the items you flagged were right, recall is how many of the right items you found, F1 balances them, and the weighted average treats both classes evenly. The machine learning track's <a href="../machine_learning/07_model_evaluation/03-classification_metrics.html">classification metrics</a> lecture derives all of it from the confusion matrix, including when each is the wrong thing to optimise.</p>
+
+  <h3>Approach 2: embeddings plus a classifier</h3>
+
+  <p>Suppose nobody has published a model for your task. You could fine-tune one, which lecture 16 covers, and it costs a GPU and a training run. Or you can split the problem in two: use a frozen embedding model as a feature extractor, and train an ordinary classifier on the features.</p>
+
+  <pre><code>from sentence_transformers import SentenceTransformer
+from sklearn.linear_model import LogisticRegression
+
+model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+train_embeddings = model.encode(data["train"]["text"])   # (8530, 768)
+test_embeddings  = model.encode(data["test"]["text"])
+
+clf = LogisticRegression(random_state=42)
+clf.fit(train_embeddings, data["train"]["label"])
+y_pred = clf.predict(test_embeddings)</code></pre>
+
+  <p><strong>Weighted F1: 0.85</strong>, the best of the three representation approaches and five points above the task-specific model. Everything interesting about this result is in what it cost. The embedding model was never updated, so no GPU training happened. The logistic regression fits on a CPU in seconds and can be refitted whenever your labels change. The whole thing is deterministic, runs offline, has no per-document cost, and produces a calibrated probability rather than a bare label, which matters if you want to route only confident cases automatically.</p>
+
+  <p>This is the pattern worth internalising: a large frozen model does the representation, a small trainable model does the task. It generalises well beyond logistic regression, since the classifier can be anything, and beyond classification, since the same frozen features drive clustering in lecture 6 and retrieval in lecture 11.</p>
+
+  <h3>Approach 3: zero-shot with no labels at all</h3>
+
+  <p>Now remove the labelled data. You still know what your categories <em>mean</em>, and you can write that down. Embed the description of each label into the same vector space as the documents, and assign each document to whichever label description it sits closest to.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zero-shot classification by embedding label descriptions and documents into the same space and comparing by cosine similarity">
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Zero-shot by embedding: turn the labels into text, then compare text with text</text>
+
+      <!-- inputs -->
+      <rect x="20" y="44" width="200" height="54" rx="8" fill="#FBF7F0" stroke="#8C6A47" stroke-width="1.5"/>
+      <text x="120" y="62" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#8C6A47">LABEL DESCRIPTIONS</text>
+      <text x="120" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8C6A47">"A negative review"</text>
+      <text x="120" y="91" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8C6A47">"A positive review"</text>
+
+      <rect x="20" y="116" width="200" height="54" rx="8" fill="#F4F4F2" stroke="#a1a1aa" stroke-width="1.5"/>
+      <text x="120" y="134" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#3f3f46">THE DOCUMENT</text>
+      <text x="120" y="152" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#52525b">"unpretentious, charming,</text>
+      <text x="120" y="164" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#52525b">quirky, original"</text>
+
+      <!-- encoder -->
+      <rect x="255" y="76" width="110" height="62" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="310" y="99" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">THE SAME</text>
+      <text x="310" y="113" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">EMBEDDING</text>
+      <text x="310" y="127" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#115e59">MODEL</text>
+
+      <path d="M 220 71 Q 240 71 250 96" fill="none" stroke="#71717a" stroke-width="1.5"/>
+      <path d="M 220 143 Q 240 143 250 118" fill="none" stroke="#71717a" stroke-width="1.5"/>
+      <line x1="365" y1="107" x2="405" y2="107" stroke="#71717a" stroke-width="1.8"/>
+
+      <!-- vector space -->
+      <rect x="410" y="40" width="230" height="180" rx="10" fill="#FFFFFF" stroke="#2A3A78" stroke-width="2"/>
+      <text x="525" y="60" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#2A3A78">ONE SHARED VECTOR SPACE</text>
+
+      <line x1="440" y1="190" x2="440" y2="76" stroke="#a1a1aa" stroke-width="1"/>
+      <line x1="440" y1="190" x2="615" y2="190" stroke="#a1a1aa" stroke-width="1"/>
+
+      <line x1="440" y1="190" x2="590" y2="96" stroke="#0d9488" stroke-width="2"/>
+      <circle cx="590" cy="96" r="4" fill="#0d9488"/>
+      <text x="596" y="92" font-family="Inter" font-size="8.5" font-weight="600" fill="#115e59">"A positive review"</text>
+
+      <line x1="440" y1="190" x2="570" y2="112" stroke="#3f3f46" stroke-width="2.5"/>
+      <circle cx="570" cy="112" r="4" fill="#3f3f46"/>
+      <text x="576" y="126" font-family="Inter" font-size="8.5" font-weight="600" fill="#3f3f46">the document</text>
+
+      <line x1="440" y1="190" x2="530" y2="168" stroke="#be185d" stroke-width="2"/>
+      <circle cx="530" cy="168" r="4" fill="#be185d"/>
+      <text x="536" y="180" font-family="Inter" font-size="8.5" font-weight="600" fill="#831843">"A negative review"</text>
+
+      <path d="M 500 158 A 70 70 0 0 1 512 141" fill="none" stroke="#0d9488" stroke-width="1.2"/>
+      <text x="470" y="120" font-family="Inter" font-size="8" font-style="italic" fill="#115e59">small angle</text>
+      <text x="470" y="131" font-family="Inter" font-size="8" font-style="italic" fill="#115e59">= high similarity</text>
+
+      <!-- result -->
+      <rect x="670" y="76" width="190" height="108" rx="8" fill="#DEEAFB" stroke="#2A3A78" stroke-width="2"/>
+      <text x="765" y="96" text-anchor="middle" font-family="Inter" font-size="9" font-weight="700" fill="#2A3A78">COSINE SIMILARITY</text>
+      <text x="680" y="118" font-family="JetBrains Mono" font-size="8.5" fill="#2A3A78">positive&#160;&#160;0.41</text>
+      <rect x="770" y="110" width="70" height="9" rx="2" fill="#2A3A78"/>
+      <text x="680" y="138" font-family="JetBrains Mono" font-size="8.5" fill="#2A3A78">negative&#160;&#160;0.12</text>
+      <rect x="770" y="130" width="20" height="9" rx="2" fill="#9dbaea"/>
+      <text x="765" y="162" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#2A3A78">argmax &#8594; positive</text>
+      <text x="765" y="176" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">no labelled data was used</text>
+      <line x1="640" y1="130" x2="670" y2="130" stroke="#71717a" stroke-width="1.8"/>
+
+      <text x="440" y="246" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">Because the labels are just text, improving them is free. "A very negative movie review" outperforms "A negative review":</text>
+      <text x="440" y="262" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#52525b">it tells the embedding model both the domain and that you want the extremes. Label wording is the only hyperparameter here, and it is worth tuning.</text>
+    </svg>
+    <figcaption>The trick is that an embedding model maps any text into the same space, so a description of a category and a document to be categorised become directly comparable. Cosine similarity measures the angle between them, ignoring magnitude, and the nearest label description wins. Since the only input you control is the wording of the descriptions, that wording is the whole model, and making it more specific to your domain reliably helps.</figcaption>
+  </figure>
+
+  <pre><code>from sklearn.metrics.pairwise import cosine_similarity
+
+label_embeddings = model.encode(["A negative review", "A positive review"])
+sim_matrix = cosine_similarity(test_embeddings, label_embeddings)
+y_pred = np.argmax(sim_matrix, axis=1)</code></pre>
+
+  <p><strong>Weighted F1: 0.78</strong>, from two short strings and no labelled data whatsoever. Two points below the task-specific model and seven below the trained classifier, which is exactly the right shape: labels buy you something, and now you know roughly how much before you commission any.</p>
+
+  <p>Note what cosine similarity is doing. It measures the angle between two vectors, computed as their dot product divided by the product of their lengths, so it compares direction and ignores magnitude. That's the right choice for embeddings, where a longer document produces a longer vector without being any more positive or negative.</p>
+
+  <h3>Approaches 4 and 5: generative models</h3>
+
+  <p>Generative models work differently in kind, not just in degree. A representation model emits numbers you interpret; a generative model emits text you must parse. So the task splits into writing an instruction the model will follow and mapping its reply back onto your label set.</p>
+
+  <p><strong>Flan-T5</strong> is the open option and an interesting one architecturally: it's an encoder-decoder, the arrangement lecture 1 described as the original 2017 transformer, with twelve encoder and twelve decoder blocks. It was pretrained by masking spans of tokens rather than single tokens, then fine-tuned on over a thousand tasks all reformulated as text-in-text-out. That multi-task fine-tuning is why it responds sensibly to an instruction it has never seen.</p>
+
+  <pre><code>pipe = pipeline("text2text-generation", model="google/flan-t5-small", device="cuda:0")
+
+prompt = "Is the following sentence positive or negative? "
+data = data.map(lambda ex: {"t5": prompt + ex["text"]})
+
+y_pred = [0 if out[0]["generated_text"] == "negative" else 1
+          for out in pipe(KeyDataset(data["test"], "t5"))]</code></pre>
+
+  <p><strong>Weighted F1: 0.84</strong>, from the <em>smallest</em> model in the Flan-T5 family, with an eight-word instruction and no training. Look closely at the parsing line, though, because it hides a real problem: <code>0 if text == "negative" else 1</code> silently classifies anything unexpected as positive. If the model returns "Positive.", or "The sentiment is negative", or an empty string, this maps it to 1 and no error is raised. That is a bug waiting to happen at scale and it's the general disease of generative classification. Lecture 8 is largely about curing it.</p>
+
+  <p><strong>A hosted model</strong> is the fifth route. Instead of loading weights, you call an API, and the prompt carries the whole specification including the output format.</p>
+
+  <pre><code>prompt = """Predict whether the following document is a positive or negative movie review:
+[DOCUMENT]
+If it is positive return 1 and if it is negative return 0. Do not give any other answers."""
+
+def classify(document, model="gpt-3.5-turbo-0125"):
+    completion = client.chat.completions.create(
+        messages=[{"role": "system", "content": "You are a helpful assistant."},
+                  {"role": "user", "content": prompt.replace("[DOCUMENT]", document)}],
+        model=model,
+        temperature=0,      # deterministic decoding: greedy, as in lecture 4
+    )
+    return completion.choices[0].message.content</code></pre>
+
+  <p><strong>Weighted F1: 0.91</strong>, and it cost about three cents to run the whole test set. Note <code>temperature=0</code>, which is the greedy decoding of lecture 4 and the right setting for any classification task: you want the same answer every time, not creativity. Note also the placeholder-substitution pattern, which is the primitive that lecture 9 generalises into prompt templates and chains.</p>
+
+  <div class="callout warn">
+    <span class="tag">Two operational points that bite before the quality does</span>
+    Watch the bill. Three cents for a thousand documents sounds free until it's a million documents a month, at which point compare it against a frozen encoder costing nothing per document. And expect rate limits: hosted APIs cap requests per minute, and the standard mitigation is exponential backoff, sleeping a little on the first failure and doubling the wait on each subsequent one until the request succeeds or a retry limit is hit. Write that before you loop over a dataset, not after.
+  </div>
+
+  <h3>The scoreboard, and how to read it</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Approach</th><th>Family</th><th>Labels needed</th><th>Weighted F1</th><th>Runs offline</th><th>Deterministic</th><th>Marginal cost</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Hosted generative model</td><td>generative</td><td>none</td><td><strong>0.91</strong></td><td>no</td><td>at temperature 0</td><td>per document</td></tr>
+        <tr><td>Embeddings + logistic regression</td><td>representation</td><td>8,530</td><td><strong>0.85</strong></td><td>yes</td><td>yes</td><td>none</td></tr>
+        <tr><td>Flan-T5-small</td><td>generative</td><td>none</td><td>0.84</td><td>yes</td><td>at temperature 0</td><td>none</td></tr>
+        <tr><td>Task-specific model</td><td>representation</td><td>none</td><td>0.80</td><td>yes</td><td>yes</td><td>none</td></tr>
+        <tr><td>Zero-shot by embedding</td><td>representation</td><td>none</td><td>0.78</td><td>yes</td><td>yes</td><td>none</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Three readings. The first is the one everybody takes: the hosted model wins. The second is more useful: the spread between the best and worst is thirteen points, and the four open approaches sit within seven points of each other while differing enormously in what they demand of you. The third is the one that should change your behaviour: 0.85 from a frozen 110-million-parameter encoder and a logistic regression, running offline with no marginal cost and byte-identical output on every run, is six points behind a hosted frontier model and ahead of everything else. For a great many production settings that's not a compromise, it's the correct answer.</p>
+
+  <p>And the 0.91 should not be treated as a measurement. <code>rotten_tomatoes</code> is a public dataset from 2005; nobody outside OpenAI knows whether it appeared in the training corpus, and if it did the test set is not a test set. This is <strong>benchmark contamination</strong>, and it isn't a reason to distrust the model, only a reason to refuse to compare closed models against open ones using public benchmarks. The honest evaluation is on data you created yourself and never published, which is the argument lecture 18 develops at length.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Five routes to one label, all with frozen models. A published task-specific model needs nothing from you and generalises decently outside its training domain. Freezing an embedding model and training a logistic regression on its output is the strongest cheap option and the pattern most worth carrying forward, because it puts a small, retrainable, interpretable, deterministic component where the task-specific logic belongs. Describing your labels in words and matching by cosine similarity needs no labelled data at all and should be run first on any new task, since it tells you whether the categories are separable before you commission any labelling. Generative models trade the flexibility of a written instruction against a parsing problem, a per-document cost, and, for hosted ones, the fact that your text leaves the building. The scoreboard orders them, but the columns beside the score are what should decide.</p>
+
+  <p>Lecture 6 removes the labels entirely, and the categories with them. When you don't know what your categories <em>are</em>, the question becomes what structure the documents have on their own, which means clustering, and then the harder second problem of naming what you found.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Name the five approaches and state, for each, whether it needs labelled data and whether it can run offline.</li>
+      <li>Explain what stays frozen in the embeddings-plus-classifier approach and what is trained, and give three practical advantages of that split.</li>
+      <li>Describe how zero-shot classification by embedding works, and name the only thing you control in it.</li>
+      <li>Explain why cosine similarity rather than Euclidean distance is used to compare a document with a label description.</li>
+      <li>Identify the defect in the line <code>0 if text == "negative" else 1</code> and describe when it would first cause harm.</li>
+      <li>State why <code>temperature=0</code> is the right setting for a classification prompt, referring to lecture 4.</li>
+      <li>Explain what benchmark contamination is and why it makes the 0.91 uninterpretable rather than merely uncertain.</li>
+      <li>In the eleven-category vignette, explain why a prompt is harder to maintain than a trained classifier when requirements change.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Part I supplied the machinery. Lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>) supplied the text embeddings that three of these five approaches run on; lecture 4 (<a href="04-inside_the_forward_pass.html">inside the forward pass</a>) explained what <code>temperature=0</code> is doing.</li>
+      <li><strong>Assumed:</strong> The machine learning track's <a href="../machine_learning/07_model_evaluation/03-classification_metrics.html">classification metrics</a> lecture derives precision, recall, F1 and the confusion matrix; its <a href="../machine_learning/03_supervised_learning/index.html">supervised learning</a> sub-module covers the classifiers you would put on top of frozen embeddings.</li>
+      <li><strong>Next:</strong> Lecture 6 (<a href="06-clustering_and_topic_modelling.html">clustering and topic modelling</a>) removes the label set itself.</li>
+      <li><strong>Forward:</strong> Lecture 8 (<a href="08-reasoning_and_output_control.html">reasoning and output control</a>) fixes the output-parsing problem exposed here; lecture 16 (<a href="16-fine_tuning_representation_models.html">fine-tuning representation models</a>) returns to this dataset and unfreezes the model, and covers SetFit for the case where you have sixteen labelled examples rather than eight thousand; lecture 18 (<a href="18-preference_tuning_and_evaluation.html">preference tuning and evaluation</a>) develops benchmark contamination and how to evaluate honestly.</li>
+      <li><strong>Preference tuning:</strong> The instruction-then-preference training that produced the hosted model used here is covered in lecture 17 (<a href="17-supervised_fine_tuning_with_qlora.html">supervised fine-tuning with QLoRA</a>) and lecture 18.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 5 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

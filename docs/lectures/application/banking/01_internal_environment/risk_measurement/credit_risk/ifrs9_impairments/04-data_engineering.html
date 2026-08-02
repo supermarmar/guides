@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IFRS 9 data engineering: shared MRD plus FLI feeds</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / IFRS 9 impairments</div>
+  <h1>Data engineering: shared MRD plus FLI feeds and monthly orchestration</h1>
+  <p class="subtitle">The data foundation of IFRS 9. The bank reuses the A-IRB model-ready dataset (MRD) as the spine and extends it with three IFRS 9-specific additions: forward-looking-information (FLI) macroeconomic feeds, contract-level granularity for any segment where IRB operated at obligor level, and a monthly orchestration layer that drives the ECL recompute at every month-end. The DQA framework is identical to A-IRB (BCBS 239) but with audit-readiness criteria added alongside supervisor-readiness.</p>
+  <div class="meta">
+    <span>IFRS 9 4 of 12</span>
+    <span>Reading time, 25 minutes</span>
+    <span>Sources: <code>docs/wiki/.../ifrs9_impairments/02_data_engineering/01-data_sourcing.md</code>, <code>02-dqa.md</code>; cross-reference to A-IRB <code>06-data_engineering.html</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">IFRS 9 data engineering reuses the A-IRB MRD from <a href="../a-irb_capital/06-data_engineering.html">lecture 06</a> as the spine. The core monthly snapshot tables (one row per facility per snapshot, with all the behavioural / bureau / payment fields) feed both the A-IRB pipeline and the IFRS 9 pipeline; the cost of running both is the marginal cost of the IFRS 9-specific additions rather than a duplicate pipeline. The IFRS 9-specific additions are three: <strong>FLI macroeconomic feeds</strong> (multi-scenario time-paths for unemployment, GDP, HPI, etc., refreshed quarterly and condition-aligned to scenario weights), <strong>contract-level granularity</strong> (where IRB aggregated to obligor level for wholesale, IFRS 9 requires facility / contract level for the ECL calculation), and a <strong>monthly orchestration layer</strong> that drives the end-to-end ECL recompute on every month-end.</p>
+
+  <p>The philosophical anchor is IFRS 9 §5.5.17's "reasonable and supportable information" requirement. The standard does not specify minimum data history (unlike IRB's 5 / 7 year requirements); instead it requires the bank to use the information that is reasonably available without undue cost or effort, including past events, current conditions, and forecasts of future economic conditions. In practice this principles-based framing translates into broadly the same data discipline as IRB (the BCBS 239 framework applies to both), but with two operational differences: the auditor judges data sufficiency at year-end and quarterly interim (a more frequent and more accounting-focused review than the supervisor's SREP), and the monthly cadence forces the data pipeline to be automated and reconcilable to the GL in real time.</p>
+
+  <p>The DQA framework is identical to A-IRB lecture 06: the same six dimensions (completeness, accuracy, consistency, timeliness, uniqueness, robustness) anchored in BCBS 239. The IFRS 9-specific addition is <strong>audit readiness</strong>: the data pipeline must produce an evidence trail that satisfies the external auditor's documentation requirements (sample data, transformation logs, reconciliation reports). The notebooks at <code>02_data_engineering/03-dqa.ipynb</code>, <code>04-data_wrangling.ipynb</code> and <code>05-model_ready_data.ipynb</code> mirror their A-IRB counterparts; the same generic-column-name discipline from A-IRB applies here.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The instinct is to build two separate data pipelines, one for IRB and one for IFRS 9. The right architecture is one shared pipeline with parameter-specific post-processing. The MRD is the single source of truth for the credit-risk-modelling function; the FLI overlay sits on top of it; the monthly orchestration drives both the A-IRB quarterly back-test and the IFRS 9 monthly ECL. A bank that runs two pipelines pays twice for the same data engineering and creates reconciliation problems the auditor will catch.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The shared-spine architecture matters because of the cost arithmetic. A retail bank's data engineering function spends typically £15-30m per year on the MRD pipeline (data feeds, schema management, DQA automation, monitoring). Running this pipeline once and producing both IRB and IFRS 9 outputs is the marginal-cost-of-one-extension architecture; running two parallel pipelines doubles the spend, doubles the reconciliation effort, and creates audit findings when the two pipelines diverge. Banks that have invested in the shared-spine architecture report 30-50% lower data-engineering operating costs than peers that did not.</p>
+
+  <p>The FLI feeds matter because they are the most subjective input in the IFRS 9 framework. Internal portfolio data (balances, arrears, payments) is observable; macroeconomic forecasts are not. The choice of macro scenarios, their probability weights, and the variables included drives the ECL number materially: a benign-skew set of scenarios produces low ECL; a stressed-skew set produces high ECL. The auditor's challenge at year-end focuses heavily on the FLI choices. Banks with documented governance around FLI (independent macro-team forecasts, board-level scenario approval, public-source benchmarks) defend the choices easily; banks without it face audit qualifications.</p>
+
+  <p>The monthly orchestration matters because it determines whether the bank can close its books on time. Public banks have a quarterly earnings calendar with a 30-45 day window between quarter-end and earnings release. The IFRS 9 ECL must be computed, reviewed, approved and booked within that window. A pipeline that takes 15 days post-month-end (as discussed in <a href="03-process_overview.html">lecture 03</a>) eats half the close window and leaves little time for governance review; a pipeline that takes 5 days leaves time for audit interim review and management challenge. The data-engineering automation is what determines which camp the bank sits in.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>The IFRS 9 data architecture has three layers stacked on the A-IRB MRD spine.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="IFRS 9 data architecture: shared MRD plus FLI plus orchestration">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">IFRS 9 data architecture: shared MRD spine plus three IFRS 9-specific extensions</text>
+
+      <!-- A-IRB MRD spine (bottom layer) -->
+      <rect x="40" y="320" width="820" height="80" fill="#eff6ff" stroke="#1e3a8a" stroke-width="1.3"/>
+      <text x="450" y="342" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#1e3a8a">Layer 1: A-IRB MRD spine (shared with A-IRB)</text>
+      <text x="450" y="360" text-anchor="middle" font-family="Inter" font-size="10" fill="#1e3a8a">monthly facility-level snapshots + transaction history + bureau pulls + default-event table</text>
+      <text x="450" y="376" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">behavioural features, identifiers, payment history, arrears, balances, limits — see A-IRB lecture 06</text>
+      <text x="450" y="390" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#1e3a8a">single source of truth for the credit-risk-modelling function</text>
+
+      <!-- FLI overlay (middle layer) -->
+      <rect x="40" y="220" width="820" height="80" fill="#fef9c3" stroke="#92400e" stroke-width="1.3"/>
+      <text x="450" y="242" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Layer 2: FLI macroeconomic feeds (IFRS 9-specific)</text>
+      <text x="450" y="260" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">multi-scenario MEV time-paths: unemployment, GDP, CPI, HPI, interest rates</text>
+      <text x="450" y="276" text-anchor="middle" font-family="Inter" font-size="9" fill="#92400e">scenarios refreshed quarterly; weights adjusted monthly; sourced from internal macro team + external benchmarks (central bank, consensus)</text>
+      <text x="450" y="290" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#92400e">the input that conditions PD / LGD / EAD on forward-looking states</text>
+
+      <!-- Monthly orchestration (top layer) -->
+      <rect x="40" y="120" width="820" height="80" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+      <text x="450" y="142" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#134e4a">Layer 3: Monthly orchestration (IFRS 9-specific)</text>
+      <text x="450" y="160" text-anchor="middle" font-family="Inter" font-size="10" fill="#134e4a">automated month-end refresh: data extracts &rarr; DQA gates &rarr; model execution &rarr; ECL aggregation &rarr; booking</text>
+      <text x="450" y="176" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">target: complete cycle within 5 working days of month-end; reconciled to GL; audit-ready evidence registers</text>
+      <text x="450" y="190" text-anchor="middle" font-family="Inter" font-size="9" font-style="italic" fill="#134e4a">the infrastructure that makes the monthly cadence feasible</text>
+
+      <!-- Output -->
+      <rect x="40" y="50" width="820" height="50" fill="#fee2e2" stroke="#991b1b" stroke-width="1.3"/>
+      <text x="450" y="72" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#7f1d1d">Output: IFRS 9 ECL per facility, per stage, per scenario, every month-end</text>
+      <text x="450" y="88" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">consumed by finance for booking, by risk for monitoring, by audit for sign-off</text>
+
+      <!-- Arrows -->
+      <line x1="450" y1="320" x2="450" y2="300" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="450,300 447,306 453,306" fill="#475569"/>
+      <line x1="450" y1="220" x2="450" y2="200" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="450,200 447,206 453,206" fill="#475569"/>
+      <line x1="450" y1="120" x2="450" y2="100" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="450,100 447,106 453,106" fill="#475569"/>
+    </svg>
+    <figcaption>The IFRS 9 data architecture. Layer 1 (the A-IRB MRD) is the shared spine used by both regulatory tracks. Layers 2 (FLI macro feeds) and 3 (monthly orchestration) are IFRS 9-specific additions. The architecture's value is that the IRB and IFRS 9 outputs come from a single data pipeline with parameter-specific post-processing rather than two parallel pipelines.</figcaption>
+  </figure>
+
+  <p>Three properties of the architecture to internalise. First, the <strong>MRD is the same physical dataset</strong> for both IRB and IFRS 9 use: there is no "IRB MRD" and "IFRS 9 MRD" — there is one MRD with parameter-specific feature engineering downstream. Second, the <strong>FLI layer sits between the MRD and the modelling layer</strong>: PiT PD scoring uses MRD features alone (intrinsic conditioning); FiT PD scoring uses MRD features plus the FLI scenario macros. Third, the <strong>monthly orchestration is a software-engineering deliverable</strong>: data extracts scheduled, DQA gates as automated checks, model execution as pipeline jobs, ECL aggregation as a dependent step, booking as the final downstream consumer. The cycle is end-to-end automated for credible banks.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The "reasonable and supportable" requirement</h3>
+
+  <p>IFRS 9 §5.5.17 anchors the data philosophy: ECL must reflect "reasonable and supportable information that is available without undue cost or effort at the reporting date about past events, current conditions and forecasts of future economic conditions". Three operational consequences:</p>
+
+  <ul>
+    <li><strong>No minimum data history</strong> is specified (unlike IRB's 5-year retail and 7-year wholesale minimums). The bank uses what is reasonably available.</li>
+    <li><strong>"Without undue cost or effort"</strong> is the auditor's leverage: if a piece of data is cheap to obtain and informative, the bank is expected to use it. The phrase has been the basis for multiple audit challenges where banks claimed FLI scenarios could not be sourced cheaply.</li>
+    <li><strong>Forward-looking explicitly required</strong>: the standard requires not just past events and current conditions but forecasts. This is the regulatory anchor for the FLI layer.</li>
+  </ul>
+
+  <h3>The shared A-IRB MRD spine</h3>
+
+  <p>The data engineering work in <a href="../a-irb_capital/06-data_engineering.html">A-IRB lecture 06</a> applies in full. Three internal source families:</p>
+
+  <ul>
+    <li><strong>Month-end financial snapshots</strong>: facility-level balance, limit, days past due, account status, delinquency stage. The workhorse data source.</li>
+    <li><strong>Transactional data</strong>: payment-by-payment records, drawing volumes, fee accruals. The behavioural-feature backbone.</li>
+    <li><strong>Collections data</strong>: workout cash flows, debt-sale records, cost-of-recovery records. Feeds the LGD pipeline.</li>
+  </ul>
+
+  <p>Plus external sources: bureau scores, application data, ratings agencies (for any wholesale segment). The same supplier hierarchy as A-IRB.</p>
+
+  <p>The same Cleaned Consolidated Dataset (CCD) and MRD construction from A-IRB lecture 06 applies. The transformation pipeline (DQA → wrangling → MRD assembly) is shared infrastructure. The same notebook patterns (DuckDB-based query engines, Pandera-based schema validation, the lag/lead windowing for default and cure indicators) apply unchanged.</p>
+
+  <h3>Extension 1: FLI macroeconomic feeds</h3>
+
+  <p>The IFRS 9-specific new data family. The FLI layer carries:</p>
+
+  <ul>
+    <li><strong>Multi-scenario macroeconomic time-paths</strong>: typically 3 scenarios (base, upside, downside) with quarterly or monthly time-series of MEVs (unemployment rate, GDP growth, CPI, HPI, interest rates, FX rates where relevant).</li>
+    <li><strong>Scenario probability weights</strong>: typically 40-60% for the base case, with the tails sharing the remainder. Reviewed at every quarterly close and signed off by the bank's macro-economic forecasting committee.</li>
+    <li><strong>Source attribution</strong>: each MEV time-series links to a source (internal macro team, central bank forecast, consensus forecast, third-party provider). Lecture 08 covers the construction in detail.</li>
+  </ul>
+
+  <p>The data feed pattern: macro time-series stored in a separate FLI table keyed by (scenario_id, mev_name, observation_date, forecast_horizon). The MRD does not embed the macros directly (a facility's row in the MRD is intrinsic); the macros are joined at scoring time when computing FiT PD or scenario-weighted LGD / EAD.</p>
+
+  <h3>Extension 2: contract-level granularity</h3>
+
+  <p>IRB allows obligor-level rating for wholesale exposures (CRR Article 178(1) and SS3/24 §1.3); IFRS 9 requires facility / contract-level ECL because the asset whose carrying amount is being adjusted is the individual facility, not the obligor. For retail, both frameworks operate at facility level so no granularity difference applies. For wholesale, the IFRS 9 pipeline either disaggregates an obligor-level IRB PD to facility level (typically by applying obligor PD uniformly to all facilities) or uses a separately calibrated facility-level model.</p>
+
+  <p>The data-engineering implication is that the wholesale MRD must support facility-level joins to the modelling output even if the IRB rating is obligor-level. The standard solution is to maintain an obligor-to-facility mapping table and propagate the obligor PD to each facility row at scoring time.</p>
+
+  <h3>Extension 3: monthly orchestration layer</h3>
+
+  <p>The infrastructure layer that makes the monthly cadence feasible. Five components:</p>
+
+  <ol>
+    <li><strong>Scheduled data extracts</strong>: source-system snapshots automatically pulled within 1-2 days of month-end. Pre-staged ready for the pipeline.</li>
+    <li><strong>Automated DQA gates</strong>: the six-dimension BCBS 239 battery from A-IRB lecture 06 runs as scheduled jobs; failures block the downstream pipeline and page the data-ops team.</li>
+    <li><strong>Model execution pipelines</strong>: PD, LGD, EAD, FLI and SICR models scheduled to run against the latest MRD in dependency order.</li>
+    <li><strong>ECL aggregation</strong>: per-facility ECL computed for each scenario, aggregated to stage and portfolio level. Output reconciled to the GL on key totals (gross balance, total ECL).</li>
+    <li><strong>Booking interface</strong>: automated journal entries to the finance ledger, with manual review and sign-off before posting.</li>
+  </ol>
+
+  <p>The orchestration is typically built on a workflow scheduler (Airflow, Dagster, internal equivalents) with monitoring dashboards visible to the model risk committee. Credible banks complete the cycle in 5 working days from month-end; the leading 2-3 days are data refresh, the middle 1-2 days are model execution and ECL aggregation, the trailing 1-2 days are reconciliation and booking.</p>
+
+  <h3>The DQA framework (unchanged from A-IRB)</h3>
+
+  <p>The six-dimension DQA from <a href="../a-irb_capital/06-data_engineering.html">A-IRB lecture 06</a> applies unchanged. The same BCBS 239 anchor; the same operational checks; the same notebook patterns. The IFRS 9-specific addition is at the documentation level (audit-ready evidence registers; reconciliation pack to the GL; sample-and-test logs for the auditor's reperformance procedures) rather than at the methodology level.</p>
+
+  <h3>Audit readiness vs supervisor readiness</h3>
+
+  <p>A subtle but operational distinction. The supervisor's data review at SREP focuses on: methodology correctness, BCBS 239 compliance, lineage documentation, materiality of issues, remediation plans. The auditor's data review at year-end focuses on: existence of controls, operating effectiveness of controls (sample-tested over the period), reconciliation to the GL, audit-trail completeness, and management's representations on material judgements.</p>
+
+  <p>The same data pipeline can satisfy both if it is engineered with both audiences in mind. Banks that engineer for supervisor-only (sufficient documentation but minimal sample-by-sample evidence) face audit issues at year-end. Banks that engineer for audit-only (heavy sample evidence but weak methodology documentation) face supervisor issues at SREP. The dual-purpose engineering is the operating standard for IRB-and-IFRS-9 banks.</p>
+
+  <h3>Worked-example notebooks</h3>
+
+  <p>The IFRS 9 data engineering wiki includes three reference notebooks that mirror the A-IRB versions:</p>
+
+  <ul>
+    <li><code>03-dqa.ipynb</code> &mdash; the DQA implementation. Mirrors A-IRB lecture 06's reference DQA notebook.</li>
+    <li><code>04-data_wrangling.ipynb</code> &mdash; CCD construction. Same pattern as A-IRB.</li>
+    <li><code>05-model_ready_data.ipynb</code> &mdash; MRD assembly with the cure / probation / default / write-off indicators. Same logic as A-IRB; the IFRS 9-specific additions (FLI joins) are applied downstream in the scoring code rather than the MRD construction.</li>
+  </ul>
+
+  <p>The same generic-column-name discipline from <a href="../a-irb_capital/06-data_engineering.html">A-IRB lecture 06</a> applies (facility_id, obligor_id, snapshot_month, outstanding_balance, credit_limit, default_indicator, etc.). The notebooks operate on the canonical column names; the IFRS 9 extensions add FLI columns at the scoring stage.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that <strong>the shared-spine architecture is the bank's IRB-IFRS-9 cost lever</strong>. Banks that run a single MRD for both frameworks operate at 30-50% lower data-engineering cost than peers running two pipelines. The infrastructure investment to build the shared spine is large (£15-30m annually for a major retail bank) but the marginal cost of the IFRS 9 extensions is small. The bank's CIO and CFO should be able to articulate the shared-pipeline architecture in board reports; banks where the IRB and IFRS 9 data engineering report to different functions with different infrastructure are paying twice.</p>
+
+  <p>The second lesson is on <strong>the FLI scenario governance</strong>. The FLI feeds are the single most subjective input in the IFRS 9 framework, and the auditor's annual challenge typically focuses there. Banks with formal scenario governance (independent macro team, board-level approval, public-benchmark comparisons, sensitivity analysis on weights) defend the ECL number easily. Banks without it face audit qualifications at year-end. The data engineering's job is to source the macro feeds; the model risk governance's job is to defend the choices. Both must be in place.</p>
+
+  <p>The third lesson is on <strong>"reasonable and supportable" as the auditor's leverage</strong>. The phrase is principles-based and gives the auditor wide latitude to challenge the bank's data choices. The right defensive posture is to maintain an explicit register of data sources considered and rejected, with documented rationale (cost, availability, materiality). A bank that can show "we considered using regional HPI by postcode and rejected it because the data is not available at the cohort level we operate" has done the work; a bank that simply did not consider the option has not. The auditor's question at year-end is on the work, not the conclusion.</p>
+
+  <p>The fourth lesson, structurally most important: <strong>the monthly orchestration is a software-engineering deliverable</strong>. The risk-modelling function builds the models; the data-engineering function builds the pipeline that operates them at scale. The two are separate disciplines with separate skill sets and different career paths. Banks that conflate them produce inconsistent results: models built without orchestration discipline that cannot run at scale, or pipelines built without modelling input that get the data engineering right but the model semantics wrong. The leading banks have both functions reporting up to the same Chief Data Officer with clear interfaces between them.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Quote the IFRS 9 §5.5.17 "reasonable and supportable information" requirement. What three categories of information does it include?</li>
+    <li>State three IFRS 9-specific extensions on top of the shared A-IRB MRD spine. For each, give one example of what the data layer carries.</li>
+    <li>Why does IFRS 9 not specify a minimum data history equivalent to IRB's 5/7 years? What replaces the explicit minimum?</li>
+    <li>Distinguish contract-level granularity from obligor-level granularity. Where does the difference matter operationally, and how does the data layer handle it for wholesale?</li>
+    <li>Name the five components of the monthly orchestration layer. What is the target cycle time post-month-end for a credible bank?</li>
+    <li>The FLI layer carries multi-scenario MEV time-paths. State the key table structure and explain why the macros are not embedded directly in the MRD.</li>
+    <li>Compare audit readiness with supervisor readiness on three axes. How does a credible IRB-and-IFRS-9 bank engineer for both simultaneously?</li>
+    <li>"Reasonable and supportable" is the auditor's leverage. Explain how a bank should construct the defensive evidence trail for its FLI scenario choices.</li>
+    <li>A bank runs two separate data pipelines for IRB and IFRS 9. What three problems does this architecture create, and what is the shared-spine alternative?</li>
+    <li>The three reference notebooks (DQA, wrangling, MRD assembly) mirror the A-IRB versions. Where do the IFRS 9-specific additions enter the pipeline?</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../ifrs9_impairments/02_data_engineering/01-data_sourcing.md</code> &mdash; the "reasonable and supportable" framing.</li>
+      <li><code>docs/wiki/.../ifrs9_impairments/02_data_engineering/02-dqa.md</code> &mdash; the DQA framework (identical to A-IRB).</li>
+      <li>Three reference notebooks at <code>03-dqa.ipynb</code>, <code>04-data_wrangling.ipynb</code>, <code>05-model_ready_data.ipynb</code> mirror A-IRB.</li>
+    </ul>
+
+    <p><strong>Cross-references to A-IRB capital:</strong></p>
+    <ul>
+      <li><a href="../a-irb_capital/06-data_engineering.html">A-IRB data engineering</a> &mdash; the shared MRD spine that IFRS 9 reuses. The six DQA dimensions, the BCBS 239 framework, the notebook patterns all transfer.</li>
+      <li><a href="../a-irb_capital/07-governance_and_limitations.html">A-IRB governance and limitations</a> &mdash; the limitations register that IFRS 9 also draws on for its own FLI / scenario choices.</li>
+      <li><a href="../a-irb_capital/08-portfolio_description.html">A-IRB portfolio description</a> &mdash; the descriptive statistics this lecture inherits with the IFRS 9 addition of stage migration tracking.</li>
+    </ul>
+
+    <p><strong>Forward references inside this IFRS 9 track:</strong></p>
+    <ul>
+      <li>05-pd_modelling (next) &mdash; the consumer of the data for FiT PD construction.</li>
+      <li>08-fli &mdash; the detailed construction of the FLI layer this lecture introduces.</li>
+      <li>10-ecl &mdash; the ECL aggregation that consumes the per-scenario per-parameter outputs.</li>
+      <li>12-monitoring &mdash; the audit interface where the data pipeline's audit-readiness is tested.</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>IFRS 9 standard, paragraph 5.5.17 ("reasonable and supportable").</li>
+      <li>EBA Guidelines on credit risk and accounting for expected credit losses (GL/2017/06), paragraphs on data infrastructure.</li>
+      <li>BCBS 239 "Principles for effective risk data aggregation and risk reporting" (January 2013), full 14 principles.</li>
+      <li>IFRS Foundation, Implementation Guidance on IFRS 9, examples on FLI scenario construction.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / IFRS 9 impairments 4 of 12.</span>
+  <span><a href="03-process_overview.html">Previous: process overview</a> &middot; <a href="05-pd_modelling.html">Next: PD modelling</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

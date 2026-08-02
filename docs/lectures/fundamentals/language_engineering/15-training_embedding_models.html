@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 15: training embedding models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Training embedding models</h1>
+  <p class="subtitle">Lecture 14 trained from scratch, which is the one thing you should almost never do. This lecture covers the three realistic situations instead: you have pairs and a pretrained model to start from, you have a few thousand labels where you need hundreds of thousands, or you have nothing labelled at all. The third case is the interesting one, because on the same benchmark an entirely unsupervised method scores 0.6992 against 0.5982 for a supervised method with fifty thousand labels.</p>
+  <div class="meta">
+    <span>Lecture 15 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part V: training your own</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Start from a model somebody else has already trained on hundreds of millions of pairs. Swapping <code>bert-base-uncased</code> for <code>all-MiniLM-L6-v2</code> and changing nothing else takes the multiple-negatives result from lecture 14 from 0.8094 to <strong>0.8510</strong>, and MiniLM is six layers rather than twelve.</p>
+
+  <p>When labels are scarce, <strong>Augmented SBERT</strong> manufactures more. Fine-tune an accurate but unusable cross-encoder on the small annotated <strong>gold</strong> set, use it to label a much larger unannotated set into a <strong>silver</strong> set, then train the bi-encoder on both. With 10,000 gold labels standing in for 50,000, the score is <strong>0.7102</strong> against 0.7222 for the fully supervised run: <strong>98.3 per cent of the quality from 20 per cent of the labels</strong>.</p>
+
+  <p>When there are no labels, <strong>TSDAE</strong> removes a fraction of the words from a sentence, encodes the damaged version to a single vector, and makes a decoder rebuild the original from that vector alone. A vector good enough to reconstruct a sentence turns out to be good enough to compare sentences. It scores <strong>0.6992</strong> with zero labels, which is <strong>16.9 per cent above</strong> the softmax-loss model of lecture 14 that used fifty thousand of them.</p>
+
+  <p>And the combination is <strong>domain adaptation</strong>: run TSDAE or masked language modelling on your own unlabelled corpus first, so the model learns your vocabulary, then fine-tune on pairs, which may come from a different domain entirely.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Three ways to get a specialist. Hire one who is already trained and give them a week on your files. Or take your one expert, have them mark a thousand cases, and use those markings to have a machine mark forty thousand more. Or, with nobody to teach you anything, tear words out of your own documents and practise putting them back, until you understand the documents well enough that the summary you write is enough to reconstruct them.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that the labels are the cost. The model is a download, the GPU is an hour's rental, and the training script is thirty lines. What actually stops embedding projects is that nobody has annotated fifty thousand pairs and nobody is going to. Both of the second and third methods here exist to remove that blocker, and between them they cover almost every real situation.</p>
+
+  <p>The second reason is that the unsupervised result is genuinely surprising and should change your default. A method using no labels at all beats a supervised method using fifty thousand. That inverts the usual assumption that unlabelled data is a consolation prize, and it means the first thing to try on a new domain is not a labelling exercise.</p>
+
+  <p>The third reason is that domain adaptation is the case most people actually have. A leaderboard model was trained on web text, and your corpus is policy wordings, clinical notes or claims narratives, where the vocabulary is different and the important distinctions are ones general text never had to make. Adapting a strong general model to your domain reliably beats picking a stronger general model.</p>
+
+  <p>And a fourth reason about honesty in measurement. One of the numbers in this lecture is contaminated, and the source says so plainly. Recognising why is a transferable skill, because the same contamination affects most published fine-tuning comparisons.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Three routes, chosen by how much labelled data exists, and one ladder showing where each lands.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three routes to an embedding model: supervised fine-tuning from a pretrained model, Augmented SBERT which uses a cross-encoder to label a silver dataset, and TSDAE which reconstructs damaged sentences without labels. Below, a ladder of STSB scores against the number of labels each route used.">
+      <rect x="0" y="0" width="880" height="440" fill="#FFFFFF"/>
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">How many labels do you have?</text>
+
+      <!-- ROUTE 1 -->
+      <rect x="20" y="34" width="272" height="210" rx="9" fill="#FFFFFF" stroke="#3E7A45" stroke-width="2"/>
+      <text x="156" y="54" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#14532d">MANY: FINE-TUNE</text>
+      <text x="156" y="68" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#3E7A45">tens of thousands of pairs</text>
+
+      <rect x="46" y="82" width="220" height="30" rx="6" fill="#DCFCE7" stroke="#3E7A45" stroke-width="1.5"/>
+      <text x="156" y="101" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#14532d">a pretrained sentence model</text>
+      <line x1="156" y1="112" x2="156" y2="124" stroke="#71717a" stroke-width="1.6"/><polygon points="156,128 151,120 161,120" fill="#71717a"/>
+      <rect x="46" y="128" width="220" height="30" rx="6" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="156" y="147" text-anchor="middle" font-family="Inter" font-size="9" fill="#3f3f46">your pairs + MNR loss</text>
+      <line x1="156" y1="158" x2="156" y2="170" stroke="#71717a" stroke-width="1.6"/><polygon points="156,174 151,166 161,166" fill="#71717a"/>
+      <rect x="46" y="174" width="220" height="28" rx="6" fill="#DCFCE7" stroke="#3E7A45" stroke-width="2"/>
+      <text x="156" y="192" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#14532d">0.8510</text>
+
+      <text x="156" y="218" text-anchor="middle" font-family="Inter" font-size="8" fill="#71717a">one line changed from lecture 14</text>
+      <text x="156" y="232" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#DC2855">and this number is contaminated</text>
+
+      <!-- ROUTE 2 -->
+      <rect x="304" y="34" width="272" height="210" rx="9" fill="#FFFFFF" stroke="#5B47E0" stroke-width="2"/>
+      <text x="440" y="54" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#4c1d95">FEW: AUGMENTED SBERT</text>
+      <text x="440" y="68" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#5B47E0">a couple of thousand labels</text>
+
+      <rect x="322" y="82" width="110" height="26" rx="5" fill="#FBF1D4" stroke="#a16207" stroke-width="1.5"/>
+      <text x="377" y="99" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#713f12">GOLD 10,000</text>
+      <line x1="432" y1="95" x2="446" y2="95" stroke="#71717a" stroke-width="1.5"/><polygon points="450,95 442,91 442,99" fill="#71717a"/>
+      <rect x="450" y="82" width="108" height="26" rx="5" fill="#FFE4E6" stroke="#DC2855" stroke-width="1.5"/>
+      <text x="504" y="99" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#9f1239">cross-encoder</text>
+
+      <line x1="504" y1="108" x2="504" y2="120" stroke="#71717a" stroke-width="1.6"/><polygon points="504,124 499,116 509,116" fill="#71717a"/>
+      <rect x="386" y="124" width="172" height="26" rx="5" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="472" y="141" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#3f3f46">labels 40,000 unlabelled pairs</text>
+      <line x1="386" y1="137" x2="368" y2="137" stroke="#71717a" stroke-width="1.5"/><polygon points="364,137 372,133 372,141" fill="#71717a"/>
+      <rect x="322" y="124" width="42" height="26" rx="5" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="343" y="141" text-anchor="middle" font-family="Inter" font-size="8" fill="#3f3f46">pool</text>
+
+      <line x1="440" y1="150" x2="440" y2="162" stroke="#71717a" stroke-width="1.6"/><polygon points="440,166 435,158 445,158" fill="#71717a"/>
+      <rect x="322" y="166" width="236" height="24" rx="5" fill="#EDE9FE" stroke="#5B47E0" stroke-width="1.5"/>
+      <text x="440" y="182" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#4c1d95">SILVER 40,000 + GOLD 10,000 &#8594; bi-encoder</text>
+      <rect x="360" y="196" width="160" height="24" rx="5" fill="#EDE9FE" stroke="#5B47E0" stroke-width="2"/>
+      <text x="440" y="212" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#4c1d95">0.7102</text>
+      <text x="440" y="234" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#4c1d95">98.3% of the full-label score, from 20% of the labels</text>
+
+      <!-- ROUTE 3 -->
+      <rect x="588" y="34" width="272" height="210" rx="9" fill="#FFFFFF" stroke="#0F62FE" stroke-width="2"/>
+      <text x="724" y="54" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#0b4bbd">NONE: TSDAE</text>
+      <text x="724" y="68" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#0F62FE">just sentences, no annotation at all</text>
+
+      <rect x="614" y="82" width="220" height="24" rx="5" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="724" y="98" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#3f3f46">"Grim faces and hardened jaws are not..."</text>
+      <line x1="724" y1="106" x2="724" y2="116" stroke="#DC2855" stroke-width="1.6"/><polygon points="724,120 719,112 729,112" fill="#DC2855"/>
+      <text x="770" y="116" font-family="Inter" font-size="7.5" font-style="italic" fill="#DC2855">delete words</text>
+      <rect x="614" y="120" width="220" height="24" rx="5" fill="#FFE4E6" stroke="#DC2855" stroke-width="1.5"/>
+      <text x="724" y="136" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#9f1239">"Grim jaws are."</text>
+      <line x1="724" y1="144" x2="724" y2="154" stroke="#71717a" stroke-width="1.6"/><polygon points="724,158 719,150 729,150" fill="#71717a"/>
+      <rect x="614" y="158" width="103" height="24" rx="5" fill="#DEEAFB" stroke="#0F62FE" stroke-width="1.5"/>
+      <text x="665" y="174" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#0b4bbd">encoder + CLS</text>
+      <line x1="717" y1="170" x2="727" y2="170" stroke="#71717a" stroke-width="1.5"/><polygon points="731,170 723,166 723,174" fill="#71717a"/>
+      <rect x="731" y="158" width="103" height="24" rx="5" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="782" y="174" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#3f3f46">decoder rebuilds</text>
+      <rect x="644" y="192" width="160" height="24" rx="5" fill="#DEEAFB" stroke="#0F62FE" stroke-width="2"/>
+      <text x="724" y="208" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="600" fill="#0b4bbd">0.6992</text>
+      <text x="724" y="230" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#0b4bbd">keep the encoder, discard the decoder</text>
+
+      <!-- LADDER -->
+      <rect x="20" y="258" width="840" height="164" rx="9" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="440" y="278" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#18181b">EVERY RESULT IN PART V SO FAR, ORDERED BY SCORE (Pearson cosine, STSB)</text>
+      <text x="60" y="296" font-family="Inter" font-size="8" font-weight="600" fill="#71717a">approach</text>
+      <text x="300" y="296" font-family="Inter" font-size="8" font-weight="600" fill="#71717a">labels used</text>
+
+      <g font-family="JetBrains Mono" font-size="8.5">
+        <text x="60" y="313" fill="#3f3f46">softmax, from scratch</text><text x="300" y="313" fill="#3f3f46">50,000</text>
+        <rect x="380" y="305" width="219" height="10" rx="2" fill="#e4e4e7"/><text x="612" y="313" fill="#3f3f46">0.5982</text>
+        <text x="676" y="313" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">lecture 14</text>
+
+        <text x="60" y="331" fill="#0b4bbd">TSDAE, unsupervised</text><text x="300" y="331" font-weight="600" fill="#0b4bbd">0</text>
+        <rect x="380" y="323" width="256" height="10" rx="2" fill="#0F62FE"/><text x="649" y="331" fill="#0b4bbd">0.6992</text>
+        <text x="713" y="331" font-family="Inter" font-size="8" font-weight="600" fill="#0F62FE">no labels, and it wins</text>
+
+        <text x="60" y="349" fill="#4c1d95">Augmented SBERT</text><text x="300" y="349" fill="#4c1d95">10,000</text>
+        <rect x="380" y="341" width="260" height="10" rx="2" fill="#5B47E0"/><text x="653" y="349" fill="#4c1d95">0.7102</text>
+        <text x="717" y="349" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">+ 40,000 silver</text>
+
+        <text x="60" y="367" fill="#3f3f46">cosine loss, from scratch</text><text x="300" y="367" fill="#3f3f46">50,000</text>
+        <rect x="380" y="359" width="264" height="10" rx="2" fill="#C8BFFF"/><text x="657" y="367" fill="#3f3f46">0.7222</text>
+        <text x="721" y="367" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">lecture 14</text>
+
+        <text x="60" y="385" fill="#3f3f46">MNR loss, from scratch</text><text x="300" y="385" fill="#3f3f46">50,000</text>
+        <rect x="380" y="377" width="296" height="10" rx="2" fill="#C8BFFF"/><text x="689" y="385" fill="#3f3f46">0.8094</text>
+        <text x="753" y="385" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">lecture 14</text>
+
+        <text x="60" y="403" fill="#14532d">MNR, fine-tuned MiniLM</text><text x="300" y="403" fill="#14532d">50,000</text>
+        <rect x="380" y="395" width="311" height="10" rx="2" fill="#3E7A45"/><text x="704" y="403" fill="#14532d">0.8510</text>
+        <text x="768" y="403" font-family="Inter" font-size="8" font-weight="600" fill="#DC2855">contaminated</text>
+      </g>
+    </svg>
+    <figcaption>The three panels are chosen by data availability rather than by ambition. The ladder underneath collects every result from lectures 14 and 15 on one axis, and the row worth staring at is the second: an unsupervised method with no labels outscores a supervised method with fifty thousand. The bar lengths are proportional to the scores; the labels column is what each result actually cost.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Supervised fine-tuning, and an honest caveat</h3>
+
+  <p>The change from lecture 14 is one line. Where the base model was a plain <code>bert-base-uncased</code> that had never been trained to produce sentence embeddings, use one that has.</p>
+
+  <pre><code>from sentence_transformers import SentenceTransformer, losses
+
+# lecture 14:  SentenceTransformer("bert-base-uncased")             -> 0.8094
+embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+train_loss = losses.MultipleNegativesRankingLoss(model=embedding_model)
+# same data, same loss, same one epoch                              -> 0.8510</code></pre>
+
+  <p>Note that MiniLM is the smaller model, six transformer layers against BERT base's twelve, and still wins by four points. Parameter count is not what separated them; having already been trained on the right objective is.</p>
+
+  <div class="callout warn">
+    <span class="tag">This particular number should not be quoted</span>
+    <code>all-MiniLM-L6-v2</code> was trained on over a billion pairs, and MNLI in full was among them. The evaluation therefore involves a model that has already seen the entire training set, of which our 50,000 examples are a subset. The 0.8510 is a demonstration that the code works, not a measurement of what fine-tuning gains. This is the same benchmark-contamination problem lecture 5 flagged for the hosted classifier, and it affects most published fine-tuning comparisons on public datasets. The only clean measurement is on pairs you constructed yourself and never released.
+  </div>
+
+  <p>The genuine finding underneath survives the caveat: starting from a model already trained for sentence similarity is cheaper and better than starting from a plain encoder, because you are adapting a good geometry rather than building one. Fine-tuning also needs far less data than training, which is what makes the next two methods worth having.</p>
+
+  <h3>Augmented SBERT: spend an expensive model to make cheap labels</h3>
+
+  <p>Production embedding models are trained on hundreds of millions of pairs. You have a few thousand. Augmented SBERT bridges that gap by using the accurate-but-unusable architecture from lecture 14 as a labelling machine rather than as a search engine, which is the one job its cost structure suits: a cross-encoder run once over a fixed dataset offline is entirely affordable, whereas the same model run per query is not.</p>
+
+  <div class="worked">AUGMENTED SBERT, FOUR STEPS
+
+  1. TRAIN A CROSS-ENCODER ON THE GOLD SET
+       gold = 10,000 hand-labelled pairs
+       cross-encoder from bert-base-uncased, 2 labels, 1 epoch
+       accurate, slow, produces no embeddings. Fine: it will
+       never see a query.
+
+  2. ASSEMBLE UNLABELLED PAIRS
+       40,000 pairs with no annotation
+       (here, the remainder of the 50,000, treated as unlabelled)
+
+  3. LABEL THEM -> THE SILVER SET
+       cross-encoder.predict(pairs)
+       40,000 machine labels. Not ground truth, hence "silver".
+
+  4. TRAIN THE BI-ENCODER ON GOLD + SILVER
+       10,000 + 40,000 = 50,000 pairs, deduplicated
+       cosine similarity loss, as in lecture 14
+
+  THE RESULT
+       Augmented SBERT, 10,000 gold      0.7102
+       fully supervised, 50,000 gold     0.7222
+                                        --------
+       ratio  0.7102 / 0.7222         =  98.34%
+       labels 10,000 / 50,000         =  20.0%
+
+     98.3 per cent of the quality for 20 per cent of the
+     annotation. The remaining 1.7 per cent is the price of
+     silver labels being predictions rather than truth.
+
+  HOW TO CHOOSE THE UNLABELLED PAIRS  (this matters more than
+  it looks)
+     RANDOM PAIRING is the obvious move and a poor one: take a
+     premise from one row and a hypothesis from another and
+     you can manufacture ten times the data, but almost every
+     pair will be dissimilar, so the silver set is wildly
+     imbalanced and teaches the model little.
+
+     SEMANTIC SEARCH is the fix. Embed all candidate sentences
+     with an existing model and keep each sentence's top-k
+     neighbours as candidate pairs. The pairs are then
+     plausible enough that the cross-encoder's judgement is
+     informative. This is the same rough-then-precise pattern
+     as two-stage retrieval, applied to dataset construction.
+
+  HOW TO CHECK THE SILVER IS WORTH ANYTHING
+     train once on gold alone, once on gold plus silver, and
+     compare. The difference is what the augmentation bought.
+     If it is zero, your candidate pairs were badly chosen.</div>
+
+  <h3>TSDAE: training with no labels at all</h3>
+
+  <p>Sometimes there is nothing to label with. The <strong>transformer-based sequential denoising auto-encoder</strong> assumes exactly that, and does not fabricate labels either. It sets up a task that any pile of sentences can supply on its own.</p>
+
+  <p>Delete a fraction of the words from a sentence. Push the damaged version through an encoder and pool it into one vector. Then hand that single vector to a decoder and require it to reproduce the original, undamaged sentence. The vector is the only channel between the two, so it must carry enough of the sentence's content to support reconstruction, and it turns out that a vector good enough for that is also good enough for comparing sentences.</p>
+
+  <div class="worked">WHAT THE MODEL SEES
+
+    damaged   "Grim jaws are."
+    original  "Grim faces and hardened jaws are not
+               people-friendly."
+
+    the encoder never sees the original. The decoder never
+    sees the damaged input. Everything that passes between
+    them is one pooled vector.
+
+  RELATION TO MASKED LANGUAGE MODELLING
+    MLM   reconstructs specific tokens, and is TOLD where the
+          gaps are by the [MASK] token
+    TSDAE reconstructs the WHOLE SENTENCE, and is not told
+          where anything was removed
+
+    the harder task forces the pooled vector to carry sentence-
+    level meaning, which is precisely what MLM never required
+    and precisely why pooling a plain BERT fails (lecture 3).
+
+  TWO CONFIGURATION POINTS THAT ARE NOT ARBITRARY
+
+    POOL ON [CLS], NOT THE MEAN.
+      The TSDAE authors found CLS pooling better here, because
+      mean pooling discards position information and
+      reconstruction needs word order. This is the one place
+      in the track where mean pooling is the wrong default.
+
+    TIE THE ENCODER AND DECODER WEIGHTS.
+      One set of weights serves both, halving the parameters
+      and stabilising training.
+
+    and lower the batch size: 16 rather than 32, because the
+    decoder is extra memory on top of the encoder.
+
+  THE DATA, AND HOW LITTLE IT NEEDS
+    25,000 MNLI rows, premises and hypotheses flattened into
+    one list and deduplicated:  50,000 sentences
+    labels used:                0
+
+  THE RESULT
+    TSDAE, no labels                   0.6992
+    softmax loss, 50,000 labels        0.5982   (lecture 14)
+                                      --------
+    0.6992 / 0.5982 = 1.169         -> +16.9%
+
+    An unsupervised method beats a supervised one that had
+    fifty thousand annotations. The supervised method was
+    handicapped by a poor loss, which is exactly the point:
+    the objective matters more than the supervision.
+
+    Against the best supervised result (MNR, 0.8094) TSDAE is
+    13.6 per cent behind. So unsupervised is not free quality;
+    it is a very good starting position.</div>
+
+  <pre><code>from sentence_transformers import models, losses, SentenceTransformer
+from sentence_transformers.datasets import DenoisingAutoEncoderDataset
+
+damaged_data = DenoisingAutoEncoderDataset(list(set(flat_sentences)))
+
+word_embedding_model = models.Transformer("bert-base-uncased")
+pooling_model = models.Pooling(
+    word_embedding_model.get_word_embedding_dimension(), "cls")   # not "mean"
+embedding_model = SentenceTransformer(modules=[word_embedding_model, pooling_model])
+
+train_loss = losses.DenoisingAutoEncoderLoss(embedding_model, tie_encoder_decoder=True)</code></pre>
+
+  <p>When training finishes, throw the decoder away. It existed only to prove the vector was good; the encoder is the artefact.</p>
+
+  <h3>Domain adaptation: use both</h3>
+
+  <p>The three routes above are not exclusive, and the standard arrangement combines them. An off-the-shelf embedding model was trained on general web text, which is a different <strong>domain</strong> from policy wordings, clinical notes or claims narratives: different vocabulary, different frequent constructions, and distinctions that matter to you and never mattered to the source corpus.</p>
+
+  <div class="worked">ADAPTIVE PRETRAINING, THEN ADAPTIVE FINE-TUNING
+
+  STAGE 1  learn the vocabulary, unsupervised, ON YOUR CORPUS
+      run TSDAE, or masked language modelling (lecture 16), over
+      your unlabelled documents. No annotation needed, and you
+      almost certainly already have the documents.
+      Outcome: a model that knows how your domain's words are
+      used.
+
+  STAGE 2  learn similarity, supervised, ON WHATEVER PAIRS EXIST
+      fine-tune with MNR loss on pairs. These may come from
+      OUTSIDE your domain and it still works, because stage 1
+      has already handled the vocabulary. General NLI or
+      question-answer pairs are enough.
+      Outcome: a model that knows what "similar" means.
+
+  WHY THE ORDER MATTERS
+      stage 1 teaches WHAT THE WORDS MEAN HERE.
+      stage 2 teaches WHAT SIMILARITY MEANS.
+      Doing 2 alone leaves the model fluent in the wrong
+      vocabulary; doing 1 alone leaves it knowledgeable and
+      unable to compare.
+
+  AND IF YOU HAVE A FEW LABELS TOO
+      stage 1 (TSDAE on your corpus)
+      stage 2 (Augmented SBERT on your small gold set)
+      is the full pipeline, and needs no dataset you do not
+      already possess.</div>
+
+  <h3>What actually determines the outcome</h3>
+
+  <p>Two closing observations that the numbers support and that get ignored.</p>
+
+  <p>The data is the constraint, not the model or the compute. Every result in the ladder used one epoch on a modest GPU. What separates 0.5982 from 0.8510 is the objective and the pairs, not the architecture, and no amount of training longer will substitute. Positive pairs are usually easy to obtain; hard negatives, as lecture 14 argued, are where the effort belongs.</p>
+
+  <p>And contrastive training is unstable on small datasets in a way ordinary supervised training is not. The objective depends on the distribution of negatives, so a small sample gives an unrepresentative one and results vary run to run. If you are working with a few thousand pairs, that instability is a reason to augment, as here, rather than a reason to accept the variance.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Do not train from scratch. Starting from a model already trained for sentence similarity moves the lecture 14 result from 0.8094 to 0.8510 with one line changed, using a model half the depth, though that particular figure is contaminated because the pretrained model had already seen the benchmark's training set. When labels are scarce, Augmented SBERT fine-tunes a cross-encoder on a small gold set and uses it to label a larger silver set, reaching 98.3 per cent of the fully supervised score from 20 per cent of the annotation, provided the candidate pairs are chosen by semantic search rather than at random. When there are no labels, TSDAE deletes words and trains a decoder to rebuild the original sentence from the pooled vector alone, scoring 0.6992 with zero annotation, which is 16.9 per cent above the softmax-loss supervised model. Combining them gives domain adaptation: unsupervised pretraining on your corpus to learn the vocabulary, then supervised fine-tuning on any available pairs to learn similarity.</p>
+
+  <div class="callout insight">
+    <span class="tag">The result worth remembering</span>
+    An unsupervised method beat a supervised method with fifty thousand labels. That is not an argument that supervision is worthless, since the best supervised result is still 13.6 per cent ahead. It is an argument that the objective matters more than the label count, and that the correct first move on a new domain is to run an unsupervised pass over the documents you already have, not to commission an annotation exercise. Measure the unsupervised baseline before you buy labels, exactly as lecture 5 argued for zero-shot classification.
+    </div>
+
+  <p>Lecture 16 turns from embedding models to representation models used directly for a task. It covers full fine-tuning of BERT for classification, what freezing layers costs and saves, SetFit for the case where you have sixteen labelled examples per class rather than thousands, continued pretraining with masked language modelling, and named-entity recognition, where the sub-token alignment problem introduced back in lecture 3 finally has to be solved properly.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the single change that takes the lecture 14 result from 0.8094 to 0.8510, and note the relative sizes of the two models.</li>
+      <li>Explain why the 0.8510 figure is contaminated, and what a clean measurement would require.</li>
+      <li>List the four steps of Augmented SBERT in order, naming what each produces.</li>
+      <li>Explain why a cross-encoder is a sensible choice as a labelling machine despite being unusable as a search engine.</li>
+      <li><strong>Do the arithmetic.</strong> Augmented SBERT scores 0.7102 against 0.7222 fully supervised, using 10,000 of 50,000 labels. Express both the quality and the label count as percentages.</li>
+      <li>Define gold and silver datasets, and say what the 1.7 per cent shortfall represents.</li>
+      <li>Explain why random pairing is a poor way to build the candidate set, and what to do instead.</li>
+      <li>Describe how you would test whether your silver data added anything.</li>
+      <li>Describe the TSDAE task in one sentence, and state what passes between the encoder and the decoder.</li>
+      <li>Give two differences between TSDAE and masked language modelling, and explain why the harder task produces better sentence vectors.</li>
+      <li>Why does TSDAE pool on <code>[CLS]</code> rather than the mean, when the rest of the track defaults to the mean?</li>
+      <li>Why is the batch size lowered from 32 to 16 for TSDAE?</li>
+      <li><strong>Do the arithmetic.</strong> Compare TSDAE at 0.6992 with softmax loss at 0.5982 and with MNR at 0.8094, as percentages.</li>
+      <li>What happens to the decoder after TSDAE training, and why?</li>
+      <li>State the two stages of domain adaptation, what each teaches the model, and why the order cannot be reversed.</li>
+      <li>Explain why stage 2 can use out-of-domain pairs.</li>
+      <li>Give the reason contrastive training is unstable on small datasets, and the implication for what to do about it.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 14 (<a href="14-contrastive_learning_and_sbert.html">contrastive learning and SBERT</a>) supplied the architecture, the loss functions, and every baseline figure in the ladder.</li>
+      <li><strong>Resolves:</strong> Lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>) noted that pooling a plain BERT gives poor sentence vectors; TSDAE is the unsupervised fix.</li>
+      <li><strong>Pattern:</strong> The rough-then-precise selection of silver pairs is the two-stage retrieval of lecture 12 (<a href="12-retrieval_quality_and_evaluation.html">retrieval quality and evaluation</a>) applied to dataset construction; the contamination caveat is the one from lecture 5 (<a href="05-text_classification.html">text classification</a>).</li>
+      <li><strong>Next:</strong> Lecture 16 (<a href="16-fine_tuning_representation_models.html">fine-tuning representation models</a>) covers masked language modelling as the other adaptive-pretraining option named here.</li>
+      <li><strong>Uses:</strong> A model adapted this way is what lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>) should be retrieving with on a specialised corpus.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 15 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

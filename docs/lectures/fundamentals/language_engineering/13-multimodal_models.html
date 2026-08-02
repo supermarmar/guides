@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 13: multimodal models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Multimodal models</h1>
+  <p class="subtitle">Part IV is one lecture and one idea: the transformer never cared that its inputs were words. Cut an image into squares, project each square to a vector, and the same architecture applies. What follows from that are three things worth knowing — why image resolution is quadratically expensive, why the batch size in contrastive training is the training signal rather than a throughput setting, and why a "shared" image-and-text space is less shared than the phrase suggests.</p>
+  <div class="meta">
+    <span>Lecture 13 of 18</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part IV: beyond text</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A vision transformer, from Dosovitskiy and colleagues in 2020, cuts an image into a grid of fixed squares and treats each as a token. A 224-pixel image at 16-pixel patches gives 196 patches plus a classification token, so <strong>197 tokens</strong>, and everything downstream is the architecture from lecture 4 unchanged.</p>
+
+  <p>The first consequence is a hard cost curve. Attention is quadratic in the token count and the token count is quadratic in the resolution, so quadrupling the pixels multiplies the attention pairs by <strong>sixteen</strong>: 224 pixels gives 38,809 pairs and 448 gives 616,225. Vision models are fussy about input size for a reason text models are not.</p>
+
+  <p><strong>CLIP</strong> (Radford and colleagues, 2021) puts images and captions in one space by contrastive training: a batch of N pairs forms an N by N similarity matrix and the correct pairing is the diagonal. So every example has one positive and N−1 negatives, and the batch size <em>is</em> the difficulty. CLIP used <strong>32,768</strong>, where a random guess is right 0.0031 per cent of the time. This is one of the few settings where a larger batch produces a better model rather than merely a faster run.</p>
+
+  <p>And the space is less shared than advertised. Liang and colleagues measured a persistent <strong>modality gap</strong>: image and text embeddings occupy separate cones after training, so a cosine of 0.31 can be an excellent cross-modal match and a poor within-modal one, and no single threshold serves both. <strong>BLIP-2</strong> then sidesteps retraining entirely, bridging a frozen vision encoder to a frozen language model by training a small adapter: <strong>2.3 per cent</strong> of the parameters.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Chop the picture into little squares, turn each square of pixels into a list of numbers, and feed them in exactly as if they were words. Then show the model millions of pictures with their captions and make it match each picture to its own caption out of thirty thousand.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that it shows what the transformer actually requires, which is a sequence of vectors and nothing else. Text needed a tokeniser because language arrives as characters; images need only a projection because pixels are already numbers. Seeing that the architecture is indifferent to the modality is the point of the lecture, and audio, video and time series follow the same route.</p>
+
+  <p>The second reason is that contrastive training, met here in its image-and-text form, is the same objective that trains a good retrieval embedding. Everything about batch size, negatives and the shape of the learned space carries directly into Part V, where the embedding models of lectures 11 and 12 stop being bought and start being trained.</p>
+
+  <p>The third reason is practical and easy to get wrong. A CLIP score is meaningful in comparison and misleading in isolation, because of the modality gap. Systems that threshold a raw cross-modal cosine behave strangely, and the fix is to rank rather than to threshold.</p>
+
+  <p>And a fourth reason about cost. The BLIP-2 arrangement, a frozen encoder and a frozen language model joined by a trained bridge, is the general pattern for adding a modality without paying for a new foundation model. It is the same instinct as the parameter-efficient fine-tuning in lecture 17: leave the large things alone and train the join.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>One projection that makes an image a sequence, one objective that puts two sequences in one space, and one bridge that avoids paying for either again.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="An image is cut into a grid of patches, each linearly projected to an embedding and fed to a transformer as tokens. CLIP trains an image encoder and a text encoder against a batch similarity matrix whose diagonal is correct. BLIP-2 freezes a vision encoder and a language model and trains only a small Q-Former bridge between them.">
+      <rect x="0" y="0" width="880" height="400" fill="#FFFFFF"/>
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A patch is a token. Everything else is the architecture you already know.</text>
+
+      <g>
+        <rect x="24" y="40" width="96" height="96" rx="4" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+        <g stroke="#a1a1aa" stroke-width="0.8">
+          <line x1="48" y1="40" x2="48" y2="136"/><line x1="72" y1="40" x2="72" y2="136"/><line x1="96" y1="40" x2="96" y2="136"/>
+          <line x1="24" y1="64" x2="120" y2="64"/><line x1="24" y1="88" x2="120" y2="88"/><line x1="24" y1="112" x2="120" y2="112"/>
+        </g>
+        <rect x="24" y="40" width="24" height="24" fill="#5B47E0" opacity="0.35"/>
+        <text x="72" y="152" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#3f3f46">224 x 224 pixels</text>
+        <text x="72" y="164" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">16-pixel patches, 14 per side</text>
+      </g>
+
+      <line x1="128" y1="88" x2="156" y2="88" stroke="#71717a" stroke-width="2"/><polygon points="162,88 152,83 152,93" fill="#71717a"/>
+
+      <rect x="168" y="52" width="196" height="72" rx="9" fill="#EDE9FE" stroke="#5B47E0" stroke-width="2"/>
+      <text x="266" y="72" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#4c1d95">LINEAR PROJECTION</text>
+      <text x="266" y="90" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#4c1d95">16 x 16 x 3 = 768 numbers</text>
+      <text x="266" y="105" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#4c1d95">-&gt; one 768-dim vector</text>
+      <text x="266" y="119" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#5B47E0">no vocabulary, nothing out-of-vocabulary</text>
+
+      <line x1="364" y1="88" x2="392" y2="88" stroke="#71717a" stroke-width="2"/><polygon points="398,88 388,83 388,93" fill="#71717a"/>
+
+      <rect x="404" y="52" width="196" height="72" rx="9" fill="#DEEAFB" stroke="#0F62FE" stroke-width="2"/>
+      <text x="502" y="72" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#0b4bbd">197 TOKENS</text>
+      <text x="502" y="90" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0b4bbd">196 patches + one CLS</text>
+      <text x="502" y="105" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#0b4bbd">plus positional embeddings</text>
+      <text x="502" y="119" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#0F62FE">the grid order is not otherwise known</text>
+
+      <line x1="600" y1="88" x2="628" y2="88" stroke="#71717a" stroke-width="2"/><polygon points="634,88 624,83 624,93" fill="#71717a"/>
+
+      <rect x="640" y="52" width="216" height="72" rx="9" fill="#DCFCE7" stroke="#3E7A45" stroke-width="2"/>
+      <text x="748" y="72" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#14532d">THE SAME TRANSFORMER</text>
+      <text x="748" y="90" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#14532d">lecture 4, unchanged</text>
+      <text x="748" y="108" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#DC2855">attention is O(tokens squared)</text>
+
+      <rect x="24" y="184" width="400" height="196" rx="9" fill="#FFFFFF" stroke="#be185d" stroke-width="2"/>
+      <text x="224" y="204" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#831843">CLIP: THE BATCH IS THE DIFFICULTY</text>
+      <text x="224" y="222" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#3f3f46">N images and N captions give an N x N matrix</text>
+
+      <g font-family="JetBrains Mono" font-size="9">
+        <text x="60" y="250" fill="#71717a">img1</text><text x="60" y="270" fill="#71717a">img2</text><text x="60" y="290" fill="#71717a">img3</text><text x="60" y="310" fill="#71717a">img4</text>
+        <text x="112" y="238" fill="#71717a">t1</text><text x="152" y="238" fill="#71717a">t2</text><text x="192" y="238" fill="#71717a">t3</text><text x="232" y="238" fill="#71717a">t4</text>
+      </g>
+      <g>
+        <rect x="104" y="240" width="26" height="14" fill="#3E7A45" opacity="0.8"/><rect x="144" y="240" width="26" height="14" fill="#e4e4e7"/><rect x="184" y="240" width="26" height="14" fill="#e4e4e7"/><rect x="224" y="240" width="26" height="14" fill="#e4e4e7"/>
+        <rect x="104" y="260" width="26" height="14" fill="#e4e4e7"/><rect x="144" y="260" width="26" height="14" fill="#3E7A45" opacity="0.8"/><rect x="184" y="260" width="26" height="14" fill="#e4e4e7"/><rect x="224" y="260" width="26" height="14" fill="#e4e4e7"/>
+        <rect x="104" y="280" width="26" height="14" fill="#e4e4e7"/><rect x="144" y="280" width="26" height="14" fill="#e4e4e7"/><rect x="184" y="280" width="26" height="14" fill="#3E7A45" opacity="0.8"/><rect x="224" y="280" width="26" height="14" fill="#e4e4e7"/>
+        <rect x="104" y="300" width="26" height="14" fill="#e4e4e7"/><rect x="144" y="300" width="26" height="14" fill="#e4e4e7"/><rect x="184" y="300" width="26" height="14" fill="#e4e4e7"/><rect x="224" y="300" width="26" height="14" fill="#3E7A45" opacity="0.8"/>
+      </g>
+      <text x="290" y="256" font-family="Inter" font-size="8.5" font-weight="600" fill="#14532d">diagonal: the true pairs</text>
+      <text x="290" y="272" font-family="Inter" font-size="8.5" fill="#71717a">everything else: negatives</text>
+      <text x="290" y="292" font-family="Inter" font-size="8.5" fill="#3f3f46">N&minus;1 negatives per example</text>
+      <text x="290" y="308" font-family="Inter" font-size="8.5" font-weight="600" fill="#be185d">CLIP used N = 32,768</text>
+      <text x="40" y="338" font-family="Inter" font-size="8.5" fill="#3f3f46">cross-entropy over each row and each column, so the model</text>
+      <text x="40" y="352" font-family="Inter" font-size="8.5" fill="#3f3f46">must find the caption for an image AND the image for a caption</text>
+      <text x="40" y="370" font-family="Inter" font-size="8.5" font-weight="600" fill="#831843">bigger batch = harder task = better representation</text>
+
+      <rect x="450" y="184" width="406" height="196" rx="9" fill="#FFFFFF" stroke="#3E7A45" stroke-width="2"/>
+      <text x="653" y="204" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#14532d">BLIP-2: TRAIN THE JOIN, NOT THE PARTS</text>
+
+      <rect x="470" y="220" width="110" height="56" rx="7" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="525" y="240" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#3f3f46">VISION ENCODER</text>
+      <text x="525" y="256" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3f3f46">1.0 B</text>
+      <text x="525" y="270" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#0F62FE">FROZEN</text>
+
+      <rect x="600" y="220" width="106" height="56" rx="7" fill="#FFE4E6" stroke="#be185d" stroke-width="2"/>
+      <text x="653" y="240" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#831843">Q-FORMER</text>
+      <text x="653" y="256" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#831843">188 M</text>
+      <text x="653" y="270" text-anchor="middle" font-family="Inter" font-size="8" font-weight="700" fill="#be185d">TRAINED</text>
+
+      <rect x="726" y="220" width="110" height="56" rx="7" fill="#F4F4F5" stroke="#71717a" stroke-width="1.5"/>
+      <text x="781" y="240" text-anchor="middle" font-family="Inter" font-size="9" font-weight="600" fill="#3f3f46">LANGUAGE MODEL</text>
+      <text x="781" y="256" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3f3f46">7.0 B</text>
+      <text x="781" y="270" text-anchor="middle" font-family="Inter" font-size="8" font-weight="600" fill="#0F62FE">FROZEN</text>
+
+      <line x1="580" y1="248" x2="596" y2="248" stroke="#71717a" stroke-width="1.8"/><polygon points="600,248 592,244 592,252" fill="#71717a"/>
+      <line x1="706" y1="248" x2="722" y2="248" stroke="#71717a" stroke-width="1.8"/><polygon points="726,248 718,244 718,252" fill="#71717a"/>
+
+      <text x="470" y="300" font-family="JetBrains Mono" font-size="9" fill="#18181b">trainable fraction = 188 / 8,188 = 2.30%</text>
+      <text x="470" y="320" font-family="Inter" font-size="8.5" fill="#3f3f46">and it compresses too: 257 patch tokens in, 32 query vectors out,</text>
+      <text x="470" y="334" font-family="Inter" font-size="8.5" fill="#3f3f46">so the language model spends 32 tokens of its context, not 257</text>
+      <text x="470" y="356" font-family="Inter" font-size="8.5" font-weight="600" fill="#14532d">the bridge learns a translation between two good representations,</text>
+      <text x="470" y="370" font-family="Inter" font-size="8.5" font-weight="600" fill="#14532d">which is a far smaller problem than learning either one</text>
+    </svg>
+    <figcaption>The top row is the whole conceptual content: a projection turns pixels into tokens and nothing else changes. The two panels below are the two things you then do with a pair of modalities — train one space for both, or keep two spaces and learn the map between them.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Patches, and the resolution wall</h3>
+
+  <div class="worked">TOKENS AND ATTENTION PAIRS BY RESOLUTION
+
+   resolution   patch   per side   tokens (+CLS)   attention pairs
+      224        16        14           197             38,809
+      224        14        16           257             66,049
+      336        14        24           577            332,929
+      448        16        28           785            616,225
+      448        14        32         1,025          1,050,625
+      896        16        56         3,137          9,840,769
+
+  GOING FROM 224 TO 448 PIXELS
+    four times the pixels, 785 tokens instead of 197, and
+    SIXTEEN times the attention pairs.
+
+  WHICH EXPLAINS TWO THINGS AT ONCE
+    why vision models specify an input size and resize
+    everything to it, where a text model happily takes any
+    length up to its window; and why high-resolution vision
+    is a genuinely hard engineering problem rather than a
+    matter of feeding in bigger pictures.
+
+  THE PATCH SIZE IS THE DIAL
+    smaller patches see finer detail and cost quadratically
+    more. 14-pixel patches at 224 give 257 tokens against 197
+    for 16-pixel, which is 70 per cent more attention for a
+    modest gain in acuity.
+
+  AND WHAT A PATCH EMBEDDING IS
+    a 16 x 16 patch in three colour channels is 768 raw
+    numbers, and a single linear layer maps them to a
+    768-dimensional vector: 590,592 parameters for the whole
+    "tokeniser".
+
+    CONTRAST WITH LECTURE 2. Text tokenisation is a lookup
+    into a learned vocabulary, discrete, with its own
+    training and its own out-of-vocabulary problem. Image
+    "tokenisation" is a linear projection of a pixel block,
+    continuous, with no vocabulary and nothing that can fail
+    to be represented. The same word is doing two very
+    different jobs.</div>
+
+  <h3>CLIP: one space, learned by elimination</h3>
+
+  <p>CLIP trains two encoders, one for images and one for text, so that a picture and its caption land near each other. The training signal is entirely comparative. Take a batch of N image-caption pairs, encode both sides, and compute the N by N matrix of cosine similarities. The correct pairing is the diagonal, so the loss is cross-entropy over each row, asking which caption belongs to this image, and over each column, asking which image belongs to this caption.</p>
+
+  <div class="worked">WHY THE BATCH SIZE IS THE TRAINING SIGNAL
+
+    batch N    negatives each   random guess   log N (nats)
+        64          63            1.5625%         4.16
+       256         255            0.3906%         5.55
+     1,024       1,023            0.0977%         6.93
+     8,192       8,191            0.0122%         9.01
+    32,768      32,767            0.0031%        10.40
+
+  CLIP TRAINED AT 32,768, where a random guess is correct
+  0.0031 per cent of the time. The task is hard by
+  construction, and that difficulty is what forces the
+  representation to be discriminative rather than merely
+  approximate.
+
+  THE FORMAL VERSION
+    the InfoNCE objective (van den Oord and colleagues, 2018)
+    bounds the mutual information between the two views from
+    below by log N. So
+
+      doubling the batch adds log 2 = 0.693 nats
+      going from 256 to 32,768 adds 4.85 nats
+
+  WHICH MAKES CONTRASTIVE TRAINING UNUSUAL
+    in most training, batch size is a throughput and
+    stability decision that leaves the objective alone. Here
+    it IS the objective: a bigger batch is a harder task and
+    a tighter bound, so it produces a better model rather
+    than the same model sooner.
+
+    that is also why contrastive training is memory-hungry in
+    a specific way, and why techniques for holding very large
+    effective batches matter more here than elsewhere.
+
+  AND WHAT IT BUYS: ZERO-SHOT CLASSIFICATION
+    once images and text share a space, classification needs
+    no classifier. Embed the candidate labels as sentences,
+    embed the image, and take the nearest. The label set can
+    change at run time, which no trained classification head
+    can do.</div>
+
+  <h3>The modality gap</h3>
+
+  <p>The phrase "shared embedding space" invites a picture in which images and captions are interleaved and a caption's nearest neighbour is its picture. That is not what happens. Liang and colleagues (2022) showed that image embeddings and text embeddings occupy <strong>separate narrow regions</strong> of the sphere, and that the gap persists through training rather than closing.</p>
+
+  <p>Two practical consequences follow, and both catch people out. Cross-modal cosines are systematically lower than within-modal ones, so a score that would be poor between two captions can be excellent between an image and a caption. And the nearest neighbour of an image, among a mixed set, is almost always another image. Which means <strong>CLIP scores must be compared, never thresholded</strong>: rank the candidate captions for this image against each other, and do not ask whether 0.31 is a good number, because in isolation it has no meaning.</p>
+
+  <h3>BLIP-2: keep both models, train the join</h3>
+
+  <p>Training a large vision-language model from scratch is expensive and largely redundant, because good vision encoders and good language models already exist. BLIP-2 (Li and colleagues, 2023) freezes both and trains a small module, the <strong>Q-Former</strong>, to convert what the vision encoder produces into something the language model can read.</p>
+
+  <div class="worked">THE ARITHMETIC THAT MAKES IT PRACTICAL
+
+    frozen vision encoder      1.0 B parameters
+    frozen language model      7.0 B
+    trained Q-Former         0.188 B
+                            --------
+    total                    8.188 B
+    trainable                0.188 B
+    TRAINABLE FRACTION         2.30%
+
+  AND IT COMPRESSES AS WELL AS TRANSLATES
+    the vision encoder emits 257 patch tokens; the Q-Former
+    emits a fixed set of 32 query vectors. So the language
+    model spends 32 tokens of its context window on the
+    image rather than 257, an eight-fold saving on a budget
+    lecture 11 showed is tight.
+
+  WHY IT WORKS AT ALL
+    both frozen models are already excellent at their own
+    half. The bridge is not learning to see or to write; it
+    is learning a TRANSLATION between two existing
+    representations, which is a far smaller problem than
+    either.
+
+  AND THE SAME INSTINCT RECURS
+    this is the pattern of lecture 17's parameter-efficient
+    fine-tuning: leave the large thing frozen and train a
+    small thing next to it. Once you have noticed it here, it
+    is visible everywhere in the field.
+
+  THE LIMITATION WORTH STATING
+    a frozen language model cannot learn anything new about
+    vision, so everything the system knows about images must
+    survive translation through 32 vectors. Tasks needing
+    fine spatial detail, counting, or reading small text in
+    an image are exactly where this shows.</div>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>A transformer needs a sequence of vectors and does not care where they came from. Cutting an image into a grid of patches and linearly projecting each one supplies exactly that, so a 224-pixel image at 16-pixel patches becomes 197 tokens and the architecture from lecture 4 runs unchanged. The cost is quadratic twice over: tokens grow with the square of the resolution and attention with the square of the tokens, so four times the pixels is sixteen times the attention.</p>
+
+  <p>CLIP puts both modalities in one space by making each example compete against the rest of its batch, which is why the batch size is the training signal rather than a throughput setting, and why 32,768 was not excessive. The resulting space supports zero-shot classification with a label set that can change at run time, and it carries a persistent modality gap that means scores are comparable within a query and meaningless as absolute thresholds. BLIP-2 declines to retrain any of it, joining a frozen encoder to a frozen language model through a bridge that is 2.3 per cent of the parameters and compresses 257 patch tokens into 32.</p>
+
+  <div class="callout insight">
+    <span class="tag">What Part IV is really setting up</span>
+    The contrastive objective in this lecture is not a vision technique that happens to involve text. It is the general recipe for learning a space in which similarity means something, and the retrieval embeddings that lectures 11 and 12 spent their length measuring are trained the same way, with a caption replaced by a related passage. Everything here about negatives, batch size and the shape of the learned space transfers directly, which is why Part V opens with it rather than with fine-tuning.
+  </div>
+
+  <p>Part V turns from using models to training them. Lecture 14 asks the question that lecture 12 left implicit: if a cross-encoder is so much more accurate, why can it not simply be the search engine? The answer is architectural rather than a matter of scale, and it leads to the three loss functions that produce a usable bi-encoder. Lectures 15 and 16 then train and adapt embedding and representation models, including the case where no labels exist at all, and lectures 17 and 18 close the course with supervised fine-tuning under quantisation, preference tuning, and the evaluation of generative systems.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>What does a transformer actually require of its input, and what does that imply for modalities other than text?</li>
+      <li><strong>Do the arithmetic.</strong> How many tokens does a 224-pixel image produce at 16-pixel patches, and how many at 14?</li>
+      <li><strong>Do the arithmetic.</strong> Compare the attention pairs at 224 and 448 pixels with 16-pixel patches. Why is the ratio sixteen rather than four?</li>
+      <li>Explain the trade-off controlled by patch size.</li>
+      <li>Describe what a patch embedding is, and state how it differs from text tokenisation in three respects.</li>
+      <li>Why does a vision transformer need positional embeddings?</li>
+      <li>Describe CLIP's training objective, including what the rows and columns of the matrix each ask.</li>
+      <li><strong>Do the arithmetic.</strong> At a batch of 32,768, how many negatives does each example face and what is the chance of a correct random guess?</li>
+      <li>State the InfoNCE bound and compute how many nats are gained going from a batch of 256 to 32,768.</li>
+      <li>Why is batch size unusual in contrastive training compared with ordinary supervised training?</li>
+      <li>Explain zero-shot classification with CLIP and the property no trained classification head has.</li>
+      <li>State the modality gap and give its two practical consequences.</li>
+      <li>Why must CLIP scores be ranked rather than thresholded?</li>
+      <li><strong>Do the arithmetic.</strong> With a 1B vision encoder, a 7B language model and a 188M bridge, what fraction of parameters is trained?</li>
+      <li>Give the Q-Former's second function and the context-window arithmetic behind it.</li>
+      <li>Why is learning a bridge a smaller problem than learning either model?</li>
+      <li>State the limitation that follows from freezing both models, and the task types where it shows.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Depends on:</strong> Lecture 4 (<a href="04-inside_the_forward_pass.html">inside the forward pass</a>) for the architecture that runs unchanged here, and lecture 2 (<a href="02-tokenisation.html">tokenisation</a>) for the text-side contrast that makes patch projection intelligible.</li>
+      <li><strong>Previous:</strong> Part III closed with lecture 12 (<a href="12-retrieval_quality_and_evaluation.html">retrieval quality and evaluation</a>), whose bi-encoder is trained with the objective introduced here.</li>
+      <li><strong>Next:</strong> Lecture 14 (<a href="14-contrastive_learning_and_sbert.html">contrastive learning and SBERT</a>) opens Part V by taking the contrastive objective back to text, and answers why a cross-encoder cannot be a search engine.</li>
+      <li><strong>Forward:</strong> The frozen-model-plus-small-adapter pattern returns as the central technique of lecture 17 (<a href="17-supervised_fine_tuning_with_qlora.html">supervised fine-tuning with QLoRA</a>), and the embeddings CLIP produces are the kind that lecture 15 (<a href="15-training_embedding_models.html">training embedding models</a>) adapts to a domain.</li>
+      <li><strong>Theory companion:</strong> The machine learning track's <a href="../machine_learning/index.html">deep learning material</a> covers convolutional alternatives to patch-based vision and the inductive biases each architecture carries.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 13 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

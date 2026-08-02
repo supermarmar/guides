@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 58: incremental learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Reinforcement learning</a></div>
+  <h1>Incremental learning</h1>
+  <p class="subtitle">The previous lecture's sample-average action-value estimate has a hidden cost: computing it exactly requires remembering every reward ever observed from every arm. This lecture rewrites the identical estimate as a running update requiring only the current estimate and the newest observation, a small algebraic trick with two large consequences: constant memory regardless of how long the agent has been running, and, once the update's step size is allowed to vary, the temporal-difference idea that becomes the computational backbone of every remaining lecture in this sub-module.</p>
+  <div class="meta">
+    <span>Lecture 58 of 62</span>
+    <span>Reading time, 30 minutes</span>
+    <span>Part IX: reinforcement learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The sample average $Q_n$ of the first $n-1$ rewards from an arm, updated with a newly observed $n$-th reward $R_n$, can be rewritten exactly, with no approximation, as an <strong>incremental update</strong>, $Q_{n+1} = Q_n + \frac{1}{n}\left[R_n - Q_n\right]$, expressing the new estimate as the old estimate plus a step in the direction of the <strong>prediction error</strong> $R_n - Q_n$, scaled by a step size that happens to equal $1/n$ for a plain running average. Generalising the step size from $1/n$ to a fixed, small constant $\alpha \in (0,1)$ gives $Q_{n+1} = Q_n + \alpha\left[R_n - Q_n\right]$, an <strong>exponentially weighted moving average</strong> that discounts older observations geometrically, letting the estimate track a genuinely non-stationary reward distribution rather than averaging old and new information together as if the process never changed. This exact template, <strong>new estimate equals old estimate plus a step size times a prediction error</strong>, recurs, with only the definition of the prediction error changing, across every value-estimation method in the remainder of this sub-module, and is the specific idea behind the name <strong>temporal-difference (TD) learning</strong>.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine keeping a running estimate of a friend's typical commute time, updated every time they mention how long today's journey took, without writing down every past journey time and recomputing the average from scratch each time. A natural shortcut is: take your current estimate, see how far off today's actual reported time was from it, and nudge your estimate a little in that direction, more than a little if today's report should count for a lot, less if it should count for only a little. That nudge, current belief plus a fraction of today's surprise, is exactly the incremental update, and choosing how large a fraction of each new surprise to absorb is exactly the choice between a plain running average and an exponentially weighted one.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture's update rule, current estimate plus a step size times a prediction error, is the single most-repeated computational pattern in the rest of this sub-module: SARSA, Q-learning, and TD(λ) in lecture 6 are all instances of it, with only the definition of the prediction error changing from lecture to lecture. Building the pattern here, in the bandit's single-state setting with no additional complexity, is what makes each later lecture a small, incremental addition rather than a wholly new idea.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this lecture's small algebraic rewrite earns a dedicated treatment rather than being a footnote to the previous lecture.</p>
+
+  <p>First, <strong>constant-memory, constant-time updates are a genuine practical requirement for any system that runs indefinitely</strong>: a bandit or full RL agent deployed continuously (an ongoing pricing-adjustment system, say) cannot realistically store every reward it has ever observed and recompute an exact average from scratch at every step; the incremental form is not an optimisation of convenience, it is what makes indefinite, streaming operation possible at all.</p>
+
+  <p>Second, <strong>the exponentially weighted average's recency-discounting is the correct response to genuine non-stationarity</strong>, flagged as a live concern at the end of the previous lecture: a competitor's pricing shift or a genuine change in claims behaviour means the true reward distribution itself has moved, and a plain running average, giving every past observation equal weight forever, actively resists detecting that the world has changed, while an exponentially weighted average discounts stale evidence automatically.</p>
+
+  <p>Third, <strong>the "estimate plus step size times prediction error" template is the actual computational content behind temporal-difference learning</strong>, the single idea most responsible for reinforcement learning's practical success at scale; recognising the pattern here, before any of the multi-state complexity of the coming lectures, is what makes SARSA and Q-learning in lecture 6 legible as small variations on an already-familiar idea rather than unrelated new algorithms to memorise from scratch.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A telematics-based driver-scoring system maintained a running average of each driver's braking-harshness metric across their entire driving history, updated after every trip, intended as a live behavioural risk signal feeding into a usage-based pricing adjustment. A driver who had genuinely, permanently improved their driving style following a serious near-miss incident continued to show an elevated risk score for many months afterwards, because the plain running average continued weighting years of earlier, harsher driving history equally alongside the recent, genuinely improved trips, diluting the recent improvement almost to invisibility. Switching the running estimate to an exponentially weighted moving average with a fixed, tuned step size $\alpha$ let the score track the driver's actual recent behaviour within a small number of weeks rather than months, a direct, practical instance of exactly the non-stationarity problem this lecture's constant step size is built to solve.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: a plain running average giving every past observation equal, permanent weight, against an exponentially weighted average whose weight on each past observation decays geometrically, letting the estimate track a moving target rather than smearing it out over the entire history.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Equal weighting in a running average versus geometric decay in an exponentially weighted average">
+      <text x="430" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Equal weighting versus geometric (exponential) decay</text>
+
+      <rect x="40" y="55" width="380" height="220" rx="12" fill="#FFF7ED" stroke="#b45309" stroke-width="2"/>
+      <text x="230" y="80" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#92400e">Plain running average, $\alpha_n = 1/n$</text>
+      <g fill="#b45309">
+        <rect x="70" y="220" width="35" height="30" opacity="0.9"/>
+        <rect x="115" y="220" width="35" height="30" opacity="0.9"/>
+        <rect x="160" y="220" width="35" height="30" opacity="0.9"/>
+        <rect x="205" y="220" width="35" height="30" opacity="0.9"/>
+        <rect x="250" y="220" width="35" height="30" opacity="0.9"/>
+        <rect x="295" y="220" width="35" height="30" opacity="0.9"/>
+        <rect x="340" y="220" width="35" height="30" opacity="0.9"/>
+      </g>
+      <text x="230" y="180" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">every past observation weighted equally</text>
+      <text x="230" y="200" text-anchor="middle" font-family="Inter" font-size="10" fill="#92400e">forever; slow to reflect genuine change</text>
+
+      <rect x="440" y="55" width="380" height="220" rx="12" fill="#ECFEF6" stroke="#0d9488" stroke-width="2"/>
+      <text x="630" y="80" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#115e59">Exponentially weighted, fixed $\alpha$</text>
+      <g fill="#0d9488">
+        <rect x="470" y="245" width="35" height="5" opacity="0.3"/>
+        <rect x="515" y="240" width="35" height="10" opacity="0.4"/>
+        <rect x="560" y="230" width="35" height="20" opacity="0.5"/>
+        <rect x="605" y="215" width="35" height="35" opacity="0.65"/>
+        <rect x="650" y="195" width="35" height="55" opacity="0.8"/>
+        <rect x="695" y="165" width="35" height="85" opacity="0.9"/>
+        <rect x="740" y="120" width="35" height="130"/>
+      </g>
+      <text x="630" y="180" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">weight decays geometrically into the past;</text>
+      <text x="630" y="198" text-anchor="middle" font-family="Inter" font-size="10" fill="#115e59">most recent observations dominate</text>
+    </svg>
+    <figcaption>A plain running average (left) weights every past reward identically, however long ago it was observed, which is exactly right when the underlying process is genuinely stationary but resists detecting real change. An exponentially weighted average with a fixed step size $\alpha$ (right) weights recent observations geometrically more than older ones, letting the estimate track a moving target, exactly the property the telematics vignette's driver-scoring fix relied on.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>New estimate equals old estimate plus a step towards the surprise.</strong> Every value-estimation update in the rest of this sub-module is a variation on this one template, with only the definition of "surprise" (the prediction error) changing. <strong>A fixed step size is a deliberate choice to forget the past.</strong> That forgetting is not a flaw, it is the specific, correct response whenever the true process being estimated can genuinely change over time.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Deriving the incremental form of the sample average</h3>
+
+  <p>Let $Q_n$ denote the sample average of the first $n-1$ rewards from a given arm. By definition, $Q_n = \frac{1}{n-1}\sum_{i=1}^{n-1} R_i$. A short algebraic rearrangement, adding and subtracting $Q_n$ inside the sum that defines $Q_{n+1}$, gives the exact identity</p>
+  $$Q_{n+1} = Q_n + \frac{1}{n}\left[R_n - Q_n\right].$$
+  <p>This is not an approximation to the sample average, it is algebraically identical to it, just rewritten in a form that only ever needs the current estimate $Q_n$, the current count $n$, and the newest reward $R_n$, with no need to retain any earlier individual reward at all. The quantity in brackets, $R_n - Q_n$, is the <strong>prediction error</strong>: the gap between what was just observed and what was expected, and the update moves the estimate a fraction of the way to close that gap.</p>
+
+  <h3>The general template</h3>
+
+  <p>Generalising the specific step size $1/n$ to an arbitrary step size $\alpha_n$ gives the general incremental-update template used throughout the rest of this sub-module,</p>
+  $$\text{new estimate} \leftarrow \text{old estimate} + \alpha_n \big[\text{target} - \text{old estimate}\big].$$
+  <p>Every value-estimation update in lectures 5 and 6, policy evaluation, SARSA, Q-learning, is an instance of exactly this template, differing only in what "target" refers to (a reward, an estimated future value, or a combination of the two) and how $\alpha_n$ is chosen. Recognising this shared skeleton is the single most useful piece of intuition this lecture offers for the remainder of the sub-module.</p>
+
+  <h3>Constant step size and the exponentially weighted average</h3>
+
+  <p>Setting $\alpha_n = \alpha$, a fixed constant not depending on $n$, and unrolling the recursion shows that $Q_{n+1}$ becomes a weighted average of all past rewards, with weight $\alpha(1-\alpha)^{n-i}$ on the $i$-th reward, a weight that decays <strong>geometrically</strong> as $i$ moves further into the past. This is precisely an <strong>exponentially weighted moving average</strong>: recent rewards dominate the estimate, and arbitrarily old rewards are discounted towards zero influence, exactly the property needed to track a non-stationary process, as in the vignette's driver-scoring fix, and exactly the property a plain $\alpha_n = 1/n$ running average deliberately does not have (there, every past reward keeps equal weight forever, which is the mathematically correct choice only when the underlying process is genuinely stationary).</p>
+
+  <h3>The temporal-difference idea, previewed</h3>
+
+  <p>The name <strong>temporal-difference (TD) learning</strong> refers to updating an estimate based on the difference between two estimates made at different points in time, rather than waiting for a final, fully known outcome before updating anything at all. In the bandit setting of this lecture, the "target" in the update template is simply the immediately observed reward $R_n$, so there is no genuine temporal gap to speak of yet; once lecture 4 introduces multiple states and delayed rewards, the target becomes an estimate of future value plus an immediately observed reward, a genuinely temporal difference between what was expected before an action and what is now expected after it, developed in full in lecture 6. This lecture's simple reward-only version is best understood as the degenerate, single-step case of the fully general idea developed later.</p>
+
+  <h3>The credibility-weight reading</h3>
+
+  <p>An actuary already has a close conceptual analogue to the constant step size $\alpha$ in Bühlmann credibility theory from the risk-modelling course: a credibility-weighted estimate blends a new observation with a prior belief using a credibility factor $Z \in [0,1]$ that plays structurally the same role as $\alpha$ here, more weight on new information when it is judged more reliable, more weight retained on the prior (older) belief otherwise. Reading the incremental update through this lens, the step size $\alpha$ as a credibility weight on the newest observation relative to the accumulated prior estimate, is often the fastest route to genuine intuition about the update for a reader with an actuarial background, and the parallel is not superficial: both formalisms are, at heart, answering the identical question of how much weight new evidence should receive relative to existing belief.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Using a plain running average on a genuinely non-stationary process</span>
+    Developed directly in the vignette: a plain $\alpha_n = 1/n$ average gives every past observation equal, permanent weight, which actively resists detecting a genuine, permanent change in the underlying process; a fixed step size is the standard, deliberate fix whenever the environment itself can change over time, which is the normal case in most genuine reinforcement-learning applications.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing a fixed $\alpha$ without considering the resulting variance-bias trade-off</span>
+    A larger fixed $\alpha$ tracks genuine change faster but makes the estimate noisier, since recent, possibly unrepresentative observations dominate more strongly; a smaller fixed $\alpha$ is more stable but slower to detect genuine change, exactly the same variance-bias trade-off this course has met repeatedly in other forms, here expressed through a single scalar step size.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Assuming the incremental form is only a computational convenience</span>
+    While constant-memory, constant-time updating is a genuine and important practical benefit, treating the incremental rewrite as merely an implementation detail misses that generalising the step size away from $1/n$ is itself a substantive modelling choice, with a real, direct consequence (tracking non-stationarity) that the plain sample average cannot achieve at all, regardless of implementation.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Forgetting the credibility-weight parallel is an analogy, not an identity</span>
+    The Bühlmann credibility reading is a genuinely useful intuition pump, but the two formalisms are not interchangeable in every technical detail (credibility weights are typically derived from an explicit variance-decomposition argument, while $\alpha$ in RL is usually a tuned hyperparameter); leaning on the analogy for intuition is valuable, treating the two frameworks as mathematically identical is not warranted.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>The sample-average action-value estimate rewrites exactly as an incremental update, new estimate equals old estimate plus a step size times a prediction error, requiring only constant memory rather than the full observation history. Generalising the step size from $1/n$ to a fixed constant $\alpha$ produces an exponentially weighted moving average that tracks a genuinely non-stationary process, exactly the property the telematics-scoring vignette needed. This "estimate plus step size times prediction error" template is the shared computational skeleton of every value-estimation method in the rest of this sub-module, and the actuary's own Bühlmann credibility weighting is a close, genuinely useful conceptual parallel to the constant step size $\alpha$, though not a strict mathematical identity.</p>
+
+  <p>The next lecture finally introduces multiple states and transitions between them, the full Markov decision process this and the previous lecture's single-state setting have been building towards, defining states, actions, policies, returns, and the value functions and Bellman equations that this lecture's incremental-update template will be applied to directly.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Derive the incremental form of the sample-average update, and identify the prediction error within it.</li>
+      <li>State the general incremental-update template, and explain what changes between lecture 2's bandit setting and the fuller RL algorithms developed later.</li>
+      <li>Explain why a fixed step size $\alpha$ produces an exponentially weighted moving average, and why this is the correct response to a non-stationary reward process.</li>
+      <li>Explain the variance-bias trade-off involved in choosing a larger versus a smaller fixed $\alpha$.</li>
+      <li>Describe the credibility-weight reading of the step size $\alpha$, and state one respect in which the analogy is not a strict mathematical identity.</li>
+      <li>In the telematics vignette, explain precisely why the plain running average understated a driver's genuine recent improvement, and why the exponentially weighted average corrected it.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 2 (<a href="02-multi_armed_bandits.html">multi-armed bandits</a>) introduced the sample-average estimate this lecture rewrites incrementally.</li>
+      <li><strong>Next:</strong> Lecture 4 (<a href="04-markov_decision_processes.html">Markov decision processes</a>) introduces multiple states and the value functions this lecture's update template will be applied to.</li>
+      <li><strong>Forward:</strong> Lecture 6 (<a href="06-monte_carlo_and_td_control.html">Monte Carlo and TD control</a>) develops the full temporal-difference idea previewed above, with a genuine temporal gap between successive value estimates.</li>
+      <li><strong>Outside this course:</strong> The risk-modelling course's <a href="../../actuarial_science/04_risk_modelling/index.html">credibility theory</a> lectures develop the Bühlmann credibility weighting this lecture draws a direct conceptual parallel to.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Reinforcement learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 58 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

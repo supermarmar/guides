@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 61: Monte Carlo and TD control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Reinforcement learning</a></div>
+  <h1>Monte Carlo and TD control</h1>
+  <p class="subtitle">The previous lecture solved the Bellman equation exactly, given full knowledge of the environment's dynamics, a luxury most genuine reinforcement-learning problems do not have. This lecture develops the two families of methods that instead estimate value functions directly from sampled experience, generalised policy iteration's evaluation step rebuilt from experience rather than known probabilities, closing with SARSA and Q-learning, the two algorithms most people mean when they say "reinforcement learning" without further qualification.</p>
+  <div class="meta">
+    <span>Lecture 61 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part IX: reinforcement learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">When the transition dynamics $p(s',r\mid s,a)$ are unknown, value functions must be estimated from sampled experience rather than computed exactly. <strong>Monte Carlo (MC) control</strong> runs complete episodes to termination, then updates each visited state-action pair's estimate towards the actual, observed return $G_t$ that followed it, using the incremental-update template from lecture 3; this requires the episode to actually finish before any update can happen at all. <strong>Temporal-difference (TD) learning</strong> instead updates after every single step, using an estimated future value in place of the actual, not-yet-observed remainder of the return, the <strong>TD target</strong> $R_{t+1} + \gamma V(S_{t+1})$, a genuinely temporal difference between the value estimated one step apart, exactly the idea previewed but not yet realised in lecture 3. <strong>SARSA</strong> is the on-policy TD control algorithm, updating $Q(S_t,A_t)$ towards $R_{t+1} + \gamma Q(S_{t+1}, A_{t+1})$ using the action $A_{t+1}$ the current policy actually takes next. <strong>Q-learning</strong> is the off-policy variant, updating towards $R_{t+1} + \gamma \max_{a'} Q(S_{t+1}, a')$, the best available next action regardless of what the current, exploring policy actually does next, letting it learn the optimal policy's values while following a different, exploring behaviour policy. <strong>$n$-step returns</strong> and <strong>TD($\lambda$)</strong> interpolate between the one-step-only TD update and the full-episode MC update, a tunable dial between the two extremes' respective bias and variance trade-offs.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Imagine two ways of learning how good a particular route home from work is. The Monte Carlo way is to drive the whole route home every single time before updating your opinion of it, using the total, actual time the full journey took. The temporal-difference way is to update your opinion of each individual road segment the moment you finish it, using your current best guess of how long the rest of the journey will take from wherever you now are, without waiting to actually get home first. TD learning lets you update continuously, segment by segment, using your own running estimates as a stand-in for the parts of the journey not yet driven, exactly the same trick lecture 3's incremental update used, just now with an estimate substituted for an unknown future rather than a fully known past.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    This lecture completes the tabular half of the sub-module: SARSA and Q-learning are, respectively, the on-policy and off-policy instances of generalised policy iteration from the previous lecture, with the exact Bellman-equation evaluation step replaced by an experience-based estimate. Together with dynamic programming, this lecture's methods form the complete tabular toolkit; lecture 7 develops what changes once a table is no longer feasible.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons this lecture's methods, not the previous lecture's dynamic programming, are the ones most genuine reinforcement-learning applications actually reach for.</p>
+
+  <p>First, <strong>the transition dynamics are unknown in the overwhelming majority of real applications</strong>, including essentially every genuine actuarial premium-control problem: nobody has an explicit, reliable probability distribution over how a policyholder's retention and claims behaviour will respond to every possible pricing action, and Monte Carlo and TD methods are specifically built to learn directly from observed experience instead of requiring that distribution up front.</p>
+
+  <p>Second, <strong>the on-policy versus off-policy distinction between SARSA and Q-learning is a genuine, consequential design choice with real safety implications</strong>: an on-policy method (SARSA) learns the value of the policy actually being followed, including its exploratory mistakes, which produces more cautious behaviour in risky environments, while an off-policy method (Q-learning) learns the value of the optimal policy regardless of the exploration actually used, which can be more sample-efficient but can also learn to value actions the current, safer exploration policy would never actually take.</p>
+
+  <p>Third, <strong>the bias-variance trade-off between pure TD and pure Monte Carlo, developed through $n$-step returns and TD($\lambda$), is the same fundamental trade-off this course has met in every other guise</strong>, and recognising it here, rather than treating $n$-step methods as an unrelated further complication, is what makes the choice of $n$ or $\lambda$ in a practical implementation a familiar kind of decision rather than an arbitrary hyperparameter.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A claims-triage team building an RL-based agent to recommend an escalation action (fast-track, standard review, or detailed investigation) for incoming claims, with a reward reflecting eventual claim-handling cost and customer satisfaction, initially deployed a Q-learning agent trained off-policy from a large batch of historical claims data, reasoning that Q-learning's ability to learn optimal-policy values regardless of the exploration behaviour actually used was a pure advantage. In live deployment, the trained agent recommended aggressive fast-tracking on a category of claims where the historical exploration data happened to be thin and unrepresentative, because Q-learning's off-policy update evaluated a hypothetical best action in that category using very few, possibly unrepresentative samples, producing an overconfident, poorly grounded value estimate exactly where the least data existed to support it. Switching the live deployment to a SARSA-based agent, which evaluates the actual, currently-followed (and more conservative) exploration policy rather than a hypothetical optimal one, produced more cautious, better-grounded recommendations precisely in the thin-data categories, at some cost in asymptotic performance in the well-sampled categories where Q-learning's more aggressive off-policy estimates were, in fact, reliable.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold one picture: Monte Carlo updating only once a full episode's actual outcome is known, TD updating after every single step using its own running estimate of what comes next, and $n$-step methods sitting on a dial between the two extremes.</p>
+
+  <figure>
+    <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Monte Carlo waits for the full episode; TD updates after one step using its own estimate">
+      <defs>
+        <marker id="mctdArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+      <text x="440" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Monte Carlo (full episode) versus TD (one step)</text>
+
+      <rect x="30" y="55" width="820" height="80" rx="8" fill="#FFF7ED" stroke="#b45309" stroke-width="1.5"/>
+      <text x="60" y="80" font-family="Inter" font-size="11" font-weight="700" fill="#92400e">Monte Carlo</text>
+      <circle cx="140" cy="100" r="12" fill="#b45309"/><circle cx="260" cy="100" r="12" fill="#b45309"/>
+      <circle cx="380" cy="100" r="12" fill="#b45309"/><circle cx="500" cy="100" r="12" fill="#b45309"/>
+      <circle cx="620" cy="100" r="14" fill="#f59e0b"/>
+      <path d="M 152 100 L 248 100 M 272 100 L 368 100 M 392 100 L 488 100 M 512 100 L 606 100" stroke="#b45309" stroke-width="1.5" marker-end="url(#mctdArrow)"/>
+      <text x="620" y="104" text-anchor="middle" font-family="Inter" font-size="9" fill="#ffffff" font-weight="700">end</text>
+      <path d="M 620 118 Q 400 150 140 118" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 2" fill="none" marker-end="url(#mctdArrow)"/>
+      <text x="380" y="150" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">update every visited state using the actual, full return $G_t$, only once the episode ends</text>
+
+      <rect x="30" y="160" width="820" height="120" rx="8" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+      <text x="60" y="185" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">Temporal difference (one-step)</text>
+      <circle cx="140" cy="215" r="12" fill="#0d9488"/><circle cx="260" cy="215" r="12" fill="#0d9488"/>
+      <path d="M 152 215 L 248 215" stroke="#0d9488" stroke-width="1.5" marker-end="url(#mctdArrow)"/>
+      <path d="M 200 230 Q 200 260 260 260 Q 260 235 260 227" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4 2" fill="none" marker-end="url(#mctdArrow)"/>
+      <text x="200" y="255" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">update immediately using $R_{t+1} + \gamma V(S_{t+1})$,</text>
+      <text x="380" y="270" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">an estimate standing in for the unfinished remainder of the episode</text>
+    </svg>
+    <figcaption>Monte Carlo (top) waits until an episode fully terminates before updating any visited state, using the actual observed return. TD (bottom) updates after every single step, substituting its own current estimate of future value for the as-yet-unobserved remainder of the episode, exactly the bootstrap that lets it learn continuously without ever waiting for a full episode to end.</figcaption>
+  </figure>
+
+  <p>Two slogans. <strong>Monte Carlo waits for the truth; TD bets on its own estimate.</strong> Neither is unconditionally better, the trade-off is developed in full below. <strong>On-policy learns what you actually do; off-policy learns what you could do.</strong> SARSA and Q-learning differ in exactly this one respect, with real safety consequences, exactly as the claims-triage vignette shows.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Monte Carlo control</h3>
+
+  <p><strong>Monte Carlo (MC) methods</strong> estimate $q_\pi(s,a)$ by running complete episodes under policy $\pi$ to termination, then, for every state-action pair visited during the episode, updating its estimate towards the actual return $G_t$ that followed, via the lecture 3 incremental template, $Q(S_t,A_t) \leftarrow Q(S_t,A_t) + \alpha\left[G_t - Q(S_t,A_t)\right]$. Because $G_t$ is the true, fully-realised sum of discounted rewards actually observed, this update is unbiased, converging to the true $q_\pi(s,a)$, at the direct cost of requiring an episode to fully terminate before any update can occur at all, which is both slow (no learning within an episode) and inapplicable to genuinely continuing tasks with no natural termination point.</p>
+
+  <h3>Temporal-difference prediction</h3>
+
+  <p><strong>TD(0)</strong>, the simplest temporal-difference method, updates after every single step using the <strong>TD target</strong> $R_{t+1} + \gamma V(S_{t+1})$ in place of the true, not-yet-observed return, $V(S_t) \leftarrow V(S_t) + \alpha\left[R_{t+1} + \gamma V(S_{t+1}) - V(S_t)\right]$. The bracketed quantity is the <strong>TD error</strong>, the genuine temporal difference (hence the name) between the value estimated after one more step of real experience and the value estimated before it. Because the TD target substitutes an estimate, $V(S_{t+1})$, for the true remainder of the return, this update is biased whenever $V(S_{t+1})$ is itself inaccurate, but it has materially lower variance than the Monte Carlo update (which depends on the entire, often highly variable, remainder of the episode) and, crucially, it can update after every single step, without ever waiting for an episode to end, a genuine practical advantage in continuing tasks and long episodes alike.</p>
+
+  <h3>SARSA: on-policy control</h3>
+
+  <p><strong>SARSA</strong> takes its name from the quintuple of quantities its update uses, $(S_t, A_t, R_{t+1}, S_{t+1}, A_{t+1})$, and extends TD(0) to action-values for control,</p>
+  $$Q(S_t,A_t) \leftarrow Q(S_t,A_t) + \alpha\left[R_{t+1} + \gamma Q(S_{t+1},A_{t+1}) - Q(S_t,A_t)\right],$$
+  <p>where $A_{t+1}$ is the action the current policy (typically $\varepsilon$-greedy with respect to the current $Q$) actually selects next. Because the update uses the action the behaviour policy genuinely takes, SARSA is <strong>on-policy</strong>: it learns the value of the policy actually being followed, exploratory missteps included, which is exactly why it produces more cautious behaviour in risky settings, as the triage vignette illustrates.</p>
+
+  <h3>Q-learning: off-policy control</h3>
+
+  <p><strong>Q-learning</strong> instead updates towards the best available next action regardless of what the current, exploring policy actually takes,</p>
+  $$Q(S_t,A_t) \leftarrow Q(S_t,A_t) + \alpha\left[R_{t+1} + \gamma \max_{a'} Q(S_{t+1},a') - Q(S_t,A_t)\right].$$
+  <p>Because the update target uses $\max_{a'} Q(S_{t+1},a')$ rather than the action the behaviour policy actually selected, Q-learning is <strong>off-policy</strong>: it learns the value of the optimal (greedy) policy while a genuinely different, exploring policy generates the experience, which is more directly aligned with the ultimate goal of finding an optimal policy, but, as the triage vignette shows, can produce overconfident estimates precisely in regions where exploration has been thin, since the greedy maximum over a small, noisy sample of next-state action-values is itself a biased-upward estimator (the same optimistic-maximum bias familiar from other contexts in this course).</p>
+
+  <h3>$n$-step returns and TD($\lambda$)</h3>
+
+  <p>TD(0) uses only one real step of experience before bootstrapping on an estimate; Monte Carlo uses the entire episode and no bootstrapping at all. An <strong>$n$-step return</strong> interpolates between the two, using $n$ real steps of observed reward followed by a bootstrapped estimate of the remaining value, $G_t^{(n)} = R_{t+1} + \gamma R_{t+2} + \cdots + \gamma^{n-1} R_{t+n} + \gamma^n V(S_{t+n})$, recovering TD(0) at $n=1$ and (in the limit, for an episode of length $n$) Monte Carlo as $n$ grows to the full episode length. <strong>TD($\lambda$)</strong> takes this further, combining every $n$-step return into a single weighted average, controlled by a single parameter $\lambda \in [0,1]$, with $\lambda = 0$ recovering TD(0) and $\lambda = 1$ recovering Monte Carlo; intermediate values of $\lambda$ smoothly trade off TD(0)'s low variance and higher bias against Monte Carlo's unbiasedness and higher variance, exactly the same bias-variance dial this course has met before in other forms, here made explicit and continuously tunable via a single scalar.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <div class="callout warn">
+    <span class="tag">Choosing Q-learning by default without weighing its off-policy overconfidence risk</span>
+    Developed directly in the vignette: Q-learning's greedy-maximum target is systematically biased upward precisely where next-state action-value estimates are noisiest, typically the thinnest-data regions of the state-action space; SARSA's on-policy alternative is the standard, more conservative choice when safety in under-explored regions matters more than asymptotic optimality.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using Monte Carlo methods on a genuinely continuing task with no natural episode boundary</span>
+    Monte Carlo updates require an episode to terminate before any learning can occur at all; a genuinely ongoing process with no natural end point (a continuously operating pricing system, say) needs a TD-based method, which updates continuously without waiting for any termination.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Treating TD's bootstrapped estimate as if it were already known to be accurate</span>
+    Early in training, $V(S_{t+1})$ or $Q(S_{t+1},a')$ in a TD target is itself a poor estimate, and bootstrapping on a poor estimate compounds error in a way Monte Carlo's use of the true, realised return does not; this bias shrinks as training progresses and estimates improve, but is a genuine, real cost during early training that a practitioner should expect and not mistake for a bug.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Picking $n$ or $\lambda$ without acknowledging the bias-variance trade-off it controls</span>
+    Treating the choice of $n$ in an $n$-step method, or $\lambda$ in TD($\lambda$), as an arbitrary tuning knob rather than a direct dial on the bias-variance trade-off developed above misses the actual content of the choice; the right setting depends on how noisy the environment's rewards are and how accurate current value estimates already are, exactly the considerations that determine the right position on this trade-off in every other guise this course has met it.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>When transition dynamics are unknown, Monte Carlo methods estimate value functions from complete, actual episode returns, unbiased but slow and inapplicable without a natural episode termination, while temporal-difference methods bootstrap on a current estimate of future value after every single step, biased early in training but far lower variance and applicable to continuing tasks. SARSA extends TD to on-policy control, learning the value of the exploring policy actually followed; Q-learning extends it to off-policy control, learning the optimal policy's values regardless of the exploration used, at the cost of a systematic optimistic bias precisely where exploration has been thinnest. $n$-step returns and TD($\lambda$) interpolate continuously between TD's low-variance, higher-bias extreme and Monte Carlo's unbiased, higher-variance one.</p>
+
+  <p>This completes the tabular half of the sub-module: dynamic programming (known dynamics) and this lecture's Monte Carlo and TD methods (unknown dynamics) together cover every combinatorially small, table-representable MDP. The final lecture develops what changes once the state or action space is too large for a table at all, replacing the exact $Q(s,a)$ table with a deep neural network function approximator, and develops DQN, policy gradients, actor-critic methods, and the PPO algorithm behind the RLHF pipeline from the large language models sub-module.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State the Monte Carlo control update, and explain why it requires an episode to terminate before it can be applied.</li>
+      <li>State the TD(0) update, identify the TD error, and explain why the TD target is described as biased.</li>
+      <li>State the SARSA and Q-learning updates, and explain the on-policy versus off-policy distinction between them.</li>
+      <li>Explain why Q-learning's greedy-maximum target can be systematically overconfident in thinly-sampled regions of the state-action space.</li>
+      <li>Define an $n$-step return, and explain how it interpolates between TD(0) and Monte Carlo.</li>
+      <li>In the claims-triage vignette, explain precisely why Q-learning produced overconfident recommendations in the thin-data category, and why SARSA did not share the same failure.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 5 (<a href="05-dynamic_programming.html">dynamic programming</a>) solved the same underlying problem exactly when the dynamics were known.</li>
+      <li><strong>Built on:</strong> Lecture 3's <a href="03-incremental_learning.html">incremental-update template</a> is the exact computational form both this lecture's Monte Carlo and TD updates instantiate.</li>
+      <li><strong>Next:</strong> Lecture 7 (<a href="07-deep_rl.html">deep reinforcement learning</a>) replaces the tabular $Q(s,a)$ of this lecture with a neural network function approximator.</li>
+      <li><strong>Outside this course:</strong> The large language models sub-module's RLHF pipeline uses proximal policy optimisation, developed in lecture 7, which itself builds on this lecture's on-policy control logic.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Reinforcement learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 61 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

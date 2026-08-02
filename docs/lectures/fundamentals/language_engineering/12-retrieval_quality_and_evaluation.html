@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 12: retrieval quality and evaluation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Language engineering</a></div>
+  <h1>Retrieval quality and evaluation</h1>
+  <p class="subtitle">Lecture 11 deferred the same question three times: how good is the retrieval, actually? Answering it needs metrics that care where a result sits rather than merely whether it appeared, a second-stage model that reorders what the first stage found, and four separate measurements, because a system that scores 57 per cent end to end might need its retriever fixed or its prompt fixed and the single number cannot tell you which.</p>
+  <div class="meta">
+    <span>Lecture 12 of 18</span>
+    <span>Reading time, 45 minutes</span>
+    <span>Part III: building systems</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Recall at <em>k</em> counts whether the right passage appeared in the top <em>k</em>. It cannot see where. Two rankings holding the same three relevant chunks inside the top six have <strong>identical recall of 1.00</strong> and normalised discounted cumulative gains of <strong>0.9207 and 0.4423</strong>, because one puts the best chunk first and the other buries it at rank six, which is where lecture 11's "lost in the middle" finding says the model reads least reliably.</p>
+
+  <p>Improving the order needs a different kind of model. A <strong>bi-encoder</strong> embeds question and chunk separately, so chunk vectors are precomputed and a query is one embedding plus a nearest-neighbour lookup. A <strong>cross-encoder</strong> reads the pair together and is markedly more accurate, and it can precompute nothing, so it needs one forward pass per candidate: a second on a hundred candidates, and <strong>223 seconds</strong> on the 22,322 chunks of a ten-million-token corpus. It cannot be the search. It can only reorder a shortlist.</p>
+
+  <p>That two-stage design is worth a great deal. If the first stage finds the answer somewhere in its top hundred 95 per cent of the time but places it in the top six only 60 per cent of the time, a reranker that promotes it correctly nine times in ten lifts recall at six to <strong>85.5 per cent</strong>, a gain of 25.5 points. The ceiling is the first stage's recall at a hundred, and no reranker exceeds it.</p>
+
+  <p>Whole-system evaluation then splits along the same seam. Two RAG systems can both score <strong>57.0 per cent</strong> end to end, one from 60 per cent retrieval and 95 per cent generation and the other from 95 and 60, and they need opposite repairs. Measuring four axes rather than one is what tells them apart.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    Finding the right paragraph is not enough; it has to be near the top, because the model reads the top best. So fetch a hundred cheaply, have a slower and better model put six of them in order, and then measure the fetching and the answering separately, because fixing the wrong one is the usual mistake.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is that almost every disappointing retrieval-augmented system is disappointing at the retrieval step, and the team debugging it is usually adjusting the prompt. The four-axis split in step 4 exists to make that mistake impossible to sustain: it localises the fault before anyone starts editing.</p>
+
+  <p>The second reason is that the metric determines what you optimise, and recall is the wrong metric for a generation system. A retriever tuned to maximise recall at fifty will happily place the answer at rank forty-nine, which is useless when six chunks fit in the prompt and the model attends best to the first. Rank-sensitive measures reward what actually helps.</p>
+
+  <p>The third reason is that reranking is the highest-value single change available to most systems and is frequently skipped because it looks like an optimisation. It is not an optimisation; it is a correction of a structural weakness in bi-encoder retrieval, which compresses a whole chunk into one vector before it has seen the question.</p>
+
+  <p>And a fourth reason about honesty. These systems are usually demonstrated rather than measured, because building an evaluation set is dull and a demonstration is not. A hundred questions with known answers, assembled once, converts every subsequent argument about a change from an exchange of anecdotes into a number.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two stages in the pipeline, and four measurements across it.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two-stage retrieval: a bi-encoder shortlists a hundred candidates cheaply from the whole corpus, a cross-encoder reorders them accurately, and the top six go to the generator. Below, four evaluation axes: context precision and context recall measure retrieval, faithfulness and answer relevance measure generation.">
+      <rect x="0" y="0" width="880" height="400" fill="#FFFFFF"/>
+      <text x="440" y="20" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Cheap and wide, then expensive and narrow</text>
+
+      <rect x="20" y="38" width="150" height="96" rx="9" fill="#F4F4F5" stroke="#a1a1aa" stroke-width="1.6"/>
+      <text x="95" y="58" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#3f3f46">THE CORPUS</text>
+      <text x="95" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#18181b">22,322</text>
+      <text x="95" y="94" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#71717a">chunks, 10M tokens</text>
+      <text x="95" y="116" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">vectors precomputed once</text>
+
+      <rect x="200" y="38" width="200" height="96" rx="9" fill="#EDE9FE" stroke="#5B47E0" stroke-width="2"/>
+      <text x="300" y="58" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#4c1d95">STAGE 1 &middot; BI-ENCODER</text>
+      <text x="300" y="76" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#4c1d95">query and chunk embedded separately</text>
+      <text x="300" y="92" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#4c1d95">one embedding + a vector search</text>
+      <text x="300" y="112" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#5B47E0">milliseconds over millions</text>
+      <text x="300" y="127" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">recall@100 = 95%, recall@6 = 60%</text>
+
+      <rect x="430" y="38" width="200" height="96" rx="9" fill="#FFE4E6" stroke="#be185d" stroke-width="2"/>
+      <text x="530" y="58" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#831843">STAGE 2 &middot; CROSS-ENCODER</text>
+      <text x="530" y="76" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">query and chunk read TOGETHER</text>
+      <text x="530" y="92" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#831843">one forward pass per candidate</text>
+      <text x="530" y="112" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#be185d">1 second over 100 candidates</text>
+      <text x="530" y="127" text-anchor="middle" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">223 seconds over the whole corpus</text>
+
+      <rect x="660" y="38" width="200" height="96" rx="9" fill="#DCFCE7" stroke="#3E7A45" stroke-width="2"/>
+      <text x="760" y="58" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="700" fill="#14532d">THE PROMPT</text>
+      <text x="760" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#14532d">top 6</text>
+      <text x="760" y="96" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#14532d">best chunk placed first</text>
+      <text x="760" y="118" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="600" fill="#3E7A45">reranked recall@6 = 85.5%</text>
+
+      <line x1="170" y1="86" x2="194" y2="86" stroke="#71717a" stroke-width="2"/><polygon points="200,86 190,81 190,91" fill="#71717a"/>
+      <text x="185" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#3f3f46">all</text>
+      <line x1="400" y1="86" x2="424" y2="86" stroke="#71717a" stroke-width="2"/><polygon points="430,86 420,81 420,91" fill="#71717a"/>
+      <text x="415" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#3f3f46">100</text>
+      <line x1="630" y1="86" x2="654" y2="86" stroke="#71717a" stroke-width="2"/><polygon points="660,86 650,81 650,91" fill="#71717a"/>
+      <text x="645" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#3f3f46">6</text>
+
+      <rect x="20" y="150" width="840" height="42" rx="8" fill="#FBF1D4" stroke="#a16207" stroke-width="1.6"/>
+      <text x="36" y="169" font-family="Inter" font-size="9.5" font-weight="700" fill="#713f12">THE CEILING</text>
+      <text x="120" y="169" font-family="Inter" font-size="9" fill="#18181b">reranking can only reorder what stage 1 already found, so reranked recall@6 &le; stage 1's recall@100.</text>
+      <text x="120" y="184" font-family="Inter" font-size="9" font-weight="600" fill="#a16207">measure recall@100 first: it is the budget everything downstream is spending.</text>
+
+      <text x="440" y="222" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="600" fill="#18181b">FOUR AXES, TWO HALVES</text>
+
+      <rect x="20" y="236" width="410" height="140" rx="9" fill="#FFFFFF" stroke="#5B47E0" stroke-width="2"/>
+      <text x="225" y="256" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#4c1d95">RETRIEVAL</text>
+      <text x="36" y="280" font-family="Inter" font-size="9.5" font-weight="600" fill="#4c1d95">CONTEXT PRECISION</text>
+      <text x="36" y="296" font-family="Inter" font-size="8.5" fill="#3f3f46">of the chunks we sent, how many were relevant?</text>
+      <text x="36" y="310" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">low precision wastes context and distracts the model</text>
+      <text x="36" y="334" font-family="Inter" font-size="9.5" font-weight="600" fill="#4c1d95">CONTEXT RECALL</text>
+      <text x="36" y="350" font-family="Inter" font-size="8.5" fill="#3f3f46">of the chunks needed, how many did we send?</text>
+      <text x="36" y="364" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">low recall makes a correct answer impossible</text>
+
+      <rect x="450" y="236" width="410" height="140" rx="9" fill="#FFFFFF" stroke="#be185d" stroke-width="2"/>
+      <text x="655" y="256" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#831843">GENERATION</text>
+      <text x="466" y="280" font-family="Inter" font-size="9.5" font-weight="600" fill="#831843">FAITHFULNESS</text>
+      <text x="466" y="296" font-family="Inter" font-size="8.5" fill="#3f3f46">is every claim supported by the supplied context?</text>
+      <text x="466" y="310" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">this is the one that catches invention</text>
+      <text x="466" y="334" font-family="Inter" font-size="9.5" font-weight="600" fill="#831843">ANSWER RELEVANCE</text>
+      <text x="466" y="350" font-family="Inter" font-size="8.5" fill="#3f3f46">does the answer address the question asked?</text>
+      <text x="466" y="364" font-family="Inter" font-size="8" font-style="italic" fill="#71717a">a faithful answer to the wrong question still fails</text>
+    </svg>
+    <figcaption>The yellow band is the constraint people forget. A reranker is a reordering, so it inherits whatever the first stage missed; buying a better reranker when recall at a hundred is 70 per cent buys nothing above 70 per cent.</figcaption>
+  </figure>
+
+  <div class="defcard">
+    <div class="term">Bi-encoder</div>
+    <div class="def">Encodes query and document independently into vectors compared by cosine similarity. Because the document vector never sees the query, it must summarise the whole chunk in advance for every possible question. That is what makes it fast and what limits its accuracy.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Cross-encoder</div>
+    <div class="def">Encodes query and document jointly and outputs a relevance score. Attention runs across both, so the model can weigh the exact terms of the question against the exact wording of the passage. Nothing can be precomputed, which restricts it to shortlists.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">nDCG</div>
+    <div class="def">Normalised discounted cumulative gain, from Järvelin and Kekäläinen (2002). Sums the relevance of each result discounted by its rank, then divides by the best achievable arrangement. Rewards putting the most relevant item first, and gives one for a perfect ordering regardless of how many relevant items exist.</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 4
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Rank-sensitive metrics, worked</h3>
+
+  <div class="worked">TWO RANKINGS, SAME RECALL, DIFFERENT VALUE
+
+  graded relevance over the top ten results,
+  3 = perfect, 2 = useful, 1 = marginal, 0 = irrelevant
+
+    ranking A   [3, 0, 0, 2, 0, 1, 0, 0, 0, 0]
+    ranking B   [0, 0, 1, 0, 2, 3, 0, 0, 0, 0]
+
+  BOTH HOLD THE SAME THREE RELEVANT CHUNKS IN THE TOP SIX
+    recall@6 for A = 1.00
+    recall@6 for B = 1.00      identical, and useless
+
+  BUILDING DCG@6 FOR RANKING A
+    each result contributes (2^relevance - 1) / log2(rank + 1)
+
+    rank  relevance   gain   discount   contribution
+      1       3         7     1.0000       7.0000
+      2       0         0     1.5850       0.0000
+      3       0         0     2.0000       0.0000
+      4       2         3     2.3219       1.2920
+      5       0         0     2.5850       0.0000
+      6       1         1     2.8074       0.3562
+                                          -------
+                              DCG@6  =     8.6482
+
+    the ideal ordering is [3, 2, 1, 0, 0, 0], giving
+                              IDCG@6 =     9.3928
+                              nDCG@6 =     0.9207
+
+  THE SAME CALCULATION FOR B GIVES 0.4423
+
+    metric      A        B      difference
+    nDCG@3    0.7453   0.0532    +0.6920
+    nDCG@6    0.9207   0.4423    +0.4785
+    MAP       0.6667   0.4111    +0.2556
+
+  READ nDCG@3
+    A scores 0.75 and B scores 0.05, because at three results
+    B has surfaced only its marginal chunk. If your prompt had
+    room for three, A works and B does not, and recall@6 said
+    they were the same system.
+
+  WHICH TO REPORT
+    nDCG when relevance is graded and position matters, which
+    is the generation case. MAP when relevance is binary and
+    you care about the whole ranking. Recall@k only as a
+    ceiling check on the first stage, never as the headline.</div>
+
+  <h3>Why the second stage exists</h3>
+
+  <p>A bi-encoder compresses a chunk into a vector before it has seen any question, so that vector has to serve every question that might ever be asked. A cross-encoder reads the pair together, which lets attention compare the actual words of the query against the actual words of the passage. The accuracy difference is large and the cost difference is larger.</p>
+
+  <div class="worked">THE ARITHMETIC THAT FORCES TWO STAGES
+
+  A CROSS-ENCODER NEEDS ONE FORWARD PASS PER CANDIDATE,
+  at roughly 10 ms per pair when batched
+
+    top 6 only                        6 passes ->    0.1 s
+    top 50                           50 passes ->    0.5 s
+    top 100                         100 passes ->    1.0 s
+    top 1,000                     1,000 passes ->   10.0 s
+    the whole 10M-token corpus   22,322 passes ->  223.2 s
+
+  SO IT CANNOT BE THE SEARCH. It can only reorder a shortlist,
+  and the shortlist size is a latency budget: 100 candidates
+  costs about a second, which most interactive systems can
+  absorb, and 1,000 costs ten, which they cannot.
+
+  WHAT THE REORDERING IS WORTH
+    suppose stage 1 finds the answer in its top 100 for 95%
+    of queries but places it in the top 6 for only 60%.
+
+    cross-encoder promotes it correctly    reranked recall@6
+              80% of the time                   76.0%   +16.0 pp
+              90% of the time                   85.5%   +25.5 pp
+              95% of the time                   90.2%   +30.2 pp
+
+  AND THE CEILING IS ABSOLUTE
+    reranking reorders; it cannot conjure. Reranked recall@6
+    can never exceed stage 1's recall@100. If that is 70 per
+    cent, no reranker takes the system past 70 per cent, and
+    the fix is a better first stage, a hybrid retriever, or
+    different chunking, not a better reranker.
+
+  SO THE DIAGNOSTIC ORDER IS FIXED
+    1  measure recall@100. that is your ceiling.
+    2  measure recall@6. the gap is what reranking can win.
+    3  only then decide whether to buy a reranker or fix
+       stage 1.</div>
+
+  <h3>Four things worth doing to the query and the results</h3>
+
+  <div class="defcard">
+    <div class="term">Reciprocal rank fusion</div>
+    <div class="def">The standard way to merge the dense and lexical rankings from lecture 11. Each document scores the sum over rankings of 1/(k + rank), with k a small constant. It needs no score calibration between systems, because it uses only positions, and it is a few lines of code. From Cormack, Clarke and Buettcher (2009).</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Query rewriting</div>
+    <div class="def">A short model call that turns a conversational question into a standalone one before it reaches the retriever. Essential in a chat setting, where "what about for contractors?" is meaningless as a search query and the previous turn holds its subject.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Hypothetical document embeddings</div>
+    <div class="def">Ask the model to draft an answer, embed the draft rather than the question, and retrieve against that. Gao and colleagues (2022) observed that an answer resembles the passage that contains it more than a question does, which is the asymmetry a bi-encoder struggles with.</div>
+  </div>
+  <div class="defcard">
+    <div class="term">Retrieve small, send large</div>
+    <div class="def">Index fine-grained chunks so that matching is precise, then send the parent section so that the model has enough context to use it. Decouples the retrieval unit from the reading unit, which the fixed chunk size in lecture 11 had forced together.</div>
+  </div>
+
+  <h3>Evaluating the whole system: four axes</h3>
+
+  <p>A retrieval-augmented system has two halves and each can fail on two counts, which is where the standard four-axis framing comes from, popularised by the RAGAS work of Es and colleagues in 2023. Retrieval is judged on <strong>context precision</strong>, whether the chunks sent were relevant, and <strong>context recall</strong>, whether the chunks needed were sent. Generation is judged on <strong>faithfulness</strong>, whether each claim is supported by the supplied context, and <strong>answer relevance</strong>, whether the answer addresses the question.</p>
+
+  <div class="worked">WHY ONE NUMBER CANNOT LOCALISE A FAULT
+
+    retrieval ok   generation ok   end-to-end
+        95%             95%           90.2%
+        85%             90%           76.5%
+        60%             95%           57.0%
+        95%             60%           57.0%
+
+  THE LAST TWO ROWS SCORE IDENTICALLY AT 57.0 PER CENT AND
+  NEED OPPOSITE REPAIRS.
+
+    row three: the retriever is not finding the material.
+      fix chunking, add a lexical retriever, add reranking.
+      nothing done to the prompt will help.
+
+    row four: the material arrives and the model mishandles
+      it. fix the grounding instructions, the ordering of
+      chunks, or the model. nothing done to the retriever
+      will help.
+
+  AND THE FOUR AXES SEPARATE THEM IMMEDIATELY
+    row three shows low context recall with high faithfulness
+    row four shows high context recall with low faithfulness
+
+  A NOTE ON HOW THESE ARE MEASURED
+    faithfulness and answer relevance are usually scored by
+    another model, which is convenient and is itself a model
+    output with its own error rate. Calibrate the judge on a
+    sample scored by hand before trusting it on a thousand,
+    and treat a judge's verdict as evidence rather than as
+    ground truth. Lecture 18 returns to this.
+
+  THE EVALUATION SET IS THE PREREQUISITE
+    a hundred questions with known answers and known source
+    passages, built once and versioned. It is dull work and
+    it converts every later argument about a change from
+    competing anecdotes into a measurement.</div>
+</section>
+
+<!-- ============================================================
+     SECTION 5
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Recall counts presence and ignores position, which is the wrong emphasis for a system whose prompt holds six chunks and whose model reads the first one best. Normalised discounted cumulative gain fixes that by discounting each result by its rank and normalising against the ideal ordering: two rankings with identical recall score 0.9207 and 0.4423, and at three results the gap widens to 0.75 against 0.05. Mean average precision does the same job for binary relevance. Recall at <em>k</em> keeps one use, as a ceiling check on the first stage.</p>
+
+  <p>Two-stage retrieval follows from an arithmetic constraint rather than a preference. A cross-encoder is more accurate because it reads the query and the chunk together, and for exactly that reason it can precompute nothing and needs a forward pass per candidate: one second over a hundred candidates, 223 seconds over a ten-million-token corpus. So the bi-encoder shortlists and the cross-encoder orders, which lifts recall at six from 60 to 85.5 per cent on the worked figures. The ceiling is the shortlist's own recall, and measuring it first is what tells you whether to buy a reranker or fix the retriever.</p>
+
+  <div class="callout insight">
+    <span class="tag">The habit this lecture is really arguing for</span>
+    Every result here depends on having an evaluation set: a hundred questions with known answers and known source passages. Without one, no claim in this lecture can be checked on your own corpus, reranking is a purchase made on faith, and "the retrieval seems better now" is the only sentence available. With one, the four axes tell you which half is broken, recall at a hundred tells you the ceiling, and nDCG tells you whether a change helped or merely moved things about. The set is a day's work and it is the difference between engineering and decoration.
+  </div>
+
+  <p>Part III is complete. You can compose calls into chains, let a model act in a loop when the sequence genuinely cannot be known in advance, retrieve rather than loop when it can, and measure whether the retrieval is any good. Part IV is a single lecture and a change of subject: lecture 13 takes the same transformer machinery and applies it to images, where a patch becomes a token, CLIP learns a shared space for pictures and captions by contrastive training, and BLIP-2 bridges a vision encoder to a language model without retraining either. The contrastive objective there is also the foundation of Part V, where the embedding models this lecture has been measuring get trained rather than bought.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State what recall at <em>k</em> measures and the property it cannot see.</li>
+      <li><strong>Do the arithmetic.</strong> For the relevance vector [3, 0, 0, 2, 0, 1], compute DCG@6 term by term.</li>
+      <li><strong>Do the arithmetic.</strong> Compute the ideal DCG for that vector and hence nDCG@6.</li>
+      <li>Why does nDCG@3 separate the two rankings so much more sharply than nDCG@6?</li>
+      <li>When should you report nDCG, when MAP, and what is the one remaining use of recall at <em>k</em>?</li>
+      <li>Explain the structural difference between a bi-encoder and a cross-encoder, and why it produces both the accuracy gain and the cost.</li>
+      <li><strong>Do the arithmetic.</strong> At 10 ms per pair, how long does a cross-encoder take over 100 candidates and over 22,322?</li>
+      <li><strong>Do the arithmetic.</strong> With recall@100 of 95 per cent, recall@6 of 60 per cent and a reranker that promotes correctly 90 per cent of the time, what is the reranked recall@6?</li>
+      <li>State the ceiling on reranking and what follows for the diagnostic order.</li>
+      <li>What does reciprocal rank fusion solve, and why does it need no score calibration?</li>
+      <li>Why is query rewriting essential in a chat setting?</li>
+      <li>Explain the asymmetry that hypothetical document embeddings exploit.</li>
+      <li>What does retrieve-small-send-large decouple, and which lecture 11 constraint does it relax?</li>
+      <li>Name the four evaluation axes and say which half of the system each belongs to.</li>
+      <li><strong>Do the arithmetic.</strong> Give two combinations of retrieval and generation quality that produce the same end-to-end score, and state the opposite repairs each needs.</li>
+      <li>Which two axes distinguish those two cases?</li>
+      <li>What caution applies to scoring faithfulness with another model?</li>
+      <li>What does an evaluation set consist of, and what does it change about how a team argues?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> Lecture 11 (<a href="11-semantic_search_and_rag.html">semantic search and RAG</a>) built the pipeline and deferred its measurement three times: the six-chunk budget, the hybrid merge, and how many chunks to send. All three are answered here.</li>
+      <li><strong>Depends on:</strong> Lecture 3 (<a href="03-embeddings_in_practice.html">embeddings in practice</a>) for the bi-encoder, and lecture 5 (<a href="05-text_classification.html">text classification</a>) for the cross-encoder architecture, which is a classifier over a pair.</li>
+      <li><strong>Completes:</strong> Part III. Chains in lecture 9 (<a href="09-chains_memory_and_state.html">chains, memory and state</a>), agents in lecture 10 (<a href="10-agents_and_react.html">agents and ReAct</a>), retrieval in lecture 11, and measurement here.</li>
+      <li><strong>Next:</strong> Lecture 13 (<a href="13-multimodal_models.html">multimodal models</a>) opens Part IV, where the contrastive objective that trains a good retrieval embedding appears in its image-and-text form.</li>
+      <li><strong>Forward:</strong> When the retriever's ceiling is the problem, Part V is the answer: lecture 14 (<a href="14-contrastive_learning_and_sbert.html">contrastive learning and SBERT</a>) explains why a cross-encoder cannot search and how a bi-encoder is trained to come closer, and lecture 15 (<a href="15-training_embedding_models.html">training embedding models</a>) adapts one to a domain. Model-as-judge evaluation returns in lecture 18 (<a href="18-preference_tuning_and_evaluation.html">preference tuning and evaluation</a>).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Language engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 12 of 18</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>

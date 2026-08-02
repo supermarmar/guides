@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LGD target and data: realised LGD, components and history</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../../../../index.html">Lectures</a> / Banking / Internal environment / Risk measurement / Credit risk / A-IRB capital</div>
+  <h1>Target and data: realised LGD, components and history</h1>
+  <p class="subtitle">The data foundation of the LGD build. The realised-LGD target per resolved facility (one continuous outcome and three component targets), the pre-default and post-default features the model is allowed to use, the discount-rate convention that turns nominal cash flows into present-value losses, and the data-history requirement that doubles in cost compared with PD because every facility needs a complete workout track.</p>
+  <div class="meta">
+    <span>A-IRB 17 of n &mdash; LGD 2 of 7</span>
+    <span>Reading time, 28 minutes</span>
+    <span>Source: <code>04_feature_engineering/lgd/02-data_requirements.md</code>; supplemented from regulation and best practice</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">The LGD target is the realised LGD per resolved defaulted facility, computed via the economic-loss formula from <a href="03-definitions.html">lecture 03</a> (EAD minus discounted recoveries plus discounted costs, divided by EAD, floored at zero). The same realised LGD per facility is also decomposed into three component targets that feed the mixture model: a binary zero-payer flag observed over a 24-month outcome window, a binary full-payer flag (conditional on non-zero) over the same 24-month window, and a continuous discounted recovery rate observed over a 60-month outcome window.</p>
+
+  <p>The independent variables split cleanly into pre-default and post-default. <strong>Pre-default features</strong> are everything observable up to one year before the default event: obligor characteristics, facility attributes (collateral type, guarantee status, product, LTV), behavioural variables (utilisation, arrears history, payment regularity). <strong>Post-default features</strong> are everything observed during the workout: recovery cash flows, time-to-recovery, recovery channel, costs incurred. The LGD1 model (applied to performing facilities) uses pre-default features only; the LGD2 model (applied to defaulted facilities) uses both, because the defaulted facility's workout is already partway through and the post-default information is informative.</p>
+
+  <p>The data history requirement is the binding constraint. CRR Article 181(1)(j) requires at least 5 years for retail and 7 years for non-retail. Crucially, the MRP from <a href="03-definitions.html">lecture 03</a> (60 months for unsecured retail, 8 to 10 years for secured) compounds the cost: a facility defaulting at month 0 of the development window is only fully resolved at month 60 (or later for secured), so a 5-year history barely supports a single complete cohort. Most banks operate with 10+ years of LGD history and a documented limitations register entry for any segment with thinner data.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    The PD model worked with one row per (obligor, snapshot) plus a 12-month forward outcome. The LGD model works with one row per resolved defaulted facility plus a 60-month forward workout track. The data quantity is much smaller (only defaulted facilities), the data depth per row is much larger (60 months of recovery cash flows), and the calendar requirement is double (because the workout has to complete before the row enters the training set). The LGD data-engineering effort is therefore as material as the PD effort, applied to a much smaller and slower-moving population.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>LGD modelling has a fundamentally different data shape from PD modelling. PD trains on tens or hundreds of millions of (performing facility, snapshot) rows, each labelled with a 12-month default outcome. LGD trains on tens or hundreds of thousands of (defaulted facility, default event) rows, each labelled with the realised LGD computed over a 60-month workout. The number of rows is two to three orders of magnitude smaller, but each row carries far more workout-track information. This shapes every later decision: feature engineering, segmentation, model class, validation. Banks that try to apply PD-style data-engineering patterns to LGD discover quickly that the data is too sparse for some methods (random downsampling on a 50,000-row dataset is unhelpful) and too dense for others (every facility has a 60-row workout history that must be aggregated correctly).</p>
+
+  <p>The discount-rate question is also surprisingly consequential. The same cash flows discounted at SOFR + 5% versus 9% produce LGDs that differ by 3 to 8 percentage points; on a portfolio with downturn LGD of 60%, that is 5 to 15% relative error before any modelling has happened. PRA SS4/24 §13.16 to §13.18 specifies the discount-rate convention: SOFR or SONIA plus 5% for LRA / BEEL calculation, max(SOFR or SONIA + 5%, 9%) for downturn LGD and LGD-in-default. The 9% floor is what makes downturn LGD materially above LRA LGD. Modellers who pick the discount rate intuitively rather than per the convention end up with calibration mismatches that propagate through the rest of the build.</p>
+
+  <p>The exam-classic question on this lecture is "what makes LGD data work harder than PD data work". The expected answer covers the MRP compounding, the resolved / unresolved split, the discount-rate convention and the data-sparsity problem in low-default segments. Candidates who treat LGD as "just another regression with a different target" miss these structural differences and underperform.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>An LGD row is built around a single default event. The diagram below traces the temporal structure of one row: feature window before default, outcome window after default, and the resolution event that finalises the realised LGD.</p>
+
+  <figure class="wide">
+    <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The temporal structure of an LGD row">
+      <text x="450" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">The temporal structure of an LGD training row</text>
+
+      <!-- Timeline -->
+      <line x1="40" y1="160" x2="860" y2="160" stroke="#475569" stroke-width="1.5"/>
+      <polygon points="860,160 852,156 852,164" fill="#475569"/>
+      <text x="868" y="164" font-family="Inter" font-size="10" fill="#64748b">time</text>
+
+      <!-- Pre-default feature window -->
+      <rect x="60" y="170" width="220" height="50" fill="#eff6ff" stroke="#1e3a8a"/>
+      <text x="170" y="190" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#1e3a8a">Pre-default window</text>
+      <text x="170" y="206" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">features: obligor + facility + behaviour</text>
+      <text x="170" y="217" text-anchor="middle" font-family="Inter" font-size="9" fill="#1e3a8a">up to 1 year before default</text>
+
+      <!-- Default event marker -->
+      <line x1="280" y1="140" x2="280" y2="160" stroke="#7f1d1d" stroke-width="2"/>
+      <circle cx="280" cy="160" r="5" fill="#7f1d1d"/>
+      <text x="280" y="135" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">default event</text>
+      <text x="280" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">(CRR Art 178)</text>
+
+      <!-- 24-month component window -->
+      <rect x="280" y="170" width="220" height="22" fill="#fef9c3" stroke="#92400e"/>
+      <text x="390" y="186" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#92400e">24-month outcome (zero / full payer)</text>
+
+      <!-- 60-month MRP window -->
+      <rect x="280" y="198" width="500" height="22" fill="#fee2e2" stroke="#991b1b"/>
+      <text x="530" y="214" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">60-month outcome (partial-recovery rate)</text>
+
+      <!-- Resolution event marker -->
+      <line x1="780" y1="140" x2="780" y2="220" stroke="#7f1d1d" stroke-width="2" stroke-dasharray="2,2"/>
+      <text x="780" y="135" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#7f1d1d">resolution</text>
+      <text x="780" y="125" text-anchor="middle" font-family="Inter" font-size="9" fill="#7f1d1d">(or MRP reached)</text>
+
+      <!-- t+12m marker on outcome -->
+      <line x1="500" y1="160" x2="500" y2="170" stroke="#475569" stroke-width="1"/>
+      <text x="500" y="240" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">t + 24m</text>
+
+      <!-- Realised LGD computation box -->
+      <rect x="40" y="275" width="820" height="50" fill="#DDF1E5" stroke="#0f766e" stroke-width="1.3"/>
+      <text x="450" y="295" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#134e4a">Realised LGD = max(0, 1 - PV(recoveries + collateral + debt sale - costs) / EAD)</text>
+      <text x="450" y="312" text-anchor="middle" font-family="Inter" font-size="9" fill="#134e4a">all cash flows discounted to default date at SOFR + 5% (LRA) or max(SOFR + 5%, 9%) (downturn)</text>
+
+      <text x="450" y="355" text-anchor="middle" font-family="Inter" font-size="9" fill="#475569">One row per resolved facility. Population: defaulted facilities with a complete (resolved or MRP-truncated) workout track.</text>
+    </svg>
+    <figcaption>The temporal structure of one LGD row. Pre-default features are observed up to one year before the default event. The 24-month outcome window captures the zero-payer and full-payer flags; the 60-month MRP window captures the partial-recovery rate. The row enters the development sample only when resolution is observed (or the MRP is reached and the facility is forced to non-cure status). All cash flows are discounted to the default date.</figcaption>
+  </figure>
+
+  <p>Three properties of the row structure to internalise. First, the <strong>feature window stops one year before default</strong>. SS4/24 §11.30 expects this to avoid look-ahead bias: features that include data from the run-up to default are partly a label leak (they reflect the default that is about to happen). The one-year offset is the standard prophylactic. Second, the <strong>outcome windows differ by component</strong>: 24 months for the binary outcomes, 60 months for the continuous outcome. Different windows reflect different observation needs (the zero/full classification is settled by month 24; the partial-recovery rate continues evolving for years). Third, the <strong>row only enters the development sample on resolution</strong>: a facility that is still in workout cannot contribute to the training data without survival-analysis machinery; the standard convention is to wait for the MRP to elapse or for a clean resolution event.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>The realised LGD target</h3>
+
+  <p>The economic-loss formula from lecture 03, rewritten as a target variable per facility i:</p>
+
+  <pre><code>realised_LGD_i  =  max(0,
+                       1 - PV(cash_recoveries_i)
+                         - PV(debt_sale_proceeds_i)
+                         - PV(collateral_proceeds_i)
+                         + PV(direct_costs_i)
+                         + PV(indirect_costs_i)
+                      / EAD_i)
+</code></pre>
+
+  <p>All PV terms are computed by discounting each cash flow back to the default date at the regulatory discount rate. The zero floor (SS4/24 §14.14) catches facilities where realised recoveries exceeded EAD (typically because of penalty interest or unexpected collateral appreciation): these are treated as zero-loss rather than negative-loss events.</p>
+
+  <p>The realised LGD is also broken into the three component targets:</p>
+
+  <pre><code>zero_payer_24m_i      = 1 if undiscounted cumulative recoveries in (t, t+24m] = 0
+                      = 0 otherwise
+
+full_payer_24m_i      = 1 if undiscounted cumulative recoveries in (t, t+24m] >= EAD_i
+                          AND zero_payer_24m_i = 0
+                      = 0 otherwise (only defined for non-zero-payers)
+
+partial_recovery_60m_i = PV(cumulative recoveries in (t, t+60m]) / EAD_i
+                         (only defined for partial-payers: not zero, not full)
+</code></pre>
+
+  <p>The 24-month windows for the binaries and the 60-month window for the continuous component reflect the operational lifecycle: by month 24 the workout has typically declared its trajectory (zero, full or grinding partial); the partial-recovery rate is then observed over the full MRP of 60 months. Banks may sensitivity-test 12-month and 36-month alternatives; 24 and 60 are the standard.</p>
+
+  <h3>The independent variables: pre-default and post-default</h3>
+
+  <p>Two structural families.</p>
+
+  <table>
+    <thead>
+      <tr><th>Family</th><th>Examples</th><th>Used by</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Pre-default obligor and facility</strong></td>
+        <td>Segment, product, geography, collateral type, guarantee presence, loan-to-value at origination, age on book at default, original credit limit</td>
+        <td>Both LGD1 (performing) and LGD2 (defaulted)</td>
+      </tr>
+      <tr>
+        <td><strong>Pre-default behavioural</strong></td>
+        <td>Utilisation in the 12 months before default, arrears history, payment regularity, transactor flag, balance trajectory; all measured at month t - 12 to t - 1 relative to default</td>
+        <td>Both LGD1 and LGD2</td>
+      </tr>
+      <tr>
+        <td><strong>Pre-default bureau</strong></td>
+        <td>External credit score at default, total system-wide exposure, recent enquiries, public-record adverse events</td>
+        <td>Both LGD1 and LGD2</td>
+      </tr>
+      <tr>
+        <td><strong>Post-default workout</strong></td>
+        <td>Time since default, recovery cash flows to date, recovery channel (internal collections, external agency, legal, debt sale), costs incurred, cure / probation status</td>
+        <td>LGD2 only</td>
+      </tr>
+      <tr>
+        <td><strong>Recovery-market macroeconomic</strong></td>
+        <td>Regional house-price index (secured); insolvency rate (unsecured); GDP and unemployment (general)</td>
+        <td>LGD2 only; LGD1 typically excludes macro from the conditioning set for the same reasons as PD</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>The same data-leakage rules from <a href="10-pd_target_and_data.html">lecture 10</a> apply: features must reflect what was knowable at the snapshot, not at any later date.</p>
+
+  <h3>Data sources</h3>
+
+  <p>Internal sources dominate, supplemented by external where internal is sparse.</p>
+
+  <ul>
+    <li><strong>Internal collections systems</strong>. Every post-default cash flow (date, amount, channel) for every defaulted facility. The workhorse data source; quality is portfolio-defining.</li>
+    <li><strong>Internal cost ledger</strong>. Direct collection costs (agency commissions, legal fees, court costs) per facility. Indirect costs (allocated in-house collections-staff time) typically allocated from a central pool.</li>
+    <li><strong>Debt-sale records</strong>. Forward-flow contracts, ad-hoc sale proceeds, contract terms. Increasingly important as banks externalise tail-end collections.</li>
+    <li><strong>Collateral valuation records</strong>. For secured portfolios: original valuations, updated valuations during the workout, sale proceeds at auction.</li>
+    <li><strong>External pooled data</strong>. Global Credit Data (GCD), S&P LossStat, ECB AnaCredit pooled defaults, Paris Club restructuring data for sovereign. Used for benchmarking and supplementing thin segments.</li>
+  </ul>
+
+  <h3>The discount-rate convention</h3>
+
+  <p>PRA SS4/24 §13.16 to §13.18 sets the discount rates that turn nominal cash flows into present-value losses:</p>
+
+  <table>
+    <thead>
+      <tr><th>Purpose</th><th>Discount rate</th><th>Reference</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>LRA LGD, BEEL (best estimate of expected loss)</td><td>Risk-free overnight rate (SOFR for USD, SONIA for GBP) + 5%</td><td>SS4/24 §13.16, §13.18</td></tr>
+      <tr><td>Downturn LGD</td><td>max(risk-free + 5%, 9%)</td><td>SS4/24 §13.17</td></tr>
+      <tr><td>LGD-in-default (for ELBE inputs)</td><td>max(risk-free + 5%, 9%)</td><td>SS4/24 §13.18</td></tr>
+    </tbody>
+  </table>
+
+  <p>The 5% spread above the overnight rate reflects the bank's funding cost in normal conditions; the 9% floor for downturn reflects that funding costs rise materially in stress. The convention is applied uniformly across all defaulted facilities; deviations require explicit justification and supervisory dialogue.</p>
+
+  <h3>Direct vs indirect costs</h3>
+
+  <p>CRR Article 5(2) defines economic loss as including "material direct and indirect costs". For IRB LGD both are included. For IFRS 9 LGD only direct costs are included (the IFRS 9 framework excludes overhead allocations on the principle that ECL is a forward-looking expected loss to the entity, not an internal management-accounting allocation). The same workout produces two different LGDs depending on which framework is asking; banks maintain both calculations in parallel.</p>
+
+  <h3>Population construction: resolved vs unresolved</h3>
+
+  <p>From <a href="03-definitions.html">lecture 03</a>: a facility is <strong>resolved</strong> when one of four outcomes is observed: MRP exceeded, full repayment, write-off, or cure event recorded. Anything else is <strong>unresolved</strong>. Three operational rules apply:</p>
+
+  <ul>
+    <li>The LGD1 development sample contains only <strong>resolved facilities</strong>. Unresolved facilities cannot be reliably labelled and are excluded.</li>
+    <li>For facilities truncated by MRP without a clean resolution, the convention is to treat the remaining unrecovered balance as a 100% loss. This is the principal source of conservative bias in LGD models built on portfolios with long-tail recoveries (mortgages, project finance).</li>
+    <li>The LGD2 development sample contains <strong>currently defaulted facilities</strong> regardless of resolution state, because LGD2 predicts the remaining loss on the open workout. The target is computed via the BEEL methodology rather than the realised-LGD formula.</li>
+  </ul>
+
+  <h3>Data history requirement</h3>
+
+  <p>CRR Article 181(1)(j) sets the minimum history:</p>
+
+  <ul>
+    <li><strong>Retail</strong>: 5 years minimum; the window must include a downturn period or be supplemented by conservative assumptions.</li>
+    <li><strong>Corporate, sovereign, bank</strong>: 7 years minimum.</li>
+  </ul>
+
+  <p>The MRP compounding effect: a 5-year history with a 60-month MRP means a default at the start of the window is only fully observable through year 5. Banks therefore typically operate with 10+ years of LGD history and use the limitations register to flag any segment where the available cohorts of resolved facilities are too thin for credible calibration. Common thin segments: high-end mortgages, large commercial real estate, defaulted credit cards from a brand-new product, sovereign exposures (where individual defaults are extremely rare).</p>
+
+  <h3>The ELGC complication for cured facilities</h3>
+
+  <p>From lecture 03: a facility that defaults and cures within the outcome window is still a default event for PD purposes but the realised LGD is computed with the artificial cash flow (the balance-at-cure as a synthetic recovery, discounted to the default date). The economic loss given cure (ELGC) formula:</p>
+
+  <pre><code>ELGC_i  =  ( EAD_i  -  NPV(observed payments)_i
+                     -  NPV(artificial cash flow)_i
+                     +  NPV(costs)_i )  /  EAD_i
+</code></pre>
+
+  <p>where the artificial cash flow represents the balance at cure (with adjustments for missed payments, post-default interest and fees, additional drawings). ELGC is typically much smaller than the LGD of a no-cure outcome and contributes the lower half of the LGD distribution. The cure / no-cure mixture is therefore one of the natural segmentation dimensions in LGD risk differentiation (covered in lecture 20).</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <p>The first lesson is that the <strong>resolved-versus-unresolved boundary is where LGD modelling silently conservatises</strong>. Truncating workouts at the MRP and assigning 100% loss on the remainder is the standard convention but it has the effect of pulling the modelled LGD up versus what would be observed if the workout were allowed to continue. For unsecured retail the bias is small because recoveries are largely complete by month 60; for secured portfolios with property collateral the bias is material because property workouts genuinely take 7 to 10 years. Banks should be aware that their MRP choice is a quantitative input to the LGD level, not just a data-engineering convenience.</p>
+
+  <p>The second lesson is on <strong>the discount-rate floor</strong>. The 9% floor on downturn-LGD discount rate is the single biggest mechanical lever in the regulatory downturn-LGD calibration. A bank with a benign cost-of-funds history might intuit a much lower discount rate, but the supervisor's floor is what makes downturn LGD materially conservative versus LRA LGD. Modellers should treat this as an external parameter rather than a thing to negotiate.</p>
+
+  <p>The third lesson is on <strong>indirect costs</strong>. The same workout produces two LGDs: an IRB LGD that includes overhead allocations and an IFRS 9 LGD that does not. The IRB LGD is the larger of the two by a few percentage points (the overhead allocation is the difference). Banks maintain both calculations in parallel; the IFRS 9 number is what hits the P&L, the IRB number is what hits regulatory capital. Practitioners should be able to articulate why both exist and not conflate them.</p>
+
+  <p>The fourth lesson is structural: <strong>the data work in LGD has a different shape than in PD</strong>. PD wants tens of millions of rows of (snapshot, 12m outcome). LGD wants tens of thousands of rows of (default event, 60m workout track). The first is a snapshot-and-label problem; the second is a workout-tracking problem. The infrastructure, the data-quality checks, and the skill profile required from the team differ between the two. Junior modellers who think LGD is just another regression often underestimate the data effort and undershoot the build schedule. The right framing is that LGD data engineering is a fundamentally different discipline that shares the same regulatory wrapper as PD data engineering.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <ol class="recall">
+    <li>Write the realised-LGD formula with all cash-flow components named. Why is the realised LGD floored at zero?</li>
+    <li>State the three component targets for the LGD mixture model. What outcome window applies to each?</li>
+    <li>Why does the feature window stop one year before the default event rather than at the default event itself?</li>
+    <li>Distinguish the feature families used by LGD1 from those used by LGD2. Which uses post-default information, and why is that legitimate?</li>
+    <li>State the discount-rate convention for LRA LGD, downturn LGD and LGD-in-default. Why is the 9% floor specifically applied to downturn?</li>
+    <li>Explain why a 5-year data history is rarely sufficient in practice for an unsecured retail LGD model. What multiplies the requirement?</li>
+    <li>What is the operational rule for facilities truncated by MRP without a clean resolution? What bias does it introduce?</li>
+    <li>Distinguish direct costs from indirect costs in the realised-LGD formula. Which framework (IRB / IFRS 9) includes each?</li>
+    <li>A facility defaults at month 6, makes regular payments, and cures at month 24. The realised LGD is computed using which formula, and what is the role of the artificial cash flow?</li>
+    <li>List three external data sources commonly used to supplement internal LGD data, and state when each is operationally helpful.</li>
+  </ol>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+
+  <div class="connections">
+    <p><strong>Sources:</strong></p>
+    <ul>
+      <li><code>docs/wiki/.../a-irb_capital/04_feature_engineering/lgd/02-data_requirements.md</code> &mdash; the metadata table on target, features, costs, discount rate and measurement period.</li>
+      <li>Supplementary regulatory references: CRR Article 5(2), 181(1)(j); SS4/24 §13.16 to §13.18, §14.6, §14.8, §14.14.</li>
+    </ul>
+
+    <p><strong>Prerequisites within the credit-risk track:</strong></p>
+    <ul>
+      <li><a href="03-definitions.html">Definitions</a> &mdash; the economic-loss formula, MRP, cure, ELGC, resolved-vs-unresolved logic.</li>
+      <li><a href="06-data_engineering.html">Data engineering</a> &mdash; the MRD this lecture's target and features derive from.</li>
+      <li><a href="10-pd_target_and_data.html">PD target and data</a> &mdash; the analogue for PD; the data-leakage rules transfer.</li>
+      <li><a href="16-lgd_concept.html">LGD concept</a> &mdash; the three-component mixture decomposition and the LGD1 / LGD2 split.</li>
+    </ul>
+
+    <p><strong>Forward references inside the LGD sequence:</strong></p>
+    <ul>
+      <li>18-lgd_sampling_and_representativeness (next) &mdash; how to choose the development sample from the resolved-facility population.</li>
+      <li>19-lgd_feature_engineering (planned) &mdash; reducing and transforming the candidate features defined here.</li>
+      <li>20-lgd_risk_differentiation (planned) &mdash; the mixture-model fit using these targets and features.</li>
+      <li>21-lgd_risk_quantification (planned) &mdash; downturn calibration via the LGD reference value (SS4/24 §15.7).</li>
+    </ul>
+
+    <p><strong>Further reading:</strong></p>
+    <ul>
+      <li>CRR Articles 5(2), 181(1)(b), (h), (j). The legislative anchors.</li>
+      <li>PRA SS4/24, paragraphs 13 to 14. UK supervisory expectations for economic loss, discount rates and resolved facilities.</li>
+      <li>EBA/GL/2017/16, paragraphs 96 to 153. The European authority's interpretation of workout LGD construction.</li>
+      <li>Global Credit Data, "Global Credit Data Methodology: LGD Database". The standard external benchmarking source.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span>Credit risk / A-IRB capital 17 of n &middot; LGD 2 of 7.</span>
+  <span><a href="16-lgd_concept.html">Previous: LGD concept</a> &middot; <a href="18-lgd_sampling_and_representativeness.html">Next: sampling and representativeness</a></span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="../../../../../../assets/lecture.js"></script>
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 10: naive Bayes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../../index.html">Lectures</a> / <a href="../index.html">Machine learning</a> / <a href="index.html">Supervised learning</a></div>
+  <h1>Naive Bayes</h1>
+  <p class="subtitle">Bayes' rule plus one wildly unrealistic independence assumption, equals an algorithm that wins on text classification and refuses to die on the basis that it does not deserve to. The naive in the name is honest, the results are not.</p>
+  <div class="meta">
+    <span>Lecture 10 of 62</span>
+    <span>Reading time, 40 minutes</span>
+    <span>Part II: supervised learning</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">A <strong>naive Bayes classifier</strong> applies Bayes' theorem to compute the posterior probability of each class given a feature vector, then assigns the class with the highest posterior. The theorem itself, $P(y \mid x) = P(x \mid y) P(y) / P(x)$, requires the joint likelihood $P(x \mid y)$, which is intractable for any non-trivial feature vector. The <strong>naive assumption</strong> rescues tractability by declaring the features conditionally independent given the class, so $P(x \mid y) = \prod_j P(x_j \mid y)$, and each one-dimensional likelihood can be estimated from training counts or moments. Three concrete variants cover almost every practical case. <strong>Multinomial naive Bayes</strong> models integer counts and is the standard for bag-of-words text classification. <strong>Bernoulli naive Bayes</strong> models binary presence or absence and is preferred for short documents where word repetition is uninformative. <strong>Gaussian naive Bayes</strong> assumes each feature is normally distributed within each class and is used for continuous tabular features. <strong>Laplace smoothing</strong> adds one to every count to prevent a single unseen word from collapsing the whole product to zero. The method is fast to train, fast to predict, easy to interpret, and competitive for text, but its probability estimates are poorly calibrated and its independence assumption is wrong almost everywhere outside the textbook.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    You want to know whether an email is spam. The honest way would be to look up how often this exact email has appeared in your spam folder, but you have never seen this exact email before. So instead you ask, for each word in the email, how often it shows up in spam versus how often it shows up in legitimate mail. You then pretend each word casts an independent vote, multiply the votes together, multiply by how common spam is overall, and pick whichever class came out higher. The pretence is plainly wrong (the words "free" and "money" are not independent of each other) but the votes still point the right way often enough that the classifier works. The naive in naive Bayes is the pretence; the surprise is that it does not matter as much as it should.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    Naive Bayes is the canonical example of a model whose assumptions are obviously violated yet whose decisions remain useful. The reason has been studied formally: classification only requires the posterior ranking to be correct, not the posterior values, and the ranking is robust to the dependence structure between features in ways the absolute probabilities are not. This is also why naive Bayes posteriors should never be quoted as calibrated probabilities. A spam filter reporting 99 per cent probability of spam is reporting the score on a saturating scale, not a frequency you could verify. If calibrated probabilities matter (regulatory PD, expected loss), wrap the classifier in a Platt or isotonic calibration on a held-out fold.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">Where this sits in the ML world</span>
+    Fifth supervised model in sub-module 03, after k-nearest neighbours, decision trees, and <a href="03-support_vector_machines.html">support vector machines</a>. The SVM contrast is the useful one: both methods are strong on text, but the SVM is a geometric discriminative model that draws a margin in feature space, while naive Bayes is a generative probabilistic model that fits a class-conditional distribution. Up next is <a href="05-ensemble_learning.html">ensemble learning</a>, which combines many weak learners into a stronger predictor, an approach naive Bayes mostly sits out because its bias is already low and its variance is hard to reduce by averaging.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Three reasons naive Bayes earns its place in a practitioner's toolbox despite its theoretical embarrassment. First, <strong>it is the fastest classifier on the menu</strong>. Training reduces to counting (or computing per-class means and variances) in a single pass over the data, with no iterative optimisation. Prediction is one product per class. For text classification on millions of documents with vocabularies in the hundreds of thousands, naive Bayes will train and score in seconds where a gradient-boosted model would still be loading. When the problem is genuinely well-suited (bag-of-words text, simple presence-or-absence signals), the speed advantage is dramatic and the accuracy gap to slower methods is small.</p>
+
+  <p>Second, <strong>it is the baseline that exposes whether a problem needs more than a baseline</strong>. A naive Bayes model trained in five minutes gives you a defensible accuracy number against which every subsequent modelling decision is judged. If a tuned gradient-boosted tree beats naive Bayes by half a point of AUC after three days of work, the gradient-boosted tree is not the right answer. The same logic applies in reverse: if naive Bayes lands well within touching distance of a deep learning model, the deep learning model's complexity is not buying enough generalisation to justify it. Skipping the baseline is how teams convince themselves that their elaborate model is doing more than it is.</p>
+
+  <p>Third, <strong>it is the textbook example of a generative model</strong>, and the right way to learn the generative-discriminative distinction that recurs throughout machine learning. A discriminative model (logistic regression, SVM, random forest) estimates $P(y \mid x)$ directly. A generative model estimates $P(x, y) = P(x \mid y) P(y)$ and recovers the posterior through Bayes' rule. The generative formulation lets you sample synthetic data, handle missing features without retraining, and incorporate prior knowledge through the class priors. It pays for those advantages by needing to model the feature distribution, which is harder than modelling the decision boundary. The trade-off is not abstract; it shows up every time you choose between logistic regression and naive Bayes on the same dataset.</p>
+
+  <div class="callout warn">
+    <span class="tag">Vignette from the field</span>
+    A team rebuilt an existing rule-based spam classifier as a tuned gradient-boosted model with hand-crafted features (header anomalies, URL entropy, attachment metadata). Validation accuracy improved from 94 to 97 per cent. Six months later, spam patterns shifted, the hand-crafted features stopped firing, and accuracy collapsed to 88 per cent. A multinomial naive Bayes model on raw token counts, retrained weekly on the latest five days of labelled mail, sat steady at 95 per cent throughout the same period. The lesson was not that naive Bayes is better than gradient boosting; it was that a model cheap enough to retrain every week beats a model that is good on the day it ships and ages without supervision.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Hold this picture. Naive Bayes is a vote on classes, where each feature casts one log-vote per class, weighted by how often the feature appears within that class in training. The class with the highest summed log-vote (plus a base rate term for the class prior) wins. Bayes' theorem provides the framework, the independence assumption converts a joint into a product, and the log converts the product into a sum so the votes add cleanly.</p>
+
+  <figure>
+    <svg viewBox="0 0 820 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Naive Bayes as a vote across features per class">
+      <defs>
+        <marker id="nbArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="410" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">Naive Bayes: each feature casts an independent log-vote; the class with the highest sum wins</text>
+
+      <!-- Input feature column -->
+      <g>
+        <rect x="30" y="60" width="150" height="44" rx="10" fill="#FFFFFF" stroke="#37352F" stroke-width="1.5"/>
+        <text x="105" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#18181b">INPUT DOCUMENT</text>
+        <text x="105" y="94" text-anchor="middle" font-family="Inter" font-size="9" fill="#71717a">tokens x1, x2, ..., xd</text>
+      </g>
+
+      <g>
+        <rect x="50" y="130" width="40" height="28" rx="6" fill="#F4F4F5" stroke="#71717a" stroke-width="1"/>
+        <text x="70" y="148" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#18181b">free</text>
+        <rect x="100" y="130" width="40" height="28" rx="6" fill="#F4F4F5" stroke="#71717a" stroke-width="1"/>
+        <text x="120" y="148" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#18181b">cash</text>
+        <rect x="50" y="170" width="40" height="28" rx="6" fill="#F4F4F5" stroke="#71717a" stroke-width="1"/>
+        <text x="70" y="188" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#18181b">now</text>
+        <rect x="100" y="170" width="40" height="28" rx="6" fill="#F4F4F5" stroke="#71717a" stroke-width="1"/>
+        <text x="120" y="188" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#18181b">meet</text>
+      </g>
+
+      <!-- Spam column -->
+      <g>
+        <rect x="280" y="60" width="200" height="44" rx="10" fill="#FEF2F2" stroke="#b91c1c" stroke-width="1.5"/>
+        <text x="380" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#7f1d1d">CLASS: SPAM</text>
+        <text x="380" y="94" text-anchor="middle" font-family="Inter" font-size="9" fill="#b91c1c">log P(spam) = -0.7</text>
+      </g>
+      <g>
+        <rect x="280" y="130" width="200" height="22" rx="4" fill="#FFFFFF" stroke="#b91c1c" stroke-width="0.8"/>
+        <text x="290" y="145" font-family="JetBrains Mono" font-size="9" fill="#7f1d1d">log P(free | spam) = -1.2</text>
+        <rect x="280" y="156" width="200" height="22" rx="4" fill="#FFFFFF" stroke="#b91c1c" stroke-width="0.8"/>
+        <text x="290" y="171" font-family="JetBrains Mono" font-size="9" fill="#7f1d1d">log P(cash | spam) = -1.5</text>
+        <rect x="280" y="182" width="200" height="22" rx="4" fill="#FFFFFF" stroke="#b91c1c" stroke-width="0.8"/>
+        <text x="290" y="197" font-family="JetBrains Mono" font-size="9" fill="#7f1d1d">log P(now | spam) = -1.0</text>
+        <rect x="280" y="208" width="200" height="22" rx="4" fill="#FFFFFF" stroke="#b91c1c" stroke-width="0.8"/>
+        <text x="290" y="223" font-family="JetBrains Mono" font-size="9" fill="#7f1d1d">log P(meet | spam) = -3.5</text>
+      </g>
+      <g>
+        <rect x="280" y="244" width="200" height="28" rx="6" fill="#FEE2E2" stroke="#b91c1c" stroke-width="1.5"/>
+        <text x="380" y="262" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#7f1d1d">sum = -7.9</text>
+      </g>
+
+      <!-- Ham column -->
+      <g>
+        <rect x="540" y="60" width="200" height="44" rx="10" fill="#ECFEF6" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="640" y="80" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#115e59">CLASS: HAM</text>
+        <text x="640" y="94" text-anchor="middle" font-family="Inter" font-size="9" fill="#0d9488">log P(ham) = -0.4</text>
+      </g>
+      <g>
+        <rect x="540" y="130" width="200" height="22" rx="4" fill="#FFFFFF" stroke="#0d9488" stroke-width="0.8"/>
+        <text x="550" y="145" font-family="JetBrains Mono" font-size="9" fill="#115e59">log P(free | ham) = -4.0</text>
+        <rect x="540" y="156" width="200" height="22" rx="4" fill="#FFFFFF" stroke="#0d9488" stroke-width="0.8"/>
+        <text x="550" y="171" font-family="JetBrains Mono" font-size="9" fill="#115e59">log P(cash | ham) = -3.8</text>
+        <rect x="540" y="182" width="200" height="22" rx="4" fill="#FFFFFF" stroke="#0d9488" stroke-width="0.8"/>
+        <text x="550" y="197" font-family="JetBrains Mono" font-size="9" fill="#115e59">log P(now | ham) = -2.5</text>
+        <rect x="540" y="208" width="200" height="22" rx="4" fill="#FFFFFF" stroke="#0d9488" stroke-width="0.8"/>
+        <text x="550" y="223" font-family="JetBrains Mono" font-size="9" fill="#115e59">log P(meet | ham) = -1.2</text>
+      </g>
+      <g>
+        <rect x="540" y="244" width="200" height="28" rx="6" fill="#CCFBF1" stroke="#0d9488" stroke-width="1.5"/>
+        <text x="640" y="262" text-anchor="middle" font-family="JetBrains Mono" font-size="11" font-weight="700" fill="#115e59">sum = -11.9</text>
+      </g>
+
+      <line x1="180" y1="165" x2="280" y2="130" stroke="#71717a" stroke-width="1" marker-end="url(#nbArrow)"/>
+      <line x1="180" y1="165" x2="540" y2="130" stroke="#71717a" stroke-width="1" marker-end="url(#nbArrow)"/>
+
+      <!-- Footer rule -->
+      <line x1="40" y1="310" x2="780" y2="310" stroke="#b45309" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="410" y="332" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#92400e">Argmax over the column sums</text>
+      <text x="410" y="350" text-anchor="middle" font-family="Inter" font-size="10" fill="#b45309">spam wins at -7.9 versus ham at -11.9; the four-word document is classified as spam</text>
+    </svg>
+    <figcaption>Each input token contributes one log-likelihood to each candidate class. The class prior sits at the top of each column as a starting offset. The class with the largest sum (least negative log-probability) is the prediction. The independence assumption is what lets the per-token log-likelihoods be added rather than computed from a joint.</figcaption>
+  </figure>
+
+  <p>Three things to read off the diagram. The features are processed one at a time per class, never jointly, which is the operational meaning of the independence assumption. The class prior $\log P(y)$ is the only term that does not depend on the input, and it shifts the comparison even before any word is seen; this is how the base rate of spam in the training corpus enters the prediction. Working in log space turns a product (which would underflow for any document with more than a few dozen tokens) into a sum (which never does). Every implementation of naive Bayes you will ever use computes the log-posterior, not the posterior; the final softmax to a probability is for reporting, not for arithmetic.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Bayes' theorem and the naive assumption</h3>
+
+  <p><strong>Bayes' theorem</strong> rewrites a conditional probability in terms of the reverse conditional and the marginals,</p>
+  $$P(y \mid x) = \frac{P(x \mid y) \, P(y)}{P(x)}.$$
+  <p>The derivation is one line from the definition of conditional probability. The joint $P(x, y)$ can be factorised two ways, $P(y \mid x) P(x) = P(x \mid y) P(y)$, and dividing both sides by $P(x)$ gives the theorem. The four pieces have names: $P(y \mid x)$ is the <strong>posterior</strong> (what we want), $P(x \mid y)$ is the <strong>likelihood</strong> (how plausibly each class generates the observed features), $P(y)$ is the <strong>prior</strong> (how common each class is before seeing $x$), and $P(x)$ is the <strong>evidence</strong> or marginal likelihood. For classification, the evidence $P(x)$ does not depend on $y$ and cancels out of any argmax over classes,</p>
+  $$\hat{y} = \operatorname*{argmax}_{y} P(y \mid x) = \operatorname*{argmax}_{y} P(x \mid y) \, P(y).$$
+  <p>This is convenient because $P(x)$ is the hardest piece to estimate (it is a marginal over a high-dimensional feature space) and we never need it for the classification decision.</p>
+
+  <p>The likelihood $P(x \mid y)$ is itself a joint distribution over all $d$ features, conditional on the class. With $d = 1000$ binary features there are $2^{1000}$ joint configurations and no realistic training set will see more than a tiny fraction. The <strong>naive assumption</strong> declares the features conditionally independent given the class,</p>
+  $$P(x \mid y) = \prod_{j=1}^{d} P(x_j \mid y).$$
+  <p>Each one-dimensional likelihood $P(x_j \mid y)$ is now a tractable per-feature, per-class quantity that can be estimated from training counts. Combined with Bayes' theorem,</p>
+  $$\hat{y} = \operatorname*{argmax}_{y} \, P(y) \prod_{j=1}^{d} P(x_j \mid y) = \operatorname*{argmax}_{y} \left[\log P(y) + \sum_{j=1}^{d} \log P(x_j \mid y)\right].$$
+  <p>The log form is what every implementation uses. The assumption is wrong almost everywhere: in a spam corpus the words "free" and "money" co-occur far more than independence would predict; in a medical dataset blood pressure and cholesterol are correlated. Naive Bayes works anyway because misranking the posterior requires more than just biased marginals; it requires the dependence structure to differ across classes in a way that flips the order of the products. That happens, but less often than the assumption would suggest, and the consequences are usually a degradation of posterior calibration rather than a flip of the predicted class.</p>
+
+  <h3>Three variants for three data types</h3>
+
+  <p><strong>Multinomial naive Bayes</strong> models each feature as a non-negative integer count, with the per-class likelihood given by a multinomial distribution over the vocabulary. The estimated probability of token $j$ in class $y$ is</p>
+  $$\hat{P}(x_j \mid y) = \frac{N_{jy} + \alpha}{N_y + \alpha d},$$
+  <p>where $N_{jy}$ is the count of token $j$ across all documents of class $y$, $N_y$ is the total token count in class $y$, $d$ is the vocabulary size, and $\alpha$ is the smoothing parameter (one for classical Laplace smoothing). This is the variant for bag-of-words text classification with raw counts or TF-IDF features. It assumes that repeated occurrences of the same word matter and that documents of different lengths are comparable on a per-token basis.</p>
+
+  <p><strong>Bernoulli naive Bayes</strong> models each feature as a binary indicator of presence or absence, and the per-class likelihood is a product of Bernoulli distributions,</p>
+  $$\hat{P}(x_j \mid y) = \hat{p}_{jy}^{x_j} \, (1 - \hat{p}_{jy})^{1 - x_j},$$
+  <p>where $\hat{p}_{jy}$ is the smoothed probability of token $j$ appearing at all in class $y$. The difference from multinomial is structural, not cosmetic: Bernoulli explicitly penalises the absence of expected tokens (the $(1 - \hat{p}_{jy})$ term for features with $x_j = 0$), whereas multinomial ignores zeros. For short documents (tweets, SMS messages, single-sentence intents) the absence of a token is informative and Bernoulli generally outperforms multinomial. For long documents the explicit-absence term becomes noisy and multinomial wins.</p>
+
+  <p><strong>Gaussian naive Bayes</strong> handles continuous features by modelling each one within each class as a univariate normal,</p>
+  $$\hat{P}(x_j \mid y) = \frac{1}{\sqrt{2\pi \hat{\sigma}_{jy}^2}} \exp\!\left(-\frac{(x_j - \hat{\mu}_{jy})^2}{2 \hat{\sigma}_{jy}^2}\right).$$
+  <p>Training is one pass over the data computing the per-class mean and variance of each feature. The independence assumption now translates into a diagonal covariance matrix per class, which is a special case of linear or quadratic discriminant analysis with the off-diagonal elements set to zero. For tabular features that are approximately Gaussian within each class (after any necessary log or Box-Cox transformation upstream from <a href="../01_feature_engineering/01-the_ml_landscape.html">feature engineering</a>) the method is competitive; for heavy-tailed or multimodal features it is poor, and a tree-based method or logistic regression with engineered features will do better.</p>
+
+  <h3>Laplace smoothing and the zero-probability problem</h3>
+
+  <p>Without smoothing, any feature value that never appears in class $y$ during training has $\hat{P}(x_j \mid y) = 0$, which forces the entire product $\prod_j \hat{P}(x_j \mid y)$ to zero and the log-posterior to negative infinity. A single unseen token in a test document then assigns probability zero to every class that did not contain that token in training, which is almost always all of them. <strong>Laplace smoothing</strong>, also called add-one smoothing, fixes this by adding a pseudocount $\alpha$ (typically one) to every count in the numerator and a corresponding correction to the denominator so the probabilities still sum to one,</p>
+  $$\hat{P}(x_j \mid y) = \frac{N_{jy} + \alpha}{N_y + \alpha d}.$$
+  <p>The interpretation is Bayesian: the smoothed estimator is the posterior mean of the multinomial parameter under a symmetric Dirichlet prior with concentration $\alpha$. Setting $\alpha = 1$ gives Laplace smoothing, $\alpha = 0.5$ gives the Jeffreys prior, and $\alpha \to 0$ recovers the maximum-likelihood estimator with the zero-probability pathology. In scikit-learn the parameter is called <code>alpha</code> and defaults to one. Smaller values yield sharper class-conditional distributions and are appropriate when the training corpus is large; larger values are appropriate when data is sparse and overfitting to single-token quirks is a real risk.</p>
+
+  <h3>A worked text-classification example</h3>
+
+  <p>Consider a binary spam filter trained on a corpus with 600 spam and 400 ham messages. The class priors are $P(\text{spam}) = 0.6$ and $P(\text{ham}) = 0.4$. The vocabulary has $d = 5$ tokens for the purposes of this illustration: free, cash, now, meet, lunch. After counting and applying Laplace smoothing with $\alpha = 1$, the per-class token probabilities are recorded in a $2 \times 5$ table. Suppose the smoothed estimates give</p>
+  <p>$P(\text{free} \mid \text{spam}) = 0.30$, $P(\text{cash} \mid \text{spam}) = 0.22$, $P(\text{now} \mid \text{spam}) = 0.37$, $P(\text{meet} \mid \text{spam}) = 0.03$, $P(\text{lunch} \mid \text{spam}) = 0.02$, with the ham row reading $0.02, 0.02, 0.08, 0.30, 0.30$.</p>
+
+  <p>A new four-token message "free cash now meet" arrives. The unnormalised posterior for spam is</p>
+  $$P(\text{spam}) \cdot P(\text{free} \mid \text{spam}) \cdot P(\text{cash} \mid \text{spam}) \cdot P(\text{now} \mid \text{spam}) \cdot P(\text{meet} \mid \text{spam})$$
+  $$= 0.6 \cdot 0.30 \cdot 0.22 \cdot 0.37 \cdot 0.03 \approx 4.4 \times 10^{-4}.$$
+  <p>For ham,</p>
+  $$0.4 \cdot 0.02 \cdot 0.02 \cdot 0.08 \cdot 0.30 \approx 3.8 \times 10^{-6}.$$
+  <p>Spam outscores ham by roughly two orders of magnitude, despite the presence of the ham-leaning word "meet", because the three other tokens are concentrated in spam strongly enough to dominate. Normalising by the sum gives a posterior of roughly 99 per cent spam. This number should not be reported as a calibrated probability; the same posterior on a fresh test set would correspond empirically to a frequency closer to 90 per cent, because the multiplication of dependent likelihoods systematically overshoots toward zero or one.</p>
+
+  <h3>sklearn implementation</h3>
+
+  <p>Scikit-learn exposes the three variants as <code>MultinomialNB</code>, <code>BernoulliNB</code>, and <code>GaussianNB</code> in <code>sklearn.naive_bayes</code>, each sharing the same fit-predict API. Text features are produced by <code>sklearn.feature_extraction.text.CountVectorizer</code> for raw token counts or <code>TfidfVectorizer</code> for term-frequency-inverse-document-frequency weights. The vectoriser is fit on the training fold and applied without re-fitting to validation and test, in the same fit-on-training-only discipline as every other learned transformation. A typical pipeline looks like the following.</p>
+
+  <pre><code>from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.pipeline import Pipeline
+
+pipe = Pipeline([
+    ("vec", CountVectorizer(min_df=5, ngram_range=(1, 2))),
+    ("clf", MultinomialNB(alpha=1.0)),
+])
+
+pipe.fit(X_train_text, y_train)
+y_pred = pipe.predict(X_test_text)
+proba = pipe.predict_proba(X_test_text)</code></pre>
+
+  <p>The <code>min_df=5</code> argument drops tokens appearing in fewer than five documents, controlling vocabulary size; <code>ngram_range=(1, 2)</code> includes both unigrams and bigrams as features. The <code>alpha</code> on the classifier is the Laplace smoothing parameter. <code>predict_proba</code> returns the normalised posterior; treat it as a ranking, not a calibrated probability. For binary features (presence-absence flags rather than counts), swap <code>CountVectorizer</code> for <code>CountVectorizer(binary=True)</code> and <code>MultinomialNB</code> for <code>BernoulliNB</code>. For continuous tabular features, drop the vectoriser and use <code>GaussianNB</code> directly on the standardised feature matrix.</p>
+
+  <h3>Strengths and weaknesses</h3>
+
+  <p>The strengths are concrete. Training is linear in the number of training examples and the number of features, with no iterative optimisation. Prediction is one dot product per class in log space. The model is robust to irrelevant features (their likelihoods are approximately equal across classes and contribute little to the argmax) and to high-dimensional sparse data (the multinomial estimator handles vocabularies of millions of tokens without issue). It handles multi-class classification natively without one-versus-rest wrapping. It works with small training sets because the parameter count per class is only $d$ (or $2d$ for Gaussian), so the variance of each parameter estimate stabilises quickly.</p>
+
+  <p>The weaknesses are equally concrete. Posterior probabilities are poorly calibrated; the independence assumption causes the product of likelihoods to over-concentrate near zero or one even when the ranking is correct. The model cannot capture interactions between features, since the assumption rules them out by construction. Gaussian naive Bayes is sensitive to non-Gaussian feature distributions and is rarely competitive on tabular data once tree-based methods enter the picture. Continuous features need careful upstream transformation (see <a href="../01_feature_engineering/01-the_ml_landscape.html">the ML landscape</a> and the lecture on feature transformation that follows it). The class prior $P(y)$ is estimated from training-set frequencies, so a corpus where the training distribution differs from the deployment distribution (calibration drift, sampling bias) will produce systematically wrong posteriors unless the prior is re-estimated from the target distribution.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Pitfalls
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Pitfalls</h2></div>
+
+  <p>Four failure modes account for almost every naive-Bayes incident. None of them are obvious from the cross-validation accuracy; all of them are obvious in production.</p>
+
+  <div class="callout warn">
+    <span class="tag">Treating posteriors as calibrated probabilities</span>
+    The output of <code>predict_proba</code> looks like a probability and is normalised like a probability, but it is a saturating ranking score that drifts toward zero or one as the number of features grows. Reporting a 99 per cent spam posterior to a downstream system that expects a frequency you can verify (a probability of default in a regulatory capital calculation, an expected loss in pricing) will misstate risk badly. The fix is to wrap the classifier in a calibration step: Platt scaling fits a logistic regression on the held-out predictions, and isotonic regression fits a monotonic step function. Both are exposed in scikit-learn as <code>CalibratedClassifierCV</code>.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Skipping smoothing on a small or sparse corpus</span>
+    Setting <code>alpha=0</code> recovers the maximum-likelihood estimate and reintroduces the zero-probability pathology. A single token absent from one class in the training set then casts an infinite negative log-vote against that class for any document containing the token. The model still trains, but assigns probability zero to one of the classes on a meaningful fraction of test documents. The fix is to leave <code>alpha</code> at its default of one or set it explicitly to a small positive value; never set it to zero unless you can prove every feature appears in every class.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Using multinomial naive Bayes on short documents</span>
+    Multinomial naive Bayes ignores the absence of expected tokens, which is fine for long documents but lossy for short ones. A two-word SMS "see you" gets the same likelihood under spam as under ham if neither word is strongly class-conditional, even though the absence of "free", "cash", and the other spam vocabulary should weigh against spam. The fix is to switch to Bernoulli naive Bayes when document length is short, or to engineer length-related features (number of tokens, presence of URLs, ratio of capitalised words) that capture what multinomial cannot.
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">Stale class priors after deployment</span>
+    The prior $P(y)$ is fixed at training time as the empirical class frequency. If the base rate of spam shifts from 60 per cent in training to 30 per cent in deployment (because filters have improved upstream, or because a quarterly business cycle changes the mix), the trained prior is wrong and every posterior is biased toward the over-represented training class. The fix is to recompute the prior on a recent labelled sample and substitute it into the model, either by retraining the classifier or by adjusting the log-prior offset directly. This is one of the few cases where partial retraining (priors only, likelihoods kept) is both legitimate and useful.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Synthesis and what's next</h2></div>
+
+  <p>Naive Bayes is the simplest probabilistic classifier that survives contact with real data. Bayes' theorem gives the framework, the naive independence assumption gives the tractability, and three variants (multinomial, Bernoulli, Gaussian) give the practical coverage. Laplace smoothing prevents the zero-probability collapse that would otherwise occur whenever a test document contains a word the training set never produced. The strengths (speed, simplicity, robustness to high-dimensional sparse data) make it the right baseline for any text classification problem and the right production choice when retraining cadence beats marginal accuracy. The weaknesses (poor calibration, no interactions, sensitivity to violated distributional assumptions on continuous features) make it the wrong choice for any application that needs faithful probabilities or that depends on feature interactions, of which there are many.</p>
+
+  <p>What this lecture deliberately did not do. It did not derive the Bayesian connection to logistic regression (the two coincide under specific generative assumptions, which is a useful theoretical bridge but not load-bearing for the practitioner). It did not cover semi-supervised naive Bayes through the EM algorithm, or hierarchical extensions, or the Bayesian network generalisation that drops the independence assumption in favour of an explicit dependence graph. It did not benchmark naive Bayes against logistic regression with the same features, which is the practitioner's first instinct and the right next step in any real text classification project. The probability foundations underlying Bayes' theorem itself are developed in the <a href="../../statistics/02-probability.html">probability lecture</a> in the statistics sub-module; review it if the conditional-probability identity at the heart of the derivation feels unfamiliar.</p>
+
+  <p>Lecture 11, <a href="05-ensemble_learning.html">ensemble learning</a>, picks up where this lecture ends. Naive Bayes mostly sits out the ensemble story because its bias is already low and its variance is hard to reduce by averaging across resampled training sets. Decision trees, by contrast, are the canonical weak learners for bagging and boosting, and the next lecture builds random forests, gradient-boosted trees, and stacking from the components developed in the earlier supervised-learning lectures.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>State Bayes' theorem and identify which term drops out when the theorem is used for classification through an argmax over the class label.</li>
+      <li>Write the naive conditional-independence assumption in equation form and explain in one sentence why it allows a joint likelihood to be replaced by a product of one-dimensional likelihoods.</li>
+      <li>You are building a classifier for two-sentence customer-service tickets. Which naive Bayes variant should you choose and why?</li>
+      <li>A multinomial naive Bayes classifier is trained without smoothing and a test document contains a single word that did not appear in the ham class during training. Describe the predicted posterior for that document and the standard fix.</li>
+      <li>Why are naive Bayes posteriors poorly calibrated even when the predicted class is correct, and what is the standard remedy if calibrated probabilities are required downstream?</li>
+      <li>A spam filter trained when 60 per cent of mail was spam is deployed in a quarter where only 30 per cent of mail is spam. Without retraining, in which direction will the posteriors be biased, and what is the cheapest fix?</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Next:</strong> Lecture 11 (<a href="05-ensemble_learning.html">ensemble learning</a>) introduces bagging, boosting, and stacking; naive Bayes mostly sits out this story because its bias is already low and ensembling primarily reduces variance.</li>
+      <li><strong>Previous:</strong> Lecture 9 (<a href="03-support_vector_machines.html">support vector machines</a>) is the discriminative geometric counterpart to naive Bayes on the same text-classification problems; the comparison illustrates the discriminative-versus-generative axis.</li>
+      <li><strong>Prerequisite:</strong> The probability lecture (<a href="../../statistics/02-probability.html">statistics module</a>) develops conditional probability, the multiplication rule, and the prior-likelihood-posterior structure that Bayes' theorem rests on.</li>
+      <li><strong>Upstream:</strong> Feature engineering lecture 1 (<a href="../01_feature_engineering/01-the_ml_landscape.html">the ML landscape</a>) frames the six-stage pipeline; naive Bayes consumes whatever matrix that pipeline produces, and assumes counts for multinomial, binaries for Bernoulli, or approximately Gaussian columns for Gaussian.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Supervised learning course</a> &middot; <a href="../index.html">Machine learning course</a> &middot; <a href="../../../index.html">All lectures</a></span>
+  <span>Lecture 10 of 62</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../../assets/lecture.js"></script>
+</body>
+</html>

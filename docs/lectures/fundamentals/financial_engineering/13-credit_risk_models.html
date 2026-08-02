@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 13: credit risk models</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Financial engineering</a></div>
+  <h1>Credit risk models</h1>
+  <p class="subtitle">A firm's equity is a call option on its own assets, struck at the face value of its debt. That one sentence, due to Merton, is the whole of structural credit risk modelling: default is what happens when the option expires worthless. The market takes a different route entirely, treating default as a bolt from the blue with a hazard rate calibrated to whatever spread it is willing to pay. This lecture builds both, and spends real time on the distinction a working credit modeller cannot afford to blur: the probability the market prices is not the probability your data measures.</p>
+  <div class="meta">
+    <span>Lecture 13 of 13</span>
+    <span>Reading time, 55 minutes</span>
+    <span>Source: <code>UP / 13 - Credit Risk.pdf</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede">Credit risk models split into two families that answer two different questions. A <strong>structural model</strong> asks what has to happen to the firm for it to default, and answers with the balance sheet: default occurs when the value of the firm's assets falls below the face value of its debt. A <strong>reduced-form model</strong> asks nothing about the firm's balance sheet at all. It asks what the market is charging for the possibility of default, and answers with a hazard rate, the instantaneous arrival probability of a default event, calibrated directly to observed bond or CDS spreads.</p>
+
+  <p>Merton's structural model treats the firm's asset value <code>V_t</code> as a geometric Brownian motion, exactly the dynamics lecture 9 gave the stock. Equity is the residual claim after debt is repaid, so at maturity <code>T</code> the equityholders receive $\max(V_T - K, 0)$, where <code>K</code> is the face value of a single zero-coupon debt tranche. That payoff is a European call on <code>V_t</code> struck at <code>K</code>, so the entire Black-Scholes machinery of lecture 9 prices the equity, prices the debt as a residual, and hands you a risk-neutral default probability, $\Phi(-d_2)$, for free. Reduced-form models skip the balance sheet and model the default time directly as the first jump of a Poisson process with hazard rate $\lambda$, from which survival probability, bond prices, and CDS spreads all follow by direct calculation.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A bank lends a company $500{,}000$ for a year. The company's assets are worth $1{,}000{,}000$ today and bounce around with 50% annual volatility. Will the loan be repaid? You cannot answer that with a balance sheet snapshot, because the number that matters is not where assets stand today but where they might stand in a year against the $500{,}000$ hurdle. Merton's insight is that this is exactly the question a call option answers: the firm's owners get to keep the upside above the debt and can walk away from the downside, so their equity stake is a call on the firm's assets, and the same volatility that makes the option valuable is exactly what makes the loan risky. Price the option and you have priced the loan, by arithmetic rather than assumption.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The UP PDF covers Merton's structural model only, sections 4.1 and 4.2, running the equity-as-a-call-option argument through to the risk premium and the real-world default probability, with a worked example and four exercises. It contains no reduced-form material whatsoever: no hazard rates, no survival probabilities, no credit default swaps, no KMV, no Black-Cox. Everything in this lecture from the reduced-form intensity model onward, the CDS mechanics and bootstrapping, the structural-versus-reduced-form comparison table, and the connections to the Vasicek single-factor model and the 2008 Gaussian copula episode, is added from outside the source to give the practising credit modeller the full map the exam and the job both require.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>Every other lecture in this course prices a claim on an asset that is not itself in danger of ceasing to exist. Credit risk is different: the underlying event is the extinction of the obligor, and that changes what "pricing" even means. A structural model earns its keep wherever a firm's balance sheet is genuinely observable or estimable, corporate credit ratings, bank internal ratings, private-firm lending, because it explains default in terms of quantities a credit analyst already looks at: leverage, asset volatility, debt maturity. A reduced-form model earns its keep wherever a liquid market already prices the risk, corporate bond desks, CDS trading books, structured credit, because it takes the market's own valuation as given and turns it into a calibrated arrival rate without ever needing to open the firm's accounts.</p>
+
+  <p>For a reader who builds A-IRB PD models and IFRS 9 impairment models for a living, this lecture is not an academic detour. Every derivative-pricing default probability in this lecture, the $\Phi(-d_2)$ from Merton and the hazard rate $\lambda$ bootstrapped from CDS spreads, is a <strong>risk-neutral</strong> quantity. It is the probability that makes traded prices arbitrage-free under a measure constructed so that every asset's discounted price is a martingale. The PD you estimate for regulatory capital or accounting provisions is a <strong>real-world</strong> quantity, estimated from historical default data under the actual probability measure, whether through-the-cycle for A-IRB or point-in-time for IFRS 9. These two numbers are not two estimates of the same thing with different error bars. They are two different mathematical objects that happen to share the letters "PD", and section 4 spends real space showing exactly how large the gap between them can be and why it never closes to zero. The credit risk lecture track in this repository, starting at <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">the credit risk overview</a> and its treatment of PD concept at <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/09-pd_concept.html">A-IRB PD concept</a>, builds the real-world side of this picture in full; this lecture builds the risk-neutral side and draws the line between them explicitly.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <p>Two pictures carry the whole of Merton's model. The first shows the same random quantity, the firm's terminal asset value $V_T$, viewed under two different probability measures, real-world and risk-neutral, each assigning a different amount of mass to the default region below the debt barrier <code>K</code>. The second shows what equityholders and bondholders each receive as a function of that same terminal asset value, which is the picture that makes the option decomposition impossible to un-see once you have seen it.</p>
+
+  <h3>Picture one: two measures, one barrier, two different default probabilities</h3>
+
+  <p>The firm's asset value at the horizon is random under both measures, but the two measures disagree about its drift: the real-world measure uses the firm's actual expected return $\mu$, the risk-neutral measure uses the risk-free rate <code>r</code>. Whenever the firm carries a positive risk premium, meaning $\mu > r$, the risk-neutral distribution sits to the left of the real-world one, and more of its mass falls below the default barrier <code>K</code>. The risk-neutral default probability is mechanically larger than the real-world one, for a reason that has nothing to do with which estimate is more accurate and everything to do with which question each measure is built to answer.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Asset value distribution at the horizon under the real-world and risk-neutral measures, with the default barrier at the debt face value and the two default tails shaded">
+      <defs>
+        <marker id="axisArrCr1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+        <linearGradient id="rwTailGradCr" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="#0f766e" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#0f766e" stop-opacity="0.15"/>
+        </linearGradient>
+        <linearGradient id="rnTailGradCr" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stop-color="#7b61ff" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#7b61ff" stop-opacity="0.15"/>
+        </linearGradient>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Real-world and risk-neutral asset distributions at T</text>
+
+      <!-- axes -->
+      <line x1="60" y1="360" x2="760" y2="360" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrCr1)"/>
+      <text x="755" y="382" text-anchor="end" font-family="Inter" font-size="12" fill="#71717a">V(T)</text>
+
+      <!-- default barrier -->
+      <line x1="330" y1="70" x2="330" y2="360" stroke="#18181b" stroke-width="2" stroke-dasharray="5,4"/>
+      <rect x="300" y="368" width="60" height="20" rx="3" fill="#18181b"/>
+      <text x="330" y="382" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">K</text>
+      <text x="330" y="58" text-anchor="middle" font-family="Inter" font-size="11" fill="#18181b" font-style="italic">default barrier</text>
+
+      <!-- risk-neutral tail shading (mean further left, more mass below K) -->
+      <polygon points="150,360 150,352 200,300 260,220 300,180 330,165 330,360" fill="url(#rnTailGradCr)"/>
+      <!-- real-world tail shading (mean further right, less mass below K) -->
+      <polygon points="230,360 230,357 270,335 300,300 330,265 330,360" fill="url(#rwTailGradCr)"/>
+
+      <!-- risk-neutral curve, mean around x=430, drift r -->
+      <path d="M 150,360 C 200,300 260,220 300,180 C 340,145 390,90 430,80 C 470,90 520,145 560,180 C 600,220 660,300 710,358"
+            fill="none" stroke="#7b61ff" stroke-width="2.5"/>
+      <!-- real-world curve, mean around x=480, drift mu -->
+      <path d="M 230,360 C 270,335 300,300 330,265 C 370,220 420,90 480,72 C 540,90 590,220 630,265 C 660,300 690,335 730,358"
+            fill="none" stroke="#0f766e" stroke-width="2.5"/>
+
+      <!-- means -->
+      <line x1="430" y1="80" x2="430" y2="95" stroke="#7b61ff" stroke-width="2"/>
+      <line x1="480" y1="72" x2="480" y2="87" stroke="#0f766e" stroke-width="2"/>
+
+      <!-- legend -->
+      <rect x="470" y="115" width="270" height="26" rx="13" fill="#7b61ff"/>
+      <text x="605" y="133" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#ffffff">Risk-neutral, drift r: PD = &Phi;(&minus;d&#8322;)</text>
+
+      <rect x="470" y="147" width="270" height="26" rx="13" fill="#0f766e"/>
+      <text x="605" y="165" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#ffffff">Real-world, drift &mu;: PD = &Phi;(&minus;d&#771;&#8322;)</text>
+
+      <text x="230" y="342" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#0f766e" font-style="italic">smaller</text>
+      <text x="230" y="354" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#0f766e" font-style="italic">tail</text>
+      <text x="175" y="322" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b21b6" font-style="italic">larger</text>
+      <text x="175" y="334" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5b21b6" font-style="italic">tail</text>
+    </svg>
+    <figcaption>The same terminal asset value $V_T$, viewed under two measures. The risk-neutral curve uses drift <code>r</code>, the real-world curve uses drift $\mu > r$, so the risk-neutral curve sits to the left and puts more mass below the default barrier <code>K</code>. The risk-neutral default probability $\Phi(-d_2)$ is mechanically larger than the real-world one $\Phi(-\tilde d_2)$, purely because of which drift each measure uses, not because either estimate is wrong.</figcaption>
+  </figure>
+
+  <h3>Picture two: equity and debt as two option payoffs on the same firm</h3>
+
+  <p>At maturity <code>T</code> the firm's asset value $V_T$ is split between exactly two claimants, and equation (4) of the source, $E_T + P^d(T,T) = V_T$, says the split is exhaustive: nothing is created or destroyed, the firm's value merely changes hands. If $V_T \geq K$ the firm is solvent, bondholders receive the promised <code>K</code> in full, and equityholders keep the excess $V_T - K$. If $V_T < K$ the firm is insolvent, bondholders receive whatever is left, $V_T$, and equityholders receive nothing. Equity is a call on the firm struck at <code>K</code>; debt is the firm minus that call, which is the same as a risk-free bond minus a put on the firm struck at <code>K</code>.</p>
+
+  <figure>
+    <svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Equity and debt payoffs at maturity as functions of the terminal firm value, showing the option decomposition of the balance sheet">
+      <defs>
+        <marker id="axisArrCr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+
+      <text x="400" y="26" text-anchor="middle" font-family="Inter" font-weight="700" font-size="15" fill="#18181b">Equity and debt payoffs at T, as functions of V(T)</text>
+
+      <!-- axes -->
+      <line x1="70" y1="330" x2="760" y2="330" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrCr2)"/>
+      <line x1="70" y1="330" x2="70" y2="70" stroke="#71717a" stroke-width="1.5" marker-end="url(#axisArrCr2)"/>
+      <text x="755" y="352" text-anchor="end" font-family="Inter" font-size="12" fill="#71717a">V(T)</text>
+      <text x="45" y="75" text-anchor="middle" font-family="Inter" font-size="12" fill="#71717a">payoff</text>
+
+      <!-- K marker -->
+      <line x1="380" y1="325" x2="380" y2="335" stroke="#18181b" stroke-width="2"/>
+      <rect x="368" y="342" width="24" height="18" rx="3" fill="#18181b"/>
+      <text x="380" y="355" text-anchor="middle" font-family="Inter" font-weight="600" font-size="11" fill="#ffffff">K</text>
+
+      <!-- debt payoff: slope 1 up to K, then flat at K -->
+      <polyline points="90,310 380,145 740,145" fill="none" stroke="#b45309" stroke-width="3" stroke-linecap="round"/>
+      <!-- equity payoff: flat at 0 up to K, then slope 1 -->
+      <polyline points="90,330 380,330 740,60" fill="none" stroke="#0f766e" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- label pills -->
+      <rect x="560" y="185" width="180" height="26" rx="13" fill="#b45309"/>
+      <text x="650" y="203" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#ffffff">Debt: min(V(T), K)</text>
+
+      <rect x="560" y="90" width="180" height="26" rx="13" fill="#0f766e"/>
+      <text x="650" y="108" text-anchor="middle" font-family="Inter" font-weight="600" font-size="12" fill="#ffffff">Equity: max(V(T)&minus;K, 0)</text>
+
+      <text x="230" y="300" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e" font-style="italic">firm defaults: debt takes the</text>
+      <text x="230" y="313" text-anchor="middle" font-family="Inter" font-size="11" fill="#92400e" font-style="italic">whole firm, equity gets zero</text>
+
+      <text x="560" y="290" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59" font-style="italic">firm solvent: debt is capped at K,</text>
+      <text x="560" y="303" text-anchor="middle" font-family="Inter" font-size="11" fill="#115e59" font-style="italic">equity keeps every dollar above it</text>
+    </svg>
+    <figcaption>Add the two lines at any value of $V(T)$ and the sum is exactly $V(T)$ itself, the balance sheet identity $E_T + P^d(T,T) = V_T$. Equity is a call on the firm struck at <code>K</code>; debt is the firm minus that call, equivalently a risk-free bond minus a put on the firm at the same strike.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>Setting up Merton's model</h3>
+
+  <p>The source (section 4.2) posits a firm whose total asset value $V_t$ follows the same geometric Brownian motion lecture 9 assumed for a stock:</p>
+
+  <p>$$ dV_t = \mu V_t \, dt + \sigma V_t \, dW_t, \qquad dB_t = r B_t \, dt, $$</p>
+
+  <p>with $\mu$ the firm's real-world asset drift, $\sigma$ its asset volatility, and <code>r</code> the continuously compounded risk-free rate. The firm's only liability is a single zero-coupon defaultable bond of face value <code>K</code> maturing at <code>T</code>. Writing $E_t$ for the value of equity and $P^d(t,T)$ for the value of the defaultable bond, the balance sheet identity $V_t = E_t + P^d(t,T)$ holds at every $t \in [0,T]$.</p>
+
+  <div class="defcard">
+    <div class="term">Merton's structural model</div>
+    <div class="def">Default is defined purely by the balance sheet at the single date <code>T</code>: the firm defaults if and only if $V_T < K$. If the firm survives, $V_T \geq K$, bondholders are repaid in full and equityholders keep the residual, $E_T = V_T - K$. If the firm defaults, bondholders seize the entire firm, $P^d(T,T) = V_T$, and equityholders receive nothing. Combining the two cases, $E_T = \max\{0, V_T - K\}$ and $P^d(T,T) = \min\{V_T, K\}$: equity is exactly the payoff of a European call on the firm's assets struck at <code>K</code>, and debt is the firm minus that call.</div>
+  </div>
+
+  <h3>Equity as a call, debt as the residual</h3>
+
+  <p>Because $E_T = \max\{0, V_T-K\}$ is a European call payoff on <code>V</code> struck at <code>K</code>, no-arbitrage forces $E_t = C_t$ for every $t \in [0,T]$, where $C_t$ is the Black-Scholes price of that call. Substituting lecture 9's boxed formula, with the firm value $V_t$ in place of the stock and <code>r</code> unchanged, gives the source's theorem 4.2.2 directly:</p>
+
+  <p>$$ \boxed{\, E_t = V_t \, \Phi(d_1) - K e^{-r(T-t)} \, \Phi(d_2), \,} $$</p>
+
+  <p>$$ d_1 = \frac{\ln(V_t/K) + (r + \sigma^2/2)(T-t)}{\sigma\sqrt{T-t}}, \qquad d_2 = d_1 - \sigma\sqrt{T-t}, $$</p>
+
+  <p>with $\Phi$ the standard normal CDF, written <code>N</code> in lecture 9; the two symbols mean the same function throughout this lecture. Debt is then the residual, $P^d(t,T) = V_t - E_t$, which a short algebraic rearrangement using $1-\Phi(d_1) = \Phi(-d_1)$ turns into the source's second formula:</p>
+
+  <p>$$ P^d(t,T) = \Phi(-d_1) \, V_t + K e^{-r(T-t)} \, \Phi(d_2). $$</p>
+
+  <p>Read the debt formula as a decomposition in its own right. The second term, $Ke^{-r(T-t)}\Phi(d_2)$, is the discounted face value weighted by $\Phi(d_2)$, the risk-neutral probability that the firm survives; the first term is the discounted value bondholders recover in the states where the firm does not. $\Phi(d_2)$ here is the exact analogue of $N(d_2)$ in the ordinary Black-Scholes call formula, the risk-neutral probability that the option, here the equity claim, finishes in the money.</p>
+
+  <h3>The risk-neutral default probability and the distance to default</h3>
+
+  <p>Since $\Phi(d_2)$ is the risk-neutral probability of solvency, $\Phi(-d_2)$ is the risk-neutral probability of default, exactly as $N(-d_2)$ in a plain vanilla put is the risk-neutral probability of finishing out of the money. This is the quantity the market prices when it prices the firm's debt: it costs the same as insuring against a default whose risk-neutral frequency is $\Phi(-d_2)$, whatever the true frequency turns out to be.</p>
+
+  <p>$$ \boxed{\, \text{PD}^{\mathbb{Q}} = \Phi(-d_2). \,} $$</p>
+
+  <p>Because $d_2$ measures $\ln(V_t/K)$, the log-distance between the firm's current value and the default barrier, netted against the drift and scaled by the volatility over the horizon, it is naturally read as a number of standard deviations of asset-value movement separating the firm from default. That reading is the <strong>distance to default</strong>: a firm with a large, positive $d_2$ is many standard deviations of asset-value movement away from insolvency, and a small or negative $d_2$ signals a firm within one bad quarter of breaching the barrier. Distance to default is the natural risk measure here for the same reason $d_2$ is the natural argument of a survival probability: it collapses leverage, volatility and horizon into a single comparable number, which is exactly why Moody's KMV built a commercial ratings methodology on top of it, discussed further below.</p>
+
+  <h3>The yield spread</h3>
+
+  <p>The source measures the compensation the bond market demands for default risk through the <strong>yield spread</strong>, following its own notation (section 4.2.1). The yield of a <code>T</code>-maturity bond with face value <code>K</code> and price $P(t,T)$ solves $P(t,T) = Ke^{-Y(t,T)(T-t)}$, so for a risk-free bond $Y(t,T) = r$ under a flat curve. The defaultable bond's yield solves the same equation with its own price, $P^d(t,T) = Ke^{-Y^d(t,T)(T-t)}$, giving</p>
+
+  <p>$$ Y^d(t,T) = \frac{\ln K - \ln P^d(t,T)}{T-t}, \qquad \text{yield spread} = Y^d(t,T) - Y(t,T). $$</p>
+
+  <p>The spread is not itself the default probability. It blends the probability of default with the loss given default implicit in the recovery $V_T$ bondholders keep when they do default, exactly the identification problem that resurfaces in reduced-form form later in this section.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th></th><th>Structural (Merton)</th><th>Reduced-form (intensity)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>What default means</td><td>An economic event: asset value falls below the debt barrier at (or before, in first-passage extensions) maturity.</td><td>A statistical event: the first jump of a point process with hazard rate $\lambda$, unrelated to any explicit balance-sheet mechanism.</td></tr>
+        <tr><td>Inputs required</td><td>Asset value $V_t$, asset volatility $\sigma$, debt face value <code>K</code>, maturity <code>T</code>, risk-free rate <code>r</code>.</td><td>A hazard rate $\lambda$ (or curve) and a recovery assumption <code>R</code>, both calibrated rather than observed directly.</td></tr>
+        <tr><td>Observability of inputs</td><td>Poor. $V_t$ and $\sigma$ are not traded prices; both must be backed out from observed equity price and equity volatility by solving the model's own equations.</td><td>Good, conditional on liquid quotes. $\lambda$ is implied directly from traded bond or CDS spreads, no unobservable firm-level quantity required.</td></tr>
+        <tr><td>Calibration target</td><td>Equity value and equity volatility (KMV), or historical asset return data.</td><td>The observed term structure of credit spreads or CDS quotes for the reference name.</td></tr>
+        <tr><td>Used for</td><td>Corporate credit ratings and internal rating philosophy, private-firm and unlisted-obligor credit assessment, distance-to-default early warning signals.</td><td>Marking traded credit to market, pricing and hedging CDS and other credit derivatives, trading-book risk management.</td></tr>
+        <tr><td>Known weaknesses</td><td>Default only at maturity in the basic form, single debt tranche, credit spreads implied for short maturities come out too low versus what is observed in the market.</td><td>No economic story for why default happens; the hazard rate is a statistical device, not an explanation, and spread alone cannot separate $\lambda$ from $R$.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Worked example: reproducing the source, then extending it</h3>
+
+  <p>Example 4.2.3 of the source gives $V_0 = 1{,}000{,}000$, $K = 500{,}000$, $T=1$, $\sigma = 0.5$, $r=0.05$, and a firm asset drift $\mu = 0.08$. Its own worked arithmetic gives $E_0 = 534{,}579$, $P^d(0,1) = 465{,}421$, a defaultable bond yield $Y^d(0,1) = 7.17\%$ against the risk-free $5\%$, a yield spread of $2.17\%$, and, from example 4.2.5, a real-world default probability of $9.74\%$. Recomputing every one of these figures independently confirms the source's arithmetic to the last reported decimal, and confirms too that the source's $d_1$ and $d_2$ formulae match the standard Black-Scholes convention exactly, with no sign or drift anomaly of the kind flagged elsewhere in this course's source material.</p>
+
+  <p>To make the risk-neutral versus real-world contrast concrete with rounder numbers, take a firm with asset value $V_0 = 100$, debt face value $K=70$ maturing in $T=1$ year, asset volatility $\sigma = 25\%$, risk-free rate $r=5\%$, and real-world asset drift $\mu = 10\%$.</p>
+
+  <div class="worked">Step 1: d1 and d2 (using r, for risk-neutral pricing of equity and debt)
+  d1 = [ln(100/70) + (0.05 + 0.25^2/2)*1] / (0.25*sqrt(1))
+     = [0.35667 + 0.08125] / 0.25
+     = 0.43792 / 0.25 = 1.7517
+
+  d2 = d1 - sigma*sqrt(T) = 1.7517 - 0.25 = 1.5017
+
+Step 2: equity and debt values
+  E0 = V0*Phi(d1) - K*exp(-rT)*Phi(d2)
+     = 100*Phi(1.7517) - 70*exp(-0.05)*Phi(1.5017)
+     = 100*0.96007 - 66.5861*0.93343
+     = 96.007 - 62.150 = 33.86
+
+  Pd(0,1) = V0 - E0 = 100 - 33.86 = 66.14
+
+Step 3: risk-neutral default probability
+  PD(risk-neutral) = Phi(-d2) = Phi(-1.5017) = 6.66%
+
+Step 4: real-world default probability (using mu instead of r)
+  d2_tilde = [ln(V0/K) + (mu - sigma^2/2)*T] / (sigma*sqrt(T))
+           = [0.35667 + (0.10 - 0.03125)*1] / 0.25
+           = [0.35667 + 0.06875] / 0.25 = 0.42542 / 0.25 = 1.7017
+
+  PD(real-world) = Phi(-d2_tilde) = Phi(-1.7017) = 4.44%
+
+Step 5: yield spread and distance to default
+  Yd(0,1) = [ln(K) - ln(Pd(0,1))] / 1 = ln(70/66.14) = 5.667%
+  spread  = Yd - r = 5.667% - 5.000% = 0.667% (about 67 basis points)
+  distance to default = d2_tilde = 1.70 standard deviations</div>
+
+  <p>Every figure above was computed independently and checked before writing; the two default probabilities are the passage that matters most, so they are worth setting side by side rather than leaving buried in the working.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Quantity</th><th>Uses drift</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Risk-neutral PD, $\Phi(-d_2)$</td><td><code>r</code> = 5%</td><td>6.66%</td></tr>
+        <tr><td>Real-world PD, $\Phi(-\tilde d_2)$</td><td>$\mu$ = 10%</td><td>4.44%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The risk-neutral PD is roughly one and a half times the real-world one, purely because pricing uses the risk-free drift and default statistics use the firm's actual, higher expected asset return. Nothing about the firm's fundamentals changed between the two calculations; only the drift assumption did.</p>
+
+  <h3>Real-world versus risk-neutral: the distinction that matters most for this reader</h3>
+
+  <p>Two default probabilities have now been derived from the same firm, the same barrier, the same volatility, and the same horizon, and they disagree by half. The mechanism is exact, not approximate: both probabilities are $\Phi$ applied to a $d_2$-type quantity built from $\ln(V_0/K)$ netted against a drift term and scaled by $\sigma\sqrt{T}$, and the two calculations differ only in which drift enters that netting, <code>r</code> for the risk-neutral case, $\mu$ for the real-world case. Whenever the firm's assets carry a positive risk premium, $\mu > r$, the real-world drift term is larger, the real-world $\tilde d_2$ is larger, and $\Phi(-\tilde d_2)$ is therefore smaller than $\Phi(-d_2)$. The risk-neutral default probability exceeds the real-world one for every firm whose assets are expected to earn more than the risk-free rate, which in practice is essentially every firm a bank would consider lending to. The gap is not noise around a shared true value; it is the risk premium, priced.</p>
+
+  <p>The economic reason is the same one lecture 9 gave for options generally. A risk-neutral price is constructed so that every traded asset's discounted price is a martingale, which requires assuming every asset drifts at the risk-free rate under that measure, whatever it actually does in the world. A defaultable bond priced this way is priced to be arbitrage-free against the other traded assets in the same market, and the $\Phi(-d_2)$ that falls out of that pricing is not an estimate of how often the firm will actually default. It is the default frequency that would make the bond's price consistent with a risk-free numeraire, inflated relative to the true frequency by exactly the compensation investors demand for bearing a risk they cannot diversify away. A CDS spread or a corporate bond yield spread is, in this precise sense, always answering "what does the market charge for this risk", never "how often will this actually happen".</p>
+
+  <p>This is the single most consequential confusion available to a credit modeller who moves between derivatives pricing and prudential or accounting work. An IFRS 9 expected credit loss calculation asks for the real-world, unbiased probability that an exposure defaults over the relevant horizon, because IFRS 9 explicitly wants a best estimate of expected cash shortfalls, not a risk-adjusted price. An A-IRB PD model targets a long-run average of realised default rates, through-the-cycle by construction, again a real-world quantity, because the regulatory capital formula already builds in its own conservatism through the supervisory correlation and confidence level rather than through an embedded market risk premium. Feeding a CDS-implied or bond-spread-implied PD into either calculation without stripping out the risk premium first systematically overstates expected loss, sometimes by the same rough factor of one and a half seen in the worked example above, and the overstatement grows, not shrinks, for lower-quality, higher-spread names, precisely where getting the number right matters most. The two PDs answer different questions and belong to different models; treating a market-implied PD as a free, well-calibrated substitute for a real-world one is a fluent-sounding error, not a subtle one, once the mechanism is seen this plainly.</p>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the source</span>
+    The source derives the real-world default probability in its own theorem 4.2.4 and computes it in example 4.2.5, but never juxtaposes it against the risk-neutral probability implicit in its own theorem 4.2.2, nor names either probability as "risk-neutral" or "real-world" explicitly. The side-by-side framing above, the ratio between the two, and the connection to IFRS 9 and A-IRB modelling are this lecture's addition to material the source states correctly but leaves unconnected.
+  </div>
+
+  <h3>Where Merton breaks, and what came after</h3>
+
+  <p>Four limitations of the basic model drove three decades of extensions. Default can only occur at the single maturity date <code>T</code>, so a firm whose assets crash and recover before <code>T</code> never defaults in the model even though it may have been briefly insolvent. The asset value $V_t$ and its volatility $\sigma$ are not directly observable, since firms do not trade their total assets on an exchange; both must be inferred indirectly from the equity price and equity volatility that are observable, by solving the model's own two equations, $E_t$ as a function of $(V_t,\sigma)$ and Itô's lemma relating equity and asset volatility, simultaneously. The model assumes a single, homogeneous class of debt, when real capital structures stack multiple seniorities with different recovery rates. And the model's short-maturity credit spreads come out far too low relative to what is observed in real corporate bond markets, because Brownian motion assigns vanishingly small probability to a large move over a very short horizon, while real short-dated spreads reflect a persistent risk of sudden jumps that a continuous diffusion cannot generate.</p>
+
+  <p>Two responses dominate practice. Moody's KMV built a commercial implementation around exactly the distance-to-default idea above: back out $V_t$ and $\sigma$ from equity data, compute distance to default, and then map that distance empirically onto an <em>expected default frequency</em> using a large historical default database, rather than trusting the model's own analytic normal-CDF formula, which tends to understate real-world default rates in the tails. Black and Cox's first-passage extension lets default occur the instant assets first touch a barrier at any time before <code>T</code>, not only at maturity, which fixes the "default can only happen at <code>T</code>" limitation directly and produces more realistic short-maturity spread behaviour, at the cost of a harder first-passage-time calculation in place of the simple terminal-value one used above.</p>
+
+  <h3>Reduced-form models: default as a jump, not a balance-sheet event</h3>
+
+  <p>A reduced-form model gives up on explaining default and instead models the default time $\tau$ directly as the first jump of a Poisson process with (initially constant) intensity, or <strong>hazard rate</strong>, $\lambda$. The defining property of such a process is memorylessness: conditional on survival to time $t$, the probability of surviving a further $u$ years is independent of how long the firm has already survived, giving the exponential survival function</p>
+
+  <p>$$ \mathbb{Q}(\tau > t) = e^{-\lambda t}. $$</p>
+
+  <p>Consider a defaultable zero-coupon bond paying $1$ at <code>T</code> if the firm survives, and a fixed recovery <code>R</code> (as a fraction of face value, paid at <code>T</code>) if it does not, with $\lambda$ constant and default risk independent of interest rates. Its risk-neutral price is the discounted expectation of that payoff,</p>
+
+  <p>$$ P^d(t,T) = e^{-r(T-t)}\Bigl[\underbrace{e^{-\lambda(T-t)}}_{\text{survives}} \cdot 1 + \underbrace{\bigl(1-e^{-\lambda(T-t)}\bigr)}_{\text{defaults}} \cdot R \Bigr] = e^{-r(T-t)}\Bigl[R + (1-R)e^{-\lambda(T-t)}\Bigr]. $$</p>
+
+  <p>Defining the bond's own yield spread the same way the source defines $Y^d - Y$, write $P^d(t,T) = e^{-(r+s)(T-t)}$ for spread $s$, so $e^{-s(T-t)} = R + (1-R)e^{-\lambda(T-t)}$. For small $\lambda(T-t)$, expand $e^{-\lambda(T-t)} \approx 1-\lambda(T-t)$, giving the right-hand side $R + (1-R)\bigl(1-\lambda(T-t)\bigr) = 1 - (1-R)\lambda(T-t)$, and $e^{-s(T-t)} \approx 1 - s(T-t)$ on the left for small $s(T-t)$. Matching the two linear approximations:</p>
+
+  <p>$$ \boxed{\, s \approx \lambda(1-R). \,} $$</p>
+
+  <p>Spread is hazard rate times loss given default, to leading order. This is a genuine identification problem, not a footnote: a single observed spread <code>s</code> pins down only the product $\lambda(1-R)$, never $\lambda$ and <code>R</code> separately. A market quoting a 200 basis point spread is exactly as consistent with $\lambda=4\%$ and $R=50\%$ as with $\lambda=2\%$ and $R=0\%$. Separating hazard rate from recovery requires an independent source of information on one of the two, exactly the split a bank's own PD and LGD models supply separately from historical workout data, and exactly why market-implied credit measures cannot substitute for a full PD and LGD decomposition even when they agree on the product.</p>
+
+  <h3>Credit default swaps: mechanics and the par spread</h3>
+
+  <p>A <strong>credit default swap</strong> (CDS) is a bilateral contract in which the protection buyer pays a periodic running premium, the CDS spread <code>s</code>, on a notional amount to the protection seller until the earlier of maturity or a default event on the reference entity; if a default event occurs before maturity, the protection seller pays the buyer $(1-R)$ times the notional, and the premium leg stops. The <strong>par spread</strong> is the value of <code>s</code> that makes the contract worth zero to both sides at inception, equivalently the spread that equates the present value of the premium leg to the present value of the protection leg.</p>
+
+  <p>Under the same constant-hazard, continuous-payment idealisation used above, with premium paid continuously at rate <code>s</code> while the reference entity survives and protection paid at the instant of default, the premium leg's present value is</p>
+
+  <p>$$ \text{PV(premium)} = s \int_0^T e^{-(r+\lambda)u} \, du = s \cdot \frac{1-e^{-(r+\lambda)T}}{r+\lambda}, $$</p>
+
+  <p>discounting at <code>r</code> and weighting by the survival probability $e^{-\lambda u}$ at each instant <code>u</code>, while the protection leg's present value, paid $(1-R)$ at the random default time with density $\lambda e^{-\lambda u}$, is</p>
+
+  <p>$$ \text{PV(protection)} = (1-R)\int_0^T \lambda e^{-\lambda u} e^{-ru} \, du = (1-R)\lambda \cdot \frac{1-e^{-(r+\lambda)T}}{r+\lambda}. $$</p>
+
+  <p>Setting the two legs equal and cancelling the common factor $\bigl(1-e^{-(r+\lambda)T}\bigr)/(r+\lambda)$ leaves</p>
+
+  <p>$$ \boxed{\, s = \lambda(1-R), \,} $$</p>
+
+  <p>exactly the bond-spread approximation above, except here it is exact in the continuous-payment, continuous-default limit rather than a small-$\lambda$ approximation. The same identification problem survives intact: a single CDS spread still identifies only the product $\lambda(1-R)$.</p>
+
+  <p>Real CDS markets quote a term structure of spreads at standard tenors, commonly one, three, five, seven and ten years, and a single flat hazard rate cannot fit all of them simultaneously unless the market happens to believe the hazard rate is constant. The standard technique, <strong>bootstrapping</strong>, assumes a piecewise-constant hazard rate, one flat segment per tenor bucket, and solves for each segment's hazard rate in turn: the shortest tenor's par-spread equation involves only $\lambda_1$ on $[0,T_1]$ and is solved directly; the next tenor's equation involves $\lambda_1$, now known, and the new unknown $\lambda_2$ on $[T_1,T_2]$, and is solved for $\lambda_2$ alone; and so on outward along the curve. The result is a piecewise-constant hazard curve consistent with every quoted spread simultaneously, the reduced-form analogue of bootstrapping a discount curve from a term structure of swap rates.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 5: The grandmaster's perspective
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>The grandmaster's perspective</h2></div>
+
+  <h3>Why banks run both families side by side</h3>
+
+  <p>A bank's internal rating and origination process leans structural, because a corporate credit analyst has a balance sheet, an income statement and a business plan in front of them, and distance to default gives a single, leverage-and-volatility-aware number that behaves sensibly as those fundamentals move. A trading desk marking a bond or CDS position to market leans reduced-form, because the desk's job is to match today's traded price exactly, not to explain it, and a hazard rate calibrated to the current spread curve does that by construction in a way no balance-sheet model can, since the balance-sheet model's output is a model price that may simply disagree with the tape. Counterparty credit risk and CVA desks sit between the two: they need a full, path-dependent simulation of a counterparty's exposure and default over the life of a long-dated derivative, so it is common to simulate default times using a reduced-form intensity, calibrated to the counterparty's own CDS curve where one exists, while retaining structural intuition (leverage, sector, macro factor sensitivity) to build intensities for the far larger number of counterparties with no liquid CDS quoted at all.</p>
+
+  <h3>The Vasicek model is Merton in disguise</h3>
+
+  <p>The single-factor Vasicek model underlying the Basel A-IRB capital formula is worth naming explicitly here, because it is structural credit risk modelling wearing a portfolio hat. Each obligor <code>i</code> is given a standardised asset-return proxy $R_i = \sqrt{\rho}\,Z + \sqrt{1-\rho}\,\varepsilon_i$, a systematic factor <code>Z</code> shared by every obligor in the portfolio and an idiosyncratic factor $\varepsilon_i$, both standard normal and independent of each other. Obligor <code>i</code> defaults exactly when $R_i$ falls below a threshold calibrated so that the unconditional default probability matches the obligor's PD, $\Phi^{-1}(\text{PD})$. This is the Merton default mechanism, asset value below a barrier, applied not to a single firm's continuous-time asset path but to a single-period, cross-sectional proxy for it, with the systematic factor <code>Z</code> standing in for the common macroeconomic driver of every firm's true (unobserved) asset return. The A-IRB risk-weight formula's conditional PD, $\Phi\bigl((\Phi^{-1}(\text{PD}) - \sqrt{\rho}\,Z)/\sqrt{1-\rho}\bigr)$ evaluated at the regulatory 99.9% confidence level for <code>Z</code>, is Merton's own $\Phi(-d_2)$-style default probability recomputed under a stress scenario for the shared factor. A reader who builds A-IRB PD models is, without perhaps naming it this way day to day, already working inside a structural model every time the capital formula is applied.</p>
+
+  <h3>2008 and the limits of a single correlation number</h3>
+
+  <p>The Gaussian copula, used to model joint default dependence across many obligors in a CDO or securitisation by coupling their individual reduced-form or structural default times through a single, constant pairwise correlation parameter, was standard market practice for portfolio credit before 2008 precisely because it let a desk fit an entire correlation structure from one traded number, the base correlation implied by index tranche prices. What the crisis exposed was that a single Gaussian correlation parameter badly underestimates the tendency of defaults to cluster in the tail: real defaults are far more likely to happen together in a systemic downturn than a Gaussian dependence structure implies, so the senior tranches of structured credit products that the Gaussian copula priced as almost risk-free absorbed losses the model had assigned near-zero probability. The lesson generalises past the specific copula: any portfolio credit model that borrows a correlation parameter fitted in ordinary times and applies it unchanged to a systemic tail event is making the same mistake, whether that correlation sits inside a Gaussian copula or inside the single asset-correlation parameter $\rho$ of the Vasicek formula just discussed.</p>
+
+  <div class="callout warn">
+    <span class="tag">Watch out</span>
+    Do not feed a CDS-implied or bond-spread-implied default probability into an IFRS 9 expected credit loss calculation or an A-IRB PD model without first stripping out the risk premium, and do not assume that stripping is a minor adjustment. Section 4's worked example showed a risk-neutral PD roughly one and a half times its real-world counterpart from identical fundamentals, and the ratio widens for riskier names, where risk premia are larger in absolute terms. A market-implied PD used directly as an accounting or regulatory input systematically overstates expected loss and understates capital efficiency, in a way that is easy to defend in a model document, because the number came from "the market", and wrong all the same.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 6: Test yourself
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 6</span><h2>Test yourself</h2></div>
+
+  <div class="recall">
+    <ol>
+      <li>State, in one sentence each, the question a structural model answers and the question a reduced-form model answers. Give one practical use case for each.</li>
+      <li>Derive the equity value $E_t = V_t\Phi(d_1) - Ke^{-r(T-t)}\Phi(d_2)$ from the Black-Scholes call formula of lecture 9. What plays the role of the stock, and what plays the role of the strike?</li>
+      <li>Show that $P^d(t,T) = \Phi(-d_1)V_t + Ke^{-r(T-t)}\Phi(d_2)$ follows from $P^d(t,T) = V_t - E_t$ and the identity $1-\Phi(d_1)=\Phi(-d_1)$.</li>
+      <li>Define distance to default. Why is it a more useful single number than either $V_t$ or $\sigma$ alone for comparing credit quality across firms of different size and leverage?</li>
+      <li>A firm has $V_0=100$, $K=70$, $T=1$, $\sigma=25\%$, $r=5\%$, $\mu=10\%$. Compute $d_2$ and $\tilde d_2$, and hence the risk-neutral and real-world default probabilities. Which is larger, and why must it be?</li>
+      <li>Explain precisely why the risk-neutral default probability exceeds the real-world one whenever the firm's asset risk premium is positive. Is this a statement about model error, or about what each measure is constructed to do?</li>
+      <li>An analyst proposes using a corporate bond's spread-implied PD directly as the input to an IFRS 9 12-month ECL calculation, since "the market already prices default risk". Give the specific reason this understates or overstates ECL, and state which direction the error runs.</li>
+      <li>List Merton's four principal limitations. For each, name the extension (KMV or Black-Cox) that addresses it, and state which limitation that extension does not address.</li>
+      <li>Derive the relationship $s \approx \lambda(1-R)$ for a defaultable bond spread, and show that under continuous premium and protection payment the CDS par spread satisfies $s=\lambda(1-R)$ exactly. Why does a single observed spread not identify $\lambda$ and <code>R</code> separately?</li>
+      <li>Explain why the Vasicek single-factor model underlying the A-IRB capital formula is a structural credit model, identifying the analogue of the firm's asset value, the default barrier, and the systematic factor. Connect this to what the Gaussian copula got wrong about correlation in 2008.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 7: Connections
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 7</span><h2>Connections</h2></div>
+  <div class="connections">
+    <h4>Next lectures in this section</h4>
+    <ul>
+      <li>This is the final lecture of the financial engineering sequence. There is no lecture 14: the natural next step is to carry the risk-neutral versus real-world distinction developed here into the applied credit risk track of this repository, starting at <a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/index.html">the credit risk overview</a>, which builds the real-world PD, LGD and EAD machinery this lecture's risk-neutral formulae were deliberately contrasted against.</li>
+      <li><a href="../../application/banking/01_internal_environment/risk_measurement/credit_risk/a-irb_capital/09-pd_concept.html">A-IRB PD concept</a>, for the through-the-cycle real-world PD this lecture's risk-neutral $\Phi(-d_2)$ must never be confused with, and for the point-in-time versus through-the-cycle distinction that sits on the real-world side of the line this lecture drew.</li>
+      <li><a href="09-black_scholes.html">Lecture 9, the Black-Scholes PDE</a>, whose closed-form call price this lecture reused wholesale to price Merton's equity claim, and whose $N(d_1)$-versus-$N(d_2)$ measure-change discussion underlies the risk-neutral reading of $\Phi(d_2)$ here.</li>
+      <li><a href="12-interest_rate_derivatives.html">Lecture 12, interest rate derivatives</a>, for the term-structure bootstrapping technique this lecture reused, in reduced form, to build a hazard curve from a term structure of CDS spreads.</li>
+    </ul>
+    <h4>Source material</h4>
+    <ul>
+      <li><code>UP / 13 - Credit Risk.pdf</code> (primary source), section 4: 4.1 motivates defaultable bonds; 4.2 develops Merton's model in full, theorem 4.2.2 (equity and debt values), section 4.2.1 (yield spread, worked example 4.2.3), theorem 4.2.4 and example 4.2.5 (real-world default probability), and four exercises extending the worked example.</li>
+      <li><code>UP / WTW 364 Summary.pdf</code>, Unit 6 (credit risk), which carries the formula summary for this material.</li>
+      <li>Merton, R.C. (1974), "On the Pricing of Corporate Debt: The Risk Structure of Interest Rates", <em>Journal of Finance</em>, for the original structural model.</li>
+      <li>Black, F. and Cox, J.C. (1976), "Valuing Corporate Securities: Some Effects of Bond Indenture Provisions", <em>Journal of Finance</em>, for the first-passage extension referenced in section 4.</li>
+      <li>Duffie, D. and Singleton, K.J. (1999), "Modeling Term Structures of Defaultable Bonds", <em>Review of Financial Studies</em>, for the reduced-form intensity framework used in section 4.</li>
+      <li>Vasicek, O. (2002), "Loan Portfolio Value", <em>Risk</em>, for the single-factor model underlying the A-IRB capital formula discussed in section 5.</li>
+      <li>Li, D.X. (2000), "On Default Correlation: A Copula Function Approach", <em>Journal of Fixed Income</em>, for the Gaussian copula discussed in section 5.</li>
+      <li>Hull, J., <em>Options, Futures and Other Derivatives</em>, the credit risk chapter, for CDS mechanics, hazard-rate bootstrapping, and a textbook treatment of both model families side by side.</li>
+      <li>Lecture 9, <code>09-black_scholes.html</code>, for the closed-form call price reused directly to price Merton's equity claim.</li>
+    </ul>
+    <h4>Reported gaps in source</h4>
+    <ul>
+      <li>The UP PDF covers only Merton's structural model. It contains no reduced-form or intensity-based material, no CDS mechanics, no mention of KMV, Black-Cox, or the Gaussian copula, and no comparison of model families. Every element of this lecture from the reduced-form intensity model onward is sourced outside the PDF, as flagged in section 1.</li>
+      <li>The source derives the real-world default probability (theorem 4.2.4) and, separately, the machinery that implies a risk-neutral one (theorem 4.2.2), but never states either probability as "risk-neutral" or "real-world" by name, and never contrasts the two directly. This lecture treats that contrast as its central addition, in section 4 and again in section 5.</li>
+      <li>No sign, drift or dividend-convention anomaly of the kind found elsewhere in this course's source material was found in this PDF: the source's $d_1$ and $d_2$ formulae, its yield-spread definition, and its real-world default probability formula all match the standard Merton convention exactly, and every reported number in example 4.2.3 and 4.2.5 was independently recomputed and matched to the last stated decimal.</li>
+      <li>The source's four exercises (4.2.1 to 4.2.4) extend the worked example numerically but are not reproduced here since they are practice problems rather than source content; a reader working through the PDF directly should complete them as a check against this lecture's worked example.</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">All financial engineering lectures</a></span>
+  <span>Lecture 13: credit risk models</span>
+</footer>
+
+<!-- ============================================================
+     Scripts
+     ============================================================ -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+
+</body>
+</html>

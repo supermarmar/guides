@@ -1,0 +1,373 @@
+﻿<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lecture 15: continuous integration and delivery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <link rel="stylesheet" href="../../assets/lecture.css" />
+</head>
+<body>
+
+<header class="lecture-header">
+  <div class="crumb"><a href="../../index.html">Lectures</a> / <a href="index.html">Software engineering</a></div>
+  <h1>Continuous integration and delivery</h1>
+  <p class="subtitle">CI/CD is the automation layer that runs on every git push. It turns "did we break anything?" from a manual question into a machine-checked answer. This lecture covers the historical argument behind continuous integration (Humble &amp; Farley 2010), the mechanics of the modern pipeline on GitHub Actions and GitLab CI, the test-pyramid trade-offs that govern CI run time, and the deployment strategies that turn a green build into a production release.</p>
+  <div class="meta">
+    <span>Lecture 15 of 16</span>
+    <span>Reading time, 50 minutes</span>
+    <span>Part IV: project and collaboration</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     SECTION 1: The 30-second version
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 1</span><h2>The 30-second version</h2></div>
+
+  <p class="lede"><strong>Continuous integration (CI)</strong> is the practice of merging every developer's work into a shared trunk many times a day, with automated tests run on every merge. <strong>Continuous delivery (CD)</strong> extends the practice: every commit that passes CI is also automatically built into an artefact that <em>could</em> be deployed to production, and the deployment itself is one button press away. <strong>Continuous deployment</strong> (a stricter variant) removes even the button: every passing commit is deployed to production automatically. The terms drift in everyday use; the substance is that the path from commit to deployable artefact is automated, fast, and run on every change.</p>
+
+  <p>The intellectual case for the practice is in two books. <strong>Martin Fowler's "Continuous Integration" essay</strong> (martinfowler.com, 2006) is the short version. <strong>Jez Humble and David Farley's "Continuous Delivery"</strong> (Addison-Wesley, 2010) is the long version, and remains the canonical text. The empirical case is in the DORA reports (Forsgren, Humble, Kim, Accelerate, 2018, and the annual State of DevOps reports through 2024): teams that deploy more frequently have lower change-failure rates, faster recovery times, and higher developer satisfaction than teams that batch their releases. The result is consistent across every industry, including regulated ones.</p>
+
+  <p>The mechanics in 2025 are well-standardised. A YAML file in the repository (<code>.github/workflows/ci.yml</code> for GitHub Actions, <code>.gitlab-ci.yml</code> for GitLab CI, <code>azure-pipelines.yml</code> for Azure DevOps) declares one or more <strong>workflows</strong>, each made up of <strong>jobs</strong> that run on hosted or self-hosted runners. A job has <strong>steps</strong>; a step is either a shell command or a reusable <strong>action</strong>. The workflow is triggered by events: a push to a branch, the opening or update of a pull request, a tag, a manual dispatch, or a schedule. Branch protection (Lecture 13) refers to specific job names as required checks; a PR cannot merge until those checks are green.</p>
+
+  <div class="callout feynman">
+    <span class="tag">Feynman test</span>
+    A CI pipeline is a sequence of programs that run on a fresh machine every time you push, against the exact contents of the commit. The output is a verdict: green or red. Green means the commit passes every check the team agrees on (lint, types, tests, security scan, license audit). Red means at least one check failed and the commit cannot ship without intervention. If you can name the checks you would put in your pipeline and describe what each one prevents, you have the working model.
+  </div>
+
+  <div class="callout insight">
+    <span class="tag">What's beyond the syllabus</span>
+    The deep ancestor of continuous integration is the <em>nightly build</em>, which Microsoft popularised in the 1990s and which Joel Spolsky's "Joel Test" (2000) listed as point number one. The nightly build's promise, that a clean machine could rebuild the whole product overnight, was modest by today's standards, but it was the first generation of the discipline: the build had to work on a machine other than the developer's, and someone had to fix it when it broke. Modern CI is that discipline taken to its limit, "every commit" instead of "every night", with the build broken into a workflow of parallel jobs and the cost of a build dropped from hours to minutes.
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 2: Why this matters
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 2</span><h2>Why this matters</h2></div>
+
+  <p>The first reason is feedback latency. The most important number in any engineering process is the time between making a mistake and finding out about it. A bug discovered in code review is cheap to fix; the same bug found in production is two orders of magnitude more expensive (Boehm 1981, "Software Engineering Economics", later revised by McConnell and others). CI compresses that distance: a test broken by a commit is reported within minutes, by the same automation that ran the tests, with a link directly to the failing build. The team's stand-up no longer needs the "is anyone blocked on the main branch?" question.</p>
+
+  <p>The second reason is that CI is the enforcement layer for everything the previous lectures established. Lecture 2's formatter and linter rules are local pre-commit hooks; CI runs them again because some authors forget to install the hooks. Lecture 5's tests are useful in proportion to how often they run; CI runs them on every commit. Lecture 10's notebook-execution check, Lecture 11's lockfile install, Lecture 13's required-reviewer rule, all bind to CI checks by name. Without the automation, each of these is a soft norm that drifts; with it, each is a binary gate that does not.</p>
+
+  <p>The third reason, specific to risk modelling, is that audit-quality reproducibility requires the build to be a script, not a memory. A model whose retraining requires "open this notebook, run cells 1 through 12, then download the snapshot, then run the calibration script" is a model whose retraining cannot be reproduced if the original author leaves. A model whose retraining is the contents of a CI workflow file, triggered on a schedule, with the artefact written to object storage, is reproducible by anyone with read access to the repository. The PRA's SS3/24 "Model risk management principles for banks" and the EBA's IRB RTS both expect this level of automation for production models; meeting the expectation costs a one-off engineering investment and an ongoing maintenance cost in the low single-digit percent of model team time.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 3: The mental model
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 3</span><h2>The mental model</h2></div>
+
+  <h3>The pipeline as a graph of jobs</h3>
+
+  <p>A modern CI workflow is a directed acyclic graph of <strong>jobs</strong>, each running on its own machine. Jobs that have no dependencies run in parallel; jobs that declare a <code>needs:</code> dependency run after their prerequisites. The total wall-clock time of the workflow is the longest path through the graph, not the sum of every job. Designing for parallelism is therefore the principal lever on CI speed.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CI pipeline as a graph of jobs">
+      <text x="380" y="22" text-anchor="middle" font-family="Inter" font-size="13" font-weight="600" fill="#18181b">A typical CI pipeline as a DAG of jobs</text>
+
+      <g font-family="Inter" font-size="11">
+        <!-- Layer 1: setup -->
+        <rect x="40"  y="60" width="120" height="50" fill="#EAE6FA" stroke="#7B61FF" stroke-width="2" rx="6"/>
+        <text x="100" y="82" text-anchor="middle" font-weight="700" fill="#3D2EB5">checkout</text>
+        <text x="100" y="98" text-anchor="middle" fill="#71717a">+ uv sync</text>
+
+        <!-- Layer 2: parallel checks -->
+        <rect x="200" y="20"  width="120" height="50" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2" rx="6"/>
+        <text x="260" y="42" text-anchor="middle" font-weight="700" fill="#1E9D54">lint</text>
+        <text x="260" y="58" text-anchor="middle" fill="#71717a">ruff check</text>
+
+        <rect x="200" y="80"  width="120" height="50" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2" rx="6"/>
+        <text x="260" y="102" text-anchor="middle" font-weight="700" fill="#1E9D54">typecheck</text>
+        <text x="260" y="118" text-anchor="middle" fill="#71717a">mypy</text>
+
+        <rect x="200" y="140" width="120" height="50" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2" rx="6"/>
+        <text x="260" y="162" text-anchor="middle" font-weight="700" fill="#1E9D54">tests</text>
+        <text x="260" y="178" text-anchor="middle" fill="#71717a">pytest</text>
+
+        <rect x="200" y="200" width="120" height="50" fill="#DDF1E5" stroke="#4FAE6B" stroke-width="2" rx="6"/>
+        <text x="260" y="222" text-anchor="middle" font-weight="700" fill="#1E9D54">notebooks</text>
+        <text x="260" y="238" text-anchor="middle" fill="#71717a">nbconvert exec</text>
+
+        <!-- Layer 3: aggregate -->
+        <rect x="360" y="80"  width="120" height="50" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2" rx="6"/>
+        <text x="420" y="102" text-anchor="middle" font-weight="700" fill="#C76B2A">build</text>
+        <text x="420" y="118" text-anchor="middle" fill="#71717a">uv build</text>
+
+        <rect x="360" y="140" width="120" height="50" fill="#FBF1D4" stroke="#C76B2A" stroke-width="2" rx="6"/>
+        <text x="420" y="162" text-anchor="middle" font-weight="700" fill="#C76B2A">docs</text>
+        <text x="420" y="178" text-anchor="middle" fill="#71717a">mkdocs build</text>
+
+        <!-- Layer 4: deploy -->
+        <rect x="520" y="110" width="120" height="50" fill="#FBEDE4" stroke="#F08C42" stroke-width="2" rx="6"/>
+        <text x="580" y="132" text-anchor="middle" font-weight="700" fill="#C76B2A">deploy</text>
+        <text x="580" y="148" text-anchor="middle" fill="#71717a">staging</text>
+
+        <rect x="660" y="110" width="80" height="50" fill="#F8E0DE" stroke="#DC2855" stroke-width="2" rx="6"/>
+        <text x="700" y="132" text-anchor="middle" font-weight="700" fill="#DC2855">prod</text>
+        <text x="700" y="148" text-anchor="middle" fill="#71717a">on tag</text>
+
+        <!-- Edges -->
+        <line x1="160" y1="85" x2="200" y2="45"  stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+        <line x1="160" y1="85" x2="200" y2="105" stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+        <line x1="160" y1="85" x2="200" y2="165" stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+        <line x1="160" y1="85" x2="200" y2="225" stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+
+        <line x1="320" y1="105" x2="360" y2="105" stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+        <line x1="320" y1="165" x2="360" y2="165" stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+
+        <line x1="480" y1="105" x2="520" y2="125" stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+        <line x1="480" y1="165" x2="520" y2="145" stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+        <line x1="640" y1="135" x2="660" y2="135" stroke="#71717a" stroke-width="1.3" marker-end="url(#ar)"/>
+      </g>
+
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#71717a"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>The four parallel jobs in the middle column run simultaneously after the shared setup completes. Build and docs depend on all four passing. Production deploy runs only on tag pushes, not on every PR.</figcaption>
+  </figure>
+
+  <h3>The cost ladder: what to run when</h3>
+
+  <p>Not every check is worth running on every commit. The right design layers checks by cost and frequency. The pattern this course recommends is a three-tier ladder.</p>
+
+  <p><strong>On pre-commit (seconds).</strong> Format, lint, the cheap unit tests. Runs locally before the commit even happens. If pre-commit blocks the commit, the developer fixes it before pushing.</p>
+
+  <p><strong>On every push (minutes).</strong> The full unit-test suite, typecheck, integration tests against a local stub, the lockfile-install check, the notebook-execution check (for short notebooks). This is the CI workflow that gates the PR.</p>
+
+  <p><strong>On a schedule or tag (longer).</strong> The expensive checks: model regression tests against a held-out dataset, end-to-end tests against a real (non-stubbed) service, security scans, license audits, dependency-update checks. These run nightly or on the release tag, not on every PR.</p>
+
+  <div class="defcard">
+    <strong>Workflow.</strong> A top-level CI configuration unit, typically one YAML file. Triggered by events (push, pull_request, schedule, manual dispatch). Contains one or more jobs.
+  </div>
+
+  <div class="defcard">
+    <strong>Runner.</strong> The machine that executes a job. Hosted runners are provided by the CI service (GitHub-hosted runners are Linux, Windows, or macOS VMs spun up fresh per job); self-hosted runners are machines the team owns, useful for GPU work, large memory, or private network access.
+  </div>
+
+  <h3>The build artefact</h3>
+
+  <p>The output of a successful CI run, beyond the green check, is the <strong>build artefact</strong>: the thing that the team intends to deploy. For a Python project this is typically a wheel (<code>.whl</code> file), a Docker image, or a versioned bundle on an S3 bucket. The artefact is built once, tested in CI, and then promoted through environments (staging, production) without being rebuilt. The principle is "build once, deploy many"; it guarantees that the production binary is the same one the tests ran against.</p>
+</section>
+
+<!-- ============================================================
+     SECTION 4: The detail
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 4</span><h2>The detail</h2></div>
+
+  <h3>A complete GitHub Actions workflow</h3>
+
+  <p>The example below is a realistic CI workflow for a credit-risk modelling project using uv, ruff, mypy, pytest, and MkDocs. It runs on every push and pull request, with parallel jobs that fan out from a shared setup step.</p>
+
+  <pre><code class="language-yaml"># .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel old runs when a new commit lands on the same PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with: { version: latest }
+      - run: uv sync --frozen --extra dev
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --frozen --extra dev
+      - run: uv run mypy src/
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --frozen --extra dev --python ${{ matrix.python-version }}
+      - run: uv run pytest --cov=credit_risk_models --cov-report=xml
+      - uses: codecov/codecov-action@v4
+        with: { files: coverage.xml }
+
+  notebooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --frozen --extra dev --extra notebook
+      - run: |
+          for f in notebooks/*.ipynb; do
+            uv run jupyter nbconvert --to notebook --execute "$f" \
+                                     --output "/tmp/$(basename $f)"
+          done
+
+  docs:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --frozen --extra docs
+      - run: uv run mkdocs build --strict
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site/ }
+</code></pre>
+
+  <p>The features worth naming. The <code>concurrency:</code> block cancels old runs when a new commit arrives on the same PR, saving runner minutes. The <code>strategy.matrix</code> on the tests job runs the suite against multiple Python versions in parallel; the <code>fail-fast: false</code> setting lets all the matrix legs finish so you see which versions fail, not just the first one. The <code>uv sync --frozen</code> command installs from the committed lockfile exactly, with no resolver step; this is the CI-side equivalent of the reproducibility discipline in Lecture 11. The <code>mkdocs build --strict</code> command turns documentation warnings into errors, so a broken cross-reference in a Markdown file fails the build the same way a broken test does.</p>
+
+  <h3>Caching: the speed multiplier</h3>
+
+  <p>The single largest determinant of CI speed, once the workflow shape is right, is whether dependencies are cached between runs. Without caching, each job downloads and installs every dependency from scratch; with caching, the dependencies are pulled from an artefact store keyed by the lockfile hash. The <code>setup-uv</code> action does this automatically when the project has a <code>uv.lock</code>: the cache key is derived from the lockfile, the cache is restored at the start of each job, and updated at the end.</p>
+
+  <p>For Docker-based pipelines, the equivalent mechanism is the <strong>buildx cache</strong>: a layered image cache keyed by the Dockerfile and the build context, stored on the runner host or in a remote registry. A multi-stage Dockerfile that puts <code>RUN uv sync</code> as an early layer takes one minute on a cache hit and four minutes on a cache miss; getting the cache hits right is the difference between a 90-second pipeline and a five-minute one.</p>
+
+  <h3>The test pyramid in CI</h3>
+
+  <p>Lecture 5 introduced the test pyramid: many fast unit tests, fewer integration tests, very few end-to-end tests. CI is where the pyramid pays for itself. Unit tests run on every push because they take seconds; integration tests run on every push when they take less than a minute, on a schedule otherwise; end-to-end tests run on the merge to main or on the release tag, not on every PR. A team that runs every test on every commit either has a slow pipeline (which discourages frequent commits) or a brittle one (which discourages trust in green builds).</p>
+
+  <p>The empirical rule is: a CI pipeline that takes more than 10 minutes will be ignored by the team. Developers switch context after a green check, return to the PR much later, lose the cache of intent, and produce worse follow-up work. The investment in pipeline speed is therefore investment in human attention. Caching, parallelisation, and the pyramid discipline together can keep most projects' PR pipeline under five minutes.</p>
+
+  <h3>Continuous delivery: from green build to deployable artefact</h3>
+
+  <p>CI produces the green check; CD produces the artefact. The dividing line is a job that publishes the build to a registry or storage location: <code>uv publish</code> for a PyPI package, <code>docker push</code> for a container image, <code>aws s3 cp</code> for a bundle. The artefact is versioned by the git tag or by the commit SHA; the same version can then be promoted through environments without rebuilding.</p>
+
+  <pre><code class="language-yaml">  release:
+    if: github.event_name == 'push' &amp;&amp; startsWith(github.ref, 'refs/tags/v')
+    needs: [lint, typecheck, tests, notebooks, docs]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write          # for trusted publishing to PyPI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv build
+      - run: uv publish --trusted-publishing
+</code></pre>
+
+  <p>The pattern above triggers only on tag pushes that match the <code>v*</code> pattern (e.g. <code>v0.3.1</code>). The release job depends on every other job passing first, so a tag that breaks tests does not ship. The <code>--trusted-publishing</code> flag is PEP 740: PyPI authenticates the publisher via the GitHub OIDC token, removing the need for stored API keys. The same shape, with different publish targets, covers Docker images, Helm charts, and S3-hosted bundles.</p>
+
+  <h3>Deployment strategies</h3>
+
+  <p>Once an artefact exists, getting it into production is a separate problem with its own established patterns. Four strategies cover most cases.</p>
+
+  <p><strong>All-at-once</strong> replaces the running version with the new one in a single step. Simple, fast, all-or-nothing; the right answer for stateless services with quick rollbacks. Used by most internal tools.</p>
+
+  <p><strong>Blue-green</strong> runs two production environments side by side (blue and green); traffic is routed to one. Deploys to the inactive environment, runs smoke tests, then flips traffic. Rollback is instant: flip back. Used where any downtime is unacceptable.</p>
+
+  <p><strong>Canary</strong> sends a small fraction of traffic (1%, 5%, 25%) to the new version while the rest stays on the old. Telemetry is monitored; if error rates rise, traffic is rolled back. If not, the fraction is increased progressively. Used for high-volume services where a bad deploy would affect many users.</p>
+
+  <p><strong>Feature flag</strong> deploys the new code path behind an off-by-default flag; the flag is then toggled on for an increasing percentage of users. The deploy and the release become separate events: code can ship dark and be activated later. Used where the user impact of a feature is unpredictable.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Strategy</th><th>Rollback speed</th><th>Operational complexity</th><th>When to choose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>All-at-once</td><td>Minutes (re-deploy)</td><td>Lowest</td><td>Internal tools, batch jobs</td></tr>
+      <tr><td>Blue-green</td><td>Seconds (traffic flip)</td><td>Medium (2× infrastructure)</td><td>Customer-facing services with downtime cost</td></tr>
+      <tr><td>Canary</td><td>Seconds (route rollback)</td><td>High (telemetry, routing)</td><td>High-traffic services</td></tr>
+      <tr><td>Feature flag</td><td>Instant (flag flip)</td><td>Medium (flag service)</td><td>Behavioural changes, A/B testing</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>The four are not mutually exclusive. A typical mature setup uses blue-green for the infrastructure layer, canary at the traffic-routing layer, and feature flags at the application layer. The artefact is the same in every case; the differentiation is in how it is rolled out.</p>
+
+  <div class="callout warn">
+    <span class="tag">Common pitfall</span>
+    The most common CI/CD mistake is putting all the rigorous checks behind a "deploy" job rather than a "PR" job. The pattern looks reasonable, deploy gates are stricter than PR gates, but it means broken code lands on main and is caught only at deploy time, by which point the original author has moved on. The correct shape is: the PR pipeline is the strict pipeline; the deploy pipeline runs the same checks plus an additional smoke-test against the live environment. Defects should never reach main.
+  </div>
+
+  <h3>Worked example: a model-retraining pipeline</h3>
+
+  <div class="worked">
+    <strong>Worked example: scheduled retraining of a PD model</strong>
+    <p>The team's PD model is retrained monthly on the latest available data. The retraining used to be manual (open the notebook, change two dates, run all cells, upload the artefact); the team wants to move it to a scheduled CI pipeline so that the artefact has a verifiable build trail.</p>
+    <p>Step 1 (script the retraining). Convert the notebook to a <code>.py</code> file via jupytext (Lecture 10). The script takes <code>--as-of-date</code> as an argument; reads inputs from the data lake; outputs a fitted model plus a validation report.</p>
+    <p>Step 2 (write the workflow). A new <code>.github/workflows/retrain.yml</code>. Triggered by a schedule (<code>cron: '0 2 1 * *'</code>, the second hour of the first day of each month) and by manual dispatch with the date as an input.</p>
+    <p>Step 3 (the job). Check out the repo at the latest tagged release; set up uv; install dependencies from the lockfile; download the data slice from S3 using OIDC credentials; run <code>uv run retrain --as-of-date $TARGET</code>; upload the fitted model and the validation report as a release artefact on a new tag <code>model-2026-05</code>.</p>
+    <p>Step 4 (validation gate). After the artefact is produced, an automated validation job checks that the new model passes the team's regression criteria (AUC within tolerance of the previous model, PSI on calibration features below threshold, no overrides). If the gate fails, the workflow opens an issue assigned to the model risk team. If it passes, the artefact is marked deployable.</p>
+    <p>Step 5 (audit trail). Every retraining is now a tagged release with an artefact, a build log, and a validation report, all linked back to the commit that defined the methodology. A regulator asking "show me how the March model was produced" has a clickable answer: open the workflow run, see the inputs, see the outputs, see the validation. No notebook to find, no laptop state to reconstruct.</p>
+    <p>The investment is one engineer-week. The recurring cost is zero, except when the script needs updating (which it would have anyway). The audit value is the part that pays back the investment many times.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SECTION 5: Synthesis and what's next
+     ============================================================ -->
+<section>
+  <div class="banner"><span class="step">Step 5</span><h2>Synthesis and what's next</h2></div>
+
+  <p>CI is the automation that runs every check the team agrees on, on every commit, with a green-or-red verdict at the end. CD extends CI by producing a deployable artefact on every passing build, with deployment one click (or zero) away. The mechanics are a YAML file declaring a graph of jobs, each running on a fresh machine; the design lever is parallelism, the speed lever is caching, and the discipline lever is layering by cost (pre-commit, every push, scheduled). The deployment side adds four strategies (all-at-once, blue-green, canary, feature flag) that decide how an artefact reaches users.</p>
+
+  <p>The deeper point is that CI/CD is the operational expression of every engineering practice in this course. Lecture 2's formatter, Lecture 5's tests, Lecture 10's notebook executions, Lecture 11's lockfile, Lecture 13's required reviewers, all bind to specific named CI checks. A team that has invested in those practices but not in CI is keeping a sports car in the garage; a team that has CI without those practices is running it empty. The two work together, or not at all. The next and final lecture turns to the documentation side of the same automation: documents that are auto-generated from the code itself, kept in sync by the same pipeline that runs the tests.</p>
+
+  <div class="recall">
+    <strong>Recall</strong>
+    <ol>
+      <li>Define continuous integration, continuous delivery, and continuous deployment. What is the operational difference between the last two?</li>
+      <li>Name the three tiers of the CI cost ladder and give one check appropriate to each tier.</li>
+      <li>What does "build once, deploy many" mean? Why is it worth doing?</li>
+      <li>Describe the four deployment strategies covered (all-at-once, blue-green, canary, feature flag). Match each to a use case.</li>
+      <li>What does <code>uv sync --frozen</code> do in a CI workflow, and why is it preferred over <code>uv sync</code>?</li>
+      <li>Why is the <code>concurrency</code> block on a GitHub Actions workflow useful for PR pipelines?</li>
+      <li>Your CI pipeline takes 22 minutes. Name three lever you would pull to bring it under 10.</li>
+    </ol>
+  </div>
+
+  <div class="connections">
+    <h4>Connections</h4>
+    <ul>
+      <li><strong>Previous:</strong> <a href="14-code_review_and_prs.html">Lecture 14 (code review and pull requests)</a> defined the gating practice that consumes CI's green or red verdict.</li>
+      <li><strong>Next:</strong> <a href="16-autogenerated_docs.html">Lecture 16 (auto-generated documentation and codewikis)</a> covers the documentation that is rebuilt as part of every CI run.</li>
+      <li><strong>Cross-link:</strong> <a href="05-testing.html">Lecture 5 (testing)</a> defined the test pyramid whose execution is the principal content of a CI run.</li>
+      <li><strong>Cross-link:</strong> <a href="12-project_setup.html">Lecture 12 (project setup)</a> defined the lockfile and the pre-commit hooks that CI relies on for reproducibility.</li>
+      <li><strong>Outside this course:</strong> Martin Fowler, "Continuous Integration" (martinfowler.com, 2006); Jez Humble and David Farley, <em>Continuous Delivery: Reliable Software Releases through Build, Test, and Deployment Automation</em> (Addison-Wesley, 2010); Forsgren, Humble, Kim, <em>Accelerate</em> (IT Revolution Press, 2018); annual DORA State of DevOps reports (dora.dev); GitHub Actions documentation (docs.github.com/actions); Joel Spolsky, "The Joel Test: 12 Steps to Better Code" (Joel on Software, 2000).</li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="lecture-footer">
+  <span><a href="index.html">Software engineering course</a> &middot; <a href="../../index.html">All lectures</a></span>
+  <span>Lecture 15 of 16</span>
+</footer>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/lecture.js"></script>
+</body>
+</html>
